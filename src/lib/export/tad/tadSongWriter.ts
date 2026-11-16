@@ -135,6 +135,7 @@ export interface TadSongResult {
 
 const NOTE_OFF = 253;
 const NOTE_RELEASE = 254;
+const MACRO_RELEASE = 255;
 const NOTE_NAMES = ['c', 'c+', 'd', 'd+', 'e', 'f', 'f+', 'g', 'g+', 'a', 'a+', 'b'];
 /** Furnace row note value of TAD note 0 (c0); Furnace C-4 = 108, TAD c4 = 48. */
 const FURNACE_NOTE_OFFSET = 60;
@@ -415,19 +416,9 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       // A rest needs 2 ticks (tad-wasm compiler mml/command_parser.rs invalid tick count, 2..=65535): a lone 1-tick
       // rest is folded into the length of the next token, which then starts 1 tick early.
       if (pending.ticks > 0 && carry) { pending.ticks += carry; carry = 0; }
-      // 'w': a sustain-mode release (snes.cpp:250-253, no KOFF on note off) rings on without key-off. Before the next
-      // key-on the channel still needs a key-off, else the next note is slurred onto the released one: end with `r%2`.
-      if (pending.tok === 'w') {
-        if (cont) { if (pending.ticks > 0) out.push(`w%${pending.ticks}`); pending.ticks = 0; return; }
-        if (pending.ticks >= 4) { out.push(`w%${pending.ticks - 2}`); pending.ticks = 2; }
-        pending.tok = 'r';
-      }
-      if (pending.tok === 'r' && pending.ticks === 1 && !slur) {
-        warnings.push(`Song channel ${ch + 1}: 1-tick rest folded into the next note (the driver needs 2 ticks).`);
-        carry = 1; pending = { tok: 'r', ticks: 0 }; return;
-      }
       if (pending.pre?.gen && pending.ticks > 1) pending.pre.steps = pending.pre.gen(Math.ceil(pending.ticks / tickScale), pending.pre.rel ?? Infinity);
       if (pending.pre && pending.ticks > 1) {
+        // A sustain release ('w') plays its macro steps as slurred pieces too, keeping 2 ticks for the key-off rest.
         // Arp macro steps slur into the held pitch (Furnace changes the frequency only, no new key-on).
         // Volume macro steps change V between the slurred pieces (snes.cpp:115-117, no new key-on).
         // v holds space-separated state commands (V, p, D/MD, G); one is emitted only when it differs from the last one of its kind.
@@ -435,7 +426,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         const sent = new Map<string, string>();
         const setState = (cmds?: string) => { for (const c of cmds?.split(' ') ?? []) { const k = /^[A-Za-z]+/.exec(c)![0]; if (sent.get(k) !== c) { sent.set(k, c); out.push(c); } } };
         for (const st of pending.pre.steps) {
-          const t = Math.min(st.ticks, pending.ticks - 1);
+          const t = Math.min(st.ticks, pending.ticks - (pending.tok === 'w' && !cont ? 2 : 1));
           if (t <= 0) break;
           if (!st.tok && Math.floor(st.p / 12) !== o) { o = Math.floor(st.p / 12); out.push(`o${o}`); }
           setState(st.v);
@@ -447,6 +438,17 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         setState(v);
       }
       pending.pre = undefined;
+      // 'w': a sustain-mode release (snes.cpp:250-253, no KOFF on note off) rings on without key-off. Before the next
+      // key-on the channel still needs a key-off, else the next note is slurred onto the released one: end with `r%2`.
+      if (pending.tok === 'w') {
+        if (cont) { if (pending.ticks > 0) out.push(`w%${pending.ticks}`); pending.ticks = 0; return; }
+        if (pending.ticks >= 4) { out.push(`w%${pending.ticks - 2}`); pending.ticks = 2; }
+        pending.tok = 'r';
+      }
+      if (pending.tok === 'r' && pending.ticks === 1 && !slur) {
+        warnings.push(`Song channel ${ch + 1}: 1-tick rest folded into the next note (the driver needs 2 ticks).`);
+        carry = 1; pending = { tok: 'r', ticks: 0 }; return;
+      }
       const short = !slur && pending.ticks === 1 && pending.tok !== 'r';
       if (short) warnings.push(`Song channel ${ch + 1}: 1-tick note slurred (the driver needs 2 ticks for a key-off note).`);
       // A slide token spans the merged rows, so its portamento velocity is checked here with the real tick count.
@@ -461,6 +463,15 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       }
       if (pending.ticks > 0) out.push(`${pending.tok}%${pending.ticks}${slur || short ? ' &' : ''}`);
       pending = { tok: slur ? curNote : 'r', ticks: 0 };
+    };
+    // Sustain mode keeps the note's macros running through the release (snes.cpp:402-420: NOTE_OFF skips macroInit when
+    // state.sus, NOTE_OFF_ENV / FCxx also releases them). el = TAD ticks the note sounded; pre exists only while the
+    // note is still in its first segment (no command row since the key-on).
+    const releaseTail = (pre: Pre | undefined, el: number, released: boolean) => {
+      if (!pre || el <= 0) return;
+      const skip = (st: Pre['steps']) => { let t = el; const o: Pre['steps'] = []; for (const x of st) { if (t >= x.ticks) { t -= x.ticks; continue; } o.push({ ...x, ticks: x.ticks - t }); t = 0; } return o; };
+      const f = el / tickScale, g = pre.gen, rel = Math.min(pre.rel ?? Infinity, released ? f : Infinity);
+      pending.pre = { steps: g ? [] : skip(pre.steps), hold: pre.hold, gen: g && ((n, r) => skip(g(Math.ceil(f + n), Math.min(rel, f + r)))) };
     };
     rows.forEach((r, i) => {
       const at = where(ch, r);
@@ -484,7 +495,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         flush(true);
         for (const [tap, v] of r.firSteps) out.push(`\\ftap ${tap},${v}`);
       }
-      let delayUsed = 0, cutAt = 0, retrig = 0, relAt = -1, soAt = -1;
+      let relCut = false, delayUsed = 0, cutAt = 0, retrig = 0, relAt = -1, soAt = -1;
       // Sustain mode (snes.cpp:402-420, 655-676): note off, ECxx and FCxx send no KOFF; the release is GAIN decrease
       // (sus 1, 2) or the ADSR sustain rate switched to r (sus 3). The note is slurred into a wait with that envelope.
       const susRelease = (si: NonNullable<TadInstrumentInput['snes']>) => {
@@ -662,6 +673,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         const e12 = e1 & 15 ? e1 : e2 & 15 ? e2 : 0, e12Dir = e1 & 15 ? 1 : -1;
         const s03 = ef.get(0x03) ?? 0, s01 = ef.get(0x01) ?? 0, s02 = ef.get(0x02) ?? 0, arp = ef.get(0x00) ?? 0;
         cutAt = cut > 0 ? Math.max(cut, 2) : 0; // a key-off note needs 2 ticks
+        relCut = !ef.get(0xec) && !!ef.get(0xfc); // FCxx = NOTE_OFF_ENV (macro release), ECxx = NOTE_OFF (playback.cpp:2589-2593)
         const left = Math.max(1, r.ticks - (delay < r.ticks ? delay : 0));
         // Pitch token replacing the plain note: slide `{..}` or broken chord `{{..}}`, or null.
         // start = pitch the token starts from (-1: previous slurred note), returns the token and end pitch.
@@ -858,8 +870,10 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             }
           }
         } else if (isOff && sounding && instruments[ins]?.snes?.sus) {
+          const pre = pending.pre, el = pending.ticks;
           flush(true); out.push(...cmds);
           susRelease(instruments[ins]!.snes!);
+          releaseTail(pre, el, cl.note === NOTE_RELEASE);
         } else if (isOff || cmds.length || (sounding && curPitch >= 0 && (s01 || s02 || arp || e12))) {
           flush(!isOff);
           out.push(...cmds);
@@ -871,12 +885,14 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         }
       }
       // E7xx: the sounding note's looping macros are released xx ticks into this row.
+      // REL (macro release, playback.cpp:842-845): DIV_CMD_ENV_RELEASE, no key-off, the macros release at the row start.
+      if (cl?.note === MACRO_RELEASE) relAt = 0;
       if (relAt >= 0 && sounding && pending.pre?.gen && pending.pre.rel === undefined) pending.pre.rel = pending.ticks / tickScale + relAt;
       // ECxx / FCxx: the note is cut (released) inside the row.
       if (cutAt > delayUsed && cutAt < r.ticks && sounding) {
         pending.ticks += cutAt - delayUsed;
         const si = instruments[ins]?.snes;
-        if (si?.sus) { flush(true); susRelease(si); }
+        if (si?.sus) { const pre = pending.pre, el = pending.ticks; flush(true); susRelease(si); releaseTail(pre, el, relCut); }
         else { flush(); sounding = false; curPitch = -1; pending = { tok: 'r', ticks: 0 }; }
         pending.ticks += r.ticks - cutAt;
         return;

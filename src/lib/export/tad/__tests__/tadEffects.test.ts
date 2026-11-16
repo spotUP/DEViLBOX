@@ -10,7 +10,7 @@ import { tadProjectJson, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 const FILE = resolve(__dirname, '../../../../../public/data/songs/furnace/snes/tetristheme.fur');
 
 // Puts one effect on each of the first note rows of the first SNES channel with enough notes, writes song + sfx and runs TAD check.
-async function writeWithEffects(effects: [number, number][], skip = 0, editInstruments?: (ins: ReturnType<typeof tadInstrumentFromFurnace>[]) => void, file = FILE, note?: number, hz?: number) {
+async function writeWithEffects(effects: [number, number, number?][], skip = 0, editInstruments?: (ins: ReturnType<typeof tadInstrumentFromFurnace>[]) => void, file = FILE, note?: number, hz?: number) {
   const buf = readFileSync(file);
   const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
   const native = buildFurnaceNativeData(module);
@@ -21,7 +21,7 @@ async function writeWithEffects(effects: [number, number][], skip = 0, editInstr
     const rows = ch.patterns.get(sub.orders[sub.channels.indexOf(ch)]?.[0] ?? -1)?.rows ?? [];
     const notes = rows.filter((r) => r.note >= 0 && r.note < 180);
     if (notes.length < effects.length || skip-- > 0) continue;
-    notes.slice(0, effects.length).forEach((r, i) => { r.effects = [{ cmd: effects[i][0], val: effects[i][1] }]; if (note !== undefined) r.note = note; });
+    notes.slice(0, effects.length).forEach((r, i) => { r.effects = [{ cmd: effects[i][0], val: effects[i][1] }]; if (effects[i][2] !== undefined || note !== undefined) r.note = effects[i][2] ?? note!; });
     placed = effects.length;
     break;
   }
@@ -185,6 +185,24 @@ describe('Furnace effects in the TAD writer', () => {
     const { song, check } = await writeWithEffects([[0xfc, 0x02]], 0, (ins) => ins.forEach((i) => { if (i.snes) i.snes = { ...i.snes, sus: 1, useEnv: true, r: 5 }; }));
     expect(song.mml).toMatch(/GDT5/);
     expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
+  }, 60000);
+
+  it('keeps the macros running through a sustain release, released on FCxx, and releases them on a REL row; check passes', async () => {
+    // Volume macro loops 20/100/60 until released, then jumps to 127 (release index 3).
+    const vol = { code: 0, data: [20, 100, 60, 127], loop: 0, release: 3, speed: 8 };
+    const sus = (ins: ReturnType<typeof tadInstrumentFromFurnace>[]) => ins.forEach((i) => { i.macros = [...(i.macros ?? []).filter((x) => x.code !== 0), vol]; if (i.snes) i.snes = { ...i.snes, sus: 1, useEnv: true, r: 5 }; });
+    const fc = await writeWithEffects([[0xfc, 0x02]], 0, sus);
+    const tail = fc.song.mml.slice(fc.song.mml.indexOf('GDT5'));
+    expect(tail.slice(0, tail.search(/\br%/))).toMatch(/V\d+ [a-g][+-]?%\d+ &/); // V steps after the release starts
+    expect(fc.check.code, `${fc.check.log}\n${fc.song.mml.slice(0, 3000)}`).toBe(0);
+    // No loop: unreleased it holds index 1 (100), released it steps on to 60 and 127.
+    const hold = { code: 0, data: [20, 100, 60, 127], loop: 255, release: 1, speed: 8 };
+    const loopOnly = (ins: ReturnType<typeof tadInstrumentFromFurnace>[]) => ins.forEach((i) => { i.macros = [...(i.macros ?? []).filter((x) => x.code !== 0), hold]; });
+    const vSet = (mml: string) => new Set(mml.match(/V\d+/g) ?? []);
+    const plain = await writeWithEffects([[0x00, 0], [0x00, 0]], 0, loopOnly);
+    const rel = await writeWithEffects([[0x00, 0], [0x00, 0, 255]], 0, loopOnly);
+    expect([...vSet(rel.song.mml)].filter((v) => !vSet(plain.song.mml).has(v)).length).toBeGreaterThan(0);
+    expect(rel.check.code, `${rel.check.log}\n${rel.song.mml.slice(0, 3000)}`).toBe(0);
   }, 60000);
 
   it('steps the echo filter one tap command per row for a 38xx blend, and ignores 38xx otherwise', async () => {
