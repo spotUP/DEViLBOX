@@ -364,6 +364,8 @@ export interface FurnaceInstrumentData {
 
   // Chip-specific config (optional)
   chipConfig?: Record<string, unknown>;
+  /** SNES envelope/gain config; the editor and TAD export read this field. */
+  snes?: import('./instrument/furnace').FurnaceSNESConfig;
 }
 
 export interface ParsedInstrument {

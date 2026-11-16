@@ -106,6 +106,19 @@ function computeBPM(sub: FurnaceSubsong): number {
   return Math.round(hz * 2.5 * vN / vD);
 }
 
+/**
+ * INS2 macros as convertToInstrument wants them. Its `type` is the macro slot id (the converter copies
+ * it to `code`); the file's own type byte is only the word size, and passing it made every volume,
+ * arpeggio and duty macro read as slot 1 in the store.
+ */
+export function furnaceMacrosForConverter(macros: ReadonlyArray<{ code: number; data: number[]; loop?: number; release?: number; mode?: number; delay?: number; speed?: number }>) {
+  return macros.map(m => ({
+    code: m.code, type: m.code, data: m.data,
+    loop: m.loop ?? -1, release: m.release ?? -1,
+    mode: m.mode ?? 0, delay: m.delay ?? 0, speed: m.speed ?? 1,
+  }));
+}
+
 export async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, subsong = 0): Promise<TrackerSong> {
   console.log(`[FurnaceToSong] parseFurnaceFile: "${_fileName}", ${buffer.byteLength} bytes, subsong=${subsong}`);
 
@@ -218,22 +231,12 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
           chipType: furIns.type,
           synthType,
           fm: furIns.fm,
-          macros: (furIns.macros || []).map(m => ({
-            code: m.code, type: m.type, data: m.data,
-            loop: m.loop ?? -1, release: m.release ?? -1,
-            mode: m.mode ?? 0, delay: m.delay ?? 0, speed: m.speed ?? 1,
-          })),
+          macros: furnaceMacrosForConverter(furIns.macros || []),
           wavetables: (furIns.wavetables || []).map((wtIndex, wi) => ({
             id: wi, data: [] as number[], len: 0, max: 0, index: wtIndex,
           })),
           amiga: furIns.amiga,
-          opMacroArrays: furIns.opMacroArrays?.map(ops =>
-            ops.map(m => ({
-              code: m.code, type: m.type, data: m.data,
-              loop: m.loop ?? -1, release: m.release ?? -1,
-              mode: m.mode ?? 0, delay: m.delay ?? 0, speed: m.speed ?? 1,
-            }))
-          ),
+          opMacroArrays: furIns.opMacroArrays?.map(furnaceMacrosForConverter),
           chipConfig: {
             ...(furIns.gb ? { gb: furIns.gb } : {}),
             ...(furIns.c64 ? { c64: furIns.c64 } : {}),

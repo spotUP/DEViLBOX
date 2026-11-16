@@ -2,7 +2,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { parseFurnaceSong, convertFurnaceToDevilbox, toSequencerSamples, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
+import { parseFurnaceSong, toSequencerSamples, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
+import { convertToInstrument } from '@/lib/import/InstrumentConverter';
+import { furnaceMacrosForConverter } from '@/lib/import/parsers/FurnaceToSong';
+import type { ParsedInstrument } from '@/types/tracker';
 import { buildTadProject, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 import { tadAudioRamBudget, TAD_DRIVER_BYTES, TAD_MAX_COMMON_DATA_BYTES } from '../tadAudioRam';
 import type { CreateTadCompiler } from '../tadCompilerWasm';
@@ -17,7 +20,17 @@ async function build(file: string, live = false) {
     title: module.name || file, native: buildFurnaceNativeData(module),
     // live = the instruments as the store holds them after import (what the export dialog reads)
     instruments: live
-      ? convertFurnaceToDevilbox(module).instruments.map((i) => tadInstrumentFromFurnace(i.name, (i as { furnace?: object }).furnace ?? {}))
+      ? module.instruments.map((i, n) => {
+        // the browser's load path: INS2 macros through the FurnaceToSong mapper, then convertToInstrument
+        const parsed = {
+          id: n + 1, name: i.name, samples: [], fadeout: 0, volumeType: 'none', panningType: 'none',
+          furnace: {
+            chipType: i.type, synthType: 'ChipSynth', fm: i.fm, macros: furnaceMacrosForConverter(i.macros),
+            wavetables: (i.wavetables || []).map((index, wi) => ({ id: wi, data: [], len: 0, max: 0, index })), amiga: i.amiga, chipConfig: { ...(i.snes ? { snes: i.snes } : {}) },
+          },
+        } as unknown as ParsedInstrument;
+        return tadInstrumentFromFurnace(i.name, (convertToInstrument(parsed, n + 1, 'FUR') as unknown as Array<{ furnace?: object }>)[0]?.furnace ?? {});
+      })
       : module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)),
     samples: toSequencerSamples(module), wavetables: module.wavetables,
   }], create as CreateTadCompiler, (f) => resolve('public/tad', f));
