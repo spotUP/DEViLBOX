@@ -62,7 +62,7 @@ export function songToBeeperRows(song: FurnaceModuleSong, maxBytes: number): Bee
       pat.channels.forEach((chan, ch) => {
         const cell = chan.rows[r];
         if (!cell) return;
-        const fc = cellToFile(cell, insIndex, `Pattern ${song.songPositions[order]} channel ${ch + 1} row ${r}`, [], effectNotationOf(chan), []);
+        const fc = cellToFile(cell, insIndex, `Pattern ${song.songPositions[order]} channel ${ch + 1} row ${r}`, [], effectNotationOf(chan.channelMeta), []);
         if (ch >= BEEPER_VOICES) {
           if (fc.note >= 0) dropped.add(`channel ${ch + 1} notes`);
           return;
