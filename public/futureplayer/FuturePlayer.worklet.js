@@ -57,6 +57,9 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
       case 'loadTune':
         this.loadTune(data.buffer, data.subsong);
         break;
+      case 'swapModule':
+        this.swapModule(data.moduleData, data.subsong);
+        break;
       case 'play':
         this.playing = true;
         break;
@@ -255,6 +258,35 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
     } else {
       this.port.postMessage({ type: 'error', message: 'fp_wasm_init failed: ' + result });
     }
+  }
+
+  /**
+   * An edited module takes the place of the playing one without a restart (G24). The player is one global instance, so the
+   * module is loaded afresh and run silently, in the 1024-frame calls it was played in, up to the call holding the frame the
+   * listener is at; that call refills the ring and the frames already heard are skipped. From there it is the edited module
+   * played from the start, at the listener's position (the replayer is deterministic).
+   */
+  swapModule(buffer, subsong) {
+    if (!this.wasm || !this.initialized || !buffer) return;
+    const played = this.framesPlayed;
+    const frac = this.resamplePos;
+    const wasPlaying = this.playing;
+    this.loadTune(buffer, subsong);
+    if (!this.tuneLoaded) return;
+    const skip = played % this.decodeBufSize;
+    for (let left = played - skip; left > 0; left -= this.decodeBufSize) {
+      this.wasm._fp_wasm_render(this.decodeBufPtr, this.decodeBufSize);
+      this.logTickMarks(this.decodeBufSize);
+    }
+    this.playing = true;
+    this.fillRingBuffer();
+    this.playing = wasPlaying;
+    this.ringReadPos = skip;
+    this.ringAvailable -= skip;
+    this.framesPlayed = played;
+    this.resamplePos = frac;
+    this.postPlayhead();
+    this.port.postMessage({ type: 'moduleSwapped', frames: played });
   }
 
   resetRingBuffer() {

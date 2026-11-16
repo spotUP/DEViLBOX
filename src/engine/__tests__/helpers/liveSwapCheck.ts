@@ -22,6 +22,8 @@ export interface LiveSwapSpec {
   swapMessage(module: ArrayBuffer, loadArgs: unknown[]): Record<string, unknown>;
   pre: number;
   post: number;
+  /** The live-edit route the song takes (default 'engine-swap'; Art of Noise re-encodes in its own 'aon-module' route and reloads). */
+  route?: string;
   /** How the audio after the swap is compared with the edited module played from the start (default: sample for sample). */
   sameTail?(after: Float32Array[], oracleTail: Float32Array[]): boolean;
 }
@@ -85,8 +87,12 @@ export async function measureLiveSwap(spec: LiveSwapSpec, at: { p: number; ch: n
 
   const live = await play(spec, bytes);
   let swapError = '';
+  // The module the route handed the engine: the oracle for routes editedModuleForPlay does not cover (Art of Noise).
+  let sent: ArrayBuffer | null = null;
   (globalThis as { __liveEngine?: unknown }).__liveEngine = {
-    swapModule: (module: ArrayBuffer, ...loadArgs: unknown[]) => { live.send(spec.swapMessage(module, loadArgs)).catch((err) => { swapError = String(err); }); },
+    swapModule: (module: ArrayBuffer, ...loadArgs: unknown[]) => { sent = module.slice(0); live.send(spec.swapMessage(module, loadArgs)).catch((err) => { swapError = String(err); }); },
+    // Art of Noise's route hands the engine its module by this name.
+    replaceModule: (module: ArrayBuffer) => { sent = module.slice(0); live.send(spec.swapMessage(module, [])).catch((err) => { swapError = String(err); }); },
     // SidMon II's exporter asks the running engine for its module; this stand-in has none to give, so the stored one is used.
     save: async () => null,
   };
@@ -100,7 +106,7 @@ export async function measureLiveSwap(spec: LiveSwapSpec, at: { p: number; ch: n
   const after = live.render(spec.post);
   (globalThis as { __liveEngine?: unknown }).__liveEngine = undefined;
 
-  const edited = (await editedModuleForPlay(liveTrackerSong(), playingDescriptor(liveTrackerSong())!))!;
+  const edited = ((await editedModuleForPlay(liveTrackerSong(), playingDescriptor(liveTrackerSong())!)) ?? sent)!;
   const oracle = await play(spec, (edited instanceof Uint8Array ? edited.slice().buffer : edited) as ArrayBuffer);
   const oracleAll = oracle.render(spec.pre + spec.post);
   const plain = await play(spec, bytes);
@@ -132,7 +138,7 @@ export async function assertLiveSwap(
     const heard = !sameAudio(r.after, r.plainAll.slice(spec.pre));
     tried.push(`${cell.p}:${cell.ch}:${cell.row} pre=${preOk} heard=${heard} swapped=${r.swapped} carriesEdit=${r.carriesEdit} route=${r.routeIs}`);
     if (!preOk || !heard) continue;
-    expectFn(r.routeIs, 'the song is edited through the engine-swap route').toBe('engine-swap');
+    expectFn(r.routeIs, 'the song is edited through its live route').toBe(spec.route ?? 'engine-swap');
     expectFn(r.swapped, 'the worklet swapped the module (sentinel)').toBe(true);
     expectFn(sameAudio(r.before, r.oracleAll.slice(0, spec.pre)), 'before the edit it is the song').toBe(true);
     expectFn((spec.sameTail ?? sameAudio)(r.after, r.oracleAll.slice(spec.pre)), 'after the edit it is the edited module at the same position').toBe(true);
@@ -141,3 +147,40 @@ export async function assertLiveSwap(
   }
   throw new Error(`no candidate cell gave an edit that is audible in the window and leaves the audio before it alone: ${tried.join(' | ')}`);
 }
+
+/** The left channel of rendered blocks as one run of frames. */
+const flat = (blocks: Float32Array[]): Float32Array => {
+  const out = new Float32Array(blocks.length * 128);
+  blocks.forEach((b, i) => out.set(b.subarray(0, 128), i * 128));
+  return out;
+};
+/** Short-time RMS of a run of frames, windows of 441 frames (10 ms). */
+const envelope = (x: Float32Array): number[] => {
+  const out: number[] = [];
+  for (let i = 0; i + 441 <= x.length; i += 441) { let s = 0; for (let k = 0; k < 441; k++) s += x[i + k] * x[i + k]; out.push(Math.sqrt(s / 441)); }
+  return out;
+};
+const correlation = (a: number[], b: number[]): number => {
+  const n = Math.min(a.length, b.length);
+  const ma = a.slice(0, n).reduce((x, y) => x + y, 0) / n, mb = b.slice(0, n).reduce((x, y) => x + y, 0) / n;
+  let sab = 0, saa = 0, sbb = 0;
+  for (let i = 0; i < n; i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) ** 2; sbb += (b[i] - mb) ** 2; }
+  return saa > 0 && sbb > 0 ? sab / Math.sqrt(saa * sbb) : 0;
+};
+/**
+ * For a worklet that reloads the edited module and seeks it to the time already played (TFMX, libtfmxaudiodecoder): it seeks the reloaded module to the time already played in whole milliseconds and the decoder's seek is not
+ * sample-exact (measured: no shift of the oracle matches a single frame exactly), so "the same position" is the loudness
+ * envelope: over the 10 ms windows of the tail it follows the edited module's played from the start (correlation >= 0.9 at a shift within 50 ms).
+ */
+export const followsOracleEnvelope = (after: Float32Array[], oracleTail: Float32Array[]): boolean => {
+  const a = envelope(flat(after)), o = envelope(flat(oracleTail));
+  if (process.env.LS_DEBUG) {
+    const res: string[] = [];
+    for (const d of [-300, -100, -30, -10, -3, -1, 0, 1, 3, 10, 30, 100, 300]) res.push(`${d}:${correlation(a.slice(Math.max(0, -d)), o.slice(Math.max(0, d))).toFixed(2)}`);
+    console.log('[ls] envelope correlation by shift (10 ms windows)', res.join(' '), 'peak a', Math.max(...a), 'o', Math.max(...o));
+  }
+  // The reload lands a little off the played time (measured: 30 ms, a jiffy and a half); more than 50 ms off is a lost position.
+  let best = 0;
+  for (let d = -5; d <= 5; d++) best = Math.max(best, correlation(a.slice(Math.max(0, -d)), o.slice(Math.max(0, d))));
+  return a.some((v) => v > 0.001) && best >= 0.9;
+};

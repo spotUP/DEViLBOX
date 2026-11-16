@@ -207,6 +207,11 @@ export class FuturePlayerEngine extends WASMSingletonBase {
     return this._tunePromise;
   }
 
+  /** Play an edited module in place of the running one, at the same position (G24 live edit; worklet swapModule). */
+  swapModule(buffer: ArrayBuffer, subsong = this._tune): void {
+    this.workletNode?.port.postMessage({ type: 'swapModule', moduleData: buffer, subsong });
+  }
+
   play(): void {
     this.workletNode?.port.postMessage({ type: 'play' });
   }

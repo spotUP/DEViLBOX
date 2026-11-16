@@ -214,6 +214,8 @@ export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
   digitalSonixChrome: 'pass',
   // hvl: hivelyLiveEdit.test.ts - the view's edit writes the step into the running tune (hively_set_track_step), no module swap.
   hvl: 'pass',
+  // futurePlayer: futurePlayerLiveSwap.test.ts - the worklet reloads the edited module and renders silently to the frame played.
+  futurePlayer: 'pass',
   jochenHippelST: 'pass',
   // med (MMD3): libopenmpt hot reload of the patched module, measured by libopenmpt/__tests__/medModuleLiveEditHeard.test.ts against the same reload of the unchanged bytes.
   med: 'pass',

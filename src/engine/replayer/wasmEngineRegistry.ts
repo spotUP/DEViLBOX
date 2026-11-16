@@ -215,6 +215,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     fileDataKey: 'futurePlayerFileData',
     loadMethod: 'loadTune',
     getLoadArgs: (song) => [song.fileSubsongs?.current ?? 0],
+    liveSwap: true,
     supportsPause: true,
     supportsResume: true,
     needsDirectRouting: true,
