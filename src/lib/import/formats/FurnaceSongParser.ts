@@ -163,35 +163,6 @@ const DIV_ELEMENT_PATTERN = 0x07;
 const DIV_ELEMENT_COMPAT_FLAGS = 0x08;
 const DIV_ELEMENT_COMMENTS = 0x09;
 const DIV_ELEMENT_GROOVE = 0x0a;
-export const CHIP_SYNTH_IDS = new Set([
-  0x03,       // SN76489/SMS/PSG
-  0x04,       // Game Boy
-  0x05,       // PC Engine
-  0x06,       // NES
-  0x07,       // C64 8580
-  0x47,       // C64 6581
-  0xf0,       // SID2
-  0x80,       // AY-3-8910
-  0x82,       // YM2151/OPM
-  0x83,       // YM2612/OPN2
-  0x84,       // TIA
-  0x87,       // SNES
-  0x88,       // VRC6
-  0x89,       // OPLL
-  0x8a,       // FDS
-  0x8d,       // YM2203/OPN
-  0x8e,       // YM2608/OPNA
-  0x8f,       // OPL
-  0x90,       // OPL2
-  0x91,       // OPL3
-  0x97,       // SAA1099
-  0x98,       // OPZ
-  0xa0,       // YM2612 ext
-  0x9e,       // YM2610B/OPNB2
-  0xa5,       // YM2610/OPNB (Neo Geo)
-  0xa6,       // YM2610/OPNB ext ch2 (Neo Geo)
-  0x02,       // Genesis (compound)
-]);
 
 const CHIP_ID_TO_ENGINE_CHIP: Record<number, number> = {
   0x02: 0,    // Genesis (compound) → OPN2
@@ -2830,10 +2801,6 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
   console.log('[FurnaceParser] Subsong patLen:', subsong.patLen, 'ordersLen:', subsong.ordersLen);
   console.log('[FurnaceParser] Orders (first 3 channels):', subsong.orders?.slice(0, 3)?.map(o => o?.slice(0, 10)));
 
-  // Check if this is a chip synth platform (no -24 octave offset needed)
-  const primaryChipId = module.systems[0] || 0;
-  const isChipSynth = CHIP_SYNTH_IDS.has(primaryChipId);
-  console.log(`[FurnaceParser] Platform chip ID: 0x${primaryChipId.toString(16)}, isChipSynth: ${isChipSynth}`);
 
   // CRITICAL: Create combined patterns by ORDER POSITION, not by pattern index.
   // Furnace has per-channel order tables: orders[channel][orderPos] = patternIndex
@@ -2867,7 +2834,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
           if (cell.effects.length > 0 && cell.effects.some(e => e.type >= 0)) {
             totalEffects++;
           }
-          const converted = convertFurnaceCell(cell, isChipSynth);
+          const converted = convertFurnaceCell(cell);
           if (converted.note > 0 && converted.note < 97) {
             totalConvertedNotes++;
           }
@@ -3068,8 +3035,6 @@ export function convertSubsongForPlayback(module: FurnaceModule, subsongIndex: n
   patterns: ConvertedPatternCell[][][];
   metadata: ImportMetadata;
 } {
-  const primaryChipId = module.systems[0] || 0;
-  const isChipSynth = CHIP_SYNTH_IDS.has(primaryChipId);
   const subsong = module.subsongs[subsongIndex] || module.subsongs[0];
   if (!subsong) {
     return { patterns: [], metadata: createMetadata(module, subsongIndex) };
@@ -3085,7 +3050,7 @@ export function convertSubsongForPlayback(module: FurnaceModule, subsongIndex: n
         const key = `${subsongIndex}_${ch}_${patIdx}`;
         const pattern = module.patterns.get(key);
         if (pattern && pattern.rows[row]) {
-          rowCells.push(convertFurnaceCell(pattern.rows[row], isChipSynth));
+          rowCells.push(convertFurnaceCell(pattern.rows[row]));
         } else {
           rowCells.push({
             note: 0, instrument: 0, volume: 0,

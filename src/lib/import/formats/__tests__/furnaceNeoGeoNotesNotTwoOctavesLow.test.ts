@@ -1,18 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { CHIP_SYNTH_IDS } from '../FurnaceSongParser';
 import { convertFurnaceCell } from '../furnace/FurnacePatternParser';
+import { furnaceNoteToXM } from '../../furnaceEditorCells';
 
-// Gumbirds arena.fur (YM2610 ext, 0xa6): SSG arps on F-4 played two octaves low because
-// the platform was not a chip synth, so convertFurnaceCell applied the Amiga -24 offset.
-describe('Neo Geo .fur notes keep their Furnace octave', () => {
-  it('treats every YM2610 platform as a chip synth', () => {
-    for (const id of [0x9e, 0xa5, 0xa6]) expect(CHIP_SYNTH_IDS.has(id)).toBe(true);
+// Gumbirds arena.fur (YM2610 ext): SSG arps on F-4 played two octaves low, and ZX Extinction
+// Sequence.fur (ZX beeper) lost its octave-1 bass, because the TS fallback shifted notes -24 for
+// chips missing from an allowlist. The WASM import path never shifts; both paths must agree.
+describe('Furnace TS fallback notes keep their Furnace octave on every chip', () => {
+  const cell = (note: number, octave: number) =>
+    ({ note, octave, instrument: 0, volume: -1, effects: [] }) as unknown as Parameters<typeof convertFurnaceCell>[0];
+
+  it('F-4 converts to native F-4', () => {
+    expect(convertFurnaceCell(cell(5, 4)).note).toBe(4 * 12 + 5 + 1);
   });
-  it('F-4 on a Neo Geo song converts like F-4 on an AY song', () => {
-    const cell = { note: 5, octave: 4, instrument: 7, volume: -1, effects: [] } as unknown as Parameters<typeof convertFurnaceCell>[0];
-    const neo = convertFurnaceCell(cell, CHIP_SYNTH_IDS.has(0xa6));
-    const ay = convertFurnaceCell(cell, CHIP_SYNTH_IDS.has(0x80));
-    expect(neo.note).toBe(ay.note);
-    expect(neo.note).toBe(4 * 12 + 5 + 1);
+
+  it('D#1 bass survives and matches the WASM path', () => {
+    // Furnace native note number = octave * 12 + semitone; furnaceNoteToXM is the WASM-path mapping.
+    expect(convertFurnaceCell(cell(3, 1)).note).toBe(furnaceNoteToXM(1 * 12 + 3));
+    expect(convertFurnaceCell(cell(3, 1)).note).toBe(16);
   });
 });

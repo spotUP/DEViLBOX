@@ -344,9 +344,9 @@ export function convertFurnaceNoteValue(cell: FurnacePatternCell): number {
 /**
  * Convert Furnace pattern cell to XM-compatible format
  * @param cell The Furnace pattern cell
- * @param isChipSynth If true, skip the -24 octave offset (chip synths use native Furnace octaves)
+ * Same note numbering as the WASM import path (furnaceNoteToXM): Furnace native octave, every chip.
  */
-export function convertFurnaceCell(cell: FurnacePatternCell, isChipSynth: boolean = false): ConvertedPatternCell {
+export function convertFurnaceCell(cell: FurnacePatternCell): ConvertedPatternCell {
   let note = 0;
 
   if (cell.note === NOTE_OFF || cell.note === NOTE_RELEASE || cell.note === MACRO_RELEASE) {
@@ -359,10 +359,7 @@ export function convertFurnaceCell(cell: FurnacePatternCell, isChipSynth: boolea
     // Adjust octave for C (note 12) - Furnace stores it one lower
     const adjustedOctave = cell.note === 12 ? cell.octave + 1 : cell.octave;
 
-    // For chip synths (SID, NES, GB, etc.), use native Furnace octave numbering
-    // For Amiga/sample-based, apply -24 offset (Furnace C-4 = MOD C-2)
-    const octaveOffset = isChipSynth ? 0 : -24;
-    note = (adjustedOctave * 12) + semitone + 1 + octaveOffset;
+    note = (adjustedOctave * 12) + semitone + 1;
 
     // Clamp to valid XM range (1-96 playable, 97 = note off)
     // Notes out of range are silenced (0 = empty) rather than transposed
