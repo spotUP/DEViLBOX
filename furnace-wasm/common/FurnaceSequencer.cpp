@@ -9,6 +9,8 @@
 #include "FurnaceSequencer.h"
 #include <cstdio>
 #include <cmath>
+#include <map>
+#include <algorithm>
 
 // upstream src/engine/defines.h:63: bit 31 marks a raw-frequency note
 #ifndef DIV_NOTE_RAW_FLAG
@@ -699,14 +701,8 @@ static bool seqPerSystemEffect(int ch, int effect, int effectVal) {
         case 0x1c: dispatchCmd(DIV_CMD_SNES_ECHO_FEEDBACK, ch, effectVal); return true;
         case 0x1e: dispatchCmd(DIV_CMD_SNES_GLOBAL_VOL_LEFT, ch, effectVal); return true;
         case 0x1f: dispatchCmd(DIV_CMD_SNES_GLOBAL_VOL_RIGHT, ch, effectVal); return true;
-        case 0x30: dispatchCmd(DIV_CMD_SNES_ECHO_FIR, ch, 0, effectVal); return true;
-        case 0x31: dispatchCmd(DIV_CMD_SNES_ECHO_FIR, ch, 1, effectVal); return true;
-        case 0x32: dispatchCmd(DIV_CMD_SNES_ECHO_FIR, ch, 2, effectVal); return true;
-        case 0x33: dispatchCmd(DIV_CMD_SNES_ECHO_FIR, ch, 3, effectVal); return true;
-        case 0x34: dispatchCmd(DIV_CMD_SNES_ECHO_FIR, ch, 4, effectVal); return true;
-        case 0x35: dispatchCmd(DIV_CMD_SNES_ECHO_FIR, ch, 5, effectVal); return true;
-        case 0x36: dispatchCmd(DIV_CMD_SNES_ECHO_FIR, ch, 6, effectVal); return true;
-        case 0x37: dispatchCmd(DIV_CMD_SNES_ECHO_FIR, ch, 7, effectVal); return true;
+        // 30xx-37xx (FIR taps) and 38xx (blend rows) are sent once per row by seqSnesFirRow.
+        case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37: case 0x38: return true;
       }
       break;
 
@@ -2193,6 +2189,67 @@ static void seqProcessRow(int i, bool afterDelay) {
   }
 }
 
+// SNES echo filter blend, DEViLBOX-only 38xx (mirror of src/lib/furnace/snesFirBlend.ts SnesFirBlender,
+// which the TAD export uses too). Taps written by 30xx-37xx on a row are the target; 38xx = blend rows;
+// the filter steps linearly toward the target, one step per row. Without 38xx the taps jump, as in Furnace.
+// State is per dispatch handle (one SNES chip), merged over all that chip's channels like the JS.
+struct SeqFirState { int fir[8]; bool blending; int from[8], to[8], rows, step; };
+static std::map<int, SeqFirState> g_firState;
+
+static void seqSnesFirReset() { g_firState.clear(); }
+
+static void seqSnesFirRow() {
+  struct Row { int rep; bool written[8]; int val[8]; int rows; };
+  std::map<int, Row> rows;
+  for (int ch = 0; ch < g_seq.numChannels; ch++) {
+    if (g_seq.chanChipId[ch] != SEQ_CHIP_SNES) continue;
+    int h = g_seq.chanDispatchHandle[ch];
+    auto it = rows.find(h);
+    if (it == rows.end()) { Row r; r.rep = ch; r.rows = 0; for (int k = 0; k < 8; k++) { r.written[k] = false; r.val[k] = 0; } it = rows.insert({h, r}).first; }
+    Row& r = it->second;
+    for (int j = 0; j < g_seq.chanPool[ch].effectCols; j++) {
+      int e = getPatCell(ch, g_seq.curOrder, g_seq.curRow, SEQ_PAT_FX(j));
+      int v = getPatCell(ch, g_seq.curOrder, g_seq.curRow, SEQ_PAT_FXVAL(j));
+      if (v == -1) v = 0;
+      v &= 255;
+      if (e >= 0x30 && e <= 0x37) { r.written[e - 0x30] = true; r.val[e - 0x30] = v > 127 ? v - 256 : v; }
+      else if (e == 0x38) r.rows = v;
+    }
+  }
+  for (auto& kv : rows) {
+    Row& r = kv.second;
+    auto st = g_firState.find(kv.first);
+    if (st == g_firState.end()) {
+      SeqFirState n; n.blending = false; n.rows = 1; n.step = 0;
+      for (int k = 0; k < 8; k++) { n.fir[k] = k == 0 ? 127 : 0; n.from[k] = n.to[k] = n.fir[k]; }
+      st = g_firState.insert({kv.first, n}).first;
+    }
+    SeqFirState& s = st->second;
+    bool any = false;
+    for (int k = 0; k < 8; k++) any = any || r.written[k];
+    int prev[8];
+    for (int k = 0; k < 8; k++) prev[k] = s.fir[k];
+    if (any) {
+      int to[8];
+      for (int k = 0; k < 8; k++) to[k] = r.written[k] ? r.val[k] : s.fir[k];
+      s.blending = r.rows > 1;
+      if (s.blending) { for (int k = 0; k < 8; k++) { s.from[k] = s.fir[k]; s.to[k] = to[k]; } s.rows = r.rows; s.step = 0; }
+      else {
+        // A jump is always sent (the chip's real taps may differ from the tracked ones).
+        for (int k = 0; k < 8; k++) { s.fir[k] = to[k]; if (r.written[k]) dispatchCmd(DIV_CMD_SNES_ECHO_FIR, r.rep, k, to[k] & 255); }
+        continue;
+      }
+    }
+    if (s.blending) {
+      s.step++;
+      double t = std::max(0.0, std::min(1.0, (double)s.step / std::max(1, s.rows)));
+      for (int k = 0; k < 8; k++) s.fir[k] = (int)std::floor(s.from[k] + (s.to[k] - s.from[k]) * t + 0.5);
+      if (s.step >= s.rows) s.blending = false;
+      for (int k = 0; k < 8; k++) if (s.fir[k] != prev[k]) dispatchCmd(DIV_CMD_SNES_ECHO_FIR, r.rep, k, s.fir[k] & 255);
+    }
+  }
+}
+
 // Process the next row (adapted from DivEngine::nextRow)
 static void seqNextRow() {
   g_seq.prevOrder = g_seq.curOrder;
@@ -2202,6 +2259,8 @@ static void seqNextRow() {
   for (int i = 0; i < g_seq.numChannels; i++) {
     seqProcessRowPre(i);
   }
+
+  seqSnesFirRow();
 
   // Process row on all channels
   for (int i = 0; i < g_seq.numChannels; i++) {
@@ -2941,6 +3000,7 @@ void furnace_seq_set_channel_dispatch(int channel, int handle) {
 EMSCRIPTEN_KEEPALIVE
 void furnace_seq_play(int order, int row) {
   initTables();
+  seqSnesFirReset();
 
   g_seq.curOrder = CLAMP(order, 0, g_seq.ordersLen - 1);
   g_seq.curRow = CLAMP(row, 0, g_seq.patLen - 1);
@@ -3000,6 +3060,7 @@ void furnace_seq_stop(void) {
 
 EMSCRIPTEN_KEEPALIVE
 void furnace_seq_seek(int order, int row) {
+  seqSnesFirReset();
   g_seq.curOrder = CLAMP(order, 0, g_seq.ordersLen - 1);
   g_seq.curRow = CLAMP(row, 0, g_seq.patLen - 1);
   g_seq.prevOrder = g_seq.curOrder;
