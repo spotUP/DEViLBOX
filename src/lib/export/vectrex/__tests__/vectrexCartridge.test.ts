@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { FurnaceChipType } from '../../../../engine/chips/FurnaceChipEngine';
 import type { RegisterWrite } from '../../VGMExporter';
-import { captureToFrames, decodeBanks } from '../../zx/zxAyStream';
-import { buildVectrexCartridge, vectrexTitle, type VectrexPlayer } from '../vectrexCartridge';
+import { captureToFrames, encodeFrames, decodeBanks } from '../../zx/zxAyStream';
+import { buildVectrexCartridge, decodeVectrexStream, runLengthFrames, vectrexTitle, type VectrexPlayer } from '../vectrexCartridge';
 
 const player: VectrexPlayer = {
   ...JSON.parse(readFileSync('public/vectrex/player.json', 'utf8')),
@@ -29,13 +29,28 @@ describe('Vectrex cartridge', () => {
     expect([4096, 8192, 16384, 32768]).toContain(r.bin.length);
     const stream = r.bin.subarray(player.dataOffset, player.dataOffset + r.dataBytes);
     expect(stream[stream.length - 1]).toBe(0xFE); // loop frame ends the stream
-    const dec = decodeBanks([stream]);
+    const dec = decodeVectrexStream(stream);
     expect(dec.length).toBe(r.frames);
     const cap = captureToFrames(writes, RATE);
     let ok = true;
     const cur = new Array(14).fill(0);
     dec.forEach((f, i) => { f.forEach((v, k) => { cur[k] = v; }); cap[i].forEach((v, k) => { if (v !== undefined && cur[k] !== v) ok = false; }); });
     expect(ok).toBe(true);
+  });
+
+  it('run-length compresses silent stretches: compress -> decode equals the raw stream', () => {
+    const writes = [w(0, 0, 10), w(0, 8, 15), w(40, 0, 20), w(41, 0, 21), w(300, 8, 0)];
+    const frames = captureToFrames(writes, RATE);
+    const raw = encodeFrames(frames);
+    const rawStream = Uint8Array.from([...raw.flatMap((f) => [...f]), 0, 0xFE]);
+    const packed = runLengthFrames(raw);
+    expect(packed.length).toBeLessThan(raw.length);
+    const packedStream = Uint8Array.from([...packed.flatMap((f) => [...f]), 0, 0xFE]);
+    const a = decodeVectrexStream(packedStream), b = decodeBanks([rawStream]);
+    expect(a.length).toBe(b.length);
+    a.forEach((f, i) => expect([...f]).toEqual([...b[i]]));
+    // runs over 255 frames split into several repeat codes
+    expect(decodeVectrexStream(Uint8Array.from([...runLengthFrames(new Array(600).fill(Uint8Array.of(0, 0))).flatMap((f) => [...f]), 0, 0xFE])).length).toBe(600);
   });
 
   it('refuses a song over 32 KB with a clear message', () => {
