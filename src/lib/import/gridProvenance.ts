@@ -78,7 +78,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   sidmon2: 'pass',
   soundmon: 'pass',
   deltaMusic1: 'fail',
-  deltaMusic2: 'fail',
+  deltaMusic2: 'pass',
   digitalSoundStudio: 'pass',
   faceTheMusic: 'pass',
   futurePlayer: 'pass',

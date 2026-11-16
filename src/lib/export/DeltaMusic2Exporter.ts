@@ -19,6 +19,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { patchModuleByLayout } from './layoutPatch';
 
 // ── Standard DM2 period table (85 entries, index 0 = no note) ────────────
 const DM2_PERIODS: number[] = [
@@ -202,6 +203,15 @@ export async function exportDeltaMusic2(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];
+  const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '_');
+
+  // A loaded DM2 module: its bytes with the grid edits written into the shared blocks (byte-exact when unedited).
+  const layout = song.uadePatternLayout;
+  if (song.deltaMusic2FileData && layout?.formatId === 'deltaMusic2') {
+    const { bytes, unplaced } = patchModuleByLayout(new Uint8Array(song.deltaMusic2FileData), layout, song.patterns);
+    if (unplaced.length) warnings.push(`${unplaced.length} edited note(s) have no place in the module and were not written.`);
+    return { data: new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer], { type: 'application/octet-stream' }), filename: `${baseName}.dm2`, warnings };
+  }
 
   const nChannels = 4;
   const numPatterns = song.patterns.length;
@@ -572,7 +582,6 @@ export async function exportDeltaMusic2(
 
   // ── Return result ─────────────────────────────────────────────────────
 
-  const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '_');
   return {
     data: new Blob([output], { type: 'application/octet-stream' }),
     filename: `${baseName}.dm2`,

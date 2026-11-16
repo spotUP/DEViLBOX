@@ -682,25 +682,36 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       // tracker display is built separately in the pattern loop above.
       return { note, instrument, volume: 0, effTyp: dm2Eff, eff: dm2Arg, effTyp2: 0, eff2: 0 };
     },
+    encodeOverStored: true,
+    // A grid pattern is a song position; each channel plays a shared block, transposed by its track entry.
+    propagateSharedCells: true,
+    // Effects show XM-mapped and are not written back over a module cell (encoder), so they stay with the position.
+    positionBoundFields: () => ['volume', 'effTyp', 'eff', 'effTyp2', 'eff2'],
+    // shortcut: a cell whose note + transpose was clamped to 1..96 gets the plain transpose, upgrade to a per-cell map if one is edited.
+    noteOffset: (pattern: number, _row: number, channel: number): number | null => trackEntryAt(pattern, channel)?.transpose ?? null,
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
-      // Resolve track position with loop wrapping (same logic as pattern build)
-      const trackEntries = tracks[channel]?.entries;
-      if (!trackEntries || trackEntries.length === 0) return 0;
-      let trackPos = pattern;
-      const tLen = trackEntries.length;
-      if (trackPos >= tLen) {
-        const loopStart = tracks[channel].loopPosition < tLen ? tracks[channel].loopPosition : 0;
-        const loopSpan = tLen - loopStart;
-        trackPos = loopSpan > 0
-          ? loopStart + ((pattern - loopStart) % loopSpan)
-          : tLen - 1;
-      }
-      const entry = trackEntries[trackPos];
-      if (!entry || entry.blockNumber >= numBlocks) return 0;
+      const entry = trackEntryAt(pattern, channel);
+      if (!entry || entry.blockNumber >= numBlocks) return -1;
       // Each block = 64 bytes (16 rows × 4 bytes); blocks are single-channel
       return blockDataOffset + entry.blockNumber * 64 + row * 4;
     },
   };
+
+  // The track entry a channel plays at a song position (loop wrapping as in the pattern build).
+  function trackEntryAt(pattern: number, channel: number): { blockNumber: number; transpose: number } | undefined {
+    const trackEntries = tracks[channel]?.entries;
+    if (!trackEntries || trackEntries.length === 0) return undefined;
+    let trackPos = pattern;
+    const tLen = trackEntries.length;
+    if (trackPos >= tLen) {
+      const loopStart = tracks[channel].loopPosition < tLen ? tracks[channel].loopPosition : 0;
+      const loopSpan = tLen - loopStart;
+      trackPos = loopSpan > 0
+        ? loopStart + ((pattern - loopStart) % loopSpan)
+        : tLen - 1;
+    }
+    return trackEntries[trackPos];
+  }
 
   return {
     name: moduleName,
