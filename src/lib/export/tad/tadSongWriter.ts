@@ -94,7 +94,7 @@ const FURNACE_NOTE_OFFSET = 60;
 const ROW_GUARD = 100_000;
 const hex2 = (n: number) => n.toString(16).toUpperCase().padStart(2, '0');
 
-interface LinearRow { pos: number; row: number; ticks: number; noise: number }
+interface LinearRow { pos: number; row: number; ticks: number; noise: number; rate: number; timer?: number }
 
 /** First SNES channel index in the song and the SNES channel count. */
 function snesChannels(native: FurnaceNativeData): { first: number; count: number; chip: number } | null {
@@ -176,10 +176,12 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   const where = (ch: number, r: LinearRow) => `channel ${ch + 1}, order ${hex2(r.pos)} row ${hex2(r.row)}`;
 
   // Pass 1: play the order list once, following speeds, jumps and breaks, until a row repeats.
-  const rate = sub.hz * (sub.virtualTempoN || 1) / (sub.virtualTempoD || 1);
+  let hz = sub.hz, tempoN = sub.virtualTempoN || 1, tempoD = sub.virtualTempoD || 1;
+  const rate = hz * tempoN / tempoD;
   const k = Math.max(1, Math.ceil(8000 / rate / 256));
   const timerExact = 8000 / (rate * k);
   let timer = Math.round(timerExact);
+  let curRate = rate, curTimer = timer;
   if (sfx) timer = 64;
   else if (timer < 64) {
     warnings.push(`Tick rate ${rate.toFixed(2)} Hz is faster than TAD allows (125 Hz); the song plays slower.`);
@@ -210,12 +212,26 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           else { const g = grooves[e.val]; if (g?.len) { speeds = g.val.slice(0, g.len); speedIdx = 0; } }
         }
         else if (e.cmd === 0x1d) noise = e.val & 31; // snes.cpp:541 one noise clock for the whole chip
+        // playback.cpp:667-671 FDxx/FExx virtual tempo, 1545-1549 F0xx tick rate xx*2/5 Hz.
+        else if (e.cmd === 0xfd && e.val > 0) tempoN = e.val;
+        else if (e.cmd === 0xfe && e.val > 0) tempoD = e.val;
+        else if (e.cmd === 0xf0) hz = Math.max(1, e.val * 2 / 5);
         else if (e.cmd === 0x0b) jump = e.val;
         else if (e.cmd === 0x0d) brk = e.val;
         else if (e.cmd === 0xff) stop = true;
       }
     }
-    rows.push({ pos, row, ticks: (speeds[speedIdx++ % speeds.length] || 1) * k, noise });
+    const rowRate = hz * tempoN / tempoD;
+    let rowTimer: number | undefined;
+    if (rowRate !== curRate && !sfx) {
+      // TAD keeps the tick multiplier k, so a tempo change is a new timer (T, 64..256: mml-syntax.md #Timer).
+      const t = Math.round(8000 / (rowRate * k));
+      const tc = Math.max(64, Math.min(256, t));
+      if (tc !== t) warnings.push(`Tempo change to ${rowRate.toFixed(2)} Hz at order ${hex2(pos)} row ${hex2(row)} is outside the TAD timer range; clamped.`);
+      if (tc !== curTimer) { rowTimer = tc; curTimer = tc; }
+    }
+    curRate = rowRate;
+    rows.push({ pos, row, ticks: (speeds[speedIdx++ % speeds.length] || 1) * k, noise, rate: rowRate, timer: rowTimer });
     if (stop) break;
     if (jump !== null || brk !== null) { pos = jump ?? pos + 1; row = brk ?? 0; }
     else if (++row >= sub.patLen) { pos++; row = 0; }
@@ -228,7 +244,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   if (sfx) {
     // Rescale row lengths to 125 Hz; accumulate so rounding does not drift.
     let acc = 0, prev = 0;
-    for (const r of rows) { acc += r.ticks / k * SFX_TICK_HZ / rate; const t = Math.round(acc); r.ticks = t - prev; prev = t; }
+    for (const r of rows) { acc += r.ticks / k * SFX_TICK_HZ / r.rate; const t = Math.round(acc); r.ticks = t - prev; prev = t; }
   }
 
   // Notes on channels of other chips cannot play.
@@ -282,6 +298,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   const insWarned = new Set<number>();
   const channelMml: string[] = [];
   let sfxChannel = -1;
+  // T (tempo) affects all channels; the first channel with notes carries it (channels without notes are not written).
+  const tempoCh = Array.from({ length: snes.count }, (_, c) => c).find((c) => rows.some((r) => { const n = cell(snes.first + c, r.pos, r.row)?.note ?? -1; return n >= 0 && n < 180; }));
   for (let c = 0; c < snes.count; c++) {
     const ch = snes.first + c;
     // echoMask: Furnace starts these channels with echo on (snes.cpp:914).
@@ -365,6 +383,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         // (bytecode.rs:1768 InstrumentState::Multiple); naming the instrument again keeps the full range.
         if (curIns >= 0) out.push(`@${curIns}`);
       }
+      if (r.timer && c === tempoCh) { flush(true); out.push(`T${r.timer}`); }
       let delayUsed = 0, cutAt = 0, retrig = 0;
       if (cl) {
         if (cl.ins >= 0) { ins = cl.ins; env = null; lastEnv = ''; }
@@ -381,7 +400,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         for (const e of cl.effects) if (e.cmd >= 0) ef.set(e.cmd, e.val);
         let envFx = false, panFx = false;
         for (const e of cl.effects) {
-          if (e.cmd < 0 || [0x09, 0x0b, 0x0d, 0x0f, 0xff].includes(e.cmd)) continue;
+          if (e.cmd < 0 || [0x09, 0x0b, 0x0d, 0x0f, 0xf0, 0xfd, 0xfe, 0xff].includes(e.cmd)) continue;
           if (e.cmd === 0x80 || e.cmd === 0x08) { [panL, panR] = panSplit(e.cmd, e.val); panFx = true; }
           else if (e.cmd === 0x12) { if ((e.val !== 0) !== echoOn) { echoOn = e.val !== 0; cmds.push(echoOn ? 'E1' : 'E0'); } }
           else if (!sfx && echo.on && ((e.cmd >= 0x19 && e.cmd <= 0x1c) || (e.cmd >= 0x30 && e.cmd <= 0x37))) {

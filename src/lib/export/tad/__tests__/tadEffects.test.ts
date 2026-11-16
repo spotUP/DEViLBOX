@@ -64,4 +64,11 @@ describe('Furnace effects in the TAD writer', () => {
     expect(song.mml).toMatch(/\{[^{}]+\}/); // E1/E2 slide token
     expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
   }, 60000);
+
+  it('maps FDxx/FExx/F0xx tempo changes to T timer commands; check passes', async () => {
+    const { song, check } = await writeWithEffects([[0xfd, 2], [0xfe, 2], [0xf0, 0x64]]);
+    expect(song.warnings.join('\n')).not.toMatch(/Dropped effect (F0|FD|FE)xx/);
+    expect(song.mml.match(/\bT\d+/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
+  }, 60000);
 });
