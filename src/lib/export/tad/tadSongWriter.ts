@@ -524,6 +524,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         const ef = new Map<number, number>();
         for (const e of cl.effects) if (e.cmd >= 0) ef.set(e.cmd, e.val);
         let envFx = false, panFx = false, panbrFx = false, panbr = '';
+        let e6 = 0;
         for (const e of cl.effects) {
           if (e.cmd < 0 || (snes && e.cmd === SNES_FIR_BLEND_EFFECT) || [0x09, 0x0b, 0x0d, 0x0f, 0xf0, 0xfd, 0xfe, 0xff].includes(e.cmd)) continue;
           if (e.cmd === 0x80 || e.cmd === 0x08) { [panL, panR] = panSplit(e.cmd, e.val); panFx = true; }
@@ -582,7 +583,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             panbrFx = true;
           }
           else if (e.cmd === 0xe5 && !linear) drop('effect E5xx fine pitch in non-linear pitch mode (TAD detune needs linear pitch)', at);
-          else if (e.cmd === 0xe6) drop('effect E6xy delayed legato transpose (TAD has no delayed pitch jump)', at);
+          else if (e.cmd === 0xe6) e6 = e.val; // playback.cpp:1464-1477, 2521-2530: applied with the note below
           else if (e.cmd === 0xe5 && linear) {
             // playback.cpp:1458 pitch = val - 0x80 (1/128 semitone, linear pitch); TAD detune only applies on play-note.
             fine = e.val - 0x80;
@@ -867,6 +868,20 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
               if (aRun || vRun || xOk) pending.pre.gen = (n, rel) => merge(aRun ? aRun(n, rel).map((o) => { const p = arpNote(sound.note, o) - FURNACE_NOTE_OFFSET, r = playable(smp); return r ? Math.max(r[0], Math.min(r[1], p)) : p; }) : pre, vRun ? vRun(n, rel) : vSteps, n, rel);
               if (xGain) { curIns = -1; lastEnv = ''; } // G replaced the instrument envelope: the next note names it again
               notePre = pending.pre;
+            }
+            // E6xy: after (x&7)+1 ticks the note moves y semitones (x bit 7 = down) without a key-on: the note is played as a slurred
+            // piece at its own pitch, then continues at the new pitch.
+            if (e6 & 15) {
+              const newP = tad + (e6 & 128 ? -(e6 & 15) : e6 & 15), d = (((e6 >> 4) & 7) + 1) * tickScale;
+              if (noiseOn || fx || pending.pre || !Number.isInteger(tickScale) || newP < 0 || newP > 95 || outside(smp, newP) || d >= r.ticks) {
+                drop('effect E6xy delayed legato (needs a plain note on the row without macro steps, the target in range and a delay inside the row)', at);
+              } else {
+                widen(smp, newP);
+                pending.pre = { steps: [{ p: tad, ticks: d }] };
+                oct = Math.floor(newP / 12);
+                curPitch = newP;
+                curNote = pending.tok = NOTE_NAMES[newP % 12];
+              }
             }
           }
         } else if (isOff && sounding && instruments[ins]?.snes?.sus) {

@@ -169,9 +169,20 @@ describe('Furnace effects in the TAD writer', () => {
     expect(seen).toEqual([...seen].sort((a, b) => a - b));
   }, 60000);
 
-  it('names E6xy delayed legato as a drop', async () => {
-    const { song } = await writeWithEffects([[0xe6, 0x13]]);
-    expect(song.warnings.join('\n')).toMatch(/E6xy delayed legato/);
+  // macro-free instruments: E6 only splits a note that has no macro steps
+  const noMacros = (ins: { macros?: unknown }[]) => { for (const i of ins) { i.macros = []; } };
+  it('plays E6xy delayed legato as a slurred piece at the note pitch, then the note moved y semitones; check passes', async () => {
+    const plain = await writeWithEffects([[0x0c, 0x00]], 0, noMacros);
+    const { song, check } = await writeWithEffects([[0xe6, 0x13]], 0, noMacros);
+    expect(song.warnings.join('\n')).not.toMatch(/E6xy delayed legato/);
+    const slurs = (m: string) => (m.match(/%\d+ &/g) ?? []).length;
+    expect(slurs(song.mml)).toBeGreaterThan(slurs(plain.song.mml)); // negative: the plain song has no extra slurred piece
+    expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
+  }, 60000);
+
+  it('names a one-side negative echo volume as made positive', async () => {
+    const { song } = await writeWithEffects([[0x1a, 0xf0]]);
+    expect(song.warnings.join('\n')).toMatch(/negative/);
   }, 60000);
 
   it('maps a constant special macro (both sides inverted) to iB; check passes', async () => {
