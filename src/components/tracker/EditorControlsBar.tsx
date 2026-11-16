@@ -29,7 +29,6 @@ import { SIDSubsongSelector } from './SIDSubsongSelector';
 import { UADESubsongSelector } from './UADESubsongSelector';
 import { AVPSubsongSelector } from './AVPSubsongSelector';
 import { ModuleInfoButton } from './ModuleInfoButton';
-import { GenreAnalysisBadge } from './GenreAnalysisBadge';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import {
@@ -409,8 +408,6 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         </Button>
         {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
 
-        {/* Genre Analysis Badge */}
-        <GenreAnalysisBadge />
 
         {/* Visual Background mode cycle (only when enabled) */}
         <VisualBgCycler />
