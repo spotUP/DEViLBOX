@@ -45,8 +45,11 @@ import { useCursorStore } from '@/stores/useCursorStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { decodeVolumeColumn, noteStartLevel } from '@/lib/tracker/volumeColumn';
 import { furnaceCellChipEffects, cellSetVolumeLevel } from './replayer/furnaceCellEffects';
+import { SnesFirBlender, SNES_FIR_BLEND_EFFECT, SNES_FIR_TAP_EFFECT, SNES_FIR_TAP_COUNT } from '@/lib/furnace/snesFirBlend';
+import { SNES_FIR_PRESETS } from '@/lib/furnace/snesDsp';
+import { FurnaceDispatchPlatform } from './furnace-dispatch/platforms';
 import { FurnaceTickEffects, TICK_STEPPED_EFFECTS } from './furnace-dispatch/FurnaceTickEffects';
-import { dispatchNoteOfMidi } from './furnace-dispatch/FurnaceDispatchEngine';
+import { dispatchNoteOfMidi, DivCmd } from './furnace-dispatch/FurnaceDispatchEngine';
 import { noteToMidi } from '@/utils/audio-context';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
@@ -771,6 +774,8 @@ export class TrackerReplayer {
   // Created when libopenmpt starts and replaced instruments exist.
   /** Per-tick Furnace cell effects (arpeggio) of the chip channels of a hybrid song. */
   private furnaceTick = new FurnaceTickEffects();
+  /** The SNES echo filter as the song has set it, so a 38xx blend starts from the real taps. */
+  private snesFir = new SnesFirBlender(SNES_FIR_PRESETS[0].taps);
   /** Song channel -> instrument id for every channel routeRowToChip has seen. */
   private furnaceTickChannels = new Map<number, number>();
   private _synthEffectProcessor: import('./replayer/SynthEffectProcessor').SynthEffectProcessor | null = null;
@@ -1420,12 +1425,19 @@ export class TrackerReplayer {
     let arp: number | null = null;
     // Slides, portamento, vibrato, volume slide and tremolo are stepped per tick too (furnaceTick).
     const stepped: { effect: number; param: number }[] = [];
-    for (const e of furnaceCellChipEffects(row)) {
+    const cellEffects = furnaceCellChipEffects(row);
+    // 30xx-37xx with 38xx: the echo filter steps toward the written taps one row at a time (snesFirBlend.ts).
+    const firSteps = config.furnace?.chipType === FurnaceDispatchPlatform.SNES
+      ? this.snesFir.row(String(time), cellEffects.map((e) => ({ cmd: e.effect, val: e.param })))
+      : null;
+    for (const e of cellEffects) {
+      if (firSteps && (e.effect === SNES_FIR_BLEND_EFFECT || (e.effect >= SNES_FIR_TAP_EFFECT && e.effect < SNES_FIR_TAP_EFFECT + SNES_FIR_TAP_COUNT))) continue;
       if (e.effect === 0x00) { arp = e.param; continue; }
       if (TICK_STEPPED_EFFECTS.has(e.effect)) { stepped.push(e); continue; }
       if (e.effect === 0xE0) this.furnaceTick.setArpSpeed(e.param);
       engine.applyFurnaceCellEffect(config.id, chIndex, config, e.effect, e.param);
     }
+    for (const [tap, v] of firSteps ?? []) engine.applyFurnaceChipCommand(config.id, chIndex, config, DivCmd.SNES_ECHO_FIR, tap, v & 255, time);
     // Furnace chip note: MIDI note - 12, as FurnaceDispatchSynth.triggerAttack sends it.
     const chipNote = isPitchedNote(row.note) ? dispatchNoteOfMidi(noteToMidi(xmNoteToNoteName(row.note))) : null;
     this.furnaceTickChannels.set(chIndex, config.id);
@@ -3192,6 +3204,7 @@ export class TrackerReplayer {
     resetCaptureSync();
 
     this.furnaceTick.reset();
+    this.snesFir = new SnesFirBlender(SNES_FIR_PRESETS[0].taps);
     this.furnaceTickChannels.clear();
 
     // Stop all channels (release synth notes + stop sample players)

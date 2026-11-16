@@ -5,6 +5,7 @@ import type { FurnaceNativeData, FurnaceModuleSample, FurnaceRow } from '@/types
 import type { FurnaceSNESConfig } from '@/types/instrument/furnace';
 import { createWavFile } from '@/lib/import/InstrumentConverter';
 import type { FurnaceWavetable } from '@/lib/import/formats/FurnaceSongParser';
+import { SnesFirBlender, SNES_FIR_TAP_EFFECT, SNES_FIR_BLEND_EFFECT } from '@/lib/furnace/snesFirBlend';
 
 /** Furnace system id of the SNES chip (DivSystem). */
 export const FURNACE_SNES_CHIP_ID = 26;
@@ -142,7 +143,7 @@ const hex2 = (n: number) => n.toString(16).toUpperCase().padStart(2, '0');
 
 /** Global echo registers at the end of a row: Furnace stores 19-1C/3x while echo is off and writes them when 18xx turns it on. */
 interface EchoRegs { live: boolean; delay: number; volL: number; volR: number; feedback: number; fir: number[] }
-interface LinearRow { pos: number; row: number; ticks: number; noise: number; rate: number; timer?: number; echo: EchoRegs }
+interface LinearRow { pos: number; row: number; ticks: number; noise: number; rate: number; timer?: number; echo: EchoRegs; firSteps?: Array<[number, number]> }
 
 /** First SNES channel index in the song and the SNES channel count. */
 function snesChannels(native: FurnaceNativeData): { first: number; count: number; chip: number } | null {
@@ -252,9 +253,11 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   const visited = new Map<string, number>();
   let loopRow: number | null = null;
   let pos = 0, row = 0, noise = 0;
+  const firBlender = new SnesFirBlender(gEcho.fir);
   while (rows.length < ROW_GUARD) {
     visited.set(`${pos}:${row}`, rows.length);
     let jump: number | null = null, brk: number | null = null, stop = false;
+    const firFx: Array<{ cmd: number; val: number }> = [];
     for (let ch = 0; ch < nCh; ch++) {
       for (const e of cell(ch, pos, row)?.effects ?? []) {
         // playback.cpp:645-668: 0Fxx sets speed 2 of a two-speed song (no grooves), else speed 1; 09xx sets
@@ -266,16 +269,16 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           else { const g = grooves[e.val]; if (g?.len) { speeds = g.val.slice(0, g.len); speedIdx = 0; } }
         }
         else if (e.cmd === 0x1d) noise = e.val & 31; // snes.cpp:541 one noise clock for the whole chip
-        else if (ch >= snes.first && ch < snes.first + snes.count && (e.cmd >= 0x18 && e.cmd <= 0x1c || e.cmd >= 0x30 && e.cmd <= 0x37)) {
+        else if (ch >= snes.first && ch < snes.first + snes.count && (e.cmd >= 0x18 && e.cmd <= 0x1c || e.cmd >= SNES_FIR_TAP_EFFECT && e.cmd <= SNES_FIR_BLEND_EFFECT)) {
           // snes.cpp:565-601, 574: 19-1C/3x always store their value; 18xx turns echo on (initEcho writes them all) or off.
           const sv = e.val > 127 ? e.val - 256 : e.val;
+          if (e.cmd >= SNES_FIR_TAP_EFFECT) { firFx.push(e); continue; } // the blender below owns the taps (snesFirBlend.ts)
           gEcho = { ...gEcho, fir: [...gEcho.fir] };
           if (e.cmd === 0x18) gEcho.live = e.val !== 0;
           else if (e.cmd === 0x19) gEcho.delay = Math.min(e.val & 15, cap);
           else if (e.cmd === 0x1a) gEcho.volL = sv;
           else if (e.cmd === 0x1b) gEcho.volR = sv;
-          else if (e.cmd === 0x1c) gEcho.feedback = sv;
-          else gEcho.fir[e.cmd - 0x30] = sv;
+          else gEcho.feedback = sv;
         }
         // playback.cpp:667-671 FDxx/FExx virtual tempo, 1545-1549 F0xx tick rate xx*2/5 Hz.
         else if (e.cmd === 0xfd && e.val > 0) tempoN = e.val;
@@ -286,6 +289,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         else if (e.cmd === 0xff) stop = true;
       }
     }
+    const firSteps = firBlender.row(String(rows.length), firFx);
+    if (firSteps.length) gEcho = { ...gEcho, fir: [...firBlender.taps] };
     const rowRate = hz * tempoN / tempoD;
     let rowTimer: number | undefined;
     if (rowRate !== curRate && !sfx) {
@@ -297,7 +302,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     }
     curRate = rowRate;
     if (gEcho.live) maxDelay = Math.max(maxDelay, gEcho.delay);
-    rows.push({ pos, row, ticks: (speeds[speedIdx++ % speeds.length] || 1) * k, noise, rate: rowRate, timer: rowTimer, echo: gEcho });
+    rows.push({ pos, row, ticks: (speeds[speedIdx++ % speeds.length] || 1) * k, noise, rate: rowRate, timer: rowTimer, echo: gEcho, firSteps });
     if (stop) break;
     if (jump !== null || brk !== null) { pos = jump ?? pos + 1; row = brk ?? 0; }
     else if (++row >= sub.patLen) { pos++; row = 0; }
@@ -474,6 +479,11 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         cuts.push(out.length); bars.push(out.length);
       }
       if (r.timer && c === tempoCh) { flush(true); out.push(`T${r.timer}`); }
+      // One tap step per row (a 38xx blend, or a plain 30xx-37xx jump): the taps are not tied to a cell, so a blend runs on rows without one.
+      if (!sfx && r.echo.live && r.firSteps?.length && c === tempoCh) {
+        flush(true);
+        for (const [tap, v] of r.firSteps) out.push(`\\ftap ${tap},${v}`);
+      }
       let delayUsed = 0, cutAt = 0, retrig = 0, relAt = -1, soAt = -1;
       // Sustain mode (snes.cpp:402-420, 655-676): note off, ECxx and FCxx send no KOFF; the release is GAIN decrease
       // (sus 1, 2) or the ADSR sustain rate switched to r (sus 3). The note is slurred into a wait with that envelope.
@@ -504,7 +514,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         for (const e of cl.effects) if (e.cmd >= 0) ef.set(e.cmd, e.val);
         let envFx = false, panFx = false, panbrFx = false, panbr = '';
         for (const e of cl.effects) {
-          if (e.cmd < 0 || [0x09, 0x0b, 0x0d, 0x0f, 0xf0, 0xfd, 0xfe, 0xff].includes(e.cmd)) continue;
+          if (e.cmd < 0 || (snes && e.cmd === SNES_FIR_BLEND_EFFECT) || [0x09, 0x0b, 0x0d, 0x0f, 0xf0, 0xfd, 0xfe, 0xff].includes(e.cmd)) continue;
           if (e.cmd === 0x80 || e.cmd === 0x08) { [panL, panR] = panSplit(e.cmd, e.val); panFx = true; }
           else if (e.cmd === 0x12) { if ((e.val !== 0) !== echoOn) { echoOn = e.val !== 0; cmds.push(echoOn ? 'E1' : 'E0'); } }
           else if (!sfx && e.cmd === 0x18) {
@@ -514,7 +524,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             else cmds.push('\\evol 0,0');
             if (e.val && (g.volL < 0 || g.volR < 0)) drop('effect 18xx turning echo on with a negative (inverted) echo volume, clamped to 0', at);
           }
-          else if (!sfx && ((e.cmd >= 0x19 && e.cmd <= 0x1c) || (e.cmd >= 0x30 && e.cmd <= 0x37))) {
+          else if (!sfx && ((e.cmd >= 0x19 && e.cmd <= 0x1c) || (e.cmd >= 0x30 && e.cmd <= 0x37 && !r.firSteps?.length))) {
             // Furnace sysDef.cpp:1212-1224 -> TAD \edl \evol \efb \ftap (mml-syntax.md:621-661). While echo is off Furnace only stores
             // the value (snes.cpp:566); pass 1 keeps it in r.echo and 18xx writes it. Values are the row-end state.
             const sv = e.val > 127 ? e.val - 256 : e.val, g = r.echo;

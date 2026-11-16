@@ -186,4 +186,11 @@ describe('Furnace effects in the TAD writer', () => {
     expect(song.mml).toMatch(/GDT5/);
     expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
   }, 60000);
+
+  it('steps the echo filter one tap command per row for a 38xx blend, and ignores 38xx otherwise', async () => {
+    const { song, check } = await writeWithEffects([[0x18, 1], [0x30, 0], [0x38, 4]]);
+    expect(song.warnings.join('\n')).not.toMatch(/38/);
+    expect(song.mml.match(/\\ftap 0,/g)?.length ?? 0).toBeGreaterThan(1);
+    expect(check.code, check.log).toBe(0);
+  });
 });

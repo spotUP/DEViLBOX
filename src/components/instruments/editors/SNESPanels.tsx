@@ -7,13 +7,15 @@
  * instrument, and lives in the Furnace chip flags (`useFormatStore.furnaceNative.chipFlags`).
  */
 
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FurnaceConfig, FurnaceAmigaConfig, FurnaceSNESConfig } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
-import { useFormatStore } from '@stores';
+import { useFormatStore, useTrackerStore, useCursorStore } from '@stores';
+import { notify } from '@stores/useNotificationStore';
+import { firBlendEffects } from '@/lib/furnace/snesFirBlend';
 import { FURNACE_NOTE_COUNT, furnaceNoteName, readNoteMapEntry, withNoteMapEntry } from '@/lib/furnace/noteMap';
 import { FurnaceDispatchPlatform } from '@engine/furnace-dispatch/platforms';
 import {
@@ -356,6 +358,8 @@ const SNESNoteMap: React.FC<{
 
 // ── Song echo panel ─────────────────────────────────────────────────────────────
 
+const KNOBS_TARGET = 'Tap knobs';
+
 export const SNESEchoPanel: React.FC = () => {
   const chipIds = useFormatStore((s) => s.furnaceNative?.chipIds);
   const chipIndex = chipIds ? chipIds.indexOf(FurnaceDispatchPlatform.SNES) : -1;
@@ -374,6 +378,31 @@ export const SNESEchoPanel: React.FC = () => {
     echoFilter[tap] = Math.round(value);
     update({ echoFilter });
   }, [update]);
+
+  const [blendTarget, setBlendTarget] = useState('Low Pass');
+  const [blendRows, setBlendRows] = useState(8);
+  const blendHere = useCallback(() => {
+    const target = blendTarget === KNOBS_TARGET ? flagsRef.current.echoFilter : SNES_FIR_PRESETS.find((p) => p.name === blendTarget)?.taps;
+    if (!target) return;
+    const { channelIndex, rowIndex } = useCursorStore.getState().cursor;
+    const tracker = useTrackerStore.getState();
+    const cell = tracker.patterns[tracker.currentPatternIndex]?.channels[channelIndex]?.rows[rowIndex];
+    if (!cell) return;
+    // The cursor cell's effect columns; an empty column (effect 0, parameter 0) is free.
+    const slots = [
+      ['effTyp', 'eff'], ['effTyp2', 'eff2'], ['effTyp3', 'eff3'], ['effTyp4', 'eff4'],
+      ['effTyp5', 'eff5'], ['effTyp6', 'eff6'], ['effTyp7', 'eff7'], ['effTyp8', 'eff8'],
+    ] as const;
+    const free = slots.filter(([t, e]) => !cell[t] && !cell[e]);
+    const effects = firBlendEffects(flagsRef.current.echoFilter, target, blendRows, free.length);
+    if (!effects) {
+      notify.warning('Not enough free effect columns on this row. Clear some effects or show more effect columns.');
+      return;
+    }
+    const update: Record<string, number> = {};
+    effects.forEach((fx, i) => { update[free[i][0]] = fx.effTyp; update[free[i][1]] = fx.eff; });
+    tracker.setCell(channelIndex, rowIndex, update);
+  }, [blendTarget, blendRows]);
 
   if (chipIndex < 0) {
     return (
@@ -471,6 +500,17 @@ export const SNESEchoPanel: React.FC = () => {
             title={`Filter tap ${i + 1} of 8: the weight of the echo sample ${i} steps back. Tap 1 at 127 and the rest at 0 leaves the echo unfiltered.`}
             onChange={(v) => setTap(i, v)} />
         ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 mt-3"
+        title="Writes the target taps and a blend length (effect 38xx) at the cursor row. The song then moves the echo filter from its current taps to the target, one step per row. In an exported Terrific Audio Driver song each step is one tap command per row. Furnace ignores 38xx and jumps.">
+        <span className={LABEL}>Blend Target</span>
+        <CustomSelect value={blendTarget} onChange={setBlendTarget}
+          options={[{ value: KNOBS_TARGET, label: KNOBS_TARGET }, ...SNES_FIR_PRESETS.map((p) => ({ value: p.name, label: p.name }))]} />
+        <span className={LABEL}>Blend Length (rows)</span>
+        <input type="number" min={2} max={255} value={blendRows}
+          onChange={(e) => setBlendRows(Math.max(2, Math.min(255, Math.round(Number(e.target.value)) || 2)))}
+          className="w-16 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs px-1" />
+        <Button variant="default" size="sm" onClick={blendHere}>Blend Here</Button>
       </div>
       <div className="flex flex-wrap items-center gap-2 mt-2">
         <span className={BADGE}>Tap sum {fir.sum}</span>
