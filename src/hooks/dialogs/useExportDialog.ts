@@ -38,7 +38,7 @@ import { saveFurFileWasm } from '@lib/import/wasm/FurnaceFileOps';
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furAy' | 'zxTap' | 'tad';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'tad';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -81,6 +81,7 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   fur: '.fur',
   furAy: '.fur',
   zxTap: '.tap',
+  zxBeeperTap: '.tap',
   tad: '.zip',
 };
 
@@ -300,6 +301,34 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     }
   }, [metadata]);
 
+  const [zxBeeperReport, setZxBeeperReport] = useState<{ warnings: string[]; seconds: number } | null>(null);
+
+  // Preview: build the tape when the tile is selected so the dialog can list what is dropped.
+  useEffect(() => {
+    if (exportMode !== 'zxBeeperTap') return;
+    let live = true;
+    import('@lib/export/moduleExportService')
+      .then((m) => m.exportZxBeeperTapFile())
+      .then((r) => { if (live) setZxBeeperReport({ warnings: r.warnings, seconds: r.seconds }); })
+      .catch((e) => { if (live) setZxBeeperReport({ warnings: [e instanceof Error ? e.message : 'The song cannot be exported.'], seconds: 0 }); });
+    return () => { live = false; };
+  }, [exportMode]);
+
+  const handleExportZxBeeperTap = useCallback(async (
+    downloadFn: (blob: Blob, filename: string) => void,
+    onClose: () => void,
+  ) => {
+    try {
+      const { exportZxBeeperTapFile } = await import('@lib/export/moduleExportService');
+      const r = await exportZxBeeperTapFile((metadata.name || 'song').slice(0, 10));
+      downloadFn(new Blob([r.tap as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.tap`);
+      notify.success(`ZX Spectrum beeper tape exported (${r.rows} rows, ${Math.round(r.seconds)} s, ${r.tap.byteLength} bytes).`);
+      onClose();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'ZX Spectrum beeper tape export failed.');
+    }
+  }, [metadata]);
+
   const tadAvailable = (furnaceNative?.chipIds ?? []).includes(FURNACE_SNES_CHIP_ID);
   const [tadReport, setTadReport] = useState<{ warnings: string[]; ram: string } | null>(null);
 
@@ -485,6 +514,8 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportZxTap,
     zxTapTempoWarning,
     zxTapBusy,
+    handleExportZxBeeperTap,
+    zxBeeperReport,
     handleExportTad,
     tadAvailable,
     tadReport,

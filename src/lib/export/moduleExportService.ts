@@ -117,6 +117,22 @@ export function exportFurnaceAyScrambleFile(target: AyScrambleTarget = 'arcade')
   return tempo ? { ...result, warnings: [...result.warnings, tempo] } : result;
 }
 
+export interface ZxBeeperTapResult { tap: Uint8Array; seconds: number; rows: number; warnings: string[] }
+
+/** ZX Spectrum 48K beeper .tap from the live song's pattern data (first four channels). */
+export async function exportZxBeeperTapFile(title = 'devilbox'): Promise<ZxBeeperTapResult> {
+  const song = liveTrackerSong();
+  const [{ songToBeeperRows, encodeBeeperMusic }, { fetchZxBeeperPlayer, buildZx48Tap }] = await Promise.all([
+    import('./zx/zxBeeperData'),
+    import('./zx/zxTap'),
+  ]);
+  const player = await fetchZxBeeperPlayer();
+  const data = songToBeeperRows(song, player.maxBytes);
+  const tap = buildZx48Tap(player, (base) => encodeBeeperMusic(data.rows, base), title);
+  const tempo = ayScrambleTempoWarning(song.initialBPM, 'zxbeeper');
+  return { tap, seconds: data.seconds, rows: data.rows.length, warnings: tempo ? [...data.warnings, tempo] : data.warnings };
+}
+
 /** SNES Furnace song(s) -> Terrific Audio Driver project zip, from the live song. Instrument index = Furnace instrument index. */
 export async function exportTadProjectFile(): Promise<TadBuildResult> {
   const song = liveTrackerSong();

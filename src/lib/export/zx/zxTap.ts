@@ -69,7 +69,7 @@ function basicLine(lineNo: number, items: BasicItem[]): number[] {
 }
 
 /** CLEAR 32767; LOAD ""CODE 32768; per bank OUT 32765,16+bank: LOAD ""CODE 49152; RANDOMIZE USR 32768. Tape block order must match. */
-export function basicLoader(banks: number[], p: ZxPlayer): Uint8Array {
+export function basicLoader(banks: number[], p: Pick<ZxPlayer, 'loadAddress' | 'entry' | 'dataAddress'>): Uint8Array {
   const colon = ':';
   const load = (addr: number) => [TOK.LOAD, '""', TOK.CODE, ...num(addr)];
   const lines: number[] = [];
@@ -102,4 +102,33 @@ export function buildZxTap(writes: readonly RegisterWrite[], sampleRate: number,
   let o = 0;
   for (const p of parts) { tap.set(p, o); o += p.length; }
   return { tap, frames: frames.length, banks: banks.length, dataBytes: banks.reduce((n, b) => n + b.length, 0), seconds: frames.length / 50 };
+}
+
+export interface ZxBeeperPlayer { bytes: Uint8Array; loadAddress: number; entry: number; dataOffset: number; maxBytes: number }
+
+/** Fetch public/zx/beeper.bin + beeper.json (browser). */
+export async function fetchZxBeeperPlayer(): Promise<ZxBeeperPlayer> {
+  const base = import.meta.env.BASE_URL;
+  const [bin, meta] = await Promise.all([
+    fetch(`${base}zx/beeper.bin`).then((r) => r.arrayBuffer()),
+    fetch(`${base}zx/beeper.json`).then((r) => r.json()),
+  ]);
+  return { ...meta, bytes: new Uint8Array(bin) };
+}
+
+/** 48K tap: BASIC loader (CLEAR; LOAD ""CODE; RANDOMIZE USR) + one CODE block of player + song data. */
+export function buildZx48Tap(player: ZxBeeperPlayer, music: (base: number) => Uint8Array, title = 'devilbox'): Uint8Array {
+  const code = new Uint8Array(player.dataOffset + music(0).length);
+  code.set(player.bytes.subarray(0, player.dataOffset));
+  code.set(music(player.loadAddress + player.dataOffset), player.dataOffset);
+  const name = title.replace(/[^\x20-\x7E]/g, '?').slice(0, 10);
+  const loader = basicLoader([], { loadAddress: player.loadAddress, entry: player.entry, dataAddress: 0 });
+  const parts = [
+    tapBlock(0x00, header(0, name, loader.length, 10, loader.length)), tapBlock(0xFF, loader),
+    ...codeBlocks('beeper', player.loadAddress, code),
+  ];
+  const tap = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  for (const p of parts) { tap.set(p, o); o += p.length; }
+  return tap;
 }

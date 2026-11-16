@@ -89,6 +89,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
 
         case 'zxTap':
           return await ex.handleExportZxTap((b, n) => saveAs(b, n), onClose);
+        case 'zxBeeperTap':
+          return await ex.handleExportZxBeeperTap((b, n) => saveAs(b, n), onClose);
         case 'furAy':
           return await ex.handleExportFurAy((b, n) => saveAs(b, n), onClose);
 
@@ -369,6 +371,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">ZX Spectrum 128 (.tap)</div>
                     </button>
                   )}
+                  {ex.furnaceAyAvailable.zxbeeper && (
+                    <button
+                      onClick={() => ex.setExportMode('zxBeeperTap')}
+                      className={`
+                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        ${ex.exportMode === 'zxBeeperTap'
+                          ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                          : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                        }
+                      `}
+                    >
+                      <FileMusic size={24} className="mx-auto mb-2" />
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">ZX Spectrum Beeper (.tap)</div>
+                    </button>
+                  )}
                   {ex.tadAvailable && (
                     <button
                       onClick={() => ex.setExportMode('tad')}
@@ -597,6 +614,24 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
+              {ex.exportMode === 'zxBeeperTap' && (
+                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+                    ZX Spectrum Beeper tape (.tap)
+                  </h3>
+                  <div className="space-y-3 text-sm font-mono text-text-secondary">
+                    <div>Writes the pattern data of the first four channels for a 4 channel pulse width beeper player. The tape loads and plays on a ZX Spectrum 48K or an emulator. Any key stops it.</div>
+                    <div className="text-xs font-mono text-text-muted">Instrument macros, volume and the sample channel are not played. A repeated note of the same pitch holds instead of restarting.</div>
+                    {ex.zxBeeperReport && ex.zxBeeperReport.seconds > 0 && (
+                      <div className="text-xs font-mono text-text-secondary">Length {Math.round(ex.zxBeeperReport.seconds)} s.</div>
+                    )}
+                    {ex.zxBeeperReport?.warnings.map((w) => (
+                      <div key={w} className="text-xs font-mono text-accent-warning">{w}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {ex.exportMode === 'tad' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
@@ -777,7 +812,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : ex.exportMode === 'chip' ? `.${chipExtension}`
                   : ex.exportMode === 'nano' ? '.dbn'
                   : ex.exportMode === 'fur' || ex.exportMode === 'furAy' ? '.fur'
-                  : ex.exportMode === 'zxTap' ? '.tap'
+                  : ex.exportMode === 'zxTap' || ex.exportMode === 'zxBeeperTap' ? '.tap'
                   : ex.exportMode === 'tad' ? '.zip'
                   : `.${ex.exportMode}.json`
                 }`
