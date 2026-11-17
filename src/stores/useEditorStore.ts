@@ -51,6 +51,8 @@ interface EditorStore {
 
   // Display preferences
   followPlayback: boolean;
+  /** Furnace 'lock cursor to order': playback advances orders without moving the edit cursor's pattern. */
+  lockCursorToOrder: boolean;
   columnVisibility: ColumnVisibility;
   bookmarks: number[];
 
@@ -108,6 +110,7 @@ interface EditorStore {
 
   // Actions — display
   setFollowPlayback: (enabled: boolean) => void;
+  setLockCursorToOrder: (enabled: boolean) => void;
   setColumnVisibility: (visibility: Partial<ColumnVisibility>) => void;
   toggleBookmark: (row: number) => void;
   clearBookmarks: () => void;
@@ -167,6 +170,7 @@ export const useEditorStore = create<EditorStore>()(
     // the view freezes on the edit cursor so rows can be repositioned/edited
     // live while the song plays (see resolveScrollRow / isManualRowNavAllowed).
     followPlayback: true,
+    lockCursorToOrder: false,
     columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
     bookmarks: [],
 
@@ -239,6 +243,8 @@ export const useEditorStore = create<EditorStore>()(
 
     setFollowPlayback: (enabled) =>
       set((state) => { state.followPlayback = enabled; }),
+    setLockCursorToOrder: (enabled) =>
+      set((state) => { state.lockCursorToOrder = enabled; }),
 
 
     setColumnVisibility: (visibility) =>

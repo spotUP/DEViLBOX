@@ -15,6 +15,13 @@ export function toggleFollowSong(): boolean {
   return true;
 }
 
+export function toggleLockCursorToOrder(): boolean {
+  const { lockCursorToOrder, setLockCursorToOrder } = useEditorStore.getState();
+  setLockCursorToOrder(!lockCursorToOrder);
+  useUIStore.getState().setStatusMessage(`Lock cursor to order: ${!lockCursorToOrder ? 'ON' : 'OFF'}`, false, 1000);
+  return true;
+}
+
 export function toggleLoopPattern(): boolean {
   const { isLooping, setIsLooping } = useTransportStore.getState();
   setIsLooping(!isLooping);

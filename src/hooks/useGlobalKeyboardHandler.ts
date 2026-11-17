@@ -88,7 +88,7 @@ import {
   copyPattern, pastePattern, cutChannel, copyChannel, pasteChannel
 } from '@engine/keyboard/commands/paste';
 import {
-  toggleFollowSong, toggleLoopPattern, toggleContinuousScroll, toggleMetronome,
+  toggleFollowSong, toggleLockCursorToOrder, toggleLoopPattern, toggleContinuousScroll, toggleMetronome,
   toggleCountIn, toggleMidiInput, toggleRecordQuantize, toggleChordMode, toggleWrapMode,
   toggleAutoRecord, toggleMultiChannelRecord, togglePatternFocus, toggleColumnVisibility,
   toggleSoloChannel, toggleMuteChannel, toggleSamplePreview, togglePluginEditor
@@ -524,6 +524,7 @@ function initializeRegistry() {
     
     // === FOLLOW/TOGGLE COMMANDS ===
     { name: 'toggle_follow_song', contexts: ['global'], handler: toggleFollowSong, description: 'Toggle follow song' },
+    { name: 'toggle_lock_cursor_to_order', contexts: ['global'], handler: toggleLockCursorToOrder, description: 'Lock cursor to order' },
     { name: 'toggle_loop_pattern', contexts: ['global'], handler: toggleLoopPattern, description: 'Toggle loop pattern' },
     { name: 'toggle_continuous_scroll', contexts: ['global'], handler: toggleContinuousScroll, description: 'Toggle continuous scroll' },
     { name: 'toggle_metronome', contexts: ['global'], handler: toggleMetronome, description: 'Toggle metronome' },

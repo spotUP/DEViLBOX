@@ -596,6 +596,7 @@ export const usePatternPlayback = () => {
               // to song pos 000 and restarting the loop on pattern 0. Follow the
               // pattern only when looping; follow both in full-song playback.
               const follow = computePlaybackFollow(isLooping, patternNum, position);
+              if (useEditorStore.getState().lockCursorToOrder) return;
               startTransition(() => {
                 setCurrentPattern(follow.pattern, true);
                 if (follow.position !== null) setCurrentPosition(follow.position, true);
