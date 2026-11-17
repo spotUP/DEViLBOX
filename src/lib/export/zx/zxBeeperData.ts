@@ -14,8 +14,8 @@ import type { FurnaceModuleSample } from '@/types/tracker';
 
 /** Must match beeper.asm (ITER_T, DRUM_BYTE_T) and the 128K CPU clock; the test checks public/zx/beeper.json. */
 export const BEEPER_CLOCK = 3546900;
-export const BEEPER_ITER_T = 363;
-export const BEEPER_DRUM_BYTE_T = 504;
+export const BEEPER_ITER_T = 365; // 363 counted + ULA contention on the 3 OUTs, see beeper.asm
+export const BEEPER_DRUM_BYTE_T = 510;
 /** Voice update rate: one phase step per voice per loop iteration. */
 export const BEEPER_SAMPLE_RATE = BEEPER_CLOCK / BEEPER_ITER_T;
 export const BEEPER_VOICES = 6;
