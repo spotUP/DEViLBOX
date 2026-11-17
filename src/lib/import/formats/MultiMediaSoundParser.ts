@@ -22,9 +22,9 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { decodeMmsCell, encodeMmsCell, MMS_CELL_SIZE } from '@/engine/uade/encoders/MultiMediaSoundEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -33,6 +33,14 @@ const NUM_LONGS = 31;
 
 /** Maximum allowed value for each of the initial longwords. */
 const MAX_LONG_VALUE = 0x20000;
+
+const ORDER_LEN_OFFSET = 0x432;
+const ORDER_OFFSET = 0x434;
+const MAX_ORDER = 128;
+const PATTERN_OFFSET = 0x4b8;
+const ROWS = 64;
+const CHANNELS = 4;
+const PATTERN_SIZE = ROWS * CHANNELS * 4;
 
 /** Minimum file size: 31*4 + 4 (SO31 magic) + 2 (non-zero word) = 130. */
 const MIN_FILE_SIZE = 130;
@@ -90,8 +98,8 @@ export function isMultiMediaSoundFormat(buffer: ArrayBuffer | Uint8Array): boole
 /**
  * Parse a MultiMedia Sound module file into a TrackerSong.
  *
- * This parser creates a metadata-only TrackerSong.
- * Actual audio playback is always delegated to UADE.
+ * The grid is the real pattern data (MultiMedia Sound.AMP2.asm GetSongSize / CONVERTNOTE): order list at $434 (length
+ * at $432), patterns of 64 rows x 4 channels x 4 bytes from $4B8, 1024 bytes each. Audio playback is delegated to UADE.
  *
  * @param buffer   Raw file bytes (ArrayBuffer)
  * @param filename Original filename (used to derive the module name)
@@ -110,37 +118,33 @@ export function parseMultiMediaSoundFile(buffer: ArrayBuffer, filename: string):
   const moduleName =
     baseName.replace(/^mms\./i, '').replace(/^sfx20\./i, '') || baseName;
 
-  // ── Instrument placeholder ────────────────────────────────────────────────
+  // ── Order list and patterns (GetSongSize: pattern count = highest order entry + 1) ──
 
-  const instruments: InstrumentConfig[] = [
-    {
-      id: 1,
-      name: '',
+  const orderLen = Math.min(buf[ORDER_LEN_OFFSET], MAX_ORDER);
+  const order = Array.from(buf.subarray(ORDER_OFFSET, ORDER_OFFSET + orderLen));
+  const wanted = (order.length > 0 ? Math.max(...order) : 0) + 1;
+  const stored = Math.min(wanted, Math.max(0, Math.floor((buf.length - PATTERN_OFFSET) / PATTERN_SIZE)));
+
+  // ── Instruments: one per non-empty sample slot (the first 31 longwords are the sample sizes) ──
+
+  const instruments: InstrumentConfig[] = [];
+  for (let i = 0; i < NUM_LONGS; i++) {
+    instruments.push({
+      id: i + 1,
+      name: u32BE(buf, i * 4) > 0 ? `Sample ${i + 1}` : '',
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],
       volume: 0,
       pan: 0,
-    } as InstrumentConfig,
-  ];
+    } as InstrumentConfig);
+  }
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
-
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
-
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
+  const patterns = Array.from({ length: Math.max(stored, 1) }, (_, p) => ({
+    id: `pattern-${p}`,
+    name: `Pattern ${p}`,
+    length: ROWS,
+    channels: Array.from({ length: CHANNELS }, (_, ch) => ({
       id: `channel-${ch}`,
       name: `Channel ${ch + 1}`,
       muted: false,
@@ -150,41 +154,46 @@ export function parseMultiMediaSoundFile(buffer: ArrayBuffer, filename: string):
       pan: ch === 0 || ch === 3 ? -50 : 50,
       instrumentId: null,
       color: null,
-      rows: emptyRows,
+      rows: Array.from({ length: ROWS }, (_, r): TrackerCell => {
+        if (p >= stored) return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 } as TrackerCell;
+        const off = PATTERN_OFFSET + p * PATTERN_SIZE + r * CHANNELS * MMS_CELL_SIZE + ch * MMS_CELL_SIZE;
+        return decodeMmsCell(buf.subarray(off, off + MMS_CELL_SIZE));
+      }),
     })),
     importMetadata: {
       sourceFormat: 'MOD' as const,
       sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: 1,
-      originalInstrumentCount: 0,
+      originalChannelCount: CHANNELS,
+      originalPatternCount: stored,
+      originalInstrumentCount: instruments.length,
     },
-  };
+  }));
 
   return {
     name: `${moduleName} [MultiMedia Sound]`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions: order.length > 0 ? order.map((n) => Math.min(n, patterns.length - 1)) : [0],
+    songLength: Math.max(order.length, 1),
     restartPosition: 0,
-    numChannels: 4,
+    numChannels: CHANNELS,
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadePatternLayout: {
-      formatId: 'mod',
-      patternDataFileOffset: 1084,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
-      numPatterns: 1,
+      formatId: 'multiMediaSound',
+      patternDataFileOffset: PATTERN_OFFSET,
+      bytesPerCell: MMS_CELL_SIZE,
+      rowsPerPattern: ROWS,
+      numChannels: CHANNELS,
+      numPatterns: stored,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
+      encodeCell: encodeMmsCell,
+      decodeCell: decodeMmsCell,
     } satisfies UADEPatternLayout,
   };
 }

@@ -27,6 +27,7 @@ registerEditableFormat({ formatId: "wallyBeben", label: "Wally Beben", patternCo
 registerEditableFormat({ formatId: "synTracker", label: "SynTracker", patternCodec: { kind: "fixed" }, exporter: { module: "SynTrackerExporter", fn: "exportSynTrackerFile", ext: "synmod" } });
 registerEditableFormat({ formatId: "tomyTracker", label: "Tomy Tracker", patternCodec: { kind: "fixed" }, exporter: { module: "TomyTrackerExporter", fn: "exportTomyTracker", ext: "sg", byLayout: true } });
 registerEditableFormat({ formatId: "glueMon", label: "GlueMon", patternCodec: { kind: "fixed" }, exporter: { module: "GlueMonExporter", fn: "exportGlueMon", ext: "glue", byLayout: true } });
+registerEditableFormat({ formatId: "multiMediaSound", label: "MultiMedia Sound", patternCodec: { kind: "fixed" }, exporter: { module: "MultiMediaSoundExporter", fn: "exportMultiMediaSound", byLayout: true } });
 registerEditableFormat({ formatId: "tme", label: "The Musical Enlightenment", patternCodec: { kind: "fixed" }, exporter: { module: "TMEExporter", fn: "exportTME", byLayout: true } });
 registerEditableFormat({ formatId: "soundPlayer", label: "Sound Player", patternCodec: { kind: "fixed" }, exporter: { module: "SoundPlayerExporter", fn: "exportSoundPlayer", byLayout: true } });
 registerEditableFormat({ formatId: "mcmd", label: "MCMD", patternCodec: { kind: "fixed" }, exporter: { module: "McmdExporter", fn: "exportMcmd", byLayout: true } });

@@ -52,6 +52,7 @@ import './MDLEncoder';
 import './MEDEncoder';
 import './MODEncoder';
 import './MTMEncoder';
+import './MultiMediaSoundEncoder';
 import './MusicAssemblerEncoder';
 import './MusicLineEncoder';
 import './NRUEncoder';

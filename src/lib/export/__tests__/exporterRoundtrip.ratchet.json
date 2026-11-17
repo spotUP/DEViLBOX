@@ -768,6 +768,14 @@
       "cells": 25010,
       "bytes": 25010
     },
+    "multiMediaSound": {
+      "exporter": "MultiMediaSoundExporter.exportMultiMediaSound",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 84914,
+      "bytes": 84914
+    },
     "tme": {
       "exporter": "TMEExporter.exportTME",
       "tier": "byte-exact",
