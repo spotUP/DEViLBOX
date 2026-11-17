@@ -46,22 +46,37 @@ export function encodeFrames(frames: readonly AyFrame[]): Uint8Array[] {
 
 /** Banks of exactly the used length. A frame never straddles banks; each bank ends in a control frame. */
 export function packBanks(encoded: readonly Uint8Array[], maxBanks: number): Uint8Array[] {
+  return packSongs([encoded], maxBanks).banks;
+}
+
+/** Where a song starts: index into the bank list and byte offset in that bank. */
+export interface ZxSongStart { bank: number; offset: number }
+
+/**
+ * Several songs one after another in the banks, each ending with the loop frame (loop to its own start). A song may
+ * start in the middle of a bank; when its first frame does not fit, its start is the bank's next-bank frame.
+ */
+export function packSongs(songs: ReadonlyArray<readonly Uint8Array[]>, maxBanks: number): { banks: Uint8Array[]; starts: ZxSongStart[] } {
   const banks: number[][] = [[]];
+  const starts: ZxSongStart[] = [];
   const room = ZX_BANK_SIZE - 2; // the closing control frame
-  for (const f of encoded) {
-    let b = banks[banks.length - 1];
-    if (b.length + f.length > room) {
-      b.push(0, ZX_CTRL_NEXT_BANK);
-      b = [];
-      banks.push(b);
+  for (const encoded of songs) {
+    starts.push({ bank: banks.length - 1, offset: banks[banks.length - 1].length });
+    for (const f of encoded) {
+      let b = banks[banks.length - 1];
+      if (b.length + f.length > room) {
+        b.push(0, ZX_CTRL_NEXT_BANK);
+        b = [];
+        banks.push(b);
+      }
+      b.push(...f);
     }
-    b.push(...f);
+    banks[banks.length - 1].push(0, ZX_CTRL_LOOP);
   }
-  banks[banks.length - 1].push(0, ZX_CTRL_LOOP);
   if (banks.length > maxBanks) {
-    throw new Error(`The song needs ${banks.length} data banks of 16 KB but a ZX Spectrum 128 has ${maxBanks} free; shorten the song.`);
+    throw new Error(`The songs need ${banks.length} data banks of 16 KB but a ZX Spectrum 128 has ${maxBanks} free; shorten the song or export fewer subsongs.`);
   }
-  return banks.map((b) => Uint8Array.from(b));
+  return { banks: banks.map((b) => Uint8Array.from(b)), starts };
 }
 
 /** Test/reference decoder: banks -> per-frame register writes, following control frames; stops at the loop frame. */

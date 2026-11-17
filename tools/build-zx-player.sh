@@ -25,6 +25,8 @@ meta = {
     'titleOffset': sym['title_str'] - load, 'authorOffset': sym['author_str'] - load, 'textLength': 32,
     'screenStatic': sym['screen_static'], 'barStatic': sym['bar_static'], 'updateBars': sym['update_bars'],
     'vars': sym['VARS'],
+    'songTableOffset': sym['songtab'] - load, 'songCountOffset': sym['nsongs'] - load, 'maxSongs': sym['MAXSONGS'],
+    'statusTextOffset': sym['statustxt'] - load,
 }
 json.dump(meta, open(sys.argv[3], 'w'), indent=1)
 open(sys.argv[3], 'a').write('\n')

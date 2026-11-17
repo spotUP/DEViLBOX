@@ -1,9 +1,10 @@
 ; screen.inc - DEViLBOX player screen for the ZX Spectrum, shared by player.asm, beeper.asm and quadtone.asm.
 ; Same layout as the NES player (public/nes/player.s Phase 8): logo + chip name rows 1-2, title row 4, author row 5,
-; status row 7 (AY only), bars rows 10-17 (AY only), scroller row 22 (AY only). Upper case only: tile = ASCII - #20,
-; tiles 64-71 logo, 72 solid block. The tiles come from screen_font.inc (tools/hwplayer/assets.ts, font8x8.json).
-; The includer defines `chiptxt` (20 characters) and, for the AY player, DEFINE AYSCREEN plus its own status/scroller data.
+; status row 7, bars rows 10-17 (NBARS bars at columns 2, 4, ..), bar labels row 18, scroller row 22. Upper case only:
+; tile = ASCII - #20, tiles 64-71 logo, 72 solid block. The tiles come from screen_font.inc (tools/hwplayer/assets.ts).
+; The includer defines `chiptxt` (20 characters), NBARS, `statustxt` (26), `bartxt` (2 * NBARS - 1) and `scrtxt` (SCRLEN >= 33).
 ; screen_static draws the whole static screen once; it needs a valid SP and clobbers every register.
+BARW	equ 2 * NBARS - 1
 
 screen_static
 	ld hl,#4000
@@ -35,7 +36,10 @@ sa2	ld (hl),c
 	djnz sa2
 	pop hl
 	jr sa1
-sa9	ld d,1			; logo, 4 x 2 tiles
+sa9	ld a,(scrtxt + 32)
+	sub #20
+	ld (sl_ch),a
+	ld d,1			; logo, 4 x 2 tiles
 	ld e,1
 	ld a,64
 	ld b,4
@@ -149,14 +153,12 @@ pt1	push hl
 
 ; row, col, length, attribute
 attrtab	db 1,1,4,#43, 2,1,4,#43, 1,6,20,#46, 2,6,20,#45, 4,0,32,#47, 5,0,32,#44
-	IFDEF AYSCREEN
-	db 7,0,26,#47, 18,2,7,#46, 22,0,32,#45
+	db 7,0,26,#47, 18,2,BARW,#46, 22,0,32,#45
 rw = 10
 	dup 8
-	db rw,2,7,0
+	db rw,2,BARW,0
 rw = rw + 1
 	edup
-	ENDIF
 	db #ff
 
 ; row, col, length, string
@@ -168,17 +170,122 @@ txttab	db 1,6,20
 	dw title_str
 	db 5,0,32
 	dw author_str
-	IFDEF AYSCREEN
 	db 7,0,26
 	dw statustxt
-	db 18,2,7
+	db 18,2,BARW
 	dw bartxt
 	db 22,0,32
 	dw scrtxt
-	ENDIF
 	db #ff
 
 subtxt	db "DEVILBOX NATIVE PLAYER "
+
+bar_static			; solid blocks for the NBARS bars (the attributes make them visible), rows 10-17
+	ld d,10
+bs1	ld e,2
+	ld b,NBARS
+bs2	push bc
+	ld a,72
+	call puttile
+	pop bc
+	inc e
+	inc e
+	djnz bs2
+	inc d
+	ld a,d
+	cp 18
+	jr nz,bs1
+	ret
+
+; ---- scroller: one pixel row of the row 22 text moves left by one character per call; 8 calls = one character.
+; About 700 T, the same every call (the character step adds a few T every 8th call). Clobbers A, BC, DE, HL.
+scroll_row
+	ld a,(sl_row)
+	add a,#50		; row 22 = third 2, character row 6: #50C0 + pixel row * 256
+	ld d,a
+	ld h,a
+	ld e,#c0
+	ld l,#c1
+	dup 31
+	ldi
+	edup
+	ld a,(sl_ch)		; the incoming character's pixel row into column 31
+	ld l,a
+	ld h,0
+	add hl,hl
+	add hl,hl
+	add hl,hl
+	ld bc,font
+	add hl,bc
+	ld a,(sl_row)
+	ld c,a
+	ld b,0
+	add hl,bc
+	ld a,(hl)
+	ld (de),a
+	ld a,c
+	inc a
+	and 7
+	ld (sl_row),a
+	ret nz
+	ld hl,(sl_pos)		; next character of the message
+	inc hl
+	ld de,scrtxt + SCRLEN
+	or a
+	sbc hl,de
+	add hl,de
+	jr c,sr1
+	ld hl,scrtxt
+sr1	ld (sl_pos),hl
+	ld a,(hl)
+	sub #20
+	ld (sl_ch),a
+	ret
+
+sl_row	db 0
+sl_pos	dw scrtxt + 32		; the character coming in next (the static screen shows the first 32)
+sl_ch	db 0			; its tile; screen_static sets it
+
+; ---- clock: four digit tiles M M : S S on row 7, columns 12, 13, 15, 16 -----------------------
+clock_inc			; one second on; clobbers A, HL
+	ld hl,clockd + 3
+	ld a,(hl)
+	inc a
+	cp 26			; tile of "9" + 1
+	jr c,ci9
+	ld (hl),16
+	dec hl
+	ld a,(hl)
+	inc a
+	cp 22			; "6"
+	jr c,ci9
+	ld (hl),16
+	dec hl
+	ld a,(hl)
+	inc a
+	cp 26
+	jr c,ci9
+	ld (hl),16
+	dec hl
+	ld a,(hl)
+	inc a
+	cp 26
+	jr c,ci9
+	ld a,16
+ci9	ld (hl),a
+	ret
+clock_reset			; 00:00; clobbers A, HL
+	ld hl,clockd
+	ld a,16
+	ld (hl),a
+	inc hl
+	ld (hl),a
+	inc hl
+	ld (hl),a
+	inc hl
+	ld (hl),a
+	ret
+clockd	db 16,16,16,16
 title_str	db "                                "	; the exporter writes the song title here (32 characters, space padded)
 author_str	db "                                "	; and the author here
 

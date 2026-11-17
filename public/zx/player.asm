@@ -3,13 +3,16 @@
 ; Stream (banks paged at 0xC000 through port 0x7FFD) is a list of frames, one per 50 Hz tick:
 ;   byte m0   bit n set = AY register n (0..7) follows
 ;   byte m1   bit n set = AY register 8+n (8..13) follows; m1 >= 0xC0 is a control byte:
-;             0xFF = continue in the next bank of banktab, 0xFE = loop to the first bank
+;             0xFF = continue in the next bank of banktab, 0xFE = loop to the start of the current song
 ;   then one value byte per set bit, register order.
 ; Control frames take no tick: the next frame is read at once.
 ; Screen (screen.inc, same layout as the NES player): after the AY writes of a tick the player updates the bars from the
 ; register shadow, the clock, and every 4th tick the scroller. SPACE pauses (AY volumes off, stream and clock stopped).
 ; The AY writes come first after the interrupt, so the screen work never moves them.
-	DEFINE AYSCREEN
+; Songs: songtab holds nsongs start points (bank index, address); each song starts from all registers 0 and ends with
+; 0xFE. P and O step to the next and previous song. The exporter patches nsongs, songtab and the SONG nn/mm count.
+NBARS		equ 4
+MAXSONGS	equ 16
 VARS		equ #BF00		; RAM outside the image
 SHADOW		equ VARS		; 14 AY register values as last written
 idx		equ VARS + 16		; bank table index
@@ -22,6 +25,8 @@ scrpos		equ VARS + 22
 scrtick		equ VARS + 23
 lvl		equ VARS + 24		; bar levels 0-8: channel A, B, C, noise
 sptr		equ VARS + 28		; stream pointer (2 bytes)
+cursong		equ VARS + 30		; song index, 0-based
+keyp2		equ VARS + 31		; O and P key bits as last read
 BARBASE		equ #5A20		; attribute address of row 17, column 0 (bottom of the bars)
 
 	org #8000
@@ -29,31 +34,24 @@ start	di
 	ld sp,#7F00
 	call screen_static
 	call bar_static
-	ld hl,SHADOW
-	ld e,0
-mute	xor a
-	ld (hl),a
-	inc hl
-	call aywr
-	inc e
-	ld a,e
-	cp 14
-	jr nz,mute
-	ld hl,VARS + 16		; clear idx .. scrtick
+	ld hl,VARS + 16		; clear idx .. keyp2
 	ld de,VARS + 17
-	ld bc,7
+	ld bc,15
 	ld (hl),0
 	ldir
 	ld a,1
 	ld (keyprev),a
-	call setbank
-	ld (sptr),hl
+	ld a,3
+	ld (keyp2),a
+	xor a
+	call songsel
 	ei
 frame	halt
 	ld a,(paused)
 	or a
 	call z,stream_frame
 	call keys
+	call songkeys
 	call tick
 	call update_bars
 	call scroll
@@ -79,15 +77,86 @@ read	ld d,(hl)		; m0
 ctrl	cp #fe
 	ld a,(idx)
 	jr nz,nxt
-	xor a
-	ld (frames),a		; the song loops: the clock restarts
-	ld (secs),a
-	ld (mins),a
-	jr st
+	ld a,(cursong)		; the song loops: back to its start, registers 0, clock 00:00
+	call songsel
+	ld hl,(sptr)
+	jr read
 nxt	inc a
-st	ld (idx),a
+	ld (idx),a
 	call setbank
 	jr read
+
+songsel	ld (cursong),a		; start song A: page its bank, all registers 0, clock 00:00, draw SONG nn
+	ld c,a
+	add a,a
+	add a,c
+	ld e,a
+	ld d,0
+	ld hl,songtab
+	add hl,de
+	ld a,(hl)
+	ld (idx),a
+	inc hl
+	ld e,(hl)
+	inc hl
+	ld d,(hl)
+	push de
+	call setbank
+	ld hl,SHADOW
+	ld e,0
+ss1	xor a
+	ld (hl),a
+	inc hl
+	call aywr
+	inc e
+	ld a,e
+	cp 14
+	jr nz,ss1
+	xor a
+	ld (frames),a
+	ld (secs),a
+	ld (mins),a
+	pop hl
+	ld (sptr),hl
+	ld a,(cursong)		; song number to BCD
+	inc a
+	ld c,a
+	xor a
+ss2	add a,1
+	daa
+	dec c
+	jr nz,ss2
+	ld d,7
+	ld e,5
+	call put_bcd
+	jp status_draw
+
+songkeys			; P = next song, O = previous, on the key press (port #DFFE: P bit 0, O bit 1)
+	ld bc,#dffe
+	in a,(c)
+	and 3
+	ld hl,keyp2
+	ld c,(hl)
+	ld (hl),a
+	cpl
+	and c
+	ret z
+	ld b,a
+	ld a,(nsongs)
+	ld c,a
+	ld a,(cursong)
+	bit 0,b
+	jr z,sk1
+	inc a
+	cp c
+	jr c,songsel
+	xor a
+	jr songsel
+sk1	or a
+	jr nz,sk2
+	ld a,c
+sk2	dec a
+	jr songsel
 
 dobyte	ld a,d			; d = mask, e = first register, hl = stream
 	or a
@@ -128,23 +197,6 @@ setbank	ld a,(idx)		; page banktab[idx] at 0xC000, hl = 0xC000
 	ret
 
 ; ---- screen ----------------------------------------------------------------------------
-bar_static			; solid blocks for the four bars (the attributes make them visible), rows 10-17, columns 2, 4, 6, 8
-	ld d,10
-bs1	ld e,2
-	ld b,4
-bs2	push bc
-	ld a,72
-	call puttile
-	pop bc
-	inc e
-	inc e
-	djnz bs2
-	inc d
-	ld a,d
-	cp 18
-	jr nz,bs1
-	ret
-
 keys	ld bc,#7ffe		; SPACE toggles pause on the key press
 	in a,(c)
 	and 1
@@ -329,12 +381,16 @@ statustxt	db "SONG 01/01  00:00  PLAYING"
 txt_playing	db "PLAYING"
 txt_paused	db "PAUSED "
 bartxt	db "A B C N"
-scrmsg	db "DEVILBOX NATIVE PLAYER FOR THE ZX SPECTRUM 128K - HOLD SPACE TO PAUSE ...                                "
+scrmsg	db "DEVILBOX NATIVE PLAYER FOR THE ZX SPECTRUM 128K - SPACE TO PAUSE - O AND P TO CHANGE SONG ...                                "
 scrend
 SCRLEN	equ scrend - scrmsg
 scrtxt	equ scrmsg
-	db "DEVILBOX NATIVE PLAYER FOR THE ZX SPECTRUM 128K - HOLD SPACE TO PAUSE ...                                "
+	db "DEVILBOX NATIVE PLAYER FOR THE ZX SPECTRUM 128K - SPACE TO PAUSE - O AND P TO CHANGE SONG ...                                "
 
 	include "screen.inc"
 
+nsongs	db 1			; patched by the exporter
+songtab	db 0			; per song: bank table index, start address (lo, hi); patched by the exporter
+	dw #c000
+	defs (MAXSONGS - 1) * 3
 banktab	defs 8			; 0x10 | bank number (ROM 1 selected), patched by the exporter

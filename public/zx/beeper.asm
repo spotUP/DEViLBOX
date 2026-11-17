@@ -243,6 +243,11 @@ v = v + 1
 	edup
 
 chiptxt	db "ZX SPECTRUM BEEPER  "
+NBARS	equ 6
+statustxt	db "SONG 01/01  00:00  PLAYING"
+bartxt	db "1 2 3 4 5 6"
+scrtxt	db "DEVILBOX NATIVE PLAYER FOR THE ZX SPECTRUM 128K - BEEPER MUSIC ...                                "
+SCRLEN	equ $ - scrtxt
 
 	include "screen.inc"
 

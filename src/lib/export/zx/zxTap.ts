@@ -2,7 +2,7 @@
  * ZX Spectrum 128 .tap: BASIC loader + player CODE + one CODE block per 16 KB data bank,
  * built around public/zx/player.bin (register-stream player, see player.asm).
  */
-import { captureToFrames, encodeFrames, packBanks } from './zxAyStream';
+import { captureToFrames, encodeFrames, packSongs } from './zxAyStream';
 import type { RegisterWrite } from '../VGMExporter';
 
 export interface ZxPlayer {
@@ -15,6 +15,8 @@ export interface ZxPlayer {
   usableBanks: number[];
   /** Offsets of the 32 character title and author blocks (screen.inc) and their length. */
   titleOffset: number; authorOffset: number; textLength: number;
+  /** Song table (bank index, address lo, hi per song), song count byte, table size, and the status line text. */
+  songTableOffset: number; songCountOffset: number; maxSongs: number; statusTextOffset: number;
 }
 
 /** Upper case ASCII 0x20-0x5F only (the screen font has 64 tiles), truncated and space padded to `length`. */
@@ -101,14 +103,24 @@ export function basicLoader(banks: number[], p: Pick<ZxPlayer, 'loadAddress' | '
   return Uint8Array.from(lines);
 }
 
-export interface ZxTapResult { tap: Uint8Array; frames: number; banks: number; dataBytes: number; seconds: number }
+export interface ZxTapResult { tap: Uint8Array; frames: number; banks: number; dataBytes: number; seconds: number; songs: number }
 
-export function buildZxTap(writes: readonly RegisterWrite[], sampleRate: number, player: ZxPlayer, title = 'devilbox', author = ''): ZxTapResult {
-  const frames = captureToFrames(writes, sampleRate);
-  if (frames.length === 0) throw new Error('No AY register writes were captured. Play a ZX Spectrum 128 (AY-3-8910) song through while recording.');
-  const banks = packBanks(encodeFrames(frames), player.usableBanks.length);
+/** One song or several (subsongs, played with O and P on the Spectrum); each is one recorded playthrough. */
+export function buildZxTap(writes: readonly RegisterWrite[] | ReadonlyArray<readonly RegisterWrite[]>, sampleRate: number, player: ZxPlayer, title = 'devilbox', author = ''): ZxTapResult {
+  const songs = (writes.length > 0 && Array.isArray(writes[0]) ? writes : [writes]) as ReadonlyArray<readonly RegisterWrite[]>;
+  if (songs.length > player.maxSongs || songs.length > 99) throw new Error(`The ZX Spectrum player holds at most ${Math.min(player.maxSongs, 99)} songs; this export has ${songs.length}.`);
+  const songFrames = songs.map((w) => captureToFrames(w, sampleRate));
+  if (songFrames.some((f) => f.length === 0)) throw new Error('No AY register writes were captured. Play a ZX Spectrum 128 (AY-3-8910) song through while recording.');
+  const { banks, starts } = packSongs(songFrames.map(encodeFrames), player.usableBanks.length);
+  const frames = songFrames.reduce((n, f) => n + f.length, 0);
   const code = Uint8Array.from(player.bytes);
   banks.forEach((_, i) => { code[player.bankTableOffset + i] = 0x10 | player.usableBanks[i]; });
+  code[player.songCountOffset] = starts.length;
+  starts.forEach((st, i) => {
+    const addr = player.dataAddress + st.offset;
+    code.set([st.bank, addr & 0xFF, addr >> 8], player.songTableOffset + i * 3);
+  });
+  code.set(screenText(String(starts.length).padStart(2, '0'), 2), player.statusTextOffset + 8); // "SONG 01/nn"
   patchScreenText(code, player, title, author);
   const name = title.replace(/[^\x20-\x7E]/g, '?').slice(0, 10);
   const loader = basicLoader(player.usableBanks.slice(0, banks.length), player);
@@ -120,7 +132,7 @@ export function buildZxTap(writes: readonly RegisterWrite[], sampleRate: number,
   const tap = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
   let o = 0;
   for (const p of parts) { tap.set(p, o); o += p.length; }
-  return { tap, frames: frames.length, banks: banks.length, dataBytes: banks.reduce((n, b) => n + b.length, 0), seconds: frames.length / 50 };
+  return { tap, frames, banks: banks.length, dataBytes: banks.reduce((n, b) => n + b.length, 0), seconds: frames / 50, songs: starts.length };
 }
 
 /** public/zx/beeper.bin + beeper.json (tools/build-zx-beeper.sh): 128K 6 voice beeper player. */

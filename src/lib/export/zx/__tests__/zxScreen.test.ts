@@ -4,6 +4,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { FurnaceChipType } from '../../../../engine/chips/FurnaceChipEngine';
+import type { RegisterWrite } from '../../VGMExporter';
+import { buildZxTap, loadZxPlayerFrom } from '../zxTap';
 
 type Mem = Uint8Array;
 
@@ -35,6 +38,10 @@ function runCall(mem: Mem, start: number): void {
       case 0x06: case 0x0E: case 0x16: case 0x1E: case 0x26: case 0x2E: case 0x36: case 0x3E:
         set(op >> 3 & 7, mem[pc++]); break;
       case 0x1A: r[A] = mem[pair(D, E)]; break;
+      case 0x3A: r[A] = mem[rd16(pc)]; pc += 2; break;
+      case 0x32: mem[rd16(pc)] = r[A]; pc += 2; break;
+      case 0x2A: setPair(H, L, rd16(rd16(pc))); pc += 2; break;
+      case 0x22: { const t = rd16(pc); mem[t] = r[L]; mem[t + 1] = r[H]; pc += 2; break; }
       case 0x13: setPair(D, E, pair(D, E) + 1); break;
       case 0x23: setPair(H, L, hl() + 1); break;
       case 0x09: setPair(H, L, hl() + pair(B, C)); break;
@@ -108,6 +115,8 @@ describe('ZX player screens (screen_static run in a Z80 interpreter)', () => {
       expect(textAt(mem, fontStart, 5, 0, 32).trim()).toBe('TEST AUTHOR');
       expect(mem[0x5800 + 4 * 32]).toBe(0x47);
       expect(mem[0x5800 + 5 * 32]).toBe(0x44);
+      expect(textAt(mem, fontStart, 7, 0, 26)).toBe('SONG 01/01  00:00  PLAYING');
+      expect(textAt(mem, fontStart, 18, 2, 3)).toMatch(/^[A1] [B2]$/);
       if (name === 'player') {
         // bar_static draws solid blocks at columns 2,4,6,8 rows 10-17, attribute 0 until lit
           runCall(mem, meta.barStatic);
@@ -117,6 +126,31 @@ describe('ZX player screens (screen_static run in a Z80 interpreter)', () => {
       }
     });
   }
+});
+
+describe('ZX AY player subsongs', () => {
+  it('packs every song, fills the song table and shows the count as SONG 01/nn', () => {
+    const meta = JSON.parse(readFileSync('public/zx/player.json', 'utf8'));
+    const player = loadZxPlayerFrom(new Uint8Array(readFileSync('public/zx/player.bin')), meta);
+    const RATE = 48000;
+    const song = (frames: number, pitch: number): RegisterWrite[] => Array.from({ length: frames }, (_, f) =>
+      ({ timestamp: f * RATE / 50, chipType: FurnaceChipType.AY, port: f % 2, data: (pitch + f) & 0xFF }));
+    const r = buildZxTap([song(100, 1), song(9000, 50), song(30, 9)], RATE, player, 'three');
+    expect(r.songs).toBe(3);
+    // The player code is the 4th tap block (loader header, loader, code header, code): 2 length bytes, flag, data, checksum.
+    let o = 0;
+    for (let i = 0; i < 3; i++) o += 2 + (r.tap[o] | r.tap[o + 1] << 8);
+    const code = r.tap.slice(o + 3, o + 3 + player.bytes.length);
+    expect(code[meta.songCountOffset]).toBe(3);
+    const tab = Array.from({ length: 3 }, (_, i) => code.slice(meta.songTableOffset + i * 3, meta.songTableOffset + i * 3 + 3));
+    expect(tab[0]).toEqual(Uint8Array.from([0, 0x00, 0xC0]));
+    expect(tab[1][2]).toBeGreaterThanOrEqual(0xC0);
+    expect(tab[2][0]).toBeGreaterThanOrEqual(1); // song 2 is 9000 frames: song 3 starts in a later bank
+    const mem = new Uint8Array(65536);
+    mem.set(code, meta.loadAddress);
+    runCall(mem, meta.screenStatic);
+    expect(textAt(mem, findFont(mem, meta), 7, 0, 10)).toBe('SONG 01/03');
+  });
 });
 
 /** The font follows the last code label; tile 0 is eight zero bytes, tile 72 is eight 0xFF: find 73 tiles ending in a solid block. */

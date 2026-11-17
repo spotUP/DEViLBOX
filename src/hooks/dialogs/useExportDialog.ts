@@ -317,7 +317,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
       const { recordZxTap } = await import('@lib/export/zx/zxTapCapture');
       const r = await recordZxTap(metadata.name || 'song', metadata.author && metadata.author !== 'Unknown' ? metadata.author : '');
       downloadFn(new Blob([r.tap as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.tap`);
-      notify.success(`ZX Spectrum 128 tape exported (${r.frames} frames, ${Math.round(r.seconds)} s, ${r.tap.byteLength} bytes).`);
+      notify.success(`ZX Spectrum 128 tape exported (${r.songs} song${r.songs === 1 ? '' : 's'}, ${r.frames} frames, ${Math.round(r.seconds)} s, ${r.tap.byteLength} bytes).`);
       onClose();
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'ZX Spectrum tape export failed.');
