@@ -44,6 +44,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   tme: 'public/data/songs/the-musical-enlightenment/64 conversion.tme',
   majortom: 'public/data/songs/formats/pseudofever.arp',
   infogrames: 'public/data/songs/formats/bob4e.dum',
+  forgottenWorlds: 'public/data/songs/forgotten-worlds/forgotten worlds intro.fw',
   coreDesign: 'public/data/songs/core-design/dynamite dux.core',
   anders0land: 'public/data/songs/anders-oland/primemover 07.hot',
   format669: 'public/data/songs/composer-669/speed fighter.669',

@@ -183,6 +183,7 @@ export interface FormatEnginePreferences {
   futurePlayer: FormatEngineChoice;     // .fp/fp.* → FuturePlayerParser vs UADE
   jasonPage?: FormatEngineChoice;        // jpn.*/jpnd.*/jp.* → JasonPageParser vs UADE
   infogrames?: FormatEngineChoice;       // .dum → InfogramesParser vs UADE
+  forgottenWorlds?: FormatEngineChoice;  // .fw → ForgottenWorldsParser vs UADE
   sawteeth: FormatEngineChoice;         // .st → SawteethParser vs UADE
   fmTracker: FormatEngineChoice;        // .fmt → FMTrackerParser vs libopenmpt
   madTracker2: FormatEngineChoice;      // .mt2 → MadTracker2Parser vs libopenmpt

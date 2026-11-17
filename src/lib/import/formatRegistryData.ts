@@ -879,6 +879,18 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
   {
+    key: 'forgottenWorlds',
+    label: 'Forgotten Worlds',
+    description: 'Forgotten Worlds (Amiga game) — FWMP stream module',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.fw$/i,
+    prefixes: ['fw.'],
+    prefKey: 'forgottenWorlds',
+    nativeParser: { module: '@lib/import/formats/ForgottenWorldsParser', parseFn: 'parseForgottenWorldsFile', detectFn: 'isForgottenWorldsFormat' },
+    uadeFallback: true,
+  },
+  {
     key: 'pt36',
     label: 'ProTracker 3.6',
     description: 'ProTracker 3.6 IFF wrapper — FORM+MODL magic',

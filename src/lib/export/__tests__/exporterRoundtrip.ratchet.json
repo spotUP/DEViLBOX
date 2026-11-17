@@ -512,6 +512,14 @@
       "cells": 999,
       "bytes": 999
     },
+    "forgottenWorlds": {
+      "exporter": "ForgottenWorldsExporter.exportForgottenWorlds",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 22400,
+      "bytes": 22400
+    },
     "majortom": {
       "exporter": "MajorTomExporter.exportMajorTom",
       "tier": "byte-exact",
