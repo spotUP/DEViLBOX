@@ -72,6 +72,8 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   faceTheMusic: 'public/data/songs/face-the-music/rock.ftm',
   sawteeth: 'public/data/songs/sawteeth/okolaNUKE.st',
   earAche: 'public/data/songs/earache/bladerunner.ea',
+  pt41: 'public/data/songs/formats/libpt4-pt4x_40.mod',
+  speedySystem: 'public/data/songs/speedy-system/pauker rap 2.ss',
   iffSmus: 'public/data/songs/formats/radiokomppi.smus',
   actionamics: 'public/data/songs/actionamics/dynablaster.ast',
   monotone: 'src/lib/import/__tests__/fixtures/monotone/PRELUDE.MON',

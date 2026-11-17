@@ -46,6 +46,9 @@ export async function parseAs(rel: string, raw: Uint8Array): Promise<TrackerSong
   const name = rel.split('/').pop() ?? rel;
   const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
   // Content decides where the name alone is shared (.mon: MONOTONE vs Maniacs of Noise), as in the product.
+  // ProTracker 4.1 modules share the .mod name; the product routes them by content to the PT4 parser.
+  const pt4 = await import('@lib/import/formats/ProTracker4Parser');
+  if (pt4.isProTracker4Format(ab)) return pt4.parseProTracker4File(ab, name);
   const fmt = detectFormatFromContent(name, raw);
   let module: string | undefined;
   let parseFn: string | undefined;

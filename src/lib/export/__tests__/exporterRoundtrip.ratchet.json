@@ -855,6 +855,22 @@
       "matchPct": 1,
       "cells": 4738,
       "bytes": 4738
+    },
+    "pt41": {
+      "exporter": "ProTracker4Exporter.exportProTracker4",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 2962,
+      "bytes": 2962
+    },
+    "speedySystem": {
+      "exporter": "SpeedySystemExporter.exportSpeedySystem",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 264198,
+      "bytes": 264198
     }
   },
   "missingFixture": [
