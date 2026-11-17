@@ -19,8 +19,10 @@
 ; Loop registers: HL ph1, DE ph2, IX ph3, IY ph4, HL' ph5, DE' ph6, BC' iteration counter,
 ; B = page of pintab, A = pulse timer.
 
-ITER_T		equ 363		; T-states per tone loop iteration (counted below, wrap path +2 per voice)
-DRUM_BYTE_T	equ 504		; T-states per drum byte (8 bits of 63 T)
+; Counted 363 T / 504 T uncontended; each out (#fe) (even port, high byte A not #40-#7F) waits for the ULA in the screen area, avg ~0.9 T on 128K (measured in MAME: 365.25 T),
+; so the pitch and tempo constants use the effective values (contention is fixed by the machine, not removable from the loop).
+ITER_T		equ 365		; effective T-states per tone loop iteration
+DRUM_BYTE_T	equ 510		; effective T-states per drum byte (8 bits of 63 T + 8 contended OUTs)
 
 	org #8000
 entry
