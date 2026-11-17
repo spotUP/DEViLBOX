@@ -131,6 +131,7 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     wavetables: [],
   };
 
+  let ver = -1; // new-format (INS2/FINS) version; -1 for the old format
   if (magic === 'INS2' || magic === 'FINS') {
     // New instrument format
     // INS2 has a block size field; FINS does NOT (reference: fur.cpp readInsData)
@@ -139,6 +140,7 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     }
     const insVersion = reader.readUint16();
     inst.type = reader.readUint16();
+    ver = insVersion;
 
     // Read features until EN
     while (!reader.isEOF()) {
@@ -508,7 +510,7 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     // Old instrument format — Reference: instrument.cpp:2878-3200 (readInsDataOld)
     // In the old format, ALL sections are read regardless of instrument type!
     reader.readUint32(); // Block size (unused)
-    const instVersion = reader.readUint16(); // insVersion
+    const instVersion = reader.readUint16(); // insVersion (AY wave +1 for < 193 is applied below at the macro read)
     inst.type = reader.readUint8();
     reader.readUint8(); // reserved
     inst.name = readString(reader);
@@ -1239,6 +1241,12 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     throw new Error(`Unknown instrument format: "${magic}"`);
   }
 
+  // New format only (the old format adds it at its macro read). Furnace instrument.cpp: before version 193 the AY wave macro was stored one lower (0 = tone); the loader adds 1
+  // so the value is the tone/noise/envelope bitmask that ay.cpp reads.
+  if (ver >= 0 && ver < 193 && (inst.type === 6 || inst.type === 7)) {
+    for (const mac of inst.macros) if (mac.code === 3) mac.data = mac.data.map((v) => v + 1);
+  }
+
   return inst;
 }
 
@@ -1468,8 +1476,11 @@ export function encodeInstrumentAsINS2(inst: FurnaceInstrument, formatVersion: n
 
       // Values
       const len = Math.min(macro.length, macro.data.length);
+      // The parser already applied Furnace's version<193 AY/AY8930 wave +1; the engine re-applies it when this INS2 is tagged < 193,
+      // so store the on-disk (pre-conversion) value and let the engine convert exactly once.
+      const ayWaveBias = formatVersion < 193 && (inst.type === 6 || inst.type === 7) && macro.code === 3 ? 1 : 0;
       for (let i = 0; i < len; i++) {
-        const val = macro.data[i];
+        const val = macro.data[i] - ayWaveBias;
         switch (wordSize) {
           case 0: writeUint8(val & 0xFF); break;          // unsigned byte
           case 1: writeInt8(val); break;                    // signed byte
