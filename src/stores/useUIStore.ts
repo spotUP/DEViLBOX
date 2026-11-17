@@ -41,6 +41,8 @@ export type DialogCommand =
   | 'scale-values'
   | 'transpose-values'
   | 'randomize-values'
+  | 'collapse-rows'
+  | 'expand-rows'
   | 'find-replace'
   | 'groove-settings'
   | 'scale-volume-block'

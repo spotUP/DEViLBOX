@@ -14,7 +14,7 @@ import { Button } from '@components/ui/Button';
 import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 import { CustomSelect } from '@components/common/CustomSelect';
 
-export type ValueOpKind = 'scale' | 'transpose' | 'transposeNotes' | 'randomize';
+export type ValueOpKind = 'scale' | 'transpose' | 'transposeNotes' | 'randomize' | 'collapse' | 'expand';
 
 interface ValueOpsDialogProps {
   isOpen: boolean;
@@ -41,6 +41,8 @@ const OP_OPTIONS: { value: ValueOpKind; label: string }[] = [
   { value: 'transposeNotes', label: 'Transpose Notes by Semitones' },
   { value: 'transpose', label: 'Transpose Values by Amount' },
   { value: 'randomize', label: 'Randomize' },
+  { value: 'collapse', label: 'Collapse Rows by Amount' },
+  { value: 'expand', label: 'Expand Rows by Amount' },
 ];
 
 const INPUT_CLASS = 'w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-sm text-text-primary font-mono focus:outline-none focus:border-accent-primary';
@@ -51,6 +53,7 @@ export const ValueOpsDialog: React.FC<ValueOpsDialogProps> = ({ isOpen, onClose,
   const cursorColumn = useCursorStore((s) => valueColumnOf(s.cursor.columnType));
   const editSelectionValues = useTrackerStore((s) => s.editSelectionValues);
   const transposeSelection = useTrackerStore((s) => s.transposeSelection);
+  const resampleSelectionRows = useTrackerStore((s) => s.resampleSelectionRows);
   const [opChoice, setOpChoice] = useState<{ from: ValueOpKind; op: ValueOpKind }>({ from: initialOp, op: initialOp });
   // Follow the menu entry that opened the dialog without an effect: a new initialOp resets the pick.
   const op = opChoice.from === initialOp ? opChoice.op : initialOp;
@@ -66,6 +69,7 @@ export const ValueOpsDialog: React.FC<ValueOpsDialogProps> = ({ isOpen, onClose,
   const handleApply = () => {
     if (!selection) return;
     if (op === 'transposeNotes') transposeSelection(amount);
+    else if (op === 'collapse' || op === 'expand') resampleSelectionRows(op, Math.max(2, amount));
     else if (op === 'scale') editSelectionValues({ kind: 'scale', percent }, column, nibble);
     else if (op === 'transpose') editSelectionValues({ kind: 'transpose', amount }, column, nibble);
     else editSelectionValues({ kind: 'randomize', min: Math.min(min, max), max: Math.max(min, max), setEffect: setEffect >= 0 ? setEffect : null }, column, nibble);
@@ -89,7 +93,7 @@ export const ValueOpsDialog: React.FC<ValueOpsDialogProps> = ({ isOpen, onClose,
           <label className="block text-xs text-text-muted mb-1">Operation</label>
           <CustomSelect value={op} onChange={(v) => setOpChoice({ from: initialOp, op: v as ValueOpKind })} options={OP_OPTIONS} className={SELECT_CLASS} />
         </div>
-        {op !== 'transposeNotes' && <>
+        {op !== 'transposeNotes' && op !== 'collapse' && op !== 'expand' && <>
         <div>
           <label className="block text-xs text-text-muted mb-1">Column</label>
           <CustomSelect value={column} onChange={(v) => setColumnPick(v as ValueColumn)} options={COLUMN_OPTIONS} className={SELECT_CLASS} />
@@ -101,6 +105,7 @@ export const ValueOpsDialog: React.FC<ValueOpsDialogProps> = ({ isOpen, onClose,
         </>}
         {op === 'scale' && numberField('Percent', percent, setPercent)}
         {(op === 'transpose' || op === 'transposeNotes') && numberField(op === 'transposeNotes' ? 'Semitones (negative lowers)' : 'Amount (negative lowers)', amount, setAmount)}
+        {(op === 'collapse' || op === 'expand') && numberField('Amount (2 or more)', amount, setAmount)}
         {op === 'randomize' && (
           <div className="grid grid-cols-2 gap-2">
             {numberField('Minimum', min, setMin)}

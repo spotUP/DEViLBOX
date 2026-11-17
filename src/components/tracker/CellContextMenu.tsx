@@ -37,7 +37,7 @@ import {
   xmNoteShortName,
 } from '@/lib/chordDefinitions';
 import { Layers, SlidersHorizontal } from 'lucide-react';
-import { invertValues, minimizeChannels, maximizeChannels } from '@/engine/keyboard/commands/advanced';
+import { invertValues, absorbInstrument, minimizeChannels, maximizeChannels } from '@/engine/keyboard/commands/advanced';
 import { useChannelMenuItems, type ChannelMenuHandlers } from './useChannelMenuItems';
 
 interface CellContextMenuProps {
@@ -451,6 +451,21 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
         ]
       },
       {
+        id: 'block-paste-overflow',
+        label: 'Paste Overflow into Next Patterns',
+        onClick: () => { useTrackerStore.getState().pasteOverflow(); onClose(); },
+      },
+      {
+        id: 'block-collapse-rows',
+        label: 'Collapse Rows...',
+        onClick: () => { useUIStore.getState().openDialogCommand('collapse-rows'); onClose(); },
+      },
+      {
+        id: 'block-expand-rows',
+        label: 'Expand Rows...',
+        onClick: () => { useUIStore.getState().openDialogCommand('expand-rows'); onClose(); },
+      },
+      {
         id: 'block-set-instrument',
         label: 'Set Instrument of Selection',
         onClick: () => { applyCurrentInstrumentId(); onClose(); },
@@ -547,6 +562,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       onClick: handleDeleteRow,
     },
     { type: 'divider' },
+    { id: 'absorb-instrument', label: 'Absorb Instrument', onClick: () => { absorbInstrument(); onClose(); } },
     { id: 'minimize-channels', label: 'Minimize Channels', onClick: () => { minimizeChannels(); onClose(); } },
     { id: 'maximize-channels', label: 'Maximize Channels', onClick: () => { maximizeChannels(); onClose(); } },
     { type: 'divider' },

@@ -302,6 +302,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       case 'transpose-values':
         setValueOp('transpose');
         break;
+      case 'collapse-rows':
+        setValueOp('collapse');
+        break;
+      case 'expand-rows':
+        setValueOp('expand');
+        break;
       case 'randomize-values':
         setValueOp('randomize');
         break;

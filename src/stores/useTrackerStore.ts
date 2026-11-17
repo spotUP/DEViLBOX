@@ -446,12 +446,13 @@ import {
   applyInstrumentToSelectionHelper, transposeSelectionHelper, remapInstrumentHelper,
   interpolateSelectionHelper, humanizeSelectionHelper, strumSelectionHelper, legatoSelectionHelper,
   scaleVolumeHelper, fadeVolumeHelper, amplifySelectionHelper, swapChannelsHelper,
+  resampleRowsHelper,
   invertValuesHelper, scaleValuesHelper, transposeValuesHelper, randomizeValuesHelper,
   type ValueColumn, type NibbleMode,
 } from './tracker/patternEditActions';
 import {
   copySelectionHelper, cutSelectionHelper, swapSelectionHelper,
-  pasteHelper, pasteMixHelper, clipboardWithInstrument, pasteFloodHelper, pastePushForwardHelper,
+  pasteHelper, pasteMixHelper, pasteOverflowHelper, clipboardWithInstrument, pasteFloodHelper, pastePushForwardHelper,
   copyTrackHelper, cutTrackHelper, pasteTrackHelper,
   copyCommandsHelper, cutCommandsHelper, pasteCommandsHelper,
   killToEndHelper, killToStartHelper,
@@ -504,6 +505,10 @@ interface TrackerStore {
   // Advanced paste modes (OpenMPT-style)
   /** Paste with every pasted note set to instrumentId; mix = only fill empty cells (Furnace foreground / background paste). */
   pasteWithInstrument: (instrumentId: number, mix?: boolean) => void;
+  /** Paste whose rows past the pattern end continue in the next patterns of the song order. */
+  pasteOverflow: () => void;
+  /** Furnace collapse (keep every amount-th row) or expand (spread rows amount apart) inside the selection. */
+  resampleSelectionRows: (mode: 'collapse' | 'expand', amount: number) => void;
   pasteMix: () => void;           // Only fill empty cells
   pasteFlood: () => void;         // Paste until pattern end
   pastePushForward: () => void;   // Insert and shift down
@@ -1086,6 +1091,25 @@ export const useTrackerStore = create<TrackerStore>()(
       });
       refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('SWAP_SELECTION', 'Swap selection', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
+    },
+
+    pasteOverflow: () => {
+      const clip = get().clipboard;
+      if (!clip) return;
+      const cursor = useCursorStore.getState().cursor;
+      get().multiPatternEdit('Paste overflow', (song) => {
+        pasteOverflowHelper(song.patterns, song.patternOrder, get().currentPositionIndex, cursor, clip, useEditorStore.getState().pasteMask);
+      });
+    },
+
+    resampleSelectionRows: (mode, amount) => {
+      const selection = useCursorStore.getState().selection;
+      if (!selection) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => { resampleRowsHelper(state.patterns[state.currentPatternIndex], selection, amount, mode); });
+      pushEditAction('AMPLIFY', `${mode} rows`, patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 

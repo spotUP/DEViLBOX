@@ -518,3 +518,33 @@ export const randomizeValuesHelper = (
     }
   }
 };
+
+// ---------------------------------------------------------------------------
+// Collapse / Expand rows by amount (Furnace doCollapse / doExpand), absorb instrument
+// ---------------------------------------------------------------------------
+
+/** Rows of the selection are re-spaced: collapse keeps every amount-th row and packs them up, expand spreads them amount rows apart. The rest of the selection is cleared. */
+export function resampleRowsHelper(pattern: Pattern, sel: BlockSelection, amount: number, mode: 'collapse' | 'expand'): void {
+  const n = Math.max(2, Math.floor(amount));
+  const minCh = Math.min(sel.startChannel, sel.endChannel);
+  const maxCh = Math.max(sel.startChannel, sel.endChannel);
+  const r0 = Math.min(sel.startRow, sel.endRow);
+  const r1 = Math.min(Math.max(sel.startRow, sel.endRow), pattern.length - 1);
+  const len = r1 - r0 + 1;
+  for (let ch = minCh; ch <= maxCh; ch++) {
+    const rows = pattern.channels[ch]?.rows;
+    if (!rows) continue;
+    const src = rows.slice(r0, r1 + 1).map((c) => ({ ...c }));
+    for (let i = 0; i < len; i++) rows[r0 + i] = { ...EMPTY_CELL };
+    if (mode === 'collapse') for (let i = 0; i * n < len; i++) rows[r0 + i] = src[i * n];
+    else for (let i = 0; i * n < len; i++) rows[r0 + i * n] = src[i];
+  }
+}
+
+/** Instrument of the nearest cell at or above the row that has one, or null (Furnace "absorb instrument"). */
+export function nearestInstrumentAbove(pattern: Pattern, channel: number, row: number): number | null {
+  const rows = pattern.channels[channel]?.rows;
+  if (!rows) return null;
+  for (let r = Math.min(row, rows.length - 1); r >= 0; r--) if (rows[r].instrument) return rows[r].instrument;
+  return null;
+}

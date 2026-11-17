@@ -666,3 +666,33 @@ export function halveBlockHelper(
     channel.rows[r] = { ...EMPTY_CELL };
   }
 }
+
+/** Paste whose rows past the pattern end continue at row 0 of the next patterns in song order (Furnace paste overflow). `patterns` are the drafts to edit, `order` the song order. Returns the pattern indices touched. */
+export function pasteOverflowHelper(
+  patterns: Pattern[],
+  order: number[],
+  position: number,
+  cursor: CursorPosition,
+  clipboard: ClipboardData,
+  pasteMask: number,
+): number[] {
+  const touched: number[] = [];
+  let pos = position;
+  let rowIndex = cursor.rowIndex;
+  let offset = 0;
+  const total = clipboard.data[0]?.length ?? 0;
+  while (offset < total && pos < order.length) {
+    const idx = order[pos];
+    const pattern = patterns[idx];
+    if (!pattern) break;
+    const fit = Math.min(total - offset, pattern.length - rowIndex);
+    if (fit <= 0) break;
+    const part: ClipboardData = { ...clipboard, rows: fit, data: clipboard.data.map((ch) => ch.slice(offset, offset + fit)) };
+    pasteHelper(pattern, { ...cursor, rowIndex }, part, pasteMask);
+    touched.push(idx);
+    offset += fit;
+    rowIndex = 0;
+    pos++;
+  }
+  return touched;
+}

@@ -6,7 +6,8 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useUIStore } from '@stores/useUIStore';
-import { valueColumnOf } from '@stores/tracker/patternEditActions';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { valueColumnOf, nearestInstrumentAbove } from '@stores/tracker/patternEditActions';
 
 type ValueOp = Parameters<ReturnType<typeof useTrackerStore.getState>['editSelectionValues']>[0];
 
@@ -27,6 +28,18 @@ export const transposeValuesUp = (): boolean => editValues({ kind: 'transpose', 
 export const transposeValuesDown = (): boolean => editValues({ kind: 'transpose', amount: -1 }, 'Values -1');
 export const scaleValuesUp = (): boolean => editValues({ kind: 'scale', percent: 110 }, 'Values scaled to 110 percent');
 export const scaleValuesDown = (): boolean => editValues({ kind: 'scale', percent: 90 }, 'Values scaled to 90 percent');
+
+/** Furnace "absorb instrument": make the nearest instrument above the cursor in its channel the current one. */
+export function absorbInstrument(): boolean {
+  const ts = useTrackerStore.getState();
+  const { cursor } = useCursorStore.getState();
+  const id = nearestInstrumentAbove(ts.patterns[ts.currentPatternIndex], cursor.channelIndex, cursor.rowIndex);
+  const ui = useUIStore.getState();
+  if (id === null) { ui.setStatusMessage('No instrument above the cursor in this channel', false, 1500); return true; }
+  useInstrumentStore.getState().setCurrentInstrument(id);
+  ui.setStatusMessage(`Instrument ${id.toString(16).toUpperCase().padStart(2, '0')} absorbed`, false, 1000);
+  return true;
+}
 
 export function minimizeChannels(): boolean {
   useTrackerStore.getState().setAllChannelsCollapsed(true);
