@@ -112,7 +112,10 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     this.wasm = null;
 
     this.port.onmessage = (event) => {
-      this.handleMessage(event.data);
+      // handleMessage is async: a throw would otherwise vanish and leave the caller waiting.
+      this.handleMessage(event.data).catch((e) => {
+        this.port.postMessage({ type: 'error', message: `${event.data && event.data.type} failed: ${(e && e.message) || e}` });
+      });
     };
   }
 
@@ -405,7 +408,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
             if (usage <= 0) continue;
             const capacity = this.wasm.sampleMem(chip.handle, index, 1);
             const ptr = this.wasm.sampleMem(chip.handle, index, 2);
-            blocks.push({ index, capacity, bytes: new Uint8Array(this.module.HEAPU8.subarray(ptr, ptr + usage)) });
+            blocks.push({ index, capacity, bytes: new Uint8Array(new Uint8Array(this.getHeapBuffer(), ptr, usage)) });
           }
         }
         this.port.postMessage({ type: 'sampleMem', platformType: data.platformType, blocks }, blocks.map(b => b.bytes.buffer));
@@ -420,7 +423,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
           const max = 65536;
           const ptr = this.module._malloc(max);
           const size = this.wasm.regPool(chip.handle, ptr, max);
-          if (size > 0) bytes = new Uint8Array(this.module.HEAPU8.subarray(ptr, ptr + Math.min(size, max)));
+          if (size > 0) bytes = new Uint8Array(new Uint8Array(this.getHeapBuffer(), ptr, Math.min(size, max)));
           this.module._free(ptr);
         }
         this.port.postMessage({ type: 'regPool', platformType: data.platformType, bytes }, [bytes.buffer]);
@@ -434,7 +437,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         if (chip && this.wasm && this.wasm.memCompo) {
           const ptr = this.wasm.memCompo(chip.handle, data.index || 0);
           if (ptr) {
-            const heap = this.module.HEAPU8;
+            const heap = new Uint8Array(this.getHeapBuffer());
             let end = ptr;
             while (heap[end] !== 0) end++;
             compo = JSON.parse(new TextDecoder().decode(heap.subarray(ptr, end)));
