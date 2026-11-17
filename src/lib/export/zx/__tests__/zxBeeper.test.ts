@@ -68,11 +68,13 @@ describe('ZX beeper tap', () => {
     expect(d.seconds).toBeCloseTo(16 * 6 / 50, 5);
     expect(rowsT(d.rows) / BEEPER_CLOCK).toBeGreaterThan(d.seconds * 0.95);
     expect(rowsT(d.rows) / BEEPER_CLOCK).toBeLessThanOrEqual(d.seconds);
-    expect(d.rows[0].freq[0]).toBe(beeperFreqWord(57));
+    // Freq words are raised by the record-gap share (screen slice), a few percent at most.
+    expect(d.rows[0].freq[0]).toBeGreaterThanOrEqual(beeperFreqWord(57));
+    expect(d.rows[0].freq[0]).toBeLessThan(beeperFreqWord(57) * 1.06);
     expect(d.rows[0].freq[4]).toBeGreaterThan(0);
     expect(d.rows[0].duty[4]).toBe(beeperDutyUnits(64));
     expect(d.rows[0].duty[2]).toBe(0);
-    const later = d.rows.find((r) => r.freq[0] === beeperFreqWord(61))!;
+    const later = d.rows.find((r) => r.freq[0] > d.rows[0].freq[0])!;
     expect(later.duty[0]).toBe(beeperDutyUnits(0x40));
     expect(d.drumHits).toBe(0);
   });
@@ -114,7 +116,8 @@ describe('ZX beeper tap', () => {
     expect(d.drums.length).toBeGreaterThan(0);
     expect(d.drums.length).toBeLessThanOrEqual(player.maxDrumBytes);
     expect(d.rows.some((r) => r.drum)).toBe(true);
-    expect(rowsT(d.rows) / BEEPER_CLOCK).toBeGreaterThan(d.seconds * 0.97);
+    // The record gaps carry the live screen slice, so the tone loop holds about 95% of the time.
+    expect(rowsT(d.rows) / BEEPER_CLOCK).toBeGreaterThan(d.seconds * 0.94);
     const m = encodeBeeperMusic(d.rows, player.loadAddress + player.dataOffset, player.usableBanks.length);
     expect(m.truncated).toBe(false);
     expect(m.seconds).toBeCloseTo(d.seconds, 3);

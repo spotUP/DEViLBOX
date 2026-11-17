@@ -43,9 +43,9 @@ describe('QuadTone song data', () => {
     expect(d.banks).toHaveLength(1);
     expect(bank[0]).toBe(0x01); // voice 1 changed
     const word = bank[1] | (bank[2] << 8);
-    // NTSC chip clock / Z80 clock, plus the small pause share.
+    // NTSC chip clock / Z80 clock, plus the pause share (record gap with the screen slice).
     expect(word / 1000).toBeGreaterThan(3579545 / 3546900);
-    expect(word / 1000).toBeLessThan(3579545 / 3546900 * 1.01);
+    expect(word / 1000).toBeLessThan(3579545 / 3546900 * 1.06);
     expect([...bank.subarray(3, 6)]).toEqual([0xC6, 128, 0x79]);
     const rounds1 = bank[6];
     expect(rounds1).toBeGreaterThan(200);
