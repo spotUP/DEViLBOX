@@ -10,10 +10,15 @@
  * The tone loop stops while a record is read, so frequencies are raised by the measured share of that time.
  */
 
+import { parseChipFlags } from '@/lib/furnace/snesDsp';
+
 /** Must match quadtone.asm and the 128K CPU clock; the test checks public/zx/quadtone.json. */
 export const QUADTONE_CLOCK = 3546900;
-export const QUADTONE_ITER_T = 320;
-export const QUADTONE_DRUM_BYTE_T = 320;
+/** Effective round / drum byte length: 320 T counted, plus ULA contention on the 8 OUT (#FE), measured in MAME (see quadtone.asm). */
+export const QUADTONE_ITER_T = 325;
+export const QUADTONE_DRUM_BYTE_T = 325;
+/** Furnace adds each voice's frequency once per 320 chip cycles; the player once per QUADTONE_ITER_T Z80 T. */
+const FURNACE_ROUND_T = 320;
 export const QUADTONE_BANK_SIZE = 16384;
 /** Furnace chip clock (zxbeeperquadtone.cpp setFlags): clockSel 1 = ZX Spectrum, otherwise NTSC. */
 export const QUADTONE_FURNACE_CLOCK = [3579545, 3546895];
@@ -37,7 +42,8 @@ const OUT_A = 0x79; // out (c),a
 const OUT_0 = 0x71; // out (c),0
 
 export interface QuadToneFrame { regs: number[]; sample: number; pos: number; hz: number }
-export interface QuadToneCapture { chipFlags?: { clockSel?: number }; frames: QuadToneFrame[]; samples: number[][] }
+/** chipFlags: Furnace's flag string ("clockSel=1\n"), as render-devilbox.ts and the dispatch engine give it. */
+export interface QuadToneCapture { chipFlags?: string; frames: QuadToneFrame[]; samples: number[][] }
 
 /** One voice as the player holds it: frequency word and the three self-modified opcode bytes. */
 export interface QuadToneVoice { freq: number; op: number; operand: number; slot0: number }
@@ -92,9 +98,10 @@ export function renderQuadToneDrum(bits: readonly number[], period: number, furn
     furnacePin.push(pin);
     cur += 40; h++;
   }
-  // Resample Furnace's 40-chip-T grid onto the player's 40-Z80-T grid.
-  const steps = Math.ceil(h * QUADTONE_CLOCK / furnaceClock);
-  for (let j = 0; j < steps; j++) out.push(furnacePin[Math.min(h - 1, Math.floor(j * furnaceClock / QUADTONE_CLOCK))]);
+  // Resample Furnace's 40-chip-T grid onto the player's bit grid (QUADTONE_DRUM_BYTE_T / 8 effective Z80 T per bit).
+  const ratio = (40 / furnaceClock) / (QUADTONE_DRUM_BYTE_T / 8 / QUADTONE_CLOCK);
+  const steps = Math.ceil(h * ratio);
+  for (let j = 0; j < steps; j++) out.push(furnacePin[Math.min(h - 1, Math.floor(j / ratio))]);
   const bytes = new Uint8Array(Math.ceil(out.length / 8));
   out.forEach((b, j) => { if (b) bytes[j >> 3] |= 0x80 >> (j & 7); });
   if (out.length & 7) { const last = out[out.length - 1]; for (let j = out.length; j < bytes.length * 8; j++) if (last) bytes[j >> 3] |= 0x80 >> (j & 7); }
@@ -103,7 +110,7 @@ export function renderQuadToneDrum(bits: readonly number[], period: number, furn
 
 export function encodeQuadTone(cap: QuadToneCapture, drumAddress: number): QuadToneData {
   const warnings: string[] = [];
-  const furnaceClock = QUADTONE_FURNACE_CLOCK[cap.chipFlags?.clockSel === 1 ? 1 : 0];
+  const furnaceClock = QUADTONE_FURNACE_CLOCK[parseChipFlags(cap.chipFlags).get('clockSel') === '1' ? 1 : 0];
   const frames = cap.frames;
   if (frames.length === 0) throw new Error('The QuadTone capture has no ticks.');
 
@@ -169,7 +176,7 @@ export function encodeQuadTone(cap: QuadToneCapture, drumAddress: number): QuadT
   }
   if (drumLen > 0xFFFF - drumAddress) throw new Error(`The drum hits need ${drumLen} bytes; the player has no room for them.`);
   const pauseFactor = roundsT > 0 ? toneT / roundsT : 1;
-  const scale = furnaceClock / QUADTONE_CLOCK * pauseFactor;
+  const scale = furnaceClock / QUADTONE_CLOCK * (QUADTONE_ITER_T / FURNACE_ROUND_T) * pauseFactor;
 
   // Pass 2: bytes. Records never cross a bank end; #80 moves to the next bank, #81 loops.
   const banks: Uint8Array[] = []; let cur: number[] = [];

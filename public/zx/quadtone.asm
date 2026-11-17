@@ -36,8 +36,11 @@
 ; Tone loop registers: HL ph1, DE ph2, IX ph3, IY ph4, C = #FE, B = slot 1 value, A = compare result,
 ; C' = round counter. Record registers: alternate set (HL' = stream pointer), A' = voice 1 value across records.
 
-ITER_T		equ 320		; T-states per tone round
-DRUM_BYTE_T	equ 320		; T-states per drum byte (8 bits of 40 T)
+; Counted 320 T per tone round / drum byte, but each of the 8 out (#fe) waits for the ULA in the screen area on the 128K
+; (measured in MAME spec128: rounds run 320 T in the border and ~329.5 T on screen lines, held A-3 27.6 cents flat = 325.1 T average).
+; The pitch and tempo constants use the effective value; the contention is fixed by the machine, not removable from the loop.
+ITER_T		equ 325		; effective T-states per tone round (320 counted + ULA contention on 8 OUTs)
+DRUM_BYTE_T	equ 325		; effective T-states per drum byte (8 bits of 40 T counted + contention)
 
 	org #8000
 entry
