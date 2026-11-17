@@ -737,4 +737,29 @@ int fur_wave_to_file(int fmt, uint8_t* buf, size_t bufLen) {
   remove(path);
   return ret;
 }
+
+/**
+ * Save the current song as Furnace's text export (DivEngine::saveText).
+ * Returns pointer to buffer (caller must free with fur_free_buffer). NULL on error.
+ */
+uint8_t* fur_save_text(size_t* outLen, int separatePatterns) {
+  ensureInit();
+  *outLen = 0;
+  SafeWriter* w = g_engine.saveText(separatePatterns != 0);
+  if (!w) {
+    snprintf(g_errorBuf, sizeof(g_errorBuf), "saveText failed");
+    return NULL;
+  }
+  size_t sz = w->size();
+  uint8_t* result = (uint8_t*)malloc(sz ? sz : 1);
+  if (!result) {
+    delete w;
+    return NULL;
+  }
+  memcpy(result, w->getFinalBuf(), sz);
+  *outLen = sz;
+  delete w;
+  return result;
+}
+
 } // extern "C"

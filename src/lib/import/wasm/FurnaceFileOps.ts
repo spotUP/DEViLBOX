@@ -43,6 +43,7 @@ async function getModule(): Promise<WasmModule> {
 interface FurnaceFileOpsAPI {
   fur_load(dataPtr: number, len: number): number;
   fur_save(outLenPtr: number): number;
+  fur_save_text(outLenPtr: number, separatePatterns: number): number;
   fur_free_buffer(ptr: number): void;
   fur_get_error(): string;
   fur_get_num_subsongs(): number;
@@ -106,6 +107,7 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
   return {
     fur_load: m.cwrap('fur_load', 'number', ['number', 'number']),
     fur_save: m.cwrap('fur_save', 'number', ['number']),
+    fur_save_text: m.cwrap('fur_save_text', 'number', ['number', 'number']),
     fur_free_buffer: m.cwrap('fur_free_buffer', null, ['number']),
     fur_get_error: m.cwrap('fur_get_error', 'string', []),
     fur_get_num_subsongs: m.cwrap('fur_get_num_subsongs', 'number', []),
@@ -574,6 +576,23 @@ export async function saveFurFileWasm(): Promise<ArrayBuffer> {
   const result = new Uint8Array(m.HEAPU8.buffer, bufPtr, len).slice(); // Copy out
   api.fur_free_buffer(bufPtr);
   return result.buffer;
+}
+
+/** Furnace's own text export (DivEngine::saveText) of the song the WASM engine holds. */
+export async function saveFurTextWasm(separatePatterns = false): Promise<string> {
+  const m = await getModule();
+  if (!cachedAPI) cachedAPI = getAPI(m);
+  const api = cachedAPI;
+  const outLenPtr = m._malloc(4);
+  const bufPtr = api.fur_save_text(outLenPtr, separatePatterns ? 1 : 0);
+  const len = m.getValue(outLenPtr, 'i32');
+  m._free(outLenPtr);
+  if (!bufPtr) {
+    throw new Error(`Furnace WASM text export failed: ${api.fur_get_error()}`);
+  }
+  const text = new TextDecoder().decode(new Uint8Array(m.HEAPU8.buffer, bufPtr, len));
+  api.fur_free_buffer(bufPtr);
+  return text;
 }
 
 /** One instrument read by Furnace's own instrumentFromFile, as the bytes the editor opens or saves. */

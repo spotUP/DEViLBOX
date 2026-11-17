@@ -35,11 +35,11 @@ import {
   type ExportOptions,
 } from '@lib/export/exporters';
 import { NanoExporter } from '@lib/export/NanoExporter';
-import { saveFurFileWasm } from '@lib/import/wasm/FurnaceFileOps';
+import { saveFurFileWasm, saveFurTextWasm, loadFurFileWasm } from '@lib/import/wasm/FurnaceFileOps';
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'vectrexCart' | 'nesRom' | 'tad';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'vectrexCart' | 'nesRom' | 'tad';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -80,7 +80,7 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   nano: '.dbn',
   native: '',
   fur: '.fur',
-  furAy: '.fur',
+  furText: '.txt',  furAy: '.fur',
   zxTap: '.tap',
   zxBeeperTap: '.tap',
   vectrexCart: '.bin',
@@ -257,6 +257,24 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     const filename = `${metadata.name || 'song'}.fur`;
     downloadFn(blob, filename);
     notify.success(`Furnace file "${filename}" exported successfully! (${furBuffer.byteLength} bytes)`);
+    onClose();
+  }, [metadata, furnaceModuleAvailable]);
+
+  const handleExportFurText = useCallback(async (
+    downloadFn: (blob: Blob, filename: string) => void,
+    onClose: () => void,
+  ) => {
+    // A song composed in the app is written to a module first so the WASM engine holds it.
+    if (furnaceModuleAvailable) {
+      const { exportFurnaceModuleFile } = await import('@lib/export/moduleExportService');
+      const result = exportFurnaceModuleFile();
+      result.warnings.forEach((w) => notify.warning(w));
+      await loadFurFileWasm(new Uint8Array(result.bytes).buffer);
+    }
+    const text = await saveFurTextWasm();
+    const filename = `${metadata.name || 'song'}.txt`;
+    downloadFn(new Blob([text], { type: 'text/plain' }), filename);
+    notify.success(`Furnace text "${filename}" exported successfully! (${text.length} characters)`);
     onClose();
   }, [metadata, furnaceModuleAvailable]);
 
@@ -563,6 +581,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportSFX,
     handleExportInstrument,
     handleExportFur,
+    handleExportFurText,
     furnaceModuleAvailable,
     handleExportFurAy,
     handleExportZxTap,

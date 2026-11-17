@@ -89,6 +89,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         case 'fur':
           return await ex.handleExportFur((b, n) => saveAs(b, n), onClose);
 
+        case 'furText':
+          return await ex.handleExportFurText((b, n) => saveAs(b, n), onClose);
+
         case 'zxTap':
           return await ex.handleExportZxTap((b, n) => saveAs(b, n), onClose);
         case 'vectrexCart':
@@ -344,6 +347,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     >
                       <FileMusic size={24} className="mx-auto mb-2" />
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Export Furnace Module</div>
+                    </button>
+                  )}
+                  {(ex.editorMode === 'furnace' || ex.furnaceModuleAvailable) && (
+                    <button
+                      onClick={() => ex.setExportMode('furText')}
+                      className={`
+                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        ${ex.exportMode === 'furText'
+                          ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                          : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                        }
+                      `}
+                    >
+                      <FileMusic size={24} className="mx-auto mb-2" />
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">Export Furnace Text</div>
                     </button>
                   )}
                   {(Object.keys(AY_SCRAMBLE_TARGETS) as AyScrambleTarget[]).filter((k) => ex.furnaceAyAvailable[k]).map((k) => (
@@ -610,6 +628,18 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div>Patterns: <span className="text-accent-primary">{ex.patterns.length}</span></div>
                       <div>Instruments: <span className="text-accent-primary">{ex.instruments.length}</span></div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {ex.exportMode === 'furText' && (
+                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+                    Furnace Text Export (.txt)
+                  </h3>
+                  <div className="text-sm font-mono text-text-secondary space-y-1">
+                    <div>Format: <span className="text-accent-primary">Furnace readable song text</span></div>
+                    <div>Engine: <span className="text-accent-primary">FurnaceFileOps WASM</span></div>
                   </div>
                 </div>
               )}
@@ -886,6 +916,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : ex.exportMode === 'chip' ? `.${chipExtension}`
                   : ex.exportMode === 'nano' ? '.dbn'
                   : ex.exportMode === 'fur' || ex.exportMode === 'furAy' ? '.fur'
+                  : ex.exportMode === 'furText' ? '.txt'
                   : ex.exportMode === 'zxTap' || ex.exportMode === 'zxBeeperTap' ? '.tap'
                   : ex.exportMode === 'vectrexCart' ? '.bin'
                   : ex.exportMode === 'nesRom' ? '.nes'
