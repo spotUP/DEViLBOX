@@ -4,6 +4,7 @@
  * byte-exact where nothing was edited. Notes typed on rows the module has no place for come back as warnings.
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { earAcheSpeedOffsets } from '@/lib/import/formats/EarAcheParser';
 import { patchModuleByLayout } from './layoutPatch';
 
 export async function exportEarAche(song: TrackerSong): Promise<{ data: Blob; filename: string; warnings: string[] }> {
@@ -13,6 +14,12 @@ export async function exportEarAche(song: TrackerSong): Promise<{ data: Blob; fi
   if (!layout) throw new Error('EarAche export needs the pattern layout the song was loaded with');
   const name = (song.uadeEditableFileName ?? 'module.ea').split('/').pop() ?? 'module.ea';
   const r = patchModuleByLayout(src, layout, song.patterns);
+  // Per-entry speed: Fxx on row 0 of a pattern is the high nibble of that entry's second word.
+  const bytes = r.bytes;
+  earAcheSpeedOffsets(bytes).forEach((at, p) => {
+    const cell = song.patterns[p]?.channels[0].rows[0];
+    if (cell?.effTyp2 === 0x0f && cell.eff2 >= 1 && cell.eff2 <= 15) bytes[at] = (bytes[at] & 0x0f) | (cell.eff2 << 4);
+  });
   return {
     data: new Blob([r.bytes as BlobPart], { type: 'application/octet-stream' }),
     filename: name,

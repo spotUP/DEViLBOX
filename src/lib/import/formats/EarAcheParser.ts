@@ -6,7 +6,7 @@
  * Rows are 8 bytes (4 voices x [note, instrument]); a position entry is two words [first row, last row | speed << 12]
  * and 0xFFFF as first word is a jump to the entry named by the second word. Grid = one pattern per non-jump entry
  * (rows first..last), song order = the sequencer walk from entry 0. Entries that share rows share stored cells, so an
- * edit is carried to every grid cell on the same bytes (propagateSharedCells). Speed per entry is not shown.
+ * edit is carried to every grid cell on the same bytes (propagateSharedCells). Speed per entry is shown as Fxx (effTyp2 0x0F) on row 0 of each pattern; the exporter writes it back to the entry word.
  */
 
 import type { TrackerSong } from '@engine/TrackerReplayer';
@@ -61,6 +61,13 @@ function walk(entries: Array<[number, number]>): number[] {
   return order;
 }
 
+/** Byte offset of each grid pattern's position-entry second word (speed << 12 | last row), in pattern order. */
+export function earAcheSpeedOffsets(buf: Uint8Array): number[] {
+  const tables = readTables(buf);
+  if (!tables) return [];
+  return [...new Set(walk(tables.entries))].map((e) => tables.positionAt + e * 4 + 2);
+}
+
 export function parseEarAcheFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   const name = filename.replace(/\.[^.]+$/, '').replace(/^[^.]+\./, '');
@@ -103,6 +110,11 @@ export function parseEarAcheFile(buffer: ArrayBuffer, filename: string): Tracker
       rows: Array.from({ length: range.length }, (_, r) => cellAt(p, r, ch)),
     })),
   }));
+
+  entryIndexes.forEach((e, p) => {
+    const speed = tables!.entries[e][1] >> 12;
+    if (speed > 0) patterns[p].channels[0].rows[0] = { ...patterns[p].channels[0].rows[0], effTyp2: 0x0f, eff2: speed };
+  });
 
   const instruments: InstrumentConfig[] = Array.from({ length: 4 }, (_, i) => ({
     id: i + 1,

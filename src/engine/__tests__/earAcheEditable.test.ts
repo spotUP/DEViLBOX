@@ -54,4 +54,25 @@ describe('EarAche editable grid', () => {
     expect(out[off]).toBe(30);
     expect(out[off + 1]).toBe(2);
   });
+
+  it('entry speed shows as Fxx on row 0 and an edit is written to the entry word only', async () => {
+    const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
+    const { earAcheSpeedOffsets } = await import('@/lib/import/formats/EarAcheParser');
+    const orig = new Uint8Array(load());
+    const at = earAcheSpeedOffsets(orig);
+    const song = parseEarAcheFile(load(), 'bladerunner.ea');
+    const cell = song.patterns[0].channels[0].rows[0];
+    expect(cell.effTyp2).toBe(0x0f);
+    expect(cell.eff2).toBe(orig[at[0]] >> 4);
+    const g = await import('@/lib/song/gridBaseline');
+    g.setGridBaseline(g.baselineOf(song.patterns), g.extraBaselineOf(song.patterns));
+    const next = (cell.eff2 % 15) + 1;
+    song.patterns[0].channels[0].rows[0] = { ...cell, eff2: next };
+    const res = await exportNativeSong(song);
+    const d = res!.data as Blob | Uint8Array | ArrayBuffer;
+    const out = d instanceof Blob ? new Uint8Array(await d.arrayBuffer()) : new Uint8Array(d as ArrayBuffer);
+    const diff = [...out].map((v, i) => (v !== orig[i] ? i : -1)).filter((i) => i >= 0);
+    expect(diff).toEqual([at[0]]);
+    expect(out[at[0]] >> 4).toBe(next);
+  });
 });
