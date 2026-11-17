@@ -582,6 +582,63 @@ int fur_get_wave_data(int idx, int pos) {
 }
 
 
+/**
+ * Song wavetable list edits, so the .fur save writes the editor's list. idx == size appends.
+ * Returns 0 on success, -1 on a bad index or length.
+ */
+int fur_set_wave(int idx, const int32_t* values, int len, int max) {
+  if (idx < 0 || idx > (int)g_engine.song.wave.size() || len < 1 || len > 256 || !values) return -1;
+  if (idx == (int)g_engine.song.wave.size()) g_engine.song.wave.push_back(new DivWavetable);
+  DivWavetable* w = g_engine.song.wave[idx];
+  if (!w) return -1;
+  w->len = len;
+  w->max = max;
+  for (int i = 0; i < len; i++) w->data[i] = values[i];
+  g_engine.song.waveLen = (int)g_engine.song.wave.size();
+  return 0;
+}
+
+/** Drop wavetables from the end of the list down to count entries. */
+int fur_truncate_waves(int count) {
+  if (count < 0 || count > (int)g_engine.song.wave.size()) return -1;
+  while ((int)g_engine.song.wave.size() > count) {
+    delete g_engine.song.wave.back();
+    g_engine.song.wave.pop_back();
+  }
+  g_engine.song.waveLen = (int)g_engine.song.wave.size();
+  return 0;
+}
+
+/**
+ * Rewrite every wavetable reference: wave macros, wavetable synth waves, N163 wave and the 10xx set-wave
+ * effect in all subsongs. map[old] is the new index; references at or past n stay.
+ */
+void fur_remap_waves(const int32_t* map, int n) {
+  auto re = [&](int v) { return (v >= 0 && v < n) ? map[v] : v; };
+  for (DivInstrument* ins : g_engine.song.ins) {
+    if (!ins) continue;
+    for (int i = 0; i < ins->std.waveMacro.len && i < 256; i++) ins->std.waveMacro.val[i] = re(ins->std.waveMacro.val[i]);
+    ins->ws.wave1 = re(ins->ws.wave1);
+    ins->ws.wave2 = re(ins->ws.wave2);
+    ins->n163.wave = re(ins->n163.wave);
+  }
+  for (DivSubSong* sub : g_engine.song.subsong) {
+    for (int ch = 0; ch < DIV_MAX_CHANS; ch++) {
+      for (int pi = 0; pi < DIV_MAX_PATTERNS; pi++) {
+        DivPattern* p = sub->pat[ch].data[pi];
+        if (!p) continue;
+        for (int row = 0; row < sub->patLen && row < DIV_MAX_ROWS; row++) {
+          for (int e = 0; e < DIV_MAX_EFFECTS; e++) {
+            if (p->newData[row][DIV_PAT_FX(e)] == 0x10 && p->newData[row][DIV_PAT_FXVAL(e)] >= 0) {
+              p->newData[row][DIV_PAT_FXVAL(e)] = (short)re(p->newData[row][DIV_PAT_FXVAL(e)]);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 // ============================================================
 // Instrument files (.tfi .vgi .opni .y12 .opli .sbi .wopl .bnk .wopn .s3i .eif .ff .gyb .opm .fti .bti .dmp .fui)
 // Furnace's own DivEngine::instrumentFromFile reads them; results are handed back as .fui bytes.

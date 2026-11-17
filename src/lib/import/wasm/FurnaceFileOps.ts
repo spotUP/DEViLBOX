@@ -80,6 +80,9 @@ interface FurnaceFileOpsAPI {
   fur_get_sample_data(idx: number, outLenPtr: number): number;
   fur_set_sample(idx: number, dataPtr: number, frames: number, centerRate: number, loopStart: number, loopEnd: number): number;
   fur_get_wave_info(idx: number, field: number): number;
+  fur_set_wave(idx: number, valuesPtr: number, len: number, max: number): number;
+  fur_truncate_waves(count: number): number;
+  fur_remap_waves(mapPtr: number, n: number): void;
   fur_get_wave_data(idx: number, pos: number): number;
   fur_get_tuning(): number;
   fur_get_packed_compat_flags(which: number): number;
@@ -143,6 +146,9 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_get_sample_info: m.cwrap('fur_get_sample_info', 'number', ['number', 'number']),
     fur_get_sample_data: m.cwrap('fur_get_sample_data', 'number', ['number', 'number']),
     fur_set_sample: m.cwrap('fur_set_sample', 'number', ['number', 'number', 'number', 'number', 'number', 'number']),
+    fur_set_wave: m.cwrap('fur_set_wave', 'number', ['number', 'number', 'number', 'number']),
+    fur_truncate_waves: m.cwrap('fur_truncate_waves', 'number', ['number']),
+    fur_remap_waves: m.cwrap('fur_remap_waves', null, ['number', 'number']),
     fur_get_wave_info: m.cwrap('fur_get_wave_info', 'number', ['number', 'number']),
     fur_get_wave_data: m.cwrap('fur_get_wave_data', 'number', ['number', 'number']),
     fur_get_tuning: m.cwrap('fur_get_tuning', 'number', []),
@@ -553,6 +559,32 @@ export async function setFurSampleWasm(idx: number, data: Int16Array, rate: numb
   } finally {
     m._free(ptr);
   }
+}
+
+/**
+ * Make the song the .fur save writes hold this wavetable list, and move every wave reference of its
+ * instruments and 10xx effects with `map` (map[old] = new index; omit for an append).
+ */
+export async function setFurWaveListWasm(waves: ReadonlyArray<{ data: number[]; height: number }>, map?: readonly number[]): Promise<void> {
+  const m = await getModule();
+  if (!cachedAPI) cachedAPI = getAPI(m);
+  const api = cachedAPI;
+  if (map) {
+    const mp = m._malloc(Math.max(4, map.length * 4));
+    try {
+      new Int32Array(m.HEAPU8.buffer, mp, map.length).set(map);
+      api.fur_remap_waves(mp, map.length);
+    } finally { m._free(mp); }
+  }
+  for (let i = 0; i < waves.length; i++) {
+    const w = waves[i];
+    const vp = m._malloc(Math.max(4, w.data.length * 4));
+    try {
+      new Int32Array(m.HEAPU8.buffer, vp, w.data.length).set(w.data);
+      if (api.fur_set_wave(i, vp, w.data.length, w.height) !== 0) throw new Error(`Furnace WASM refused wavetable ${i}`);
+    } finally { m._free(vp); }
+  }
+  api.fur_truncate_waves(waves.length);
 }
 
 /**

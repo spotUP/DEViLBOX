@@ -1548,6 +1548,12 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
     for (const chipId of this.chips.keys()) this.uploadModuleSamplesToPlatform(chipId, true);
   }
 
+  /** Replace the song's wavetables while it plays and write them to every chip that exists. */
+  replaceModuleWavetables(wavetables: Array<{ data: number[]; width: number; height: number }>): void {
+    this.setModuleWavetables(wavetables.length ? wavetables : null);
+    for (const chipId of this.chips.keys()) this.uploadModuleWavetablesToPlatform(chipId, true);
+  }
+
   /** Get stored module wavetables (used by FurnaceDispatchSynth during chip init). */
   getModuleWavetables(): Array<{ data: number[]; width: number; height: number }> | null {
     return this._moduleWavetables;

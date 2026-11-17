@@ -38,6 +38,7 @@ import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { MacroListEditor } from './MacroEditor';
 import { SNESPanel, SNESEchoPanel } from './SNESPanels';
 import { SNES_MACRO_LABELS } from '@/lib/furnace/snesDsp';
+import { FurnaceWaveList } from './FurnaceWaveList';
 import { WavetableListEditor, type WavetableData } from './WavetableEditor';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 import { EnvelopeVisualization, WaveformThumbnail, FMAlgorithmDiagram } from '@components/instruments/shared';
@@ -783,6 +784,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           />
         </div>
       )}
+
+      <FurnaceWaveList />
 
       {(category === "Wavetable" || config.wavetables.length > 0 || config.ws) && (
         <WaveSynthPanel config={config} onChange={pushLiveUpdate} />
