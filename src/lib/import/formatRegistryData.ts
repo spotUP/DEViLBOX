@@ -2120,12 +2120,13 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'easyTrax',
     label: 'EasyTrax',
-    description: 'EasyTrax — native parser or libopenmpt',
+    description: 'EasyTrax — libopenmpt',
     family: 'pc-tracker',
     matchMode: 'extension',
     extRegex: /\.etx$/i,
     prefKey: 'easyTrax',
-    nativeParser: { module: '@lib/import/formats/EasyTraxParser', parseFn: 'parseEasyTraxFile', detectFn: 'isEasyTraxFormat' },
+    // No native parser: the one that was here detected 'EASO', the EarAche magic (EarAcheParser covers it),
+    // so it never matched an .etx file (2026-11-17).
     libopenmptFallback: true,
   },
   {

@@ -1383,23 +1383,6 @@ export async function tryRouteFormat(
     // Fall through to libopenmpt
   }
 
-  // ── EasyTrax (.etx) ──────────────────────────────────────────────────────
-  if (matchesExt(filename, ['etx'])) {
-    if (prefs.easyTrax === 'native') {
-      try {
-        const { isEasyTraxFormat, parseEasyTraxFile } = await import('@lib/import/formats/EasyTraxParser');
-        const bytes = new Uint8Array(buffer);
-        if (isEasyTraxFormat(bytes)) {
-          const result = parseEasyTraxFile(bytes, originalFileName);
-          if (result) { result.libopenmptFileData = buffer.slice(0); return result; }
-        }
-      } catch (err) {
-        console.warn(`[EasyTraxParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
-      }
-    }
-    // Fall through to libopenmpt
-  }
-
   // ── Karl Morton Music Format (.mus) ───────────────────────────────────────
   // Note: .mus is also used by UFO/MicroProse format (DDAT magic, checked later).
   if (matchesExt(filename, ['mus']) && prefs.karlMorton === 'native') {
