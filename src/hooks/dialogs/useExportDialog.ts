@@ -312,7 +312,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     setVectrexCartBusy(true);
     try {
       const { recordVectrexCartridge } = await import('@lib/export/vectrex/vectrexCapture');
-      const r = await recordVectrexCartridge((metadata.name || 'song').slice(0, 16));
+      const r = await recordVectrexCartridge((metadata.name || 'song').slice(0, 16), metadata.author && metadata.author !== 'Unknown' ? metadata.author : undefined);
       downloadFn(new Blob([r.bin as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.bin`);
       notify.success(`Vectrex cartridge exported (${r.frames} frames, ${Math.round(r.seconds)} s, ${r.bin.byteLength} bytes).`);
       onClose();

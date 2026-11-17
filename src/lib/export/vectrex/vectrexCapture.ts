@@ -50,7 +50,7 @@ export function cutToFrames(writes: readonly RegisterWrite[], frames: number, sa
   return writes.filter((w) => (w.timestamp - origin) < (frames - 0.5) * sampleRate / 50);
 }
 
-export async function recordVectrexCartridge(title: string): Promise<VectrexCartridgeResult> {
+export async function recordVectrexCartridge(title: string, author?: string): Promise<VectrexCartridgeResult> {
   const transport = useTransportStore.getState();
   const wasPlaying = transport.isPlaying;
   const wasLooping = transport.isLooping;
@@ -68,5 +68,5 @@ export async function recordVectrexCartridge(title: string): Promise<VectrexCart
   const log = await session.stopRecording();
   useTransportStore.getState().stop();
   useTransportStore.getState().setIsLooping(wasLooping);
-  return buildVectrexCartridge(cutToFrames(parseRegisterLog(log), pass.frames, VGM_SAMPLE_RATE), VGM_SAMPLE_RATE, await fetchVectrexPlayer(), title);
+  return buildVectrexCartridge(cutToFrames(parseRegisterLog(log), pass.frames, VGM_SAMPLE_RATE), VGM_SAMPLE_RATE, await fetchVectrexPlayer(), title, author || undefined);
 }
