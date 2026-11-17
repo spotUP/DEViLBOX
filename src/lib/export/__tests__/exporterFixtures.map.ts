@@ -50,6 +50,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   silmarils: 'public/data/songs/formats/silmarils_smallest.mok',
   pierreAdane: 'public/data/songs/formats/Ivanhoe_ivanhoe - bonus.pap',
   synthPack: 'public/data/songs/synth-pack/centerbase soft.osp',
+  maximumEffect: 'public/data/songs/maximum-effect/MAX.DinosaurDetective music1',
   coreDesign: 'public/data/songs/core-design/dynamite dux.core',
   anders0land: 'public/data/songs/anders-oland/primemover 07.hot',
   format669: 'public/data/songs/composer-669/speed fighter.669',

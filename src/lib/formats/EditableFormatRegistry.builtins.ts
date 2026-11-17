@@ -233,4 +233,5 @@ registerEditableFormat({ formatId: "lme", label: "Leggless Music Editor", patter
 registerEditableFormat({ formatId: "silmarils", label: "Silmarils", patternCodec: { kind: "fixed" }, exporter: { module: "SilmarilsExporter", fn: "exportSilmarils", byLayout: true } });
 registerEditableFormat({ formatId: "pierreAdane", label: "Pierre Adane Packer", patternCodec: { kind: "fixed" }, exporter: { module: "PierreAdaneExporter", fn: "exportPierreAdane", byLayout: true } });
 registerEditableFormat({ formatId: "synthPack", label: "SynthPack", patternCodec: { kind: "fixed" }, exporter: { module: "SynthPackExporter", fn: "exportSynthPack", byLayout: true } });
+registerEditableFormat({ formatId: "maximumEffect", label: "Maximum Effect", patternCodec: { kind: "fixed" }, exporter: { module: "MaximumEffectExporter", fn: "exportMaximumEffect", byLayout: true } });
 registerEditableFormat({ formatId: "peterVerswyvelenPacker", label: "Peter Verswyvelen Packer", patternCodec: { kind: "fixed" }, exporter: { module: "PeterVerswyvelenPackerExporter", fn: "exportPeterVerswyvelenPacker", byLayout: true } });

@@ -951,6 +951,14 @@
       "matchPct": 1,
       "cells": 264198,
       "bytes": 264198
+    },
+    "maximumEffect": {
+      "exporter": "MaximumEffectExporter.exportMaximumEffect",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 3768,
+      "bytes": 3768
     }
   },
   "missingFixture": [

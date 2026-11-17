@@ -59,6 +59,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { decodeMaximumEffectCell, encodeMaximumEffectCell } from '@/engine/uade/encoders/MaximumEffectEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 const MIN_FILE_SIZE = 20;
@@ -70,6 +71,10 @@ function u16BE(buf: Uint8Array, off: number): number {
 function u32BE(buf: Uint8Array, off: number): number {
   return (((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0);
 }
+
+// Two Dinosaur Detective files (complete, intro) carry 0xD4 where header/list words should have a zero high byte.
+const mxeWord = (v: number): number => ((v >> 8) === 0xd4 ? ((v & 0xff) === 0xd4 ? 0 : v & 0xff) : v);
+const mxeLong = (v: number): number => ((mxeWord(v >>> 16) << 16) | mxeWord(v & 0xffff)) >>> 0;
 
 const MAGIC_MXTX = 0x4D585458; // 'MXTX'
 
@@ -88,14 +93,14 @@ export function isMaximumEffectFormat(buffer: ArrayBuffer | Uint8Array): boolean
   if (u32BE(buf, 0) === MAGIC_MXTX) return true;
 
   const fileSize = buf.length;
-  const d1_0 = u32BE(buf, 0);
+  const d1_0 = mxeLong(u32BE(buf, 0));
 
   // long[0] must be 1..15 (sub-song count)
   if (d1_0 === 0) return false;
   if (d1_0 > 15) return false;
 
   // long[4]: pattern list pointer
-  const d1_4 = u32BE(buf, 4);
+  const d1_4 = mxeLong(u32BE(buf, 4));
   if (d1_4 !== 0) {
     if (d1_4 & 0x80000000) return false; // negative
     if (d1_4 & 1) return false;          // odd
@@ -111,7 +116,7 @@ export function isMaximumEffectFormat(buffer: ArrayBuffer | Uint8Array): boolean
   for (let i = 0; i < 3; i++) {
     const off = 8 + i * 4;
     if (off + 4 > buf.length) return false;
-    const d0 = u32BE(buf, off);
+    const d0 = mxeLong(u32BE(buf, off));
     if (d0 & 0x80000000) return false; // negative
     if (d0 === 0) continue;            // zero is allowed
     if (d0 & 1) return false;          // odd
@@ -119,7 +124,7 @@ export function isMaximumEffectFormat(buffer: ArrayBuffer | Uint8Array): boolean
     // tst.l -6(A0,D0.L): check that long at (buf[0 + D0 - 6]) == 0
     const testOff = d0 - 6;
     if (testOff + 4 > buf.length) return false;
-    if (u32BE(buf, testOff) !== 0) return false;
+    if (mxeLong(u32BE(buf, testOff)) !== 0) return false;
     foundOne = true;
   }
 
@@ -138,7 +143,7 @@ function findModuleDataEnd(buf: Uint8Array): number {
   for (let i = 1; i < 5; i++) {
     const off = i * 4;
     if (off + 4 > buf.length) break;
-    const ptr = u32BE(buf, off);
+    const ptr = mxeLong(u32BE(buf, off));
     if (ptr > 0 && !(ptr & 0x80000000) && ptr <= buf.length) {
       if (ptr > maxPtr) maxPtr = ptr;
     }
@@ -227,6 +232,8 @@ function extractSamples(buf: Uint8Array, smpOffset: number): InstrumentConfig[] 
 
 export function parseMaximumEffectFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
+  const walked = walkMaximumEffect(buf);
+  if (walked) return buildMaximumEffectSong(buf, buffer, filename, walked);
   if (!isMaximumEffectFormat(buf)) throw new Error('Not a Maximum Effect module');
 
   const baseName = filename.split('/').pop() ?? filename;
@@ -295,5 +302,126 @@ export function parseMaximumEffectFile(buffer: ArrayBuffer, filename: string): T
       encodeCell: encodeMODCell,
       decodeCell: decodeMODCell,
     } as UADEPatternLayout,
+  };
+}
+
+// ---- Editable grid: the MAX.<name> song file (third-party/nuade/players/maximumeffect/mxe_module.c) ----
+
+const MXE_VOICES = 4;
+const MXE_ENTRY = 6;
+const MXE_ROWS = 64;
+
+interface MxeWalk { rows: number; at: number[][]; grid: number; maxInstrument: number }
+
+const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+
+/** Walk subsong 0 of a MAX song file into per-voice note-word offsets on a row grid; null when it is not one. */
+function walkMaximumEffect(b: Uint8Array): MxeWalk | null {
+  const n = b.length;
+  const u16 = (o: number) => (o + 2 <= n ? (b[o] << 8) | b[o + 1] : 0);
+  const u32 = (o: number) => (o + 4 <= n ? mxeLong(((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0) : 0);
+  if (n < 20 || u32(0) < 0xf) return null;
+  const first = u32(4);
+  if ((first & 1) !== 0 || first > n || first <= 2 || (first - 2) % 18 !== 0 || mxeWord(u16(0)) + 1 !== (first - 2) / 18) return null;
+  const mask = b[3];
+  const events: { tick: number; at: number }[][] = [[], [], [], []];
+  let grid = 0;
+  let maxInstrument = 0;
+  let budget = 400000;
+  const total: number[] = [0, 0, 0, 0];
+  for (let v = 0; v < MXE_VOICES; v++) {
+    const list = u32(2 + 2 + 4 * v);
+    if (!(mask >> v & 1) || list === 0) continue;
+    if ((list & 1) !== 0) return null;
+    let tick = 0;
+    for (let at = list; at + MXE_ENTRY <= n && at - list < 0x10000; at += MXE_ENTRY) {
+      const pattern = u32(at);
+      const count = mxeWord(u16(at + 4));
+      if (pattern === 0) break;
+      if ((pattern & 1) !== 0 || count === 0) return null;
+      let pos = pattern;
+      for (let e = 0; e < count; e++) {
+        const start = pos;
+        let first = true;
+        let isNote = false;
+        for (;;) {
+          if (--budget < 0 || pos + 2 > n) return null;
+          const w = u16(pos);
+          pos += 2;
+          if ((w & 0x8000) !== 0 && !first) {
+            const d = (w & 0x7fff) + 1;
+            grid = gcd(grid, d);
+            if (isNote) events[v].push({ tick, at: start });
+            tick += d;
+            break;
+          }
+          if ((w & 0x8000) !== 0) {
+            isNote = true;
+            maxInstrument = Math.max(maxInstrument, (w >> 8) & 0x7f);
+            if ((w & 0xfe) >= 72) return null;
+          } else {
+            const cmd = w >> 8;
+            if (cmd >= 9) return null;
+            if (cmd === 4 || cmd === 5 || cmd === 7 || cmd === 8) pos += 2; // the commands with two parameter bytes
+          }
+          first = false;
+        }
+      }
+    }
+    total[v] = tick;
+  }
+  if (grid === 0) return null;
+  const rows = Math.max(1, Math.ceil(Math.max(...total) / grid / MXE_ROWS)) * MXE_ROWS;
+  const at: number[][] = Array.from({ length: rows }, () => [-1, -1, -1, -1]);
+  events.forEach((list, v) => list.forEach((ev) => { const r = ev.tick / grid; if (at[r][v] < 0) at[r][v] = ev.at; }));
+  return { rows, at, grid, maxInstrument };
+}
+
+function buildMaximumEffectSong(buf: Uint8Array, buffer: ArrayBuffer, filename: string, w: MxeWalk): TrackerSong {
+  const baseName = filename.split('/').pop() ?? filename;
+  const moduleName = baseName.replace(/^max\./i, '') || baseName;
+  const count = w.rows / MXE_ROWS;
+  const empty = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+  const instruments: InstrumentConfig[] = Array.from({ length: w.maxInstrument + 1 }, (_, i) => ({
+    id: i + 1, name: '', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+  } as InstrumentConfig));
+  const patterns = Array.from({ length: count }, (_, k) => ({
+    id: `pattern-${k}`, name: `Pattern ${k}`, length: MXE_ROWS,
+    channels: Array.from({ length: MXE_VOICES }, (_, c) => ({
+      id: `channel-${c}`, name: `Channel ${c + 1}`, muted: false,
+      solo: false, collapsed: false, volume: 100,
+      pan: c === 0 || c === 3 ? -50 : 50,
+      instrumentId: null, color: null,
+      rows: Array.from({ length: MXE_ROWS }, (_, r) => {
+        const o = w.at[k * MXE_ROWS + r][c];
+        return o < 0 ? empty : decodeMaximumEffectCell(buf.subarray(o, o + 2));
+      }),
+    })),
+    importMetadata: {
+      sourceFormat: 'MOD' as const, sourceFile: filename,
+      importedAt: new Date().toISOString(),
+      originalChannelCount: MXE_VOICES, originalPatternCount: count, originalInstrumentCount: instruments.length,
+    },
+  }));
+  return {
+    name: `${moduleName} [Maximum Effect]`, format: 'MOD' as TrackerFormat,
+    patterns, instruments, songPositions: patterns.map((_, k) => k),
+    songLength: count, restartPosition: 0, numChannels: MXE_VOICES,
+    initialSpeed: w.grid, initialBPM: 125, linearPeriods: false,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'maximumEffect',
+      patternDataFileOffset: 0,
+      bytesPerCell: 2,
+      rowsPerPattern: MXE_ROWS,
+      numChannels: MXE_VOICES,
+      numPatterns: count,
+      moduleSize: buffer.byteLength,
+      encodeCell: encodeMaximumEffectCell,
+      encodeOverStored: true,
+      decodeCell: decodeMaximumEffectCell,
+      getCellFileOffset: (p, r, c) => w.at[p * MXE_ROWS + r]?.[c] ?? -1,
+    } satisfies UADEPatternLayout,
   };
 }
