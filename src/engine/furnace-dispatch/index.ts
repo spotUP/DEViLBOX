@@ -2,8 +2,6 @@ export { FurnaceDispatchEngine, FurnaceDispatchPlatform, DivCmd } from './Furnac
 export { FurnaceDispatchSynth } from './FurnaceDispatchSynth';
 export {
   FurnaceEffectRouter,
-  getPlatformFamily,
   getFurnaceEffectRouter,
-  type DispatchCommand,
-  type PlatformFamily
+  type DispatchCommand
 } from './FurnaceEffectRouter';
