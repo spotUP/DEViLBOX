@@ -18,6 +18,7 @@ import { getToneEngine } from '@/engine/ToneEngine';
 import { releaseEngineSubscriptions } from '@/engine/replayer/NativeEngineRouting';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { stopAudition } from '@/lib/uprough/auditionPlayer';
+import { dubLanePlayer } from '@/engine/dub/DubLanePlayer';
 
 /** The generation of the song that is current now. */
 export function currentSongGeneration(): number {
@@ -34,6 +35,10 @@ export async function unloadSong(): Promise<void> {
   // The song's header info belongs to the song: only some openers set it, so
   // one left over showed a SID's title and subsongs for the next song (U4.6).
   useFormatStore.getState().clearSongInfo();
+
+  // The dub lane player is a singleton fed only by the Dub Deck view: without this the
+  // outgoing song's lane kept firing ghostReverb (mute + full send) on the new song's channel.
+  dubLanePlayer.setLane(null);
 
   useTransportStore.getState().stop();
   // The Up Rough audition is a render of the outgoing song: it leaves with it.
