@@ -28,6 +28,7 @@ import '@lib/formats/EditableFormatRegistry.builtins';
 import { getLayoutExporters, songFormatId, songLayoutFormatId, type LayoutExporterEntry } from '@lib/formats/EditableFormatRegistry';
 import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
 import { moduleHeldIn } from '@/engine/formatFileDataFields';
+import { furnaceModuleExportAvailable } from './FurnaceModuleExporter';
 
 export type { LayoutExporterEntry };
 
@@ -343,7 +344,29 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
       const out = await exportDssEdited(s);
       return { data: out.data, filename: out.filename, warnings: out.warnings };
     } },
-  { id: 'mod', matches: (s) => songIds(s).format === 'MOD' && !songIds(s).layoutFormatId,
+  // Furnace (also tagged 'XM' by its parser, so it goes before xm): the Neo Geo module writer, when the song holds Neo Geo voices.
+  { id: 'fur', matches: (s) => !!s.furnaceNative && furnaceModuleExportAvailable(s.instruments),
+    run: async (s) => {
+      const { exportFurnaceModule } = await import('./FurnaceModuleExporter');
+      const { furnaceSettingsForExport } = await import('./furnaceSongSettings');
+      const { useProjectStore } = await import('@/stores/useProjectStore');
+      const { FurnaceDispatchPlatform } = await import('@/engine/furnace-dispatch/platforms');
+      const extendedFm = s.furnaceNative?.chipIds.includes(FurnaceDispatchPlatform.YM2610_EXT) ?? false;
+      const r = exportFurnaceModule({ ...s, extendedFm, ...furnaceSettingsForExport(useProjectStore.getState().metadata) });
+      return { data: r.bytes, filename: `${(s.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_')}.fur`, warnings: r.warnings };
+    } },
+  { id: 'dtm', matches: (s) => songIds(s).layoutFormatId === 'dtm_204' || songIds(s).layoutFormatId === 'dtm_pt',
+    run: async (s) => { const { exportDTM } = await import('./DTMExporter'); return exportDTM(s); } },
+  // The OpenMPT-parsed PC trackers carry no layout; the general OpenMPT writer is their export.
+  { id: 'openMpt', matches: (s) => ['XM', 'IT', 'S3M'].includes(songIds(s).format) && !s.furnaceNative
+      && (!songIds(s).layoutFormatId || songIds(s).layoutFormatId === songIds(s).format.toLowerCase()),
+    run: async (s) => {
+      const { exportWithOpenMPT } = await import('./OpenMPTExporter');
+      const format = songIds(s).format.toLowerCase() as 'xm' | 'it' | 's3m';
+      return exportWithOpenMPT(s.patterns, s.instruments, s.songPositions, { format, moduleName: s.name, initialBPM: s.initialBPM, initialSpeed: s.initialSpeed });
+    } },
+  // MODParser tags its layout 'mod'; any other layout on a 'MOD' song names a different format.
+  { id: 'mod', matches: (s) => songIds(s).format === 'MOD' && (!songIds(s).layoutFormatId || songIds(s).layoutFormatId === 'mod'),
     run: async (s) => {
       const { exportSongToMOD } = await import('./modExport');
       const modResult = await exportSongToMOD(s, { bakeSynths: true });
