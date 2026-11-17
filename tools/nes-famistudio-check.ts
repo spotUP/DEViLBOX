@@ -2,7 +2,7 @@
 // Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/nes-famistudio-check.ts [--only <name>] [--failed] [--ticks N] [--out <dir>]
 // Results: test-data/nes-famistudio-check.json (skips songs whose input hash matches a recorded verdict).
 // FamiStudio is lossy against Furnace by design (plan "FamiStudio route"), so no register diff: the verdict is
-//   pass = the ROM ran the requested NMI ticks and every 2A03 channel that has notes in the song sounded in some frame
+//   pass = the ROM ran the requested NMI ticks (at least to every channel's first note + 1 s) and every 2A03 channel that has notes in the song sounded in some frame
 //   (pulse/noise volume nibble > 0, triangle linear counter > 0, DPCM enable bit written to $4015).
 // firstHz reports pulse 1's first sounding frequency next to the song's first pulse 1 note (macros can move it; not failed).
 import { createHash } from 'node:crypto';
@@ -18,6 +18,11 @@ const RESULTS = path.join(ROOT, 'test-data/nes-famistudio-check.json');
 const PLAYER = readFileSync(path.join(ROOT, 'public/nes/famistudio/player.nes'));
 const META: FamistudioMeta = JSON.parse(readFileSync(path.join(ROOT, 'public/nes/famistudio/player.json'), 'utf8'));
 const CPU_NTSC = 1789773;
+// Tick marker at NMI entry (vector at $FFFA), not META.tickAddr (after famistudio_update): the harness drops writes before
+// the first marker, which would lose the first update (note attacks, the $4003 period-high write).
+const NMI_ADDR = PLAYER[16 + 0x7ffa] | (PLAYER[16 + 0x7ffb] << 8);
+// Frames run past the last channel's first note, so a channel that enters late is still heard.
+const FIRST_NOTE_MARGIN = 60;
 
 interface Verdict { inputHash: string; pass: boolean; ticks: number; got: number; sounding: number[]; hasNotes: boolean[]; firstHz?: number; wantHz?: number; romBytes?: number; songBytes?: number; dpcmBytes?: number; lossy?: string[]; error?: string }
 
@@ -44,7 +49,7 @@ function sounding(writes: Array<Array<[number, number]>>): { frames: number[]; f
 
 const results: Record<string, Verdict> = existsSync(RESULTS) ? JSON.parse(readFileSync(RESULTS, 'utf8')) : {};
 const names = readdirSync(SONGS).filter((f) => f.endsWith('.fur')).map((f) => f.slice(0, -4)).filter((n) => !only || n === only).filter((n) => !failedOnly || results[n]?.pass === false);
-const toolHash = createHash('sha1').update(PLAYER).update(readFileSync(path.join(ROOT, 'src/lib/export/nes/famistudioSong.ts'))).digest('hex');
+const toolHash = createHash('sha1').update(PLAYER).update(readFileSync(import.meta.filename)).update(readFileSync(path.join(ROOT, 'src/lib/export/nes/famistudioSong.ts'))).digest('hex');
 for (const name of names) {
   const fur = readFileSync(path.join(SONGS, `${name}.fur`));
   const inputHash = createHash('sha1').update(fur).update(toolHash).update(String(TICKS)).digest('hex');
@@ -55,10 +60,11 @@ for (const name of names) {
     const song = furnaceToFamistudio(m, 0, META.dpcmCap);
     const rom = buildFamistudioRom(PLAYER, META, song);
     if (OUT) writeFileSync(path.join(OUT, `${name}.nes`), rom);
-    const run = mesen(rom, TICKS, Math.ceil(TICKS / 60) + 20, undefined, { tickAddress: META.tickAddr, region: 'Ntsc' });
+    const ticks = Math.max(TICKS, ...song.firstNoteFrames.map((f) => f + FIRST_NOTE_MARGIN));
+    const run = mesen(rom, ticks, Math.ceil(ticks / 60) + 20, undefined, { tickAddress: NMI_ADDR, region: 'Ntsc' });
     const s = sounding(run.writes);
     const wantHz = song.firstNotes[0] >= 0 ? Math.round(440 * 2 ** ((song.firstNotes[0] - 57) / 12)) : undefined;
-    v = { inputHash, pass: run.writes.length === TICKS && song.channelsWithNotes.every((n, i) => !n || s.frames[i] > 0), ticks: run.writes.length, got: run.writes.flat().length, sounding: s.frames, hasNotes: song.channelsWithNotes, firstHz: s.firstHz, wantHz, romBytes: rom.length, songBytes: song.music.length, dpcmBytes: song.dpcm.length, lossy: song.lossy };
+    v = { inputHash, pass: run.writes.length === ticks && song.channelsWithNotes.every((n, i) => !n || s.frames[i] > 0), ticks: run.writes.length, got: run.writes.flat().length, sounding: s.frames, hasNotes: song.channelsWithNotes, firstHz: s.firstHz, wantHz, romBytes: rom.length, songBytes: song.music.length, dpcmBytes: song.dpcm.length, lossy: song.lossy };
   } catch (e) {
     v = { inputHash, pass: false, ticks: 0, got: 0, sounding: [], hasNotes: [], error: e instanceof Error ? e.message : String(e) };
   }
