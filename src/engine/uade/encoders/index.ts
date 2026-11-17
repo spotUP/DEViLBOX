@@ -66,6 +66,7 @@ import './OktalyzerEncoder';
 import './PaulRobothamEncoder';
 import './MedleyEncoder';
 import './PaulShieldsEncoder';
+import './PaulSummersEncoder';
 import './PLMEncoder';
 import './PSMEncoder';
 import './PTMEncoder';

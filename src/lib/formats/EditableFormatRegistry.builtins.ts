@@ -121,6 +121,7 @@ registerEditableFormat({ formatId: "medley", label: "Medley", patternCodec: { ki
 registerEditableFormat({ formatId: "markCooksey", label: "Mark Cooksey", patternCodec: { kind: "variable" }, exporter: { module: "MarkCookseyExporter", fn: "exportMarkCooksey", byLayout: true } });
 registerEditableFormat({ formatId: "jasonPage", label: "Jason Page", patternCodec: { kind: "variable" }, exporter: { module: "JasonPageExporter", fn: "exportJasonPage", byLayout: true } });
 registerEditableFormat({ formatId: "paulShields", label: "Paul Shields", patternCodec: { kind: "variable" }, exporter: { module: "PaulShieldsExporter", fn: "exportPaulShields", byLayout: true } });
+registerEditableFormat({ formatId: "paulSummers", label: "Paul Summers", patternCodec: { kind: "variable" }, exporter: { module: "PaulSummersExporter", fn: "exportPaulSummers", byLayout: true } });
 registerEditableFormat({ formatId: "quartet", label: "Quartet PSG", patternCodec: { kind: "variable" }, exporter: { module: "QuartetExporter", fn: "exportQuartet", byLayout: true } });
 registerEditableFormat({ formatId: "plm", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "preTracker", label: "PreTracker", exporter: { module: "PreTrackerExporter", fn: "exportAsPreTracker" } });

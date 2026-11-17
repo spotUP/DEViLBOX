@@ -512,6 +512,14 @@
       "cells": 58518,
       "bytes": 58518
     },
+    "paulSummers": {
+      "exporter": "PaulSummersExporter.exportPaulSummers",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 87472,
+      "bytes": 87472
+    },
     "piyoPiyo": {
       "exporter": "PiyoPiyoExporter.exportPiyoPiyo",
       "tier": "byte-exact",

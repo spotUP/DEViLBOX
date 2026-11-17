@@ -416,6 +416,14 @@
       "matchPct": 1,
       "cells": 16
     },
+    "paulSummers": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 14
+    },
     "plm": {
       "kind": "fixed",
       "method": "decode-encode",
@@ -786,12 +794,16 @@
     "octamed_mmd0",
     "octamed_mmd1",
     "oktalyzer",
+    "psa",
     "psm",
     "pt36",
+    "pt41",
     "sawteeth",
     "soundFactoryStub",
+    "speedySystem",
     "startrekkerAM",
     "stk",
+    "thomasHermann",
     "wantedTeamDaveLowe",
     "xmf"
   ]

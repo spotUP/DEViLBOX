@@ -101,6 +101,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "paulShields", fixture: "public/data/songs/paul-shields/amigasoccer-1.ps", kind: "variable", parser: { module: "@lib/import/formats/PaulShieldsParser", parseFn: "parsePaulShieldsFile" } },
   { formatId: "paulShields", fixture: "public/data/songs/paul-shields/amnios-highscore.ps", kind: "variable", parser: { module: "@lib/import/formats/PaulShieldsParser", parseFn: "parsePaulShieldsFile" } },
   { formatId: "paulShields", fixture: "public/data/songs/paul-shields/airball-gameover.ps", kind: "variable", parser: { module: "@lib/import/formats/PaulShieldsParser", parseFn: "parsePaulShieldsFile" } },
+  { formatId: "paulSummers", fixture: "public/data/songs/formats/everton_fc_-_jingles.snk", kind: "variable", parser: { module: "@lib/import/formats/PaulSummersParser", parseFn: "parsePaulSummersFile" } },
   { formatId: "plm", fixture: "public/data/songs/disorder-tracker-2/hyper geckoo.plm", kind: "fixed" },
   { formatId: "ptm", fixture: "public/data/songs/formats/rew_vibr.ptm", kind: "variable" },
   { formatId: "pumaTracker", fixture: "public/data/songs/pumatracker/liquid kids - lv1a.puma", kind: "variable" },
