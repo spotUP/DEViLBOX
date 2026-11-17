@@ -55,3 +55,12 @@ describe.skipIf(!existsSync(join(DIR, 'player19.bin')))('Namco 163 cartridge (ma
     expect(() => buildBoardCartridge('n163', [{ ntsc: song('vrc6', 10) }], p)).toThrow(/2A03 and Namco 163 only/);
   });
 });
+
+describe.skipIf(!existsSync(join(DIR, 'player85.bin')))('VRC7 cartridge (mapper 85)', () => {
+  it('emits a mapper-85 image and refuses other chips; the Mesen2 bus check is `tools/nes-rom-check.ts --target vrc7cart`', () => {
+    const p: NesPlayer = { ...JSON.parse(readFileSync(join(DIR, 'player85.json'), 'utf8')), bytes: Uint8Array.from(readFileSync(join(DIR, 'player85.bin'))) };
+    const { rom } = buildBoardCartridge('vrc7', [{ ntsc: cap(Array.from({ length: 1500 }, (_, t) => [w(t, 'nes', 0x4002, t & 255), w(t, 'vrc7', 0x10, t & 255)]).flat()) }], p, 'vrc7 test');
+    expect(((rom[7] & 0xf0) | (rom[6] >> 4))).toBe(85);
+    expect(() => buildBoardCartridge('vrc7', [{ ntsc: song('vrc6', 10) }], p)).toThrow(/2A03 and VRC7 only/);
+  });
+});
