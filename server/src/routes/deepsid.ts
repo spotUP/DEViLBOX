@@ -16,6 +16,17 @@ const IMAGES_DIR = process.env.DB_DIR
   ? path.join(process.env.DB_DIR, 'deepsid-images')
   : path.join(__dirname, '../../data/deepsid-images');
 
+// The DeepSID database archive ships Version_HVSC_<n>.txt next to the SQL dumps; <n> is the HVSC release.
+function readHvscVersion(): number | null {
+  const importDir = path.join(process.env.DB_DIR || path.join(__dirname, '../../data'), 'deepsid-import');
+  try {
+    const hit = fs.readdirSync(importDir).map(f => /^Version_HVSC_(\d+)\.txt$/.exec(f)).find(Boolean);
+    return hit ? Number(hit[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Types ───────────────────────────────────────────────────────────────────
 
 interface ComposerRow {
@@ -528,7 +539,7 @@ router.get('/stats', (_req: Request, res: Response) => {
     files: files.cnt,
     tags: tags.cnt,
     youtubeLinks: youtube.cnt,
-    hvscVersion: 80,
+    hvscVersion: readHvscVersion(),
   });
 });
 

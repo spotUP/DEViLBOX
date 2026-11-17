@@ -60,7 +60,7 @@ export interface DeepSIDStats {
   files: number;
   tags: number;
   youtubeLinks: number;
-  hvscVersion: number;
+  hvscVersion: number | null;
 }
 
 // ── In-memory cache ─────────────────────────────────────────────────────────

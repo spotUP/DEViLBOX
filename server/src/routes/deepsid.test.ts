@@ -23,6 +23,8 @@ const get = async (p: string) => {
 beforeAll(async () => {
   fs.mkdirSync(path.join(dir, 'deepsid-images', 'composers'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'deepsid-images', 'composers', 'musicians_h_hubbard_rob.jpg'), 'x');
+  fs.mkdirSync(path.join(dir, 'deepsid-import'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'deepsid-import', 'Version_HVSC_83.txt'), 'The version of the High Voltage SID Collection in this database archive is 83.');
   const db = new Database(path.join(dir, 'deepsid.db'));
   db.exec(`
     CREATE TABLE composers (id INTEGER, fullname TEXT, focus TEXT, name TEXT, shortname TEXT, handles TEXT, shorthandle TEXT,
@@ -113,7 +115,7 @@ describe('/api/deepsid', () => {
     expect((await get('/search?q=')).body).toEqual({ composers: [], files: [], total: 0 });
   });
   it('stats: row counts', async () => {
-    expect((await get('/stats')).body).toMatchObject({ composers: 1, files: 2, tags: 1, youtubeLinks: 3 });
+    expect((await get('/stats')).body).toMatchObject({ composers: 1, files: 2, tags: 1, youtubeLinks: 3, hvscVersion: 83 });
   });
   it('image: serves a file, rejects bad type, 404 missing', async () => {
     const r = await fetch(`${base}/image/composers/musicians_h_hubbard_rob.jpg`);
