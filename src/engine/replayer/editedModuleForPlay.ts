@@ -68,6 +68,9 @@ export async function editedModuleForPlay(
   desc: NativeEngineDescriptor,
 ): Promise<ArrayBuffer | Uint8Array | null> {
   if (desc.key === 'Klystrack') return klysEditedModule(song);
+  if (desc.key === 'MusicMaker' && song.musicMakerFileData && gridIsEdited(song.patterns)) {
+    return (await import('@/lib/export/MusicMakerExporter')).editedMusicMakerIff(song);
+  }
   if (NOT_RELOADABLE.has(desc.key) || !(gridIsEdited(song.patterns) || sampleIsEdited())) return null;
   const loaded = song[desc.fileDataKey] as ArrayBuffer | Uint8Array | undefined;
   const carriesEdit = (d: ArrayBuffer | Uint8Array | null | undefined): d is ArrayBuffer | Uint8Array => {

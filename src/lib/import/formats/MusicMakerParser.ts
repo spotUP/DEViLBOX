@@ -86,7 +86,7 @@ interface IFFChunk { offset: number; size: number; }
  * Walk FORM+MMV4/MMV8 IFF chunks. Returns a Map from chunk ID to
  * { offset, size } where offset points to the first byte of chunk data.
  */
-function readChunks(buf: Uint8Array): Map<string, IFFChunk> {
+export function readChunks(buf: Uint8Array): Map<string, IFFChunk> {
   const chunks = new Map<string, IFFChunk>();
   let pos = 12; // skip FORM(4) + file_content_size(4) + format_tag(4)
   const fileEnd = buf.length;
