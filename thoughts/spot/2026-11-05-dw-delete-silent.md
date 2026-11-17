@@ -68,3 +68,26 @@ Fix: dw_played_ticks (C export, counts processed play_tick calls, reset in initi
 Test: src/engine/__tests__/davidWhittakerPlayheadFollowsEngineTick.test.ts; fails with the worklet change reverted and with the engine emit removed.
 Live MCP check: not done, the browser kept disconnecting from the MCP bridge. Human check: http://localhost:5174, load apb.dw, play, the cursor must stay on the audible row.
 Found: davidWhittakerGridEdits.test.ts "an edit the module cannot hold is refused" (2 cases) fails; it expects a note removal to be refused, but commit 902e9767b now writes it as a mute command. Stale test, not touched here.
+
+## Sync offset measured + play pattern seek
+
+Live measurement NOT done: no browser was connected to the MCP bridge. Measured offsets (ms) before/after: not available.
+Expected, unmeasured: about -33 ms before (grid early), about 0 to +16 ms after.
+
+Tool: `get_playhead_offset` (MCP, bridge handler `getPlayheadOffset` in engineHandlers.ts, math in
+`src/bridge/handlers/playheadOffset.ts`, tested in `playheadOffset.test.ts`). The MCP server needs a restart before the tool is callable.
+Offset = wall time the grid changed row minus wall time the row is heard (render time mapped through `ctx.getOutputTimestamp()`); negative = grid early.
+
+Root cause: the DW worklet reported the tick it had just rendered; the ear hears it one output latency later.
+Fix: `play` carries `latencyFrames = (outputLatency + baseLatency) * sampleRate` (the Nuade pattern); the worklet queues ticks and reports
+each when `framesPlayed - latencyFrames` has reached it, stamped with the render frame.
+
+Play Pattern seek: C export `dw_seek_ticks` (silent, restarts subsong when the target is behind), worklet message `seekTicks`
+with a generation stamped on later `playTick` reports, `DavidWhittakerEngine.seekToPattern` drops stale generations,
+`enforcePatternLoopOnEngine` has a DW branch.
+
+Tests: `davidWhittakerLatencyAndSeek.test.ts` (4; fails with the latency hold-back removed, fails with the DW seek branch removed),
+`playheadOffset.test.ts` (4), `davidWhittakerPlayheadFollowsEngineTick.test.ts` (fake engine fields extended).
+
+Open: the render runs about 33 ms ahead of the ear, so a seek can leak a short blip of the next pattern. The outputLatency+baseLatency
+sum follows Nuade and may double count on some browsers. A seek target must be below the pass length (about 193 ticks for apb.dw).

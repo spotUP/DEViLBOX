@@ -1,0 +1,349 @@
+<title>DEViLBOX Player Screens</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding-block: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: #111; color: #ccc; font: 13px/1.4 system-ui, sans-serif; }
+  figure { max-width: 100%; min-width: 0; }
+  #bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 16px; }
+  #grid { display: flex; flex-wrap: wrap; gap: 20px; }
+  figure { margin: 0; }
+  figcaption { margin-bottom: 4px; color: #888; }
+  canvas { image-rendering: pixelated; display: block; background: #000; max-width: 100%; height: auto; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #f59e0b; outline-offset: 1px; }
+  button, select { background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 4px 8px; font: inherit; }
+  label { white-space: nowrap; }
+</style>
+<div id="bar">
+  <select id="view" aria-label="Platform"></select>
+  <button id="prev">Previous subsong</button>
+  <button id="play">Pause</button>
+  <button id="next">Next subsong</button>
+  <label><input type="checkbox" id="oZones"> Bar colours: green / amber / red zones</label>
+  <label><input type="checkbox" id="oCap" checked> Peak caps</label>
+  <label><input type="checkbox" id="oCut"> Subsong change: instant cut</label>
+  <span>Keys: Space, Left, Right</span>
+</div>
+<div id="grid"></div>
+<script>
+'use strict';
+// ---- Shared 8x8 font, 1bpp. 5x7 glyph in an 8x8 cell (x offset 1, bottom row blank).
+// 5 column bytes per glyph, bit 0 = top row. ASCII 32..95, then play, pause, block.
+const FONT_HEX = [
+  '0000000000','00005F0000','0007000700','147F147F14','242A7F2A12','2313086462','3649552250','0005030000',
+  '001C224100','0041221C00','14083E0814','08083E0808','0050300000','0808080808','0060600000','2010080402',
+  '3E5149453E','00427F4000','4261514946','2141454B31','1814127F10','2745454539','3C4A494930','0171090503',
+  '3649494936','064949291E','0036360000','0056360000','0814224100','1414141414','0041221408','0201510906',
+  '324979413E','7E1111117E','7F49494936','3E41414122','7F4141221C','7F49494941','7F09090901','3E4149497A',
+  '7F0808087F','00417F4100','2040413F01','7F08142241','7F40404040','7F020C027F','7F0408107F','3E4141413E',
+  '7F09090906','3E4151215E','7F09192946','4649494931','01017F0101','3F4040403F','1F2040201F','3F4038403F',
+  '6314081463','0708700807','6151494543','007F414100','0204081020','0041417F00','0402010204','4040404040',
+  '7F3E1C0800','7F7F007F7F','7F7F7F7F7F'
+].join('');
+const FONT = new Uint8Array(FONT_HEX.length / 2);
+for (let i = 0; i < FONT.length; i++) FONT[i] = parseInt(FONT_HEX.substr(i * 2, 2), 16);
+// In strings: { = play, | = pause, } = block cursor. Lowercase folds to uppercase.
+function charIdx(ch) {
+  let c = ch.charCodeAt(0);
+  if (c >= 97 && c <= 122) c -= 32;
+  if (c >= 123 && c <= 125) return 64 + c - 123;
+  return c < 32 || c > 95 ? 31 : c - 32;
+}
+
+// ---- Logo: horned D. Rows 0-1 (16x16) and row 0 (8x8) are the horns.
+const LOGO16 = [
+  '##..........##..',
+  '.##........##...',
+  '.############...',
+  '.#############..',
+  '.####.....#####.',
+  '.####......####.',
+  '.####.......####',
+  '.####.......####',
+  '.####.......####',
+  '.####.......####',
+  '.####......####.',
+  '.####.....#####.',
+  '.#############..',
+  '.############...',
+  '................',
+  '................'
+];
+const LOGO8 = [
+  '#....#..',
+  '#####...',
+  '##..##..',
+  '##...##.',
+  '##...##.',
+  '##..##..',
+  '#####...',
+  '........'
+];
+
+// ---- Palettes. Roles map to DEViLBOX tokens (src/index.css defaults).
+const TOK = { bg: '#1a1a1a', rule: '#383838', text: '#f0f0f0', dim: '#a0a0a0', bar: '#f59e0b', barlo: '#b45309', cap: '#22d3ee', logo: '#ef4444', green: '#22c55e' };
+function q(hex, bits) {
+  const L = (1 << bits) - 1;
+  return '#' + [1, 3, 5].map(i => Math.round(Math.round(parseInt(hex.substr(i, 2), 16) / 255 * L) * 255 / L).toString(16).padStart(2, '0')).join('');
+}
+// Owner 2026-11-15: every platform starts from the Game Gear palette (roles at 4 bits per channel).
+const GG = {}; for (const k in TOK) GG[k] = q(TOK[k], 4);
+function qpal(bits) { const o = {}; for (const k in GG) o[k] = q(GG[k], bits); return o; }
+// Fixed-palette machines: each role takes the nearest hardware entry to its Game Gear value.
+function rgb(h) { return [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16)); }
+function hex3(r, g, b) { return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join(''); }
+// Brightness error plus double-weighted hue error, so greys stay grey and reds stay red.
+function dist(a, b) { const yuv = h => { const [r, g, b] = rgb(h), y = 0.299 * r + 0.587 * g + 0.114 * b; return [y, b - y, r - y]; }; const x = yuv(a), z = yuv(b); return (x[0] - z[0]) ** 2 + 2 * ((x[1] - z[1]) ** 2 + (x[2] - z[2]) ** 2); }
+function nearest(c, list) { let best = list[0], bd = Infinity; for (const e of list) { const d = dist(c, e); if (d < bd) { bd = d; best = e; } } return best; }
+function npal(list, inks) {
+  const o = {}; for (const k in GG) o[k] = nearest(GG[k], list);
+  // inks: machines with fewer on-screen colours than roles keep these roles; the rest snap to them.
+  if (inks) { const keep = [...new Set(inks.map(k => o[k]))]; for (const k in o) o[k] = nearest(o[k], keep); }
+  return o;
+}
+// shortcut: NTSC hue wheel is an approximation of TIA/GTIA, replace with a measured table before the real ROM.
+function ntscList(lums) {
+  const out = [];
+  for (let h = 0; h < 16; h++) for (let l = 0; l < lums; l++) {
+    const Y = 0.95 * 255 * l / (lums - 1);
+    if (h === 0) { out.push(hex3(Y, Y, Y)); continue; }
+    const t = (-50 + (h - 1) * 25.7) * Math.PI / 180, I = 64 * Math.cos(t), Q = 64 * Math.sin(t);
+    out.push(hex3(Y + 0.956 * I + 0.621 * Q, Y - 0.272 * I - 0.647 * Q, Y - 1.106 * I + 1.703 * Q));
+  }
+  return out;
+}
+const NES_HW = ['#626262','#001fb2','#2404c8','#5200b2','#730076','#800024','#730b00','#522800','#244400','#005700','#005c00','#005324','#003c76','#000000',
+  '#ababab','#0d57ff','#4b30ff','#8a13ff','#bc08d6','#d21269','#c72e00','#9d5400','#607b00','#209800','#00a300','#009942','#007db4',
+  '#ffffff','#53aeff','#9085ff','#d365ff','#ff57ff','#ff5dcf','#ff7757','#fa9e00','#bdc700','#7ae700','#43f611','#26ef7e','#2cd5f6','#4e4e4e',
+  '#b6e1ff','#ced1ff','#e9c3ff','#ffbcff','#ffbdf4','#ffc6c3','#ffd59a','#e9e681','#cef481','#b6fb9a','#a9fac3','#a9f0f4','#b8b8b8'];
+const ZX_HW = ['#000000','#0000d7','#d70000','#d700d7','#00d700','#00d7d7','#d7d700','#d7d7d7','#0000ff','#ff0000','#ff00ff','#00ff00','#00ffff','#ffff00','#ffffff'];
+const CPC_HW = []; for (const r of [0, 128, 255]) for (const g of [0, 128, 255]) for (const b of [0, 128, 255]) CPC_HW.push(hex3(r, g, b));
+const DMG_HW = ['#081820', '#346856', '#88c070', '#e0f8d0'];
+// DMG has four shades only: each role takes the shade nearest its Game Gear brightness.
+function dmgPal() { const o = {}; for (const k in GG) { const [r, g, b] = rgb(GG[k]); o[k] = DMG_HW[Math.min(3, Math.floor((0.299 * r + 0.587 * g + 0.114 * b) / 64))]; } return o; }
+const TIA = npal(ntscList(8));
+
+const PLATFORMS = [
+  { id: 'md', name: 'Mega Drive', w: 320, h: 224, m: 1, mx: 1, chip: 'YM2612 + SN76489', plat: 'MEGA DRIVE', n: 10, pal: qpal(3) },
+  { id: 'sms', name: 'Master System', w: 256, h: 192, m: 1, mx: 1, chip: 'SN76489', plat: 'MASTER SYSTEM', n: 4, pal: qpal(2) },
+  { id: 'gg', name: 'Game Gear', w: 160, h: 144, m: 0, mx: 0, chip: 'SN76489', plat: 'GAME GEAR', n: 4, pal: qpal(4) },
+  { id: 'gb', name: 'Game Boy (DMG)', w: 160, h: 144, m: 0, mx: 0, chip: 'DMG APU', plat: 'GAME BOY', n: 4,
+    pal: dmgPal() },
+  { id: 'gbc', name: 'Game Boy Color', w: 160, h: 144, m: 0, mx: 0, chip: 'DMG APU', plat: 'GAME BOY COLOR', n: 4, pal: qpal(5) },
+  { id: 'nes', name: 'NES', w: 256, h: 240, m: 2, mx: 2, chip: '2A03', plat: 'NES', n: 5, noCapInZones: true,
+    pal: npal(NES_HW) },
+  { id: 'snes', name: 'SNES', w: 256, h: 224, m: 1, mx: 1, chip: 'SPC700 + S-DSP', plat: 'SUPER NES', n: 8, pal: qpal(5) },
+  { id: 'a2600', name: 'Atari 2600', w: 160, h: 192, par: 2, custom: true, n: 2, barRows: 15, pal: TIA },
+  { id: 'zx', name: 'ZX Spectrum', w: 256, h: 192, m: 1, mx: 1, chip: 'AY-3-8912', plat: 'ZX SPECTRUM', n: 3, coarse: true, clash: true,
+    pal: npal(ZX_HW) },
+  { id: 'cpc', name: 'Amstrad CPC (mode 1)', w: 320, h: 200, m: 0, mx: 1, chip: 'AY-3-8912', plat: 'AMSTRAD CPC', n: 3, coarse: true,
+    pal: npal(CPC_HW, ['bg', 'text', 'bar', 'logo']) },
+  { id: 'a8', name: 'Atari 8-bit', w: 320, h: 192, m: 0, mx: 1, chip: 'POKEY', plat: 'ATARI 8-BIT', n: 4, logo8: true, pal: npal(ntscList(16)) },
+  { id: 'x16', name: 'Commander X16', w: 320, h: 240, m: 1, mx: 1, chip: 'YM2151 + VERA PSG', plat: 'COMMANDER X16', n: 16, pal: qpal(4) },
+  { id: 'gba', name: 'GBA', w: 240, h: 160, m: 0, mx: 0, chip: 'DMG + DIRECT SOUND', plat: 'GBA', n: 6, pal: qpal(5) },
+  { id: 'ds', name: 'Nintendo DS (top screen)', w: 256, h: 192, m: 1, mx: 1, chip: '16 CH PCM', plat: 'NINTENDO DS', n: 16, pal: qpal(5) },
+  { id: 'neogeo', name: 'Neo Geo', w: 320, h: 224, m: 1, mx: 1, chip: 'YM2610', plat: 'NEO GEO', n: 14, coarse: true, pal: qpal(5) },
+  { id: 'amiga', name: 'Amiga (PAL)', w: 320, h: 256, m: 1, mx: 1, chip: 'PAULA', plat: 'AMIGA', n: 4, pal: qpal(4) }
+];
+for (const p of PLATFORMS) {
+  p.pal = Object.assign({}, p.pal);
+  if (!p.pal.horn) p.pal.horn = p.pal.bar;
+  if (!p.pal.time) p.pal.time = p.pal.cap;
+  p.cols = p.w >> 3; p.rows = p.h >> 3;
+  if (!p.custom) {
+    p.barRows = p.rows - 2 * p.m - 8;
+    p.bw = Math.max(1, Math.min(4, Math.floor((p.cols - 2 * p.mx) / p.n)));
+    p.bx = (p.cols - p.n * p.bw) >> 1;
+  }
+}
+
+// ---- Fake song. Placeholder metadata, not a real tune.
+const TITLES = ['EXAMPLE SONG TITLE', 'SECOND SUBSONG NAME', 'THIRD SUBSONG NAME', 'FOURTH TUNE', 'FIFTH TUNE'];
+const AUTHOR = 'AUTHOR NAME';
+const MSG = 'THIS LINE IS BUILT FROM THE SONG COMMENTS AND MESSAGE.   GREETINGS GO HERE.   SAMPLE NAMES USED AS A MESSAGE GO HERE TOO.   ***   ';
+const LABELS = '123456789ABCDEFGHIJKLMNO';
+
+// ---- One layout for every tile platform. g is a drawing backend (pixels or ASCII).
+function layout(g, p, S) {
+  const C = p.cols, T = p.m, B = p.rows - p.m, mx = p.mx, tx = mx + 9, tw = C - mx - tx;
+  g.logo(mx, T, S);
+  let title = S.title.padEnd(tw).slice(0, tw);
+  if (S.wipe >= 0 && S.wipe < tw) title = title.slice(0, S.wipe) + '}' + S.old.padEnd(tw).slice(S.wipe + 1, tw);
+  g.text(tx, T, title, 'text');
+  g.text(mx, T + 1, ('BY ' + S.author).slice(0, C - 2 * mx), 'dim');
+  g.text(mx, T + 2, p.chip.slice(0, C - 2 * mx), 'bar');
+  if (p.chip.length + 1 + p.plat.length <= C - 2 * mx) g.text(C - mx - p.plat.length, T + 2, p.plat, 'dim');
+  g.rule(T + 3);
+  g.bars(T + 4, S);
+  for (let i = 0; i < p.n; i++) g.text(p.bx + i * p.bw + ((p.bw - 1) >> 1), B - 4, LABELS[i], 'dim');
+  g.text(mx, B - 3, (S.paused ? '| ' : '{ ') + S.time, 'time');
+  const sng = 'SONG ' + S.song + '/' + S.count;
+  g.text(C - mx - sng.length, B - 3, sng, 'text');
+  g.rule(B - 2);
+  g.scroll(B - 1, S.msg, p.coarse ? S.scroll & ~7 : S.scroll);
+}
+
+function makePix(p, buf) {
+  const W = p.w, H = p.h, pal = p.rgba;
+  const px = (x, y, c) => { if (x >= 0 && x < W && y >= 0 && y < H) buf[y * W + x] = c; };
+  const ch = (x, y, idx, c, x0, x1) => {
+    for (let i = 0; i < 5; i++) {
+      const b = FONT[idx * 5 + i], xx = x + 1 + i;
+      if (xx < x0 || xx >= x1) continue;
+      for (let r = 0; r < 7; r++) if (b >> r & 1) px(xx, y + r, c);
+    }
+  };
+  const logo8 = (x, y, sx, sy, S) => {
+    for (let r = S.o.plain ? 1 : 0; r < 8; r++) for (let c = 0; c < 8; c++) if (LOGO8[r][c] === '#')
+      for (let a = 0; a < sx; a++) for (let b = 0; b < sy; b++) px(x + c * sx + a, y + r * sy + b, r === 0 ? pal.horn : pal.logo);
+  };
+  return {
+    px, ch, logo8,
+    text(col, row, s, role) { for (let i = 0; i < s.length; i++) ch((col + i) * 8, row * 8, charIdx(s[i]), pal[role], 0, W); },
+    rule(row) { for (let x = p.mx * 8; x < W - p.mx * 8; x++) px(x, row * 8 + 3, pal.rule); },
+    // Owner 2026-11-15: text logo "DEViLBOX" (mock font has no lowercase, so the i shows as I).
+    logo(col, row) { this.text(col, row, 'DEVILBOX', 'logo'); },
+    bars(top, S) {
+      const R = p.barRows, bot = (top + R) * 8, o = S.o, zones = o.zones && pal.green !== undefined;
+      for (let i = 0; i < p.n; i++) {
+        const x0 = (p.bx + i * p.bw) * 8, wp = p.bw * 8 - 1, h = S.lv[i], cp = S.cap[i];
+        const capOn = o.cap && cp > 0 && !(zones && p.noCapInZones);
+        const cy = Math.max(top * 8, bot - cp - 2), capCell = (cy + 1) >> 3;
+        for (let k = 0; k < h; k++) {
+          const y = bot - 1 - k, f = (k >> 3) / R;
+          let c = zones ? (f < 0.6 ? pal.green : f < 0.85 ? pal.bar : pal.logo) : pal.bar;
+          // Attribute clash: one ink per 8x8 cell, so the cell holding the cap takes the cap colour.
+          if (p.clash && capOn && (y >> 3) === capCell) c = pal.cap;
+          for (let x = 0; x < wp; x++) px(x0 + x, y, x === wp - 1 && !zones && !p.clash ? pal.barlo : c);
+        }
+        if (capOn) for (let y = cy; y < cy + 2; y++) {
+          if (p.clash && (y >> 3) !== capCell) continue;
+          for (let x = 0; x < wp; x++) px(x0 + x, y, pal.cap);
+        }
+      }
+    },
+    scroll(row, msg, off) {
+      const x0 = p.mx * 8, x1 = W - p.mx * 8, start = off % (msg.length * 8);
+      for (let i = start >> 3, x = x0 - (start & 7); x < x1; i++, x += 8) ch(x, row * 8, charIdx(msg[i % msg.length]), pal.text, x0, x1);
+    }
+  };
+}
+
+// ---- Atari 2600: kernel bands, no tiles. Two playfield bars, 48-pixel text lines.
+function draw2600(g, p, S) {
+  const pal = p.rgba, zones = S.o.zones;
+  const text6 = (y, s, c) => { for (let i = 0; i < 6; i++) g.ch(56 + i * 8, y, charIdx(s[i] || ' '), c, 0, 160); };
+  const mq = 'DEVILBOX - ' + S.title + ' BY ' + S.author + ' - TIA   ', at = (S.scroll >> 4) % mq.length;
+  text6(28, (mq + mq).substr(at, 6), pal.text);
+  for (let i = 0; i < 2; i++) for (let k = 0; k < S.lv[i]; k++) {
+    const f = (k >> 3) / 15, c = zones ? (f < 0.6 ? pal.green : f < 0.85 ? pal.bar : pal.logo) : (k >> 3 & 1 ? pal.bar : pal.barlo);
+    for (let x = 0; x < 32; x++) g.px((i ? 112 : 16) + x, 159 - k, c);
+  }
+  text6(168, ' ' + S.time, S.paused ? pal.dim : pal.cap);
+  text6(180, S.song + ' OF ' + S.count, pal.text);
+}
+
+function makeAscii(p) {
+  const grid = Array.from({ length: p.rows }, () => Array(p.cols).fill(' '));
+  const put = (c, r, s) => { for (let i = 0; i < s.length; i++) if (c + i >= 0 && c + i < p.cols && r >= 0 && r < p.rows) grid[r][c + i] = s[i]; };
+  return {
+    grid,
+    text(c, r, s) { put(c, r, s.replace('{', '>').replace('|', '"')); },
+    rule(r) { put(p.mx, r, '-'.repeat(p.cols - 2 * p.mx)); },
+    logo(c, r) { put(c, r, 'DEVILBOX'); },
+    bars(top, S) {
+      for (let i = 0; i < p.n; i++) for (let k = 0; k < Math.ceil(S.lv[i] / 8); k++)
+        put(p.bx + i * p.bw, top + p.barRows - 1 - k, '#'.repeat(Math.max(1, p.bw - 1)));
+    },
+    scroll(r, msg) { put(p.mx, r, msg.repeat(3).slice(0, p.cols - 2 * p.mx)); }
+  };
+}
+
+// ---- Motion rules (the same integer rules the ROMs use).
+const G = { ticks: 0, song: 0, old: 0, paused: false, scroll: 0, wipe: -1, drop: 0, o: { zones: false, cap: true, cut: false } };
+// Fake driver volume 0..15: a note trigger, then the envelope falls 1 step every 2 frames.
+function drvVol(chn, f, song) {
+  const per = 12 + ((chn * 7 + song * 5) % 5) * 6, t = f + chn * 13;
+  return Math.max(0, 9 + ((chn * 5 + song * 3 + Math.floor(t / per) * 7) % 7) - ((t % per) >> 1));
+}
+function updBars(P) {
+  const H = P.p.barRows * 8, fall = Math.max(1, P.p.barRows >> 2);
+  for (let i = 0; i < P.p.n; i++) {
+    const v = G.paused || G.drop > 0 ? 0 : drvVol(i, G.ticks, G.song);
+    const t = Math.round(v * H / 15);               // a 16-entry table on hardware
+    P.lv[i] = t > P.lv[i] ? t : Math.max(t, P.lv[i] - fall);   // instant attack, linear fall
+    if (P.lv[i] >= P.cap[i]) { P.cap[i] = P.lv[i]; P.hold[i] = 32; }
+    else if (P.hold[i] > 0) P.hold[i]--;
+    else P.cap[i] = Math.max(P.lv[i], P.cap[i] - 1);
+  }
+}
+function step() {
+  if (!G.paused) G.ticks++;
+  G.scroll++;
+  if (G.drop > 0) G.drop--;
+  if (G.wipe >= 0 && (G.wipe += 2) > 40) G.wipe = -1;
+  for (const P of live) updBars(P);
+}
+function changeSong(d) {
+  G.old = G.song; G.song = (G.song + d + TITLES.length) % TITLES.length;
+  G.ticks = 0; G.scroll = 0;
+  if (!G.o.cut) { G.wipe = 0; G.drop = 16; }
+}
+function songState(P) {
+  const s = Math.floor(G.ticks / 60);
+  return { title: TITLES[G.song], old: TITLES[G.old], wipe: G.wipe, author: AUTHOR, msg: MSG, scroll: G.scroll, paused: G.paused,
+    time: String(Math.floor(s / 60) % 100).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'),
+    song: G.song + 1, count: TITLES.length, lv: P.lv, cap: P.cap, o: G.o };
+}
+
+let live = [];
+if (typeof document === 'undefined') {
+  globalThis.PLAYERUI = { PLATFORMS, layout, makeAscii, LOGO16, LOGO8, TOK };
+} else {
+  const rgba = h => (255 << 24 | parseInt(h.substr(5, 2), 16) << 16 | parseInt(h.substr(3, 2), 16) << 8 | parseInt(h.substr(1, 2), 16)) >>> 0;
+  for (const p of PLATFORMS) { p.rgba = {}; for (const k in p.pal) p.rgba[k] = rgba(p.pal[k]); }
+  const $ = id => document.getElementById(id), view = $('view'), grid = $('grid');
+  view.innerHTML = '<option value="all">All platforms</option>' + PLATFORMS.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  function build() {
+    grid.textContent = ''; live = [];
+    const all = view.value === 'all', scale = all ? 2 : 3;
+    for (const p of PLATFORMS) {
+      if (!all && p.id !== view.value) continue;
+      const fig = document.createElement('figure'), cap = document.createElement('figcaption'), cv = document.createElement('canvas');
+      cap.textContent = `${p.name} - ${p.w}x${p.h}, ${p.n} bars`;
+      cv.width = p.w; cv.height = p.h;
+      cv.style.width = p.w * scale * (p.par || 1) + 'px'; cv.style.aspectRatio = p.w * (p.par || 1) + ' / ' + p.h;
+      fig.append(cap, cv); grid.append(fig);
+      const ctx = cv.getContext('2d'), img = ctx.createImageData(p.w, p.h), buf = new Uint32Array(img.data.buffer);
+      live.push({ p, ctx, img, buf, g: makePix(p, buf), lv: new Array(p.n).fill(0), cap: new Array(p.n).fill(0), hold: new Array(p.n).fill(0) });
+    }
+  }
+  function render() {
+    for (const P of live) {
+      P.buf.fill(P.p.rgba.bg);
+      const S = songState(P);
+      if (P.p.custom) draw2600(P.g, P.p, S); else layout(P.g, P.p, S);
+      P.ctx.putImageData(P.img, 0, 0);
+    }
+  }
+  // Fixed 60 Hz steps whatever the monitor refresh is.
+  let last = performance.now(), acc = 0;
+  function frame(now) {
+    acc = Math.min(acc + now - last, 100); last = now;
+    while (acc >= 1000 / 60) { step(); acc -= 1000 / 60; }
+    render(); requestAnimationFrame(frame);
+  }
+  const togglePlay = () => { G.paused = !G.paused; $('play').textContent = G.paused ? 'Play' : 'Pause'; };
+  view.onchange = build;
+  $('prev').onclick = () => changeSong(-1);
+  $('next').onclick = () => changeSong(1);
+  $('play').onclick = togglePlay;
+  for (const [id, key] of [['oZones', 'zones'], ['oCap', 'cap'], ['oCut', 'cut']]) $(id).onchange = e => { G.o[key] = e.target.checked; };
+  addEventListener('keydown', e => {
+    if (e.target !== document.body) return;
+    if (e.key === ' ') { togglePlay(); e.preventDefault(); }
+    if (e.key === 'ArrowLeft') changeSong(-1);
+    if (e.key === 'ArrowRight') changeSong(1);
+  });
+  build(); requestAnimationFrame(frame);
+}
+</script>

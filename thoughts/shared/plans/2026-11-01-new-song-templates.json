@@ -55,9 +55,9 @@
   "davidWhittaker": {
     "status": "written",
     "file": "templates/davidWhittaker.dw",
-    "source": "public/data/songs/formats/apb.dw",
+    "source": "public/data/songs/david-whittaker/garfield2+.dw",
     "variant": "trimmed-1-pattern",
-    "bytes": 45810
+    "bytes": 14882
   },
   "deltaMusic1": {
     "status": "skipped",

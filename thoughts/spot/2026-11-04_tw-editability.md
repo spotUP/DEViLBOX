@@ -117,3 +117,22 @@ Safe middle path if wanted later: shrink-only edits (delete an event, pad the bl
 Only two .tw files are in public/data/songs/formats: future basketball main (parses, grid 4 voices, export byte-exact) and blinkys scary school-sfx. chuckie egg 2 and warinthegulf are not in the repo; Modland path not found by guess (404), not fetched.
 blinkys scary school-sfx.tw: header `6000 00a0`, both `c0fc 000a`/`c0fc 000c` scans succeed (base 0x932, 5 songs, instrument table found) but the walker returns null: different song-table layout. Record = `0032 0034 0036 0000 0202`: three voice words, the 4th is 0 (unused voice), and each word points at ONE block word (0x38, 0x5b, 0x59) with no 0x0000 terminator and no loop word; the "lists" overlap and run straight into stream data. So the list format differs (sound-effect player variant: a single block per voice, ended by an end opcode); not an offset or signature change. Needs: list parse mode "one block word per voice", zero word = unused voice, verification of 0x80/0x83 end handling. Result: parses NO, grid n/a, export n/a (falls back to UADE, original bytes untouched).
 warinthegulf (`b27a 003c`): not available, different player, not attempted.
+
+## 2026-11-14 tail pointer hunt (devilbox-5f, static: m68k-elf-objdump + byte scan, no UADE run)
+
+Layout: head code, song table, lists, blocks, trailing sfx-trigger routine, dummy, samples.
+fb (future basketball): last block ends ~0x138c, routine 0x1392-0x1403, dummy+samples 0x1404.
+bl (blinkys sfx): routine 0xade-0xb6b, sfx table 0xb6c, sfx streams 0xb74-0xbc3, dummy+samples 0xbc4.
+a5 = file+4. Shift N must be even. Chunk = end of last block to EOF, moved rigidly.
+
+Patch list (+N unless noted):
+- head->chunk word displacements: fb 0xcc (bsrw routine), 0x228 + 0x482 (lea pc@ dummy); bl 0xd2, 0x1ec, 0x456.
+- instrument table, 8 entries x 12 bytes, longs at +0 and +6 (sample, loop; no-loop = dummy): fb 0x704, bl 0x710. a5-relative.
+- chunk->head displacements change by -N: fb 0x13a2, 0x13ca, 0x13f2, 0x1400; bl 0xb5c, 0xb6a, 0xae6, 0xaf0, 0xafa, 0xb04.
+- bl sfx table 0xb6e..0xb77 (5 words, a5-relative, +N). fb sfx table at 0x1402+2n all zero: patch only nonzero.
+- Signed 16-bit displacement limit: N < ~0x6e00 (fb).
+Not patched (judged harmless, unproven): stale absolute longs in the 4 voice structs (fb 0x764/0x7b0/0x7fc/0x848), rewritten by song init.
+Arp table base = table itself (fb 0x2e4, bl 0x2d2), targets in head, no patch.
+Block/list/loop words are head-relative, stay put.
+Not checked: further routines in fb tail past 0x1404, eagleplayer hard-coded offsets.
+Next: implement relocation with this list (offsets must be found per file by pattern, not hard-coded), verify with headless UADE render of edited fb + bl.
