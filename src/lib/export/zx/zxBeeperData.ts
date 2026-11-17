@@ -24,7 +24,12 @@ const MAX_FREQ_HZ = 4800; // below the 4886 Hz Nyquist of the voice update rate
 const PIN_SLOT_T = BEEPER_ITER_T / 3; // the pin is written 3 times per iteration, each write takes 1 from the timer
 // Estimated T-states between two tone runs (save, record read, restore) and per changed voice; keeps the tempo honest.
 // shortcut: hand-counted estimates, upgrade by measuring the record path in an emulator trace.
-const RECORD_T = 650;
+// The screen slice (screen.inc `slice`: one scroller pixel row plus one bar or clock digit) runs in every record gap.
+// shortcut: SLICE_T is the measured average (MAME port trace); the slice length varies a little per task.
+export const BEEPER_SLICE_T = 1640;
+const RECORD_T = 650 + 20 + BEEPER_SLICE_T;
+// A record at least every 1/50 s keeps the bars, clock and scroller moving during held notes.
+const SCREEN_ITERS = Math.floor(BEEPER_CLOCK / 50 / BEEPER_ITER_T);
 const VOICE_T = 73;
 const DRUM_SETUP_T = 90;
 const MAX_ITERS = 65535;
@@ -178,8 +183,9 @@ export function songToBeeperRows(song: BeeperSong): BeeperData {
     const prev = rows[rows.length - 1];
     const changes = prev ? freq.filter((f, v) => f !== prev.freq[v] || duty[v] !== prev.duty[v]).length : BEEPER_VOICES;
     let avail = targetT - doneT;
-    if (!drum && prev && changes === 0 && prev.iters < MAX_ITERS) {
-      const iters = Math.min(MAX_ITERS - prev.iters, Math.max(0, Math.round(avail / BEEPER_ITER_T)));
+    const more = Math.max(0, Math.round(avail / BEEPER_ITER_T));
+    if (!drum && prev && changes === 0 && prev.iters + more <= SCREEN_ITERS) {
+      const iters = more;
       prev.iters += iters; doneT += iters * BEEPER_ITER_T; prev.end = targetT / BEEPER_CLOCK;
       return;
     }
@@ -255,12 +261,18 @@ export function songToBeeperRows(song: BeeperSong): BeeperData {
   }
   if (dropped.size) warnings.push(`Dropped, the beeper player cannot play: ${[...dropped].join(', ')}`);
   if (rows.length === 0) throw new Error('The song has no notes.');
+  // The phases advance only inside the tone loop; the record gaps (screen slice included) would flatten every note.
+  // Scale all frequency words by tone time / loop time so the average pitch is exact. Drum time is excluded: no tone sounds then.
+  const loopT = rows.reduce((t, r) => t + r.iters * BEEPER_ITER_T, 0);
+  const drumT = rows.reduce((t, r) => t + (r.drum ? r.drum.bytes * BEEPER_DRUM_BYTE_T + DRUM_SETUP_T : 0), 0);
+  const pitchFactor = loopT > 0 ? Math.max(1, (targetT - drumT) / loopT) : 1;
+  for (const r of rows) r.freq = r.freq.map((f) => Math.min(0xFFFF, Math.round(f * pitchFactor)));
   return { rows, drums: Uint8Array.from(blob), seconds: targetT / BEEPER_CLOCK, drumHits, warnings: [...new Set(warnings)] };
 }
 
 /**
  * Record stream of beeper.asm split over 16K banks (at most `maxBanks`). `drumBase` = address of the drum blob.
- * Each bank ends with #80 (next bank), the last with #81 (loop to the start). The first record sets every voice.
+ * Each bank ends with #80 (next bank), the last with #81 (loop to the start); #82 ticks the clock once per song second. The first record sets every voice.
  */
 export function encodeBeeperMusic(rows: readonly BeeperRow[], drumBase: number, maxBanks: number): { banks: Uint8Array[]; seconds: number; truncated: boolean } {
   const banks: Uint8Array[] = [];
@@ -269,14 +281,20 @@ export function encodeBeeperMusic(rows: readonly BeeperRow[], drumBase: number, 
   let prev: BeeperRow | null = null;
   let seconds = 0;
   let truncated = false;
+  let second = 0;
+  let start = 0;
   for (const row of rows) {
-    const rec: number[] = [0];
+    const rec: number[] = [];
+    // #82 = one more second of song for the clock (about 80 T, inside the timing slack).
+    for (; start >= second + 1; second++) rec.push(0x82);
+    const head = rec.length;
+    rec.push(0);
     for (let v = 0; v < BEEPER_VOICES; v++) {
       if (prev && prev.freq[v] === row.freq[v] && prev.duty[v] === row.duty[v]) continue;
-      rec[0] |= 1 << v;
+      rec[head] |= 1 << v;
       rec.push(row.freq[v] & 255, row.freq[v] >> 8, row.duty[v]);
     }
-    if (row.drum) { rec[0] |= 0x40; const p = drumBase + row.drum.offset; rec.push(p & 255, p >> 8, row.drum.bytes); }
+    if (row.drum) { rec[head] |= 0x40; const p = drumBase + row.drum.offset; rec.push(p & 255, p >> 8, row.drum.bytes); }
     rec.push(row.iters & 255, row.iters >> 8);
     if (at + rec.length + 1 > BEEPER_BANK_SIZE) {
       if (banks.length + 1 >= maxBanks) { truncated = true; break; }
@@ -284,7 +302,7 @@ export function encodeBeeperMusic(rows: readonly BeeperRow[], drumBase: number, 
       bank = new Uint8Array(BEEPER_BANK_SIZE); at = 0;
     }
     bank.set(rec, at); at += rec.length;
-    prev = row; seconds = row.end;
+    prev = row; seconds = row.end; start = row.end;
   }
   bank[at] = 0x81; banks.push(bank.subarray(0, at + 1));
   return { banks, seconds, truncated };

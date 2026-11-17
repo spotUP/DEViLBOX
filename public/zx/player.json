@@ -1,8 +1,8 @@
 {
  "loadAddress": 32768,
  "entry": 32768,
- "size": 2200,
- "bankTableOffset": 2192,
+ "size": 2167,
+ "bankTableOffset": 2159,
  "maxBanks": 8,
  "dataAddress": 49152,
  "bankSize": 16384,
@@ -14,15 +14,15 @@
   6,
   7
  ],
- "titleOffset": 1495,
- "authorOffset": 1527,
+ "titleOffset": 1462,
+ "authorOffset": 1494,
  "textLength": 32,
- "screenStatic": 33721,
- "barStatic": 34049,
+ "screenStatic": 33653,
+ "barStatic": 33981,
  "updateBars": 33220,
  "vars": 48896,
- "songTableOffset": 2144,
- "songCountOffset": 2143,
+ "songTableOffset": 2111,
+ "songCountOffset": 2110,
  "maxSongs": 16,
- "statusTextOffset": 656
+ "statusTextOffset": 588
 }

@@ -19,13 +19,16 @@ export const QUADTONE_BANK_SIZE = 16384;
 export const QUADTONE_FURNACE_CLOCK = [3579545, 3546895];
 
 // Record costs in T-states, hand counted in quadtone.asm (header comment).
-const REC_T = 31 + 80; // record head + four unchanged voices
+const REC_T = 31 + 34 + 80; // record head + bar change bits + four unchanged voices
+// The screen slice (screen.inc `slice`) runs before every tone run.
+// shortcut: QUADTONE_SLICE_T is the measured average (MAME port trace); the slice length varies a little per task.
+export const QUADTONE_SLICE_T = 1700;
 const VOICE_CHANGED_T = 125;
 const NO_DRUM_T = 46;
 const DRUM_T = 106;
-const TONE_RUN_T = 51;
+const TONE_RUN_T = 51 + 16 + 17 + 16 + 13 + 4 + QUADTONE_SLICE_T; // + save stream pointer, call slice, reload
 const NO_TONE_T = 25;
-const NEXT_BANK_T = 153;
+const NEXT_BANK_T = 153 + 41;
 const MAX_COUNT = 255;
 
 const OP_ADD = 0xC6; // add a,n
@@ -121,7 +124,7 @@ export function encodeQuadTone(cap: QuadToneCapture, drumAddress: number): QuadT
   };
 
   // Pass 1: place records on the Z80 timeline. Voice word choice does not change any cost, so freqs come later.
-  type Rec = { voices: Array<Omit<QuadToneVoice, 'freq'> & { word: number } | null>; drum?: { ptr: number; bytes: number }; rounds: number };
+  type Rec = { voices: Array<Omit<QuadToneVoice, 'freq'> & { word: number } | null>; drum?: { ptr: number; bytes: number }; rounds: number; t: number };
   const recs: Rec[] = [];
   const prev = [0, 1, 2, 3].map(() => ({ word: 0, op: OP_SUB, operand: 0, slot0: OUT_0 }));
   let z = 0; let target = 0; let toneT = 0; let roundsT = 0; let hits = 0; let maxErr = 0;
@@ -155,7 +158,7 @@ export function encodeQuadTone(cap: QuadToneCapture, drumAddress: number): QuadT
       const left = target - z - cost - TONE_RUN_T;
       const rounds = Math.max(0, Math.min(MAX_COUNT, Math.round(left / QUADTONE_ITER_T)));
       cost += rounds ? TONE_RUN_T + rounds * QUADTONE_ITER_T : NO_TONE_T;
-      recs.push({ voices, drum, rounds });
+      recs.push({ voices, drum, rounds, t: start / QUADTONE_CLOCK });
       z += cost; roundsT += rounds * QUADTONE_ITER_T;
       voices = [null, null, null, null];
       // Another record only when a count hit its cap and the tick still has time for it.
@@ -172,16 +175,21 @@ export function encodeQuadTone(cap: QuadToneCapture, drumAddress: number): QuadT
   const banks: Uint8Array[] = []; let cur: number[] = [];
   const flush = () => { banks.push(Uint8Array.from(cur)); cur = []; };
   let wordWarned = false;
+  let second = 0;
   for (const r of recs) {
-    const bytes: number[] = [0];
+    const bytes: number[] = [];
+    // #82 = one more second of song for the clock (about 80 T, inside the timing slack).
+    for (; r.t >= second + 1; second++) bytes.push(0x82);
+    const head = bytes.length;
+    bytes.push(0);
     r.voices.forEach((v, i) => {
       if (!v) return;
       let w = Math.round(v.word * scale);
       if (w > 0xFFFF) { w = 0xFFFF; if (!wordWarned) warnings.push('A frequency above the player range was lowered'); wordWarned = true; }
-      bytes[0] |= 1 << i;
+      bytes[head] |= 1 << i;
       bytes.push(w & 0xFF, w >> 8, v.op, v.operand, v.slot0);
     });
-    if (r.drum) { bytes[0] |= 0x10; bytes.push(r.drum.ptr & 0xFF, r.drum.ptr >> 8, r.drum.bytes); }
+    if (r.drum) { bytes[head] |= 0x10; bytes.push(r.drum.ptr & 0xFF, r.drum.ptr >> 8, r.drum.bytes); }
     bytes.push(r.rounds);
     if (cur.length + bytes.length + 1 > QUADTONE_BANK_SIZE) { cur.push(0x80); flush(); z += NEXT_BANK_T; }
     cur.push(...bytes);
