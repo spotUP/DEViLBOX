@@ -8,6 +8,7 @@ import { exportFurnaceModule, furnaceModuleExportAvailable, FUR_SYSTEM_YM2610, F
 import { maxVolumeOfChipChannel } from '@engine/furnace-dispatch/chipVoiceKinds';
 import pako from 'pako';
 import { parseFurnaceSong } from '@/lib/import/formats/FurnaceSongParser';
+import { userSampleFromWavDataUrl, userSampleToWavDataUrl } from '@engine/furnace-dispatch/userSampleWav';
 import { DEFAULT_FURNACE } from '@/types/instrument/defaults';
 import { EMPTY_CELL } from '@/types/tracker';
 import type { Pattern, TrackerCell, ChannelData } from '@/types/tracker';
@@ -296,6 +297,18 @@ describe('exportFurnaceModule', () => {
     expect(mod.samples[1].c4Rate).toBe(22050);
     expect(mod.instruments.slice(2).map((i) => i.amiga?.initSample)).toEqual([0, 0, 1]);
     expect(mod.instruments[0].amiga?.initSample ?? -1).toBe(-1);
+  });
+
+  it('a sample edited in the sample editor (new PCM, resampled rate) is what the .fur SMP2 holds', async () => {
+    const edited = userSampleFromWavDataUrl(
+      userSampleToWavDataUrl({ name: 'kick', data: new Int16Array([9, -9, 300, 4]), rate: 11025 }), 'kick');
+    const s = song();
+    s.instruments.push(inst(3, 'Kick', { ...ssgConfig, divInsType: 37, macros: [], userSample: edited } as unknown as FurnaceConfig));
+    set(s.patterns[0], 7, 0, { note: 49, instrument: 3 });
+    const r = exportFurnaceModule(s);
+    const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+    expect(Array.from(mod.samples[0].data as Int16Array)).toEqual([9, -9, 300, 4]);
+    expect(mod.samples[0].c4Rate).toBe(11025);
   });
 
   it('gives an ADPCM-A and an ADPCM-B instrument on one sample buffer a module sample each (ngdevkit furtool converts a module sample to one codec only)', async () => {

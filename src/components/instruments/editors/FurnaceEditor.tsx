@@ -17,6 +17,7 @@ import { Button } from '@components/ui/Button';
 import { notify } from '@stores/useNotificationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { parseWavToAudioBuffer } from '@utils/audio/wavParser';
+import { FurnaceUserSampleEditor } from './FurnaceUserSampleEditor';
 import { OPNB_VOICE_KINDS, SSG_MACRO_LABELS, isOpnbChipType, opnbFirstChannel, opnbVoiceKind, withSsgDefaultMacros } from '@engine/furnace-dispatch/opnbVoices';
 import { TabStrip } from '@components/ui/TabStrip';
 import { resolveColor, toneColor, type ControlTone } from '@components/ui/controlColor';
@@ -457,6 +458,11 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
                   ? `${config.userSample.name} (${config.userSample.data.length} samples at ${config.userSample.rate} Hz)`
                   : 'No sample loaded. The voice is silent until a WAV file is loaded.'}
               </span>
+              {config.userSample && (
+                <div className="w-full">
+                  <FurnaceUserSampleEditor instrumentId={instrumentId} sample={config.userSample} onChange={(userSample) => pushLiveUpdate({ userSample })} />
+                </div>
+              )}
             </>
           )}
         </div>
