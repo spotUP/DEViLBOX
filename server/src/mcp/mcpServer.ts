@@ -15,6 +15,7 @@ import { PRIVATE_EFFECTS_DOC, PRIVATE_EFFECTS_TOPIC } from '../ai/privateEffectB
 import { COMMAND_STREAM_DOC, COMMAND_STREAM_TOPIC } from '../ai/commandStreamEffects';
 import { AMIGA_STANDARD_DOC, AMIGA_STANDARD_TOPIC } from '../ai/amigaStandardEffects';
 import { NEO_GEO_COMPOSING_DOC, NEO_GEO_COMPOSING_TOPIC } from '../ai/neoGeoComposing';
+import { NES_COMPOSING_DOC, NES_COMPOSING_TOPIC } from '../ai/nesComposing';
 import { PC_TRACKER_COMPOSING_DOC, PC_TRACKER_COMPOSING_TOPIC } from '../ai/pcTrackerComposing';
 import { resolveCompanions, modlandListing, type CompanionListing } from '../../../src/lib/import/companionResolver';
 
@@ -2195,10 +2196,11 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
     'List all available MCP tools grouped by category with brief descriptions. Use this to discover what DEViLBOX can do. Optionally filter by category.',
     {
       category: z.string().optional().describe('Filter by category name (e.g., "transport", "mixer", "pattern", "synth", "modland", "hvsc", "performance")'),
-      topic: z.string().optional().describe('Return a help topic instead of the tool list. Topics: "neo-geo-composing" (effect commands that reach the YM2610 chip), "pc-tracker-composing" (cell effects of MOD, XM, S3M, IT style songs), "format-private-effects" (effect ids of formats with their own effect set), "command-stream-effects" (effect ids of command-stream formats such as Riff Raff and Ron Klaren), "amiga-standard-effects" (standard effect ids that Amiga native importers write)'),
+      topic: z.string().optional().describe('Return a help topic instead of the tool list. Topics: "neo-geo-composing" (effect commands that reach the YM2610 chip), "nes-composing" (effect commands of the 2A03 and the NES expansion chips), "pc-tracker-composing" (cell effects of MOD, XM, S3M, IT style songs), "format-private-effects" (effect ids of formats with their own effect set), "command-stream-effects" (effect ids of command-stream formats such as Riff Raff and Ron Klaren), "amiga-standard-effects" (standard effect ids that Amiga native importers write)'),
     },
     async (p) => {
       if (p.topic === NEO_GEO_COMPOSING_TOPIC) return textResult(NEO_GEO_COMPOSING_DOC);
+      if (p.topic === NES_COMPOSING_TOPIC) return textResult(NES_COMPOSING_DOC);
       if (p.topic === PC_TRACKER_COMPOSING_TOPIC) return textResult(PC_TRACKER_COMPOSING_DOC);
       if (p.topic === PRIVATE_EFFECTS_TOPIC) return textResult(PRIVATE_EFFECTS_DOC);
       if (p.topic === COMMAND_STREAM_TOPIC) return textResult(COMMAND_STREAM_DOC);

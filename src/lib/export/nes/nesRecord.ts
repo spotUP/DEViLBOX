@@ -11,7 +11,7 @@ import { orderPassLength } from '../vectrex/vectrexCapture';
 const MAX_RECORD_MS = 10 * 60 * 1000;
 
 /** One pass over the order list with the NES-family chips clocked for `region`. */
-async function recordRegion(region: NesRegion, sunsoft: boolean): Promise<NesCapture> {
+export async function recordRegion(region: NesRegion, sunsoft: boolean): Promise<NesCapture> {
   const transport = useTransportStore.getState();
   const { patterns, patternOrder } = useTrackerStore.getState();
   const pass = orderPassLength(patterns, patternOrder.length ? patternOrder : patterns.map((_, i) => i), transport.speed);
