@@ -14,6 +14,7 @@ import type {
   TrackerCell,
   ClipboardData,
 } from '@typedefs';
+import type { CursorPosition } from '@typedefs';
 import { EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
 import { peekTrackerReplayer, syncFurnaceCellEdit } from '@engine/TrackerReplayer';
 
@@ -380,6 +381,19 @@ function applyHistoryStep(action: HistoryAction, dir: 'undo' | 'redo'): void {
   const patterns = useTrackerStore.getState().patterns;
   for (const r of replaced) syncBulkEdit(r.index, patterns[r.index], r.before);
   if (action.instruments) applyInstrumentChanges(action.instruments, dir);
+  if (action.cursor) restoreCursor(action.cursor);
+}
+
+/** Put the cursor back where the undo step was recorded, clamped to the pattern now on screen. */
+export function restoreCursor(saved: CursorPosition): void {
+  const st = useTrackerStore.getState();
+  const pattern = st.patterns[st.currentPatternIndex];
+  if (!pattern) return;
+  useCursorStore.setState({ cursor: {
+    ...saved,
+    channelIndex: Math.min(saved.channelIndex, pattern.channels.length - 1),
+    rowIndex: Math.min(saved.rowIndex, pattern.length - 1),
+  } });
 }
 
 /**
@@ -450,6 +464,7 @@ import {
   invertValuesHelper, scaleValuesHelper, transposeValuesHelper, randomizeValuesHelper,
   type ValueColumn, type NibbleMode,
 } from './tracker/patternEditActions';
+import { parseMPTClipboard, mptToClipboard } from '@/lib/import/MPTClipboardParser';
 import {
   copySelectionHelper, cutSelectionHelper, swapSelectionHelper,
   pasteHelper, pasteMixHelper, pasteOverflowHelper, clipboardWithInstrument, pasteFloodHelper, pastePushForwardHelper,
@@ -507,6 +522,8 @@ interface TrackerStore {
   pasteWithInstrument: (instrumentId: number, mix?: boolean) => void;
   /** Paste whose rows past the pattern end continue in the next patterns of the song order. */
   pasteOverflow: () => void;
+  /** Paste OpenMPT clipboard text at the cursor, honouring the paste mask. False when the text is not OpenMPT data. */
+  pasteOpenMpt: (text: string) => boolean;
   /** Furnace collapse (keep every amount-th row) or expand (spread rows amount apart) inside the selection. */
   resampleSelectionRows: (mode: 'collapse' | 'expand', amount: number) => void;
   pasteMix: () => void;           // Only fill empty cells
@@ -1101,6 +1118,21 @@ export const useTrackerStore = create<TrackerStore>()(
       get().multiPatternEdit('Paste overflow', (song) => {
         pasteOverflowHelper(song.patterns, song.patternOrder, get().currentPositionIndex, cursor, clip, useEditorStore.getState().pasteMask);
       });
+    },
+
+    pasteOpenMpt: (text) => {
+      const mpt = parseMPTClipboard(text);
+      if (!mpt) return false;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      const clip = mptToClipboard(mpt);
+      set((state) => {
+        pasteHelper(state.patterns[state.currentPatternIndex], useCursorStore.getState().cursor, clip, useEditorStore.getState().pasteMask);
+      });
+      refuseWrongKindCells(patternIndex, beforePattern);
+      pushEditAction('PASTE', 'Paste OpenMPT clipboard', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
+      return true;
     },
 
     resampleSelectionRows: (mode, amount) => {

@@ -79,7 +79,7 @@ import {
   doubleBlockLength, halveBlockLength, doubleBlock, halveBlock,
   scaleVolumeTrack, scaleVolumePattern, scaleVolumeBlock, swapChannels, splitPattern,
   joinBlocks, setPatternLength, patternLengthDialog, setBpm, setSpeed, setTempo, appendBlock, insertBlock,
-  invertValues, transposeValuesUp, transposeValuesDown, scaleValuesUp, scaleValuesDown, minimizeChannels, maximizeChannels,
+  invertValues, transposeValuesUp, transposeValuesDown, scaleValuesUp, scaleValuesDown, minimizeChannels, maximizeChannels, pasteOpenMptClipboard,
   splitBlock, gotoBlock, findSample, findReplace, findNext, gotoDialog, quantizeSettings
 } from '@engine/keyboard/commands/advanced';
 import {
@@ -483,6 +483,7 @@ function initializeRegistry() {
     { name: 'transpose_values_down', contexts: ['pattern'], handler: transposeValuesDown, description: 'Transpose values down 1 in selection column' },
     { name: 'scale_values_up', contexts: ['pattern'], handler: scaleValuesUp, description: 'Scale values to 110 percent in selection column' },
     { name: 'scale_values_down', contexts: ['pattern'], handler: scaleValuesDown, description: 'Scale values to 90 percent in selection column' },
+    { name: 'paste_openmpt', contexts: ['pattern'], handler: pasteOpenMptClipboard, description: 'Paste OpenMPT clipboard text at the cursor' },
     { name: 'minimize_channels', contexts: ['pattern'], handler: minimizeChannels, description: 'Minimize all channels' },
     { name: 'maximize_channels', contexts: ['pattern'], handler: maximizeChannels, description: 'Maximize all channels' },
     { name: 'swap_channels', contexts: ['pattern'], handler: swapChannels, description: 'Swap channels' },

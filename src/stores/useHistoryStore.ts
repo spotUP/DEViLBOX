@@ -5,7 +5,8 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import type { Pattern, InstrumentConfig } from '@typedefs';
+import type { Pattern, InstrumentConfig, CursorPosition } from '@typedefs';
+import { useCursorStore } from './useCursorStore';
 
 export type ActionType =
   | 'EDIT_CELL'
@@ -82,6 +83,8 @@ export interface HistoryAction {
   changes: PatternChange[];
   order?: { before: number[]; after: number[] };
   instruments?: InstrumentChange[];
+  /** Edit cursor when the step was recorded; undo and redo put it back (Furnace restores the cursor with the undo step). */
+  cursor?: CursorPosition;
 }
 
 interface HistoryStore {
@@ -147,6 +150,7 @@ export const useHistoryStore = create<HistoryStore>()(
             before: c.before ? structuredClone(c.before) : null,
             after: structuredClone(c.after),
           })),
+          cursor: { ...useCursorStore.getState().cursor },
           ...(order ? { order: { before: [...order.before], after: [...order.after] } } : {}),
           ...(instruments?.length ? { instruments: structuredClone(instruments) } : {}),
         };

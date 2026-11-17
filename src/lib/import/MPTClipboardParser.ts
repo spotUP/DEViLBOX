@@ -1,125 +1,96 @@
 /**
- * MPTClipboardParser — Parse OpenMPT / Furnace clipboard text format.
+ * MPTClipboardParser: parse the OpenMPT text clipboard (Furnace "paste special" accepts the same).
  *
- * OpenMPT format (pipe-separated):
+ * OpenMPT rows are fixed width, one `|` before every channel and no separators inside a channel:
  *   ModPlug Tracker  XM
- *   |C-5|01|v64|A01|
- *   |---|..|...|...|
- *
- * Furnace format (pipe-separated, variable effect columns):
- *   org.tildearrow.furnace - Pattern Data (1 channel(s), 64 row(s))
- *   C-4|00|..|01FF|
- *   ...|..|..|....|
- *
- * Returns null if the text doesn't match either format.
+ *   |C-501v64A01|---..........|
+ * Per channel: note (3 chars), instrument (2), volume (3: symbol + 2 digits), effect (3: letter + 2 hex).
+ * Layout copied from Furnace src/gui/editing.cpp doPasteMPT. Furnace's own clipboard format is not handled here.
  */
 
-import type { TrackerCell } from '@/types/tracker';
+import { EMPTY_CELL, type ClipboardData, type TrackerCell } from '@/types/tracker';
 
 const NOTE_NAMES: Record<string, number> = {
   'C-': 0, 'C#': 1, 'D-': 2, 'D#': 3, 'E-': 4, 'F-': 5,
   'F#': 6, 'G-': 7, 'G#': 8, 'A-': 9, 'A#': 10, 'B-': 11,
 };
 
-function parseNote(s: string): number {
-  if (!s || s === '---' || s === '...' || s === '...') return 0;
-  if (s === '===' || s === '===') return 97; // note off (XM convention)
-  const name = s.substring(0, 2);
-  const octave = parseInt(s[2], 10);
-  const semitone = NOTE_NAMES[name];
-  if (semitone === undefined || isNaN(octave)) return 0;
-  return semitone + (octave + 1) * 12; // XM note format: C-0 = 12
-}
+/** Header prefixes Furnace accepts (modPlugFormatHeaders). */
+const HEADERS = ['ModPlug Tracker MOD', 'ModPlug Tracker S3M', 'ModPlug Tracker  XM', 'ModPlug Tracker XM', 'ModPlug Tracker  IT', 'ModPlug Tracker IT', 'ModPlug Tracker MPT'];
 
-function parseHex(s: string): number {
-  if (!s || s === '..' || s === '--') return 0;
-  const v = parseInt(s, 16);
-  return isNaN(v) ? 0 : v;
-}
+/** XM volume column: symbol -> high nibble (the 'v' set-volume range is 0x10 + 0..64). */
+const VOLUME_SYMBOL: Record<string, number> = { d: 0x60, c: 0x70, b: 0x80, a: 0x90, u: 0xA0, h: 0xB0, p: 0xC0, l: 0xD0, r: 0xE0, g: 0xF0 };
+
+const isBlank = (s: string): boolean => /^[. ]*$/.test(s);
 
 export interface MPTClipboardData {
   channels: number;
+  /** Row-major: rows[row][channel]. */
   rows: TrackerCell[][];
 }
 
-/**
- * Try to parse clipboard text as MPT/Furnace pattern data.
- * Returns null if the text doesn't match the expected format.
- */
+/** One note field; undefined = invalid, null = empty. */
+function parseNote(s: string): number | null | undefined {
+  if (isBlank(s) || s === '---') return null;
+  if (s === '===' || s === '^^^' || s === '~~~') return 97;
+  const semitone = NOTE_NAMES[s.substring(0, 2)];
+  const octave = parseInt(s[2], 10);
+  if (semitone === undefined || isNaN(octave)) return undefined;
+  return octave * 12 + semitone + 1; // C-0 = 1, same numbering as OpenMPT and XM
+}
+
+/** Parse OpenMPT clipboard text; null when the header or any row is not OpenMPT data. */
 export function parseMPTClipboard(text: string): MPTClipboardData | null {
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) return null;
+  const lines = text.split(/\r?\n/);
+  const header = lines[0] ?? '';
+  const format = HEADERS.find((h) => header.startsWith(h));
+  if (!format || lines.length < 2) return null;
+  const letterBase1 = /S3M|IT|MPT/.test(format); // XM/MOD effect letters are base 36 from '0'; S3M/IT letters start at A = 1
 
-  // Detect format by header
-  const header = lines[0].trim();
-  const isMPT = header.startsWith('ModPlug Tracker') || header.startsWith('OpenMPT');
-  const isFurnace = header.startsWith('org.tildearrow.furnace');
-
-  if (!isMPT && !isFurnace) {
-    // Try heuristic: first data line starts with | or contains pipe-separated note
-    const firstData = lines[0];
-    if (!firstData.includes('|')) return null;
-  }
-
-  const dataLines = isMPT || isFurnace ? lines.slice(1) : lines;
-  if (dataLines.length === 0) return null;
-
-  // Count channels from first data line
-  // MPT format: |C-5|01|v64|A01| — each channel is 4 fields between pipes
-  // We'll parse each row as pipe-separated fields
   const rows: TrackerCell[][] = [];
-  let maxChannels = 0;
-
-  for (const line of dataLines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-
-    // Split by pipe, removing empty leading/trailing entries
-    const fields = trimmed.split('|').filter(f => f.length > 0);
-    if (fields.length < 1) continue;
-
-    // Group fields into channels (4 fields per channel: note, inst, vol, effect)
-    const channelCount = Math.floor(fields.length / 4) || 1;
-    maxChannels = Math.max(maxChannels, channelCount);
-
-    const rowCells: TrackerCell[] = [];
-    for (let ch = 0; ch < channelCount; ch++) {
-      const base = ch * 4;
-      const noteStr = fields[base]?.trim() || '---';
-      const insStr = fields[base + 1]?.trim() || '..';
-      const volStr = fields[base + 2]?.trim() || '..';
-      const effStr = fields[base + 3]?.trim() || '....';
-
-      // Parse volume — MPT uses 'v64' format, Furnace uses hex
-      let volume = 0;
-      if (volStr.startsWith('v')) {
-        volume = parseInt(volStr.slice(1), 10) || 0;
-      } else {
-        volume = parseHex(volStr);
+  let channels = 0;
+  for (const line of lines.slice(1)) {
+    if (!line.startsWith('|')) continue;
+    const cells: TrackerCell[] = [];
+    // each channel is 11 chars followed by '|'
+    for (let pos = 1; pos + 11 <= line.length; pos += 12) {
+      const f = line.substring(pos, pos + 11);
+      const note = parseNote(f.substring(0, 3));
+      if (note === undefined) return null;
+      const cell: TrackerCell = { ...EMPTY_CELL };
+      if (note !== null) cell.note = note;
+      const ins = f.substring(3, 5);
+      if (!isBlank(ins)) { const v = parseInt(ins, 10); if (isNaN(v)) return null; cell.instrument = v; }
+      const vol = f.substring(5, 8);
+      if (!isBlank(vol)) {
+        const n = parseInt(vol.substring(1), vol[0] === 'v' ? 10 : 16);
+        if (isNaN(n)) return null;
+        if (vol[0] === 'v') cell.volume = 0x10 + Math.min(n, 64);
+        else if (VOLUME_SYMBOL[vol[0]] !== undefined) cell.volume = VOLUME_SYMBOL[vol[0]] + (n & 0xF);
+        else return null;
       }
-
-      // Parse effect — can be 2-char cmd + 2-char val or 4-char combined
-      let effTyp = 0;
-      let eff = 0;
-      if (effStr.length >= 3) {
-        effTyp = parseHex(effStr.substring(0, effStr.length === 4 ? 2 : 1));
-        eff = parseHex(effStr.substring(effStr.length === 4 ? 2 : 1));
+      const eff = f.substring(8, 11);
+      if (!isBlank(eff)) {
+        const letter = parseInt(eff[0], 36);
+        const param = parseInt(eff.substring(1), 16);
+        if (isNaN(letter) || isNaN(param)) return null;
+        cell.effTyp = letterBase1 ? letter - 9 : letter;
+        cell.eff = param;
       }
-
-      rowCells.push({
-        note: parseNote(noteStr),
-        instrument: parseHex(insStr),
-        volume,
-        effTyp,
-        eff,
-        effTyp2: 0,
-        eff2: 0,
-      } as TrackerCell);
+      cells.push(cell);
     }
-    rows.push(rowCells);
+    if (cells.length === 0) return null;
+    channels = Math.max(channels, cells.length);
+    rows.push(cells);
   }
+  return rows.length ? { channels, rows } : null;
+}
 
-  if (rows.length === 0) return null;
-
-  return { channels: maxChannels, rows };
+/** Channel-major clipboard, ready for pasteHelper. */
+export function mptToClipboard(mpt: MPTClipboardData): ClipboardData {
+  return {
+    channels: mpt.channels,
+    rows: mpt.rows.length,
+    data: Array.from({ length: mpt.channels }, (_, ch) => mpt.rows.map((r) => r[ch] ?? { ...EMPTY_CELL })),
+  };
 }

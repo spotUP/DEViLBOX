@@ -37,7 +37,7 @@ import {
   xmNoteShortName,
 } from '@/lib/chordDefinitions';
 import { Layers, SlidersHorizontal } from 'lucide-react';
-import { invertValues, absorbInstrument, minimizeChannels, maximizeChannels } from '@/engine/keyboard/commands/advanced';
+import { invertValues, absorbInstrument, pasteOpenMptClipboard, minimizeChannels, maximizeChannels } from '@/engine/keyboard/commands/advanced';
 import { useChannelMenuItems, type ChannelMenuHandlers } from './useChannelMenuItems';
 
 interface CellContextMenuProps {
@@ -562,6 +562,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       onClick: handleDeleteRow,
     },
     { type: 'divider' },
+    { id: 'paste-openmpt', label: 'Paste OpenMPT Clipboard', onClick: () => { pasteOpenMptClipboard(); onClose(); } },
     { id: 'absorb-instrument', label: 'Absorb Instrument', onClick: () => { absorbInstrument(); onClose(); } },
     { id: 'minimize-channels', label: 'Minimize Channels', onClick: () => { minimizeChannels(); onClose(); } },
     { id: 'maximize-channels', label: 'Maximize Channels', onClick: () => { maximizeChannels(); onClose(); } },

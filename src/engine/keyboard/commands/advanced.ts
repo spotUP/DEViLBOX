@@ -228,3 +228,13 @@ export function quantizeSettings(): boolean {
   useUIStore.getState().openDialogCommand('groove-settings');
   return true;
 }
+
+/** Paste OpenMPT text from the system clipboard at the cursor (Furnace paste special). */
+export function pasteOpenMptClipboard(): boolean {
+  const ui = useUIStore.getState();
+  navigator.clipboard.readText().then((text) => {
+    const ok = useTrackerStore.getState().pasteOpenMpt(text);
+    ui.setStatusMessage(ok ? 'Pasted OpenMPT clipboard' : 'Clipboard does not hold OpenMPT pattern data', false, 1500);
+  }).catch(() => ui.setStatusMessage('Clipboard could not be read', false, 1500));
+  return true;
+}
