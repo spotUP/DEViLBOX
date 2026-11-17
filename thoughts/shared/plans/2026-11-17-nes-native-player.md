@@ -76,6 +76,11 @@ Defaults I chose (not owner decisions): raw per-frame register stream like Vectr
 - Done-check: ROM builds; Mesen2 runs it.
 - Verification: Mesen2 Lua log of $4000-$4017 vs the capture, per tick per register, on a 2A03-only .fur.
 
+**Result 2026-11-17 (Phase 3 built).** `public/nes/player.s`, `nes.cfg`, `player.bin` (iNES NROM-256, 32784 bytes: stream area $8000-$EFFF = 28672 bytes at file offset 16, code at $F000), `player.json` (offsets for stream, title, start subsong, nmi address), `tools/build-nes-player.sh`, `tools/nes-player-staleness.py` (`--files` / `<base> <head>`, fails when player.s/nes.cfg/build script change without player.bin+json).
+- Player: one stream tick per NMI, decodes empty, mask, chip blocks (items, $80 ascending and $81 constant runs), dictionary refs (short and long), repeat, loop, end; chip 0 (2A03) is written to $4000-$4017 and mirrored in a RAM shadow at $0200; other chips' blocks are parsed and skipped; events prefix parsed and skipped (PCM and control events ignored); set-bank skipped (Phase 4); `restart` (A = subsong) walks the subsong table and dictionary.
+- Verified: `src/lib/export/__tests__/nesPlayerMesen.test.ts` encodes a 2A03 capture (run item, dictionary repeats, empty ticks, VRC6/FDS blocks mixed in) with `encodeNesStreams`, patches it into player.bin, runs Mesen2 headless with a Lua write callback ($4000-$4017) plus an exec callback on the NMI address, and the per-tick write list equals the capture for END (then silent) and for a LOOP (three passes). Init writes ($4017, $4010) come before the first NMI and are excluded by the tick markers.
+- Not done: tick rate is the NMI rate (tick-rate dividers, Phase 6); PCM/control events; other chips; PAL/Dendy; banking.
+
 ### Phase 4 - Mapper, banking, large cart
 - Files: `public/nes/player.s` banking code, `src/lib/export/nes/nesCartridge.ts` (copy of `vectrexCartridge.ts` structure: `fetchNesPlayer`, `buildNesCartridge`, header, size check).
 - Custom mapper: mapper-31-style 4 KB banking at $5FF8-$5FFF (eight 4 KB windows over $8000-$FFFF), NES 2.0 header up to 8 MB PRG, fixed player bank, stream banks switched by the decoder, DPCM window kept mapped while a sample plays.

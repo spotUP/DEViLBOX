@@ -1,0 +1,9 @@
+{
+ "size": 32784,
+ "dataOffset": 16,
+ "dataCapacity": 28672,
+ "titleOffset": 28688,
+ "titleLength": 32,
+ "startSubsongOffset": 28720,
+ "nmiAddress": 61615
+}
