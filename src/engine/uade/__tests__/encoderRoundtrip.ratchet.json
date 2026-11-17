@@ -32,6 +32,14 @@
       "matchPct": 1,
       "cells": 47
     },
+    "anders0land": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 147
+    },
     "coreDesign": {
       "kind": "fixed",
       "method": "decode-encode",

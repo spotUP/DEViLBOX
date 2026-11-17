@@ -34,6 +34,7 @@ const PARSE_FALLBACK: Record<string, { module: string; fn: string }> = {
   synmod: { module: '@lib/import/formats/SynTrackerParser', fn: 'parseSynTrackerFile' },
   mms: { module: '@lib/import/formats/MultiMediaSoundParser', fn: 'parseMultiMediaSoundFile' },
   core: { module: '@lib/import/formats/CoreDesignParser', fn: 'parseCoreDesignFile' },
+  hot: { module: '@lib/import/formats/Anders0landParser', fn: 'parseAnders0landFile' },
   mso: { module: '@lib/import/formats/MedleyParser', fn: 'parseMedleyFile' },
   sqt: { module: '@lib/import/formats/QuartetParser', fn: 'parseQuartetFile' },
   mmdc: { module: '@lib/import/formats/MMDCParser', fn: 'parseMMDCFile' },

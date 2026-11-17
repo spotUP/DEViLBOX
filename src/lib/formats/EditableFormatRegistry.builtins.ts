@@ -30,6 +30,7 @@ registerEditableFormat({ formatId: "glueMon", label: "GlueMon", patternCodec: { 
 registerEditableFormat({ formatId: "multiMediaSound", label: "MultiMedia Sound", patternCodec: { kind: "fixed" }, exporter: { module: "MultiMediaSoundExporter", fn: "exportMultiMediaSound", byLayout: true } });
 registerEditableFormat({ formatId: "tme", label: "The Musical Enlightenment", patternCodec: { kind: "fixed" }, exporter: { module: "TMEExporter", fn: "exportTME", byLayout: true } });
 registerEditableFormat({ formatId: "coreDesign", label: "Core Design", patternCodec: { kind: "fixed" }, exporter: { module: "CoreDesignExporter", fn: "exportCoreDesign", byLayout: true } });
+registerEditableFormat({ formatId: "anders0land", label: "Anders 0land", patternCodec: { kind: "fixed" }, exporter: { module: "Anders0landExporter", fn: "exportAnders0land", byLayout: true } });
 registerEditableFormat({ formatId: "soundPlayer", label: "Sound Player", patternCodec: { kind: "fixed" }, exporter: { module: "SoundPlayerExporter", fn: "exportSoundPlayer", byLayout: true } });
 registerEditableFormat({ formatId: "mcmd", label: "MCMD", patternCodec: { kind: "fixed" }, exporter: { module: "McmdExporter", fn: "exportMcmd", byLayout: true } });
 registerEditableFormat({ formatId: "organya", label: "Organya", patternCodec: { kind: "fixed" }, exporter: { module: "OrganyaExporter", fn: "exportOrganya", byLayout: true } });

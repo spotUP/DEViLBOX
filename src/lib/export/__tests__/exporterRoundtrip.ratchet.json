@@ -847,6 +847,14 @@
       "matchPct": 1,
       "cells": 156532,
       "bytes": 156532
+    },
+    "anders0land": {
+      "exporter": "Anders0landExporter.exportAnders0land",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 4738,
+      "bytes": 4738
     }
   },
   "missingFixture": [

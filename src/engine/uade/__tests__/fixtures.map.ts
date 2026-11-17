@@ -55,6 +55,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "synthesis", fixture: "public/data/songs/synthesis/space sound.syn", kind: "fixed" },
   { formatId: "benDaglish", fixture: "public/data/songs/ben-daglish/motorhead-titleandingame.bd", kind: "variable" },
   { formatId: "coreDesign", fixture: "public/data/songs/core-design/dynamite dux.core", kind: "fixed" },
+  { formatId: "anders0land", fixture: "public/data/songs/anders-oland/primemover 07.hot", kind: "fixed" },
   { formatId: "customMade", fixture: "public/data/songs/formats/cm.viking_child", kind: "fixed" },
   { formatId: "daveLowe", fixture: "public/data/songs/dave-lowe/incredibleshrinkingsphere.dl", kind: "variable" },
   { formatId: "davidWhittaker", fixture: "public/data/songs/david-whittaker/garfield2+.dw", kind: "variable" },
