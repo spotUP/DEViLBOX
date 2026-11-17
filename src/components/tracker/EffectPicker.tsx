@@ -258,7 +258,7 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
                 : EXTENDED_CATEGORY_COLORS[eff.category];
               return (
                 <button
-                  key={eff.isFurnace ? `f-${eff.key}` : eff.isExtended ? `e-${eff.key}` : `n-${eff.key}`}
+                  key={eff.isFurnace ? `f-${eff.key}-${eff.command}` : eff.isExtended ? `e-${eff.key}` : `n-${eff.key}`}
                   onClick={() => handleSelect(eff)}
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-dark-bgSecondary transition-colors text-left group"
                 >
