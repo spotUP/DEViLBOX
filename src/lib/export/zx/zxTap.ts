@@ -61,7 +61,7 @@ export function tapBlock(flag: number, data: Uint8Array): Uint8Array {
   return out;
 }
 
-function header(type: number, name: string, length: number, p1: number, p2: number): Uint8Array {
+export function header(type: number, name: string, length: number, p1: number, p2: number): Uint8Array {
   const h = new Uint8Array(17);
   h[0] = type;
   for (let i = 0; i < 10; i++) h[1 + i] = name.charCodeAt(i) || 0x20;
@@ -71,7 +71,7 @@ function header(type: number, name: string, length: number, p1: number, p2: numb
   return h;
 }
 
-const codeBlocks = (name: string, address: number, data: Uint8Array) =>
+export const codeBlocks = (name: string, address: number, data: Uint8Array) =>
   [tapBlock(0x00, header(3, name, data.length, address, 32768)), tapBlock(0xFF, data)];
 
 type BasicItem = number | string; // number = token byte, string = literal text

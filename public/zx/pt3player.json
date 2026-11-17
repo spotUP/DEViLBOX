@@ -1,0 +1,19 @@
+{
+ "loadAddress": 32768,
+ "entry": 32768,
+ "size": 2566,
+ "bankOffset": 22,
+ "dataAddress": 49152,
+ "bankSize": 16384,
+ "usableBanks": [
+  0,
+  1,
+  3,
+  4,
+  6,
+  7
+ ],
+ "setupAddress": 32801,
+ "vars": 34793,
+ "varsEnd": 35334
+}
