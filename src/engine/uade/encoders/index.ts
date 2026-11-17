@@ -24,6 +24,7 @@ import './DigitalMugicianEncoder';
 import './DigitalSonixChromeEncoder';
 import './PSAEncoder';
 import './ThomasHermannEncoder';
+import './SpeedySystemEncoder';
 import './DigitalSymphonyEncoder';
 import './DSMDynEncoder';
 import './DSSEncoder';

@@ -22,7 +22,9 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, Pattern } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { speedySystemEncoder, unpackSpeedySystemPattern, SS_ROWS } from '@/engine/uade/encoders/SpeedySystemEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -60,6 +62,61 @@ export function isSpeedySystemFormat(buffer: ArrayBuffer): boolean {
   return checkSSMagic(buf) || checkSASSignature(buf);
 }
 
+// ── Pattern grid (ss_module.c): pointer tables of 4 voices x 256 longs at the marker, offsets relative to it ──
+
+const MARKER = 0x00001190;
+const POSITIONS = 256;
+const VOICE_TABLE = 0x400;
+
+const u32 = (b: Uint8Array, o: number): number => o >= 0 && o + 4 <= b.length ? ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0 : 0;
+
+function findBase(b: Uint8Array): number {
+  for (let o = 0x12; o + 4 <= b.length; o += 2) if (u32(b, o) === MARKER) return o;
+  return -1;
+}
+
+/** One grid pattern per song position (up to the first end cell of voice 0), with the variable layout that repacks edits. */
+function parseSpeedySystemGrid(buf: Uint8Array, base: number): { patterns: Pattern[]; layout: UADEVariablePatternLayout; filename: string } | null {
+  const offsetOf = (voice: number, pos: number) => base + (u32(buf, base + voice * VOICE_TABLE + pos * 4) | 0);
+  const fileIndex = new Map<number, number>(); // pattern offset -> file pattern index
+  const addrs: number[] = [], sizes: number[] = [], refs: number[][] = [];
+  const stored: ReturnType<typeof unpackSpeedySystemPattern>[] = [];
+  for (let voice = 0; voice < 4; voice++) for (let pos = 0; pos < POSITIONS; pos++) {
+    const off = offsetOf(voice, pos);
+    const at = base + voice * VOICE_TABLE + pos * 4;
+    if (!fileIndex.has(off)) {
+      const u = unpackSpeedySystemPattern(buf, off);
+      if (!u) continue;
+      fileIndex.set(off, addrs.length); addrs.push(off); sizes.push(u.size); refs.push([]); stored.push(u);
+    }
+    refs[fileIndex.get(off)!]?.push(at);
+  }
+  const trackMap: number[][] = [];
+  const patterns: Pattern[] = [];
+  for (let pos = 0; pos < POSITIONS; pos++) {
+    const fps = [0, 1, 2, 3].map((v) => fileIndex.get(offsetOf(v, pos)) ?? -1);
+    if (fps.some((f) => f < 0)) break;
+    trackMap.push(fps);
+    patterns.push({
+      id: `pattern-${pos}`, name: `Position ${pos}`, length: SS_ROWS,
+      channels: fps.map((fp, ch) => ({
+        id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false, solo: false, collapsed: false, volume: 100,
+        pan: [-50, 50, 50, -50][ch], instrumentId: null, color: null, rows: stored[fp]!.rows.map((r) => ({ ...r })),
+      })),
+    } as Pattern);
+    if (stored[fps[0]]!.rows.some((r) => r.effTyp === 0xff)) break;
+  }
+  if (patterns.length === 0) return null;
+  const layout: UADEVariablePatternLayout = {
+    formatId: 'speedySystem', numChannels: 4, numFilePatterns: addrs.length, rowsPerPattern: SS_ROWS, moduleSize: buf.length,
+    encoder: speedySystemEncoder, filePatternAddrs: addrs, filePatternSizes: sizes, trackMap,
+    blockRows: stored.map((u) => u!.rows), blockRawBytes: addrs.map((a, i) => buf.slice(a, a + sizes[i])),
+    // every pointer long that reaches a pattern, so a grown pattern can move to the file end and be repointed
+    sectionRefs: { base, at: refs },
+  };
+  return { patterns, layout, filename: '' };
+}
+
 // ── Parser ────────────────────────────────────────────────────────────────────
 
 /**
@@ -95,6 +152,8 @@ export async function parseSpeedySystemFile(
   // Amiga LRRL panning
   const CHAN_PAN = [-50, 50, 50, -50];
 
+  const grid = isSAS ? null : (() => { const base = findBase(buf); return base < 0 ? null : parseSpeedySystemGrid(buf, base); })();
+
   const pattern = {
     id:      'pattern-0',
     name:    'Pattern 0',
@@ -124,10 +183,11 @@ export async function parseSpeedySystemFile(
   return {
     name:            `${songName} [${label}]`,
     format:          'MOD' as TrackerFormat,
-    patterns:        [pattern],
-    instruments,
-    songPositions:   [0],
-    songLength:      1,
+    patterns:        grid ? grid.patterns : [pattern],
+    instruments:     grid ? Array.from({ length: 50 }, (_, i) => ({ ...instruments[0], id: i + 1 })) : instruments,
+    songPositions:   grid ? grid.patterns.map((_, i) => i) : [0],
+    songLength:      grid ? grid.patterns.length : 1,
+    ...(grid ? { uadeVariableLayout: grid.layout } : {}),
     restartPosition: 0,
     numChannels:     NUM_CHANNELS,
     initialSpeed:    6,
