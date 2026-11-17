@@ -7,10 +7,10 @@ import { exportNativeSong } from '@lib/export/nativeExportRouter';
 
 const DIR = join(process.cwd(), 'public/data/songs/formats/MusicMaker V8 Old/- unknown');
 const rd = (n: string) => new Uint8Array(readFileSync(join(DIR, n)));
-const load = () => {
-  const raw = rd('moveback.sdata');
+const load = (n = 'moveback') => {
+  const raw = rd(n + '.sdata');
   const ab = (u: Uint8Array) => u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength) as ArrayBuffer;
-  const song = parseMusicMakerSongFile(raw, 'moveback.sdata', new Map([['moveback.ip', ab(rd('moveback.ip'))], ['moveback.ip.n', ab(rd('moveback.ip.n'))]]));
+  const song = parseMusicMakerSongFile(raw, n + '.sdata', new Map([[n + '.ip', ab(rd(n + '.ip'))], [n + '.ip.n', ab(rd(n + '.ip.n'))]]));
   return { raw, song };
 };
 
@@ -19,6 +19,12 @@ describe('Music Maker native export: moveback.sdata', () => {
     const { raw, song } = load();
     const r = await exportNativeSong(song);
     expect(r?.warnings ?? []).toEqual([]);
+    expect(Array.from(r!.data as Uint8Array)).toEqual(Array.from(raw));
+  });
+
+  it('best of guitars.sdata exports byte-exact unedited', async () => {
+    const { raw, song } = load('best of guitars');
+    const r = await exportNativeSong(song);
     expect(Array.from(r!.data as Uint8Array)).toEqual(Array.from(raw));
   });
 
@@ -37,5 +43,26 @@ describe('Music Maker native export: moveback.sdata', () => {
     expect(out.reduce((n, x, i) => n + (x !== raw[i] ? 1 : 0), 0)).toBe(1);
     const again = buildMusicMakerGrid(decodeMusicMakerSong(out));
     expect(again.patterns[p].channels[v].rows[r].note).toBe(cell.note);
+  });
+});
+
+describe('Music Maker edit reaches the bytes the engine plays', () => {
+  it('editedModuleForPlay returns the IFF with the edited sdata; unedited returns null', async () => {
+    const { song } = load();
+    const { setGridBaseline, baselineOf } = await import('@/lib/song/gridBaseline');
+    setGridBaseline(baselineOf(song.patterns));
+    const { editedModuleForPlay } = await import('@engine/replayer/editedModuleForPlay');
+    const { WASM_ENGINES } = await import('@engine/replayer/wasmEngineRegistry');
+    const desc = WASM_ENGINES.find((d) => d.key === 'MusicMaker')!;
+    expect(await editedModuleForPlay(song, desc)).toBeNull();
+    const g = buildMusicMakerGrid(decodeMusicMakerSong(load().raw));
+    let hit: [number, number, number] | null = null;
+    g.sources.forEach((pp, p) => pp.forEach((vv, v) => vv.forEach((s, r) => { if (!hit && s?.note) hit = [p, v, r]; })));
+    const [p, v, r] = hit!;
+    song.patterns[p].channels[v].rows[r].note += 2;
+    const played = new Uint8Array((await editedModuleForPlay(song, desc)) as ArrayBuffer);
+    const loaded = new Uint8Array(song.musicMakerFileData!);
+    expect(played.length).toBe(loaded.length);
+    expect(played.reduce((n, x, i) => n + (x !== loaded[i] ? 1 : 0), 0)).toBe(1);
   });
 });

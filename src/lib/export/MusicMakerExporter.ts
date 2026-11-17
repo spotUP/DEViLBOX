@@ -5,7 +5,7 @@
  * is played. Edits the triple cannot hold (empty cell, legato instrument, note off, other bank) come back as warnings.
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import { buildMusicMakerGrid, MM_NOTE_PERIODS, MM_VOLUMES, readMusicMakerIff } from '@lib/import/formats/MusicMakerParser';
+import { buildMusicMakerGrid, MM_NOTE_PERIODS, MM_VOLUMES, readChunks, readMusicMakerIff } from '@lib/import/formats/MusicMakerParser';
 import { noteToPeriod } from '@lib/amiga/periodNotes';
 
 export interface MusicMakerExportResult { data: Uint8Array; filename: string; warnings: string[] }
@@ -16,7 +16,8 @@ const nearest = (table: readonly number[], v: number, from = 0): number => {
   return best;
 };
 
-export async function exportMusicMaker(song: TrackerSong): Promise<MusicMakerExportResult> {
+/** The sdata with the grid's edits patched in, plus warnings for edits it cannot hold. Single patch path for export and playback. */
+function patchedSdata(song: TrackerSong): { out: Uint8Array; warnings: string[] } {
   if (!song.musicMakerFileData) throw new Error('Music Maker export needs the song it was loaded from');
   const { song: orig } = readMusicMakerIff(song.musicMakerFileData);
   const out = orig.sdata.slice();
@@ -49,6 +50,19 @@ export async function exportMusicMaker(song: TrackerSong): Promise<MusicMakerExp
     written.set(src.at, bytes);
     out[src.at] = n0; out[src.at + 1] = n1;
   })));
+  return { out, warnings };
+}
+
+/** The FORM/MMV8 the engine loads (musicMakerFileData) with the edited sdata written over its SDAT body (same length). */
+export function editedMusicMakerIff(song: TrackerSong): ArrayBuffer {
+  const iff = new Uint8Array(song.musicMakerFileData!.slice(0));
+  const sdat = readChunks(iff).get('SDAT')!;
+  iff.set(patchedSdata(song).out, sdat.offset + 4);
+  return iff.buffer as ArrayBuffer;
+}
+
+export async function exportMusicMaker(song: TrackerSong): Promise<MusicMakerExportResult> {
+  const { out, warnings } = patchedSdata(song);
   const stem = (song.name || 'song').replace(/[^\w.-]+/g, '_');
   return { data: out, filename: `${stem}.sdata`, warnings };
 }
