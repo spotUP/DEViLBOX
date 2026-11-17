@@ -77,6 +77,7 @@ interface FurnaceFileOpsAPI {
   fur_get_ins_data(idx: number, buf: number, bufLen: number): number;
   fur_get_sample_info(idx: number, field: number): number;
   fur_get_sample_data(idx: number, outLenPtr: number): number;
+  fur_set_sample(idx: number, dataPtr: number, frames: number, centerRate: number, loopStart: number, loopEnd: number): number;
   fur_get_wave_info(idx: number, field: number): number;
   fur_get_wave_data(idx: number, pos: number): number;
   fur_get_tuning(): number;
@@ -128,6 +129,7 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_get_ins_data: m.cwrap('fur_get_ins_data', 'number', ['number', 'number', 'number']),
     fur_get_sample_info: m.cwrap('fur_get_sample_info', 'number', ['number', 'number']),
     fur_get_sample_data: m.cwrap('fur_get_sample_data', 'number', ['number', 'number']),
+    fur_set_sample: m.cwrap('fur_set_sample', 'number', ['number', 'number', 'number', 'number', 'number', 'number']),
     fur_get_wave_info: m.cwrap('fur_get_wave_info', 'number', ['number', 'number']),
     fur_get_wave_data: m.cwrap('fur_get_wave_data', 'number', ['number', 'number']),
     fur_get_tuning: m.cwrap('fur_get_tuning', 'number', []),
@@ -509,6 +511,24 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
     samples,
     loadWarning,
   };
+}
+
+/**
+ * Replace module sample `idx` of the song the .fur save writes with edited 16-bit PCM
+ * (loopStart/loopEnd < 0 = no loop), so the export holds the edit.
+ */
+export async function setFurSampleWasm(idx: number, data: Int16Array, rate: number, loopStart: number, loopEnd: number): Promise<void> {
+  const m = await getModule();
+  if (!cachedAPI) cachedAPI = getAPI(m);
+  const ptr = m._malloc(Math.max(2, data.length * 2));
+  try {
+    m.HEAPU8.set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength), ptr);
+    if (cachedAPI.fur_set_sample(idx, ptr, data.length, Math.round(rate), loopStart, loopEnd) !== 0) {
+      throw new Error(`Furnace WASM refused sample ${idx}`);
+    }
+  } finally {
+    m._free(ptr);
+  }
 }
 
 /**

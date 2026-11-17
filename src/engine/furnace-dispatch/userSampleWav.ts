@@ -5,6 +5,7 @@
  * SMP2 rate (C-4 rate) and the chip upload follow it.
  */
 import type { FurnaceUserSample } from '@/types/instrument/furnace';
+import type { FurnaceModuleSample } from '@/types/tracker';
 
 const WAV_HEADER = 44;
 
@@ -40,4 +41,33 @@ export function userSampleFromWavDataUrl(url: string, name: string): FurnaceUser
   const data = new Int16Array(frames);
   for (let i = 0; i < frames; i++) data[i] = v.getInt16(WAV_HEADER + i * 2 * channels, true);
   return { name, data, rate: v.getUint32(24, true) };
+}
+
+/** True for a module sample the sample editor can edit: raw 8-bit or 16-bit PCM (compressed depths hold codec bytes). */
+export function isEditableModuleSample(s: FurnaceModuleSample): boolean {
+  return s.data instanceof Int16Array || s.data instanceof Int8Array;
+}
+
+/** A module sample as the editor's mono 16-bit user sample (8-bit PCM scaled by 256). */
+export function moduleSampleToUserSample(s: FurnaceModuleSample): FurnaceUserSample {
+  const data = s.data instanceof Int16Array ? s.data : Int16Array.from(s.data as Int8Array, (v) => v * 256);
+  return { name: s.name, data, rate: s.rate };
+}
+
+/**
+ * The module sample after an edit: the edited PCM at 16 bit and the edited rate; the loop points stay when
+ * they still fit inside the edited length, else the sample plays without a loop.
+ */
+export function moduleSampleWithEdit(prev: FurnaceModuleSample, edited: FurnaceUserSample): FurnaceModuleSample {
+  const frames = edited.data.length;
+  const keepLoop = prev.loopStart >= 0 && prev.loopEnd > prev.loopStart && prev.loopEnd <= frames;
+  return {
+    ...prev,
+    data: edited.data,
+    rate: edited.rate,
+    depth: 16,
+    samples: frames,
+    loopStart: keepLoop ? prev.loopStart : -1,
+    loopEnd: keepLoop ? prev.loopEnd : -1,
+  };
 }

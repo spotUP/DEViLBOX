@@ -270,6 +270,8 @@ export interface FormatStore {
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
   /** Change SNES echo and mixing settings of one chip of the Furnace song; a running chip follows. */
+  /** Replace module sample `index` (sample editor edit): the store, the running Furnace engine and the song the .fur save writes. */
+  setFurnaceModuleSample: (index: number, sample: FurnaceModuleSample) => void;
   setSnesChipFlags: (chipIndex: number, updates: Partial<SnesChipFlags>) => void;
   /** Insert a new order row (copy of current) after the given position */
   insertFurnaceOrderRow: (position: number) => void;
@@ -885,6 +887,22 @@ export const useFormatStore = create<FormatStore>()(
       void import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
         if (FurnaceDispatchEngine.hasInstance()) FurnaceDispatchEngine.getInstance().seqSetOrder(channel, position, patternIndex);
       }).catch(() => {});
+    },
+    setFurnaceModuleSample: (index, sample) => {
+      let all: FurnaceModuleSample[] | null = null;
+      set((state) => {
+        if (!state.furnaceSamples || index < 0 || index >= state.furnaceSamples.length) return;
+        state.furnaceSamples[index] = sample;
+        all = state.furnaceSamples.slice();
+      });
+      if (!all) return;
+      const list: FurnaceModuleSample[] = all;
+      void import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
+        if (FurnaceDispatchEngine.hasInstance()) FurnaceDispatchEngine.getInstance().replaceModuleSamples(list);
+      }).catch(() => {});
+      if (sample.data instanceof Int16Array) {
+        void import('@lib/import/wasm/FurnaceFileOps').then(({ setFurSampleWasm }) => setFurSampleWasm(index, sample.data as Int16Array, sample.rate, sample.loopStart, sample.loopEnd)).catch(() => {});
+      }
     },
     setSnesChipFlags: (chipIndex, updates) => {
       let flagsStr: string | null = null;

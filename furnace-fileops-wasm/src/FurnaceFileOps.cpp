@@ -534,6 +534,24 @@ const void* fur_get_sample_data(int idx, size_t* outLen) {
   return s->getCurBuf();
 }
 
+/**
+ * Replace sample idx with 16-bit PCM (frames values at dataPtr), so fur_save writes the edited sample.
+ * loopStart/loopEnd < 0 = no loop. Returns 0 on success, -1 on a bad index or length.
+ */
+int fur_set_sample(int idx, const int16_t* data, int frames, int centerRate, int loopStart, int loopEnd) {
+  if (idx < 0 || idx >= (int)g_engine.song.sample.size() || frames < 0 || !data) return -1;
+  DivSample* s = g_engine.song.sample[idx];
+  if (!s) return -1;
+  s->depth = DIV_SAMPLE_DEPTH_16BIT;
+  if (!s->init(frames)) return -1;
+  memcpy(s->data16, data, (size_t)frames * 2);
+  s->centerRate = centerRate;
+  s->loop = loopStart >= 0 && loopEnd > loopStart;
+  s->loopStart = s->loop ? loopStart : -1;
+  s->loopEnd = s->loop ? loopEnd : -1;
+  return 0;
+}
+
 // ============================================================
 // Wavetable data access
 // ============================================================

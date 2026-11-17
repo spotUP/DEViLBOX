@@ -17,7 +17,7 @@ import { Button } from '@components/ui/Button';
 import { notify } from '@stores/useNotificationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { parseWavToAudioBuffer } from '@utils/audio/wavParser';
-import { FurnaceUserSampleEditor } from './FurnaceUserSampleEditor';
+import { FurnaceModuleSampleEditor, FurnaceUserSampleEditor } from './FurnaceUserSampleEditor';
 import { OPNB_VOICE_KINDS, SSG_MACRO_LABELS, isOpnbChipType, opnbFirstChannel, opnbVoiceKind, withSsgDefaultMacros } from '@engine/furnace-dispatch/opnbVoices';
 import { TabStrip } from '@components/ui/TabStrip';
 import { resolveColor, toneColor, type ControlTone } from '@components/ui/controlColor';
@@ -667,6 +667,9 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       {/* Amiga Panel (when amiga config present) */}
       {config.amiga && config.chipType !== 24 && (
         <AmigaPanel config={config} onChange={pushLiveUpdate} />
+      )}
+      {config.amiga && config.chipType !== 24 && config.amiga.useSample && config.amiga.initSample >= 0 && (
+        <FurnaceModuleSampleEditor instrumentId={instrumentId} index={config.amiga.initSample} />
       )}
 
       {/* N163 Panel (chipType 8 or n163 config present) */}
