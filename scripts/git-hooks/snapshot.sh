@@ -185,6 +185,7 @@ SNAPSHOT_KEPT_PATHS=(
   /third-party/furnace-master/src/engine/sysDef.cpp
   /third-party/furnace-master/src/engine/sysDef.h
   /third-party/furnace-master/src/engine/dispatch.h
+  /third-party/furnace-master/src/engine/song.h
 )
 # The sparse-checkout file (non-cone, gitignore syntax: the last matching line wins).
 snapshot_sparse_patterns() {
