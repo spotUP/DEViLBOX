@@ -73,6 +73,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "gameMusicCreator", fixture: "public/data/songs/formats/knights_of_sky.gmc", kind: "fixed" },
   { formatId: "gdm", fixture: "public/data/songs/formats/breakin's chipsong.gdm", kind: "variable" },
   { formatId: "glueMon", fixture: "public/data/songs/formats/memphis.glue", kind: "fixed" },
+  { formatId: "tme", fixture: "public/data/songs/the-musical-enlightenment/64 conversion.tme", kind: "fixed" },
   { formatId: "hippelCoSo", fixture: "public/data/songs/formats/prehistoric_tale.hipc", kind: "variable" },
   { formatId: "hivelyAHX", fixture: "public/data/songs/ahx/amanda.ahx", kind: "fixed" },
   { formatId: "hivelyHVL", fixture: "public/data/songs/formats/hexplosion.hvl", kind: "variable" },

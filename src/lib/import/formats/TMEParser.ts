@@ -27,20 +27,38 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, Pattern } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { decodeTmeCell, encodeTmeCell, tmeStoredNote, TME_STEP_SIZE } from '@/engine/uade/encoders/TMEEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
 /** Minimum file size required by DTP_Check2. */
 const MIN_FILE_SIZE = 7000;
 
-/** Fixed number of placeholder instruments for this format. */
-const INSTRUMENT_COUNT = 31;
+/** Layout (third-party/nuade/players/musicalenlightenment/musicalenlightenment.c): 32 instrument records of 128 bytes. */
+const INSTRUMENT_COUNT = 32;
+const INSTRUMENTS_OFFSET = 0x44;
+const INSTRUMENT_SIZE = 0x80;
+/** The instrument name: a NUL-terminated string in the record at +0x18 (32 bytes). */
+const INSTRUMENT_NAME_AT = 0x18;
+const POSITION_COUNT_OFFSET = 0x1a84;
+const STEP_COUNT_OFFSET = 0x1a86;
+const POSITIONS_OFFSET = 0x1aaa;
+const VOICES = 4;
+const POSITION_SIZE = VOICES * 3;
+const ROWS = 32;
+const TRACK_SIZE = ROWS * TME_STEP_SIZE;
+const FLAG_ABSOLUTE_NOTE = 0x04;
 
 /** Maximum subsong count (slots 0-15 → max 16 subsongs). */
 const MAX_SUBSONGS = 16;
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
+
+function u16BE(buf: Uint8Array, off: number): number {
+  return (buf[off] << 8) | buf[off + 1];
+}
 
 function u32BE(buf: Uint8Array, off: number): number {
   return (
@@ -114,39 +132,44 @@ export function parseTMEFile(buffer: ArrayBuffer, filename: string): TrackerSong
   const rawSubsongs = buf[5];
   const subsongCount = Math.min(Math.max(rawSubsongs + 1, 1), MAX_SUBSONGS);
 
-  // ── Instrument placeholders ──────────────────────────────────────────────
+  // ── Instruments: the names the module stores ────────────────────────────
 
-  const instruments: InstrumentConfig[] = Array.from(
-    { length: INSTRUMENT_COUNT },
-    (_, i) =>
-      ({
-        id: i + 1,
-        name: '',
-        type: 'synth' as const,
-        synthType: 'Synth' as const,
-        effects: [],
-        volume: 0,
-        pan: 0,
-      }) as InstrumentConfig,
-  );
+  const instruments: InstrumentConfig[] = Array.from({ length: INSTRUMENT_COUNT }, (_, i) => {
+    const at = INSTRUMENTS_OFFSET + i * INSTRUMENT_SIZE + INSTRUMENT_NAME_AT;
+    let name = '';
+    for (let j = 0; j < 32 && buf[at + j] !== 0; j++) {
+      const c = buf[at + j];
+      if (c >= 0x20 && c < 0x7f) name += String.fromCharCode(c);
+    }
+    return { id: i + 1, name, type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig;
+  });
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
+  // ── Grid: one pattern per position, four voices of the position's tracks (32 rows) ──
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
+  const positionCount = Math.min(u16BE(buf, POSITION_COUNT_OFFSET), Math.floor((buf.length - POSITIONS_OFFSET) / POSITION_SIZE));
+  const stepsOffset = POSITIONS_OFFSET + u16BE(buf, POSITION_COUNT_OFFSET) * POSITION_SIZE;
+  const stepCount = u16BE(buf, STEP_COUNT_OFFSET);
+  const trackOf = (pos: number, ch: number) => buf[POSITIONS_OFFSET + pos * POSITION_SIZE + ch * 3];
+  const stepAt = (pos: number, row: number, ch: number): number => {
+    const off = stepsOffset + trackOf(pos, ch) * TRACK_SIZE + row * TME_STEP_SIZE;
+    return off + TME_STEP_SIZE <= buf.length && off + TME_STEP_SIZE <= stepsOffset + stepCount * TME_STEP_SIZE ? off : -1;
+  };
+  // The position's note transpose moves a step's note unless the step is absolute; release/stop notes do not move.
+  const noteOffset = (pattern: number, row: number, channel: number): number | null => {
+    const off = stepAt(pattern, row, channel);
+    if (off < 0) return 0;
+    const n = tmeStoredNote(buf[off]);
+    if (n === 97) return null;
+    if (buf[off + 4] & FLAG_ABSOLUTE_NOTE) return 0;
+    return (buf[POSITIONS_OFFSET + pattern * POSITION_SIZE + channel * 3 + 2] << 24) >> 24;
+  };
 
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
+  const empty = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+  const patterns: Pattern[] = Array.from({ length: positionCount }, (_, pos) => ({
+    id: `pattern-${pos}`,
+    name: `Position ${pos}`,
+    length: ROWS,
+    channels: Array.from({ length: VOICES }, (_, ch) => ({
       id: `channel-${ch}`,
       name: `Channel ${ch + 1}`,
       muted: false,
@@ -156,19 +179,39 @@ export function parseTMEFile(buffer: ArrayBuffer, filename: string): TrackerSong
       pan: ch === 0 || ch === 3 ? -50 : 50,
       instrumentId: null,
       color: null,
-      rows: emptyRows,
+      rows: Array.from({ length: ROWS }, (_, row) => {
+        const off = stepAt(pos, row, ch);
+        if (off < 0) return { ...empty };
+        const cell = decodeTmeCell(buf.subarray(off, off + TME_STEP_SIZE));
+        const shift = noteOffset(pos, row, ch) ?? 0;
+        if (cell.note > 0 && shift !== 0) cell.note = Math.min(96, Math.max(1, cell.note + shift));
+        return cell;
+      }),
     })),
     importMetadata: {
       sourceFormat: 'MOD' as const,
       sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: 1,
+      originalChannelCount: VOICES,
+      originalPatternCount: positionCount,
       originalInstrumentCount: INSTRUMENT_COUNT,
     },
-  };
+  })) as Pattern[];
 
-  // ── Song name ─────────────────────────────────────────────────────────────
+  const layout: UADEPatternLayout = {
+    formatId: 'tme',
+    patternDataFileOffset: stepsOffset,
+    bytesPerCell: TME_STEP_SIZE,
+    rowsPerPattern: ROWS,
+    numChannels: VOICES,
+    numPatterns: positionCount,
+    moduleSize: buf.length,
+    encodeCell: encodeTmeCell,
+    decodeCell: decodeTmeCell,
+    getCellFileOffset: stepAt,
+    propagateSharedCells: true,
+    noteOffset,
+  };
 
   const nameParts: string[] = [`${moduleName} [TME]`];
   if (subsongCount > 1) nameParts.push(`(${subsongCount} subsongs)`);
@@ -176,16 +219,17 @@ export function parseTMEFile(buffer: ArrayBuffer, filename: string): TrackerSong
   return {
     name: nameParts.join(' '),
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions: patterns.map((_, i) => i),
+    songLength: patterns.length,
     restartPosition: 0,
-    numChannels: 4,
+    numChannels: VOICES,
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: layout,
   };
 }

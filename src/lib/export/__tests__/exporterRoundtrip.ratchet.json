@@ -768,6 +768,14 @@
       "cells": 25010,
       "bytes": 25010
     },
+    "tme": {
+      "exporter": "TMEExporter.exportTME",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 22112,
+      "bytes": 22112
+    },
     "tomyTracker": {
       "exporter": "TomyTrackerExporter.exportTomyTracker",
       "tier": "byte-exact",

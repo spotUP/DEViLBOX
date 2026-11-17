@@ -40,6 +40,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   inStereo2: 'public/data/songs/instereo!-2.0/spaceflight.is20',
   tomyTracker: 'public/data/songs/formats/irrepressible intro.sg',
   glueMon: 'public/data/songs/formats/memphis.glue',
+  tme: 'public/data/songs/the-musical-enlightenment/64 conversion.tme',
   format669: 'public/data/songs/composer-669/speed fighter.669',
   stoneTracker: 'public/data/songs/stonetracker/hypnosphere.spm',
   daveLowe: 'public/data/songs/dave-lowe/incredibleshrinkingsphere.dl',

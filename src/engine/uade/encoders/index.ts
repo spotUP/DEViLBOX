@@ -89,6 +89,7 @@ import './STXEncoder';
 import './SymphonieProEncoder';
 import './SynthesisEncoder';
 import './TCBTrackerEncoder';
+import './TMEEncoder';
 import './TFMX7VEncoder';
 import './TFMXEncoder';
 import './TomyTrackerEncoder';
