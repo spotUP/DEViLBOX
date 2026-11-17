@@ -79,6 +79,8 @@ describe('Music Maker IFF (.mm4/.mm8) is editable', () => {
     it(`${n}: real grid, byte-exact unedited, one note edit = one byte, play returns patched IFF`, async () => {
       const { raw, song } = await loadIff(n);
       expect(song.format).toBe('MusicMaker');
+      const names = song.instruments.map((i) => i.name);
+      expect(names).toEqual(expect.arrayContaining(n.endsWith('.mm4') ? ['bass_0.1', '#bassdrum1', 'polysynth'] : ['House1', 'FLOETTE', 'Bongo']));
       let hit: [number, number, number] | null = null;
       song.patterns.forEach((pp, p) => pp.channels.forEach((c, v) => c.rows.forEach((cell, r) => { if (!hit && cell.note > 0 && cell.note < 90) hit = [p, v, r]; })));
       expect(hit).not.toBeNull();

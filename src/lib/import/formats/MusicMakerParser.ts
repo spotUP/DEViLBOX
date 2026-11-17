@@ -170,7 +170,10 @@ function parseMusicMakerFile(
         const sdata = buf.slice(sdat.offset + 4, sdat.offset + sdat.size);
         const names = ch.get('INAM');
         const comp = new Map<string, ArrayBuffer>([[`${stem}.${pins ? 'ip' : 'i'}`, buf.slice(ic.offset, ic.offset + ic.size).buffer as ArrayBuffer]]);
-        if (names) comp.set(`${stem}.${pins ? 'ip' : 'i'}.n`, buf.slice(names.offset, names.offset + names.size).buffer as ArrayBuffer);
+        // INAM in a saved IFF: a 2200-byte path block, u16 name length (16), then the 36 x 16-byte table a split song keeps in .ip.n.
+        // shortcut: layout measured on easystyleofmsx.mm4 + house2.mm8 only; other layouts fall back to the whole chunk.
+        const nameAt = names && names.size >= 2202 + 36 * 16 && u16be(buf, names.offset + 2200) === 16 ? names.offset + 2202 : names?.offset;
+        if (names && nameAt !== undefined) comp.set(`${stem}.${pins ? 'ip' : 'i'}.n`, buf.slice(nameAt, nameAt === names.offset ? names.offset + names.size : nameAt + 36 * 16).buffer as ArrayBuffer);
         const song = parseMusicMakerSongFile(sdata, `${stem}.sdata`, comp);
         return { ...song, name: moduleName, musicMakerFileData: buf.slice().buffer as ArrayBuffer };
       }
