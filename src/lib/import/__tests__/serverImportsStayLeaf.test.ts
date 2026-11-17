@@ -6,6 +6,7 @@
  * and left the live API un-deployable.
  */
 import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -96,26 +97,28 @@ describe('server imports of the frontend tree stay leaf modules', () => {
 
 /** Root src/ files that import from server/src (the frontend type-check and vitest pull these in). */
 function rootFilesImportingServer(): string[] {
-  const out: string[] = [];
-  const scan = (dir: string): void => {
-    for (const n of readdirSync(dir)) {
-      const p = join(dir, n);
-      if (statSync(p).isDirectory()) {
-        if (n !== 'node_modules') scan(p);
-      } else if (/\.tsx?$/.test(n)) {
-        for (const s of specifiers(p)) {
-          if (!s.startsWith('.')) continue;
-          const r = resolveRelative(p, s);
-          if (r && r.startsWith(serverSrc + '/')) {
-            out.push(p);
-            break;
-          }
-        }
-      }
-    }
-  };
-  scan(appSrc);
-  return out;
+  // A node fs walk of src/ (5900 files) took 12-15 s under load; git grep prefilters in ~1.5 s.
+  // Every relative specifier into server/src contains "server/"; --untracked keeps new files visible.
+  let hits: string[];
+  try {
+    hits = execFileSync('git', ['grep', '--untracked', '-l', '-e', 'server/', '--', 'src/*.ts', 'src/*.tsx'], {
+      cwd: repo,
+      encoding: 'utf8',
+      maxBuffer: 1 << 24,
+    })
+      .split('\n')
+      .filter(Boolean);
+  } catch (e) {
+    if ((e as { status?: number }).status !== 1) throw e; // status 1 = no match
+    hits = [];
+  }
+  return hits.map((h) => join(repo, h)).filter((p) =>
+    specifiers(p).some((s) => {
+      if (!s.startsWith('.')) return false;
+      const r = resolveRelative(p, s);
+      return !!r && r.startsWith(serverSrc + '/');
+    }),
+  );
 }
 
 function packageName(spec: string): string {
