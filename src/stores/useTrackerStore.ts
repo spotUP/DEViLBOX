@@ -15,7 +15,14 @@ import type {
   ClipboardData,
 } from '@typedefs';
 import { EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
-import { peekTrackerReplayer } from '@engine/TrackerReplayer';
+import { peekTrackerReplayer, syncFurnaceCellEdit } from '@engine/TrackerReplayer';
+
+/** A cell edit to a Furnace song: via the replayer when it holds one (a composed Neo Geo song), else to the stored native. */
+function syncFurnaceCell(ch: number, pat: number, row: number, cell: Partial<import('@/types/tracker').TrackerCell>): void {
+  const replayer = peekTrackerReplayer();
+  if (replayer) replayer.syncCellToWasmSequencer(ch, pat, row, cell);
+  else syncFurnaceCellEdit(ch, pat, row, cell);
+}
 import { sendCellEditsToEngine, changedCells, type LiveCellEdit } from '@engine/replayer/liveCellEdits';
 import { useTransportStore } from './useTransportStore';
 import { idGenerator } from '../utils/idGenerator';
@@ -266,7 +273,7 @@ function pushEditAction(
   const spans = hippelModule ? hippelSpansFor(hippelModule, useInstrumentStore.getState().instruments.length, fmt.fileSubsongs?.current ?? 0) : null;
   const aonModule = UNLINKED_EDITS.has(type) ? null : moduleHeldIn(fmt, 'artOfNoiseFileData');
   // Art of Noise positions share stored patterns: an edit shows in every position of the same stored pattern.
-  const linked: Array<{ pattern: number; row: number; channel: number; values: Partial<import('@typedefs').TrackerCell> }> = spans
+  const linked: Array<{ pattern: number; row: number; channel: number; values: Partial<import('@/types/tracker').TrackerCell> }> = spans
     ? hippelLinkedEdits(spans, patternIndex, before, after, useTrackerStore.getState().patterns)
     : aonModule ? aonLinkedEdits(new Uint8Array(aonModule), patternIndex, before, after, useTrackerStore.getState().patterns)
     // A layout whose stored pattern plays at several song positions (Composer 669): grid cells with one file offset are one cell.
@@ -317,15 +324,9 @@ function syncBulkEdit(
   }
 
   // Furnace WASM sequencer sync — iterate all cells
-  const furnaceReplayer = peekTrackerReplayer();
-  if (furnaceReplayer) {
-    for (let ch = 0; ch < pattern.channels.length; ch++) {
-      const rows = pattern.channels[ch].rows;
-      for (let row = 0; row < rows.length; row++) {
-        const cell = rows[row];
-        furnaceReplayer.syncCellToWasmSequencer(ch, patternIndex, row, cell);
-      }
-    }
+  for (let ch = 0; ch < pattern.channels.length; ch++) {
+    const rows = pattern.channels[ch].rows;
+    for (let row = 0; row < rows.length; row++) syncFurnaceCell(ch, patternIndex, row, rows[row]);
   }
 
   // The changed cells to the engine playing the song (native replayer or UADE).
@@ -803,7 +804,7 @@ export const useTrackerStore = create<TrackerStore>()(
       });
       pushEditAction('EDIT_CELL', 'Edit cell', patternIndex, beforePattern, get().patterns[patternIndex]);
       // Apply the edit to a Furnace song: its native data, and the sequencer while it runs
-      peekTrackerReplayer()?.syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, cellUpdate);
+      syncFurnaceCell(channelIndex, patternIndex, rowIndex, cellUpdate);
       // Sync edit to OpenMPT soundlib if loaded (MOD/XM/IT/S3M)
       // Bridge is the primary edit path for libopenmpt formats — statically imported
       // to eliminate the async window where the store and soundlib could diverge.
@@ -944,7 +945,7 @@ export const useTrackerStore = create<TrackerStore>()(
       });
       pushEditAction('CLEAR_CELL', 'Clear cell', patternIndex, beforePattern, get().patterns[patternIndex]);
       // Sync the cleared cell to a Furnace song (editor units: 0 = empty)
-      peekTrackerReplayer()?.syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, {
+      syncFurnaceCell(channelIndex, patternIndex, rowIndex, {
         note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
       });
       // Sync clear to OpenMPT soundlib if loaded (MOD/XM/IT/S3M)

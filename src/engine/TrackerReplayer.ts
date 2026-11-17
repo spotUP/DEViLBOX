@@ -13,7 +13,6 @@
  * Format-specific behavior is handled by effect handlers.
  */
 
-import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { DavidWhittakerEngine } from './davidwhittaker/DavidWhittakerEngine';
 import { outputLatencySec } from './audioLatency';
 import { composedNeoGeoSequencerRoute, deriveComposedNeoGeo, isReplacedForDerivedSong, sameDerivedSamples } from './replayer/composedNeoGeo';
@@ -1793,14 +1792,10 @@ export class TrackerReplayer {
     // A composed Neo Geo song plays from a derived native: its cell is converted by the .fur
     // exporter's own conversion, not by the import-side applyEditorCellEdit.
     if (this._derivedNeoGeo) { this.syncDerivedCell(ch, patIdx, row); return; }
-    const native = this.song?.furnaceNative;
-    if (!native || !this.song) return;
-    const writes = applyEditorCellEdit(native, this.song.songPositions, patIdx, ch, row, cell);
-    if (!this.useWasmSequencer || writes.length === 0) return;
-    import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
-      const engine = FurnaceDispatchEngine.getInstance();
-      for (const w of writes) engine.seqSetCell(w.ch, w.pat, w.row, w.col, w.val);
-    }).catch(() => {});
+    syncFurnaceCellEdit(ch, patIdx, row, cell);
+    // Keep the song this replayer holds on the edited native (the store replaced its frozen copy).
+    const native = useFormatStore.getState().furnaceNative;
+    if (this.song?.furnaceNative && native) this.song.furnaceNative = native;
   }
 
   /** (a) One store cell of a derived song to the sequencer: all columns, exporter conversion. */
@@ -4573,6 +4568,17 @@ export function getTrackerReplayer(): TrackerReplayer {
 
 /** The replayer if one was ever constructed, else null. Never constructs: a caller that only
  *  acts on a PLAYING replayer asks this, so a store action does not build the audio graph. */
+/**
+ * A pattern-cell edit to the loaded .fur song: into `useFormatStore.furnaceNative`
+ * (what every Play uploads) and the WASM sequencer. Works before the first Play,
+ * when no replayer holds the song. The editor's own order maps the editor pattern
+ * to each channel's Furnace pattern, not playback's (a looped pattern is order [n]).
+ */
+export function syncFurnaceCellEdit(ch: number, patIdx: number, row: number, cell: Partial<import('@/types/tracker').TrackerCell>): void {
+  const order = useTrackerStore.getState().patternOrder;
+  useFormatStore.getState().applyFurnaceCellEdit(order, patIdx, ch, row, cell);
+}
+
 export function peekTrackerReplayer(): TrackerReplayer | null {
   return instance;
 }

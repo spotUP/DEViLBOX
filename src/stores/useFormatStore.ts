@@ -43,6 +43,8 @@ import { musicLineInstrumentBytes } from '@/lib/export/MusicLineExporter';
 import { gridOpensInScopeView } from '@/lib/tracker/gridOpensInScopeView';
 import { writeSnesChipFlags, type SnesChipFlags } from '@/lib/furnace/snesDsp';
 import { chipKeysFor } from '@engine/furnace-dispatch/chipKey';
+import { applyEditorCellEdit, type SeqCellWrite } from '@lib/import/furnaceEditorCells';
+import type { TrackerCell } from '@/types/tracker';
 // Type-only — erased at build time, no runtime cycle. Mirrors useCursorStore.ts
 // pattern so getState() can be cast without `any`.
 import type { useTrackerStore as _TrackerStoreType } from './useTrackerStore';
@@ -269,6 +271,8 @@ export interface FormatStore {
   setEditorMode: (mode: EditorMode) => void;
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
+  /** One editor cell edit into furnaceNative (what Play uploads) and into the loaded WASM sequencer. */
+  applyFurnaceCellEdit: (songPositions: readonly number[], editorPattern: number, ch: number, row: number, cell: Partial<TrackerCell>) => void;
   /** Change SNES echo and mixing settings of one chip of the Furnace song; a running chip follows. */
   /** Replace module sample `index` (sample editor edit): the store, the running Furnace engine and the song the .fur save writes. */
   setFurnaceModuleSample: (index: number, sample: FurnaceModuleSample) => void;
@@ -886,6 +890,21 @@ export const useFormatStore = create<FormatStore>()(
       // entry now, so the tune already playing follows the matrix edit too.
       void import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
         if (FurnaceDispatchEngine.hasInstance()) FurnaceDispatchEngine.getInstance().seqSetOrder(channel, position, patternIndex);
+      }).catch(() => {});
+    },
+    applyFurnaceCellEdit: (songPositions, editorPattern, ch, row, cell) => {
+      let writes: SeqCellWrite[] = [];
+      // On the immer draft: the stored native is frozen, and it is the copy Play uploads.
+      set((state) => {
+        if (state.furnaceNative) writes = applyEditorCellEdit(state.furnaceNative as FurnaceNativeData, songPositions, editorPattern, ch, row, cell);
+      });
+      if (writes.length === 0) return;
+      // The sequencer holds this song from import on (and from every Play), so it gets the cell now.
+      const list = writes;
+      void import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
+        if (!FurnaceDispatchEngine.hasInstance()) return;
+        const engine = FurnaceDispatchEngine.getInstance();
+        for (const w of list) engine.seqSetCell(w.ch, w.pat, w.row, w.col, w.val);
       }).catch(() => {});
     },
     setFurnaceModuleSample: (index, sample) => {

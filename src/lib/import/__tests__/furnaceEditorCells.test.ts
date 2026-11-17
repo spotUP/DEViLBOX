@@ -123,10 +123,18 @@ describe('through the real loader and replayer', { timeout: 60000 }, () => {
     const s = await parseFurnaceFile(readSong('deflemask/220hertz/Andrew_haggles.dmf'), 'Andrew_haggles.dmf');
     expect(s.patterns[0].channels[0].rows[0].note).toBe(49);   // C-4, as Furnace shows it
 
-    const { TrackerReplayer } = await import('@/engine/TrackerReplayer');
-    const sync = TrackerReplayer.prototype.syncCellToWasmSequencer;
-    sync.call({ song: s, useWasmSequencer: false } as never, 0, 0, 0, { note: 58 });
-    const native = s.furnaceNative!;
+    // The edit is made before any Play: no replayer holds the song yet, and the stored
+    // native is immer-frozen. It must still land in the native that Play uploads
+    // (2026-11-17: edits before the first Play were dropped, Play played the old notes).
+    const { useFormatStore } = await import('@/stores/useFormatStore');
+    const { useTrackerStore } = await import('@/stores/useTrackerStore');
+    const { peekTrackerReplayer } = await import('@/engine/TrackerReplayer');
+    expect(peekTrackerReplayer()).toBeNull();
+    useFormatStore.getState().setFurnaceNative(s.furnaceNative!);
+    useTrackerStore.setState({ patterns: s.patterns, patternOrder: s.songPositions, currentPatternIndex: 0 });
+    expect(Object.isFrozen(useFormatStore.getState().furnaceNative)).toBe(true);
+    useTrackerStore.getState().setCell(0, 0, { note: 58 }, 0);
+    const native = useFormatStore.getState().furnaceNative!;
     const first = native.subsongs[0].orders[0][0];
     expect(native.subsongs[0].channels[0].patterns.get(first)!.rows[0].note).toBe(57);
   });
