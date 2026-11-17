@@ -492,7 +492,9 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   if (song.songPositions.length > 256) problems.push('A Furnace order table holds at most 256 entries');
 
   // Cells per channel and pattern
-  const fxColumns = new Array<number>(chans).fill(1);
+  // The user's chosen effect-column count is the floor; used columns raise it (never above 8).
+  const fxColumns = Array.from({ length: chans }, (_, ch) =>
+    Math.min(MAX_FX_COLUMNS, Math.max(1, song.patterns[0]?.channels[ch]?.channelMeta?.effectCols ?? 1)));
   // Furnace writes every pattern the order list names, an empty one too (fur.cpp, patsToWrite).
   // ngdevkit nsstool looks each ordered pattern up in the file and stops on a missing one.
   const orderedPatterns = new Set(song.songPositions);

@@ -575,6 +575,12 @@ interface TrackerStore {
   removeFromOrder: (positionIndex: number) => void;
   insertInOrder: (patternIndex: number, positionIndex: number) => void;
   duplicatePosition: (positionIndex: number) => void;
+  /** Furnace "deep clone order": new copy of the position's pattern, inserted as the next position. */
+  deepClonePosition: (positionIndex: number) => void;
+  /** Furnace "place copy at end": append the position's pattern reference to the order list. */
+  placeCopyAtEnd: (positionIndex: number) => void;
+  /** Furnace effect columns: 1-8 per channel (clamped), applied to every pattern. */
+  setChannelEffectCols: (channelIndex: number, cols: number) => void;
   clearOrder: () => void;
   reorderPositions: (oldIndex: number, newIndex: number) => void;
   setCurrentPosition: (positionIndex: number, fromReplayer?: boolean) => void;
@@ -2381,6 +2387,29 @@ export const useTrackerStore = create<TrackerStore>()(
           state.patternOrder.splice(positionIndex + 1, 0, patternIndex);
         }
       }),
+
+    deepClonePosition: (positionIndex) =>
+      set((state) => {
+        if (positionIndex < 0 || positionIndex >= state.patternOrder.length || state.patternOrder.length >= 256) return;
+        const src = state.patterns[state.patternOrder[positionIndex]];
+        if (!src) return;
+        const cloned: Pattern = structuredClone(current(src));
+        cloned.id = idGenerator.generate('pattern');
+        cloned.name = `${src.name} (Copy)`;
+        state.patterns.push(cloned);
+        state.patternOrder.splice(positionIndex + 1, 0, state.patterns.length - 1);
+      }),
+
+    placeCopyAtEnd: (positionIndex) =>
+      set((state) => {
+        if (positionIndex < 0 || positionIndex >= state.patternOrder.length || state.patternOrder.length >= 256) return;
+        state.patternOrder.push(state.patternOrder[positionIndex]);
+      }),
+
+    setChannelEffectCols: (channelIndex, cols) => {
+      const n = Math.max(1, Math.min(8, Math.round(cols)));
+      get().setChannelMeta(channelIndex, { effectCols: n });
+    },
 
     clearOrder: () =>
       set((state) => {

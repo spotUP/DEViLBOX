@@ -166,6 +166,17 @@ export function getGlobalRegistry(): CommandRegistry {
   return globalRegistry;
 }
 
+/** Add (+1) or remove (-1) one effect column on the cursor channel, 1-8. */
+function changeEffectColumns(delta: 1 | -1): boolean {
+  const { cursor } = useCursorStore.getState();
+  const { patterns, currentPatternIndex, setChannelEffectCols } = useTrackerStore.getState();
+  const cur = patterns[currentPatternIndex]?.channels[cursor.channelIndex]?.channelMeta?.effectCols ?? 2;
+  const next = Math.max(1, Math.min(8, cur + delta));
+  setChannelEffectCols(cursor.channelIndex, next);
+  useUIStore.getState().setStatusMessage(`Effect columns: ${next}`, false, 1000);
+  return true;
+}
+
 function setVolumeInCell(volume: number): boolean {
   const { cursor } = useCursorStore.getState();
   const { setCell } = useTrackerStore.getState();
@@ -1656,14 +1667,8 @@ function initializeRegistry() {
       useUIStore.getState().setStatusMessage('Insert track: use pattern editor', false, 1500);
       return true;
     }, description: 'Insert track' },
-    { name: 'add_column', contexts: ['pattern'], handler: () => {
-      useUIStore.getState().setStatusMessage('Add column: not applicable', false, 1000);
-      return true;
-    }, description: 'Add column' },
-    { name: 'remove_column', contexts: ['pattern'], handler: () => {
-      useUIStore.getState().setStatusMessage('Remove column: not applicable', false, 1000);
-      return true;
-    }, description: 'Remove column' },
+    { name: 'add_column', contexts: ['pattern'], handler: () => changeEffectColumns(1), description: 'Add column' },
+    { name: 'remove_column', contexts: ['pattern'], handler: () => changeEffectColumns(-1), description: 'Remove column' },
     { name: 'insert_column_row', contexts: ['pattern'], handler: insertRow, description: 'Insert column row' },
     { name: 'delete_column_and_pull', contexts: ['pattern'], handler: deleteAndPull, description: 'Delete column and pull' },
 

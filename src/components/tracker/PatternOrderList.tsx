@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { useTrackerStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
+import { Button } from '@components/ui/Button';
 import { notify } from '@stores/useNotificationStore';
 import { Plus, Trash2, List, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -19,6 +20,8 @@ export const PatternOrderList: React.FC = React.memo(() => {
   const addToOrder = useTrackerStore((state) => state.addToOrder);
   const removeFromOrder = useTrackerStore((state) => state.removeFromOrder);
   const duplicatePosition = useTrackerStore((state) => state.duplicatePosition);
+  const deepClonePosition = useTrackerStore((state) => state.deepClonePosition);
+  const placeCopyAtEnd = useTrackerStore((state) => state.placeCopyAtEnd);
   const clearOrder = useTrackerStore((state) => state.clearOrder);
   const reorderPositions = useTrackerStore((state) => state.reorderPositions);
   const setCurrentPosition = useTrackerStore((state) => state.setCurrentPosition);
@@ -89,6 +92,11 @@ export const PatternOrderList: React.FC = React.memo(() => {
     notify.success('Position duplicated', 2000);
   };
 
+  const handleMove = (delta: -1 | 1) => {
+    const to = currentPositionIndex + delta;
+    if (to >= 0 && to < patternOrder.length) reorderPositions(currentPositionIndex, to);
+  };
+
   // Extract per-position speed from row 0 Fxx effect (Symphonie Pro and similar formats)
   const getPositionSpeed = (patternIndex: number): number | null => {
     const row = patterns[patternIndex]?.channels[0]?.rows[0];
@@ -142,6 +150,21 @@ export const PatternOrderList: React.FC = React.memo(() => {
             <Plus size={12} />
             Add
           </button>
+          <Button variant="default" size="sm" onClick={() => handleMove(-1)} title="Move the selected position up">
+            Move Up
+          </Button>
+          <Button variant="default" size="sm" onClick={() => handleMove(1)} title="Move the selected position down">
+            Move Down
+          </Button>
+          <Button variant="default" size="sm" onClick={() => handleDuplicate(currentPositionIndex)} title="Duplicate the selected position (same pattern)">
+            Duplicate
+          </Button>
+          <Button variant="default" size="sm" onClick={() => deepClonePosition(currentPositionIndex)} title="Copy the selected position's pattern into a new pattern">
+            Deep Clone
+          </Button>
+          <Button variant="default" size="sm" onClick={() => placeCopyAtEnd(currentPositionIndex)} title="Place a copy of the selected position at the end">
+            Copy To End
+          </Button>
           <button
             onClick={handleClearAll}
             className="px-2 py-1 text-xs bg-dark-bgActive hover:bg-dark-bgHover text-ft2-text border border-ft2-border rounded flex items-center gap-1 transition-colors whitespace-nowrap"
