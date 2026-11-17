@@ -104,6 +104,8 @@ const FILE: Record<string, string> = {
   // neither name matches the registry (rjp./.rj, wb. prefix): the corpus holds cannon fodder.sng and wicked.wb
   richardJoseph: 'richard-joseph/cannon fodder (intro).sng',
   wallyBeben: 'wally-beben/wicked.wb',
+  // the .cm file in custommade/ has the suffix, not the cm. prefix isCustomMadeFormat requires: the parser declines it and UADE (absent in node) parses it
+  customMade: 'formats/cm.viking_child',
   // the corpus holds one song per format below; each is confirmed by content detection (E.M.S. V6 header for emsv6, 0x0125 for ems)
   davidHanney: 'david-hanney/tearaway thomas unused.dh',
   ems: 'formats/ballade.song.ems',

@@ -154,6 +154,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   benDaglish: 'pass',
   cheesecutter: 'n/a',
   composer667: 'n/a',
+  customMade: 'pass',
   daveLowe: 'pass',
   davidWhittaker: 'pass',
   deltaMusic1: 'pass',
@@ -303,6 +304,8 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   benDaglish: 'pass',
   cheesecutter: 'n/a',
   composer667: 'n/a',
+  // customMade: a note edit patches the track byte of an existing note (layoutPatch); a blank row has no byte to patch.
+  customMade: 'fail',
   daveLowe: 'pass',
   davidWhittaker: 'pass',
   deltaMusic1: 'pass',
