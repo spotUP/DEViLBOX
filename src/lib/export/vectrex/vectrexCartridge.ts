@@ -11,6 +11,10 @@ export interface VectrexPlayer {
   titleOffset: number;
   titleLength: number;
   dataOffset: number;
+  authorOffset: number;
+  authorLength: number;
+  scrollOffset: number;
+  scrollLength: number;
   maxCartridge: number;
 }
 
@@ -63,7 +67,7 @@ export function vectrexTitle(title: string, length: number): Uint8Array {
   return Uint8Array.from(t, (c) => c.charCodeAt(0));
 }
 
-export function buildVectrexCartridge(writes: readonly RegisterWrite[], sampleRate: number, player: VectrexPlayer, title = 'devilbox'): VectrexCartridgeResult {
+export function buildVectrexCartridge(writes: readonly RegisterWrite[], sampleRate: number, player: VectrexPlayer, title = 'devilbox', author = 'devilbox', scrollText = ''): VectrexCartridgeResult {
   const frames = captureToFrames(writes, sampleRate);
   if (frames.length === 0) throw new Error('No AY register writes were captured. Play a Vectrex (AY-3-8910) song through while recording.');
   const raw = encodeFrames(frames);
@@ -79,6 +83,10 @@ export function buildVectrexCartridge(writes: readonly RegisterWrite[], sampleRa
   const bin = new Uint8Array(padded);
   bin.set(player.bytes.subarray(0, player.dataOffset));
   bin.set(vectrexTitle(title, player.titleLength), player.titleOffset);
+  bin.set(vectrexTitle(author, player.authorLength), player.authorOffset);
+  // The scroller wraps over the whole field: lead and trail with 16 spaces (the window width) so the text enters and leaves clean.
+  const pad = ' '.repeat(16);
+  if (scrollText) bin.set(vectrexTitle(pad + scrollText + pad, player.scrollLength), player.scrollOffset);
   let o = player.dataOffset;
   for (const f of encoded) { bin.set(f, o); o += f.length; }
   bin[o++] = 0; bin[o] = ZX_CTRL_LOOP;

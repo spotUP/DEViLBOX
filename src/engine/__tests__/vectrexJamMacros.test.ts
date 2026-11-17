@@ -110,7 +110,7 @@ describe('AY-3-8910 Jam register stream', () => {
 describe('shipped Vectrex Jam cartridge', () => {
   it('carries the instrument macros and covers the whole order list', () => {
     const bin = readFileSync('public/vectrex/demo-ay8910-jam.bin');
-    const frames = decodeVectrexStream(new Uint8Array(bin.subarray(174)));
+    const frames = decodeVectrexStream(new Uint8Array(bin.subarray(PLAYER_META.dataOffset)));
     const w = frames.flatMap((f) => [...f]);
     expect(w.filter(([r]) => r === 6).length).toBeGreaterThan(0);
     expect(w.filter(([r, v]) => r === 7 && (v & 0x38) !== 0x38).length).toBeGreaterThan(0);
@@ -119,6 +119,7 @@ describe('shipped Vectrex Jam cartridge', () => {
   });
 });
 
+const PLAYER_META = JSON.parse(readFileSync('public/vectrex/player.json', 'utf8'));
 const TORTURE_CART = 'public/vectrex/demo-ay8910-torture.bin';
 
 /** Register write counts (0-13), envelope shapes, mixer values and noise periods in a list of [register, value] writes. */
@@ -165,7 +166,7 @@ describe.runIf(process.env.VECTREX_TORTURE_BUILD)('build Vectrex torture cartrid
 describe('shipped Vectrex torture cartridge', () => {
   it('writes every AY register 0-13, all 16 envelope shapes and every mixer state', () => {
     const bin = readFileSync(TORTURE_CART);
-    const frames = decodeVectrexStream(new Uint8Array(bin.subarray(174)));
+    const frames = decodeVectrexStream(new Uint8Array(bin.subarray(PLAYER_META.dataOffset)));
     const c = coverage(frames.flatMap((f) => [...f]));
     c.writes.forEach((n, reg) => { expect(n, `register ${reg} written`).toBeGreaterThan(0); });
     expect(c.shapes).toEqual(Array.from({ length: 16 }, (_, i) => i));

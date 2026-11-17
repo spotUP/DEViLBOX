@@ -8,11 +8,23 @@ Wait_Recal    equ $F192
 Intensity_5F  equ $F2A5
 Print_Str_d   equ $F37A
 Sound_Byte    equ $F256
+Reset0Ref     equ $F354
+Moveto_d      equ $F312
+Draw_Line_d   equ $F3DF
 mask          equ $C880
 reg           equ $C882
 ptr           equ $C883
 rep           equ $C885
-
+vol           equ $C886       ; 3 shadow volumes 0-15 (regs 8-10; envelope bit = 15)
+sub           equ $C889       ; frame within the second
+clk           equ $C88A       ; "MM:SS" + $80
+scr           equ $C890       ; scroller offset
+scrt          equ $C891       ; scroller tick
+buf           equ $C892       ; 16 char scroller window + $80
+bi            equ $C8A4
+dy            equ $C8A5
+xs            equ $C8A6
+ph            equ $C8A7
         org $0000
         fcc "g GCE 2026"
         fcb $80
@@ -21,19 +33,31 @@ rep           equ $C885
 title:  fcc "DEVILBOX        "
         fcb $80
         fcb 0
+author: fcc "DEVILBOX        "
+        fcb $80
+scroll: fcc "    DEVILBOX VECTREX AY-3-8910 PLAYER - MUSIC CAPTURED FROM FURNACE                                                             "
+scrollEnd:
+sLogo:  fcc "DEVILBOX"
+        fcb $80
+sPlat:  fcc "VECTREX AY-3-8910"
+        fcb $80
+sSong:  fcc "SONG 1/1"
+        fcb $80
+sPlay:  fcc "PLAYING"
+        fcb $80
 
 start:  lda #$D0
         tfr a,dp
         jsr mute
+        jsr resetclk
         clr rep
+        clr scr
+        clr scrt
         ldx #data
 frame:  stx ptr
 frame2: jsr Wait_Recal
-        jsr Intensity_5F
-        ldu #title
-        lda #$20
-        ldb #$B8
-        jsr Print_Str_d
+        jsr tick
+        jsr screen
         lda #$D0
         tfr a,dp
         ldx ptr
@@ -46,13 +70,14 @@ getf:   lda ,x+
         cmpb #$FE
         bne chkrl
         jsr mute
+        jsr resetclk
         ldx #data
         bra getf
 chkrl:  cmpb #$FD
         bne play
         deca
         sta rep
-        bra frame
+        lbra frame
 play:   sta mask+1
         stb mask
         clr reg
@@ -64,16 +89,35 @@ nextr:  lsr mask
         cmpa #7
         bne wr
         andb #$3F
-wr:     stx ptr
+wr:     pshs b          ; volume shadow for the bars
+        lda reg
+        cmpa #8
+        blo nov
+        cmpa #10
+        bhi nov
+        ldy #vol-8
+        leay a,y
+        ldb ,s
+        bitb #$10
+        beq lowv
+        ldb #15
+lowv:   andb #$0F
+        stb ,y
+nov:    puls b
+        lda reg
+        stx ptr
         jsr Sound_Byte
         ldx ptr
 skip:   inc reg
         lda reg
         cmpa #14
         bne nextr
-        bra frame
+        lbra frame
 
-mute:   clra
+mute:   clr vol
+        clr vol+1
+        clr vol+2
+        clra
 mu:     pshs a
         clrb
         jsr Sound_Byte
@@ -82,4 +126,150 @@ mu:     pshs a
         cmpa #14
         bne mu
         rts
+
+resetclk: clr sub
+        ldx #clk
+        ldd #$3030
+        std ,x++
+        lda #':'
+        sta ,x+
+        ldd #$3030
+        std ,x++
+        lda #$80
+        sta ,x
+        rts
+
+tick:   inc sub
+        lda sub
+        cmpa #50
+        blo tkd
+        clr sub
+        lda clk+4
+        inca
+        sta clk+4
+        cmpa #'9'+1
+        blo tkd
+        lda #'0'
+        sta clk+4
+        lda clk+3
+        inca
+        sta clk+3
+        cmpa #'6'
+        blo tkd
+        lda #'0'
+        sta clk+3
+        lda clk+1
+        inca
+        sta clk+1
+        cmpa #'9'+1
+        blo tkd
+        lda #'0'
+        sta clk+1
+        inc clk
+tkd:    rts
+
+; A = y, B = x, U = string: absolute position, then print
+pstr:   pshs d,u
+        jsr Reset0Ref
+        jsr Intensity_5F
+        puls d,u
+        jsr Print_Str_d
+        lda #$D0
+        tfr a,dp
+        rts
+
+screen: lda ph
+        eora #1
+        sta ph
+        bne scr2
+        ldu #sLogo
+        lda #110
+        ldb #-120
+        jsr pstr
+        ldu #sPlat
+        lda #88
+        ldb #-76
+        jsr pstr
+        ldu #title
+        lda #60
+        ldb #-72
+        jsr pstr
+        ldu #author
+        lda #38
+        ldb #-72
+        jsr pstr
+        ldu #sSong
+        lda #12
+        ldb #-72
+        jsr pstr
+        rts
+scr2:   ldu #clk
+        lda #12
+        ldb #20
+        jsr pstr
+        ldu #sPlay
+        lda #-10
+        ldb #-72
+        jsr pstr
+        clr bi
+bl:     ldb bi
+        ldx #vol
+        lda b,x
+        ldb #3
+        mul
+        stb dy
+        ldb bi
+        lda #50
+        mul
+        subb #60
+        stb xs
+        jsr Reset0Ref
+        jsr Intensity_5F
+        lda #-105
+        ldb xs
+        jsr Moveto_d
+        lda dy
+        clrb
+        jsr Draw_Line_d
+        clra
+        ldb #10
+        jsr Draw_Line_d
+        lda dy
+        nega
+        clrb
+        jsr Draw_Line_d
+        lda #$D0
+        tfr a,dp
+        inc bi
+        lda bi
+        cmpa #3
+        blo bl
+        lda scrt
+        inca
+        sta scrt
+        cmpa #2
+        blo scd
+        clr scrt
+        lda scr
+        inca
+        cmpa #scrollEnd-scroll-16
+        blo scs
+        clra
+scs:    sta scr
+scd:    ldx #scroll
+        ldb scr
+        abx
+        ldu #buf
+        ldb #16
+scc:    lda ,x+
+        sta ,u+
+        decb
+        bne scc
+        lda #$80
+        sta ,u
+        ldu #buf
+        lda #-122
+        ldb #-72
+        jmp pstr
+
 data:
