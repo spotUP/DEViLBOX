@@ -53,3 +53,14 @@ describe('parseCustomMadeFile — terramex.cus', () => {
     expect(report.numChannels).toBeGreaterThan(0);
   });
 });
+
+describe('parseCustomMadeFile — suffix-named .cm', () => {
+  const CM = resolve(REF, 'custommade/the viking child crack.cm');
+  it('detects the suffix name and parses natively with notes in the grid', async () => {
+    expect(isCustomMadeFormat(loadBuf(CM), 'the viking child crack.cm')).toBe(true);
+    const song = await parseCustomMadeFile(loadBuf(CM), 'the viking child crack.cm');
+    expect(song.name).not.toMatch(/\.cm$/i);
+    const notes = song.patterns.flatMap((p) => p.channels.flatMap((c) => c.rows)).filter((c) => c.note > 0);
+    expect(notes.length).toBeGreaterThan(0);
+  });
+});

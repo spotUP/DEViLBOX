@@ -100,9 +100,8 @@ export function isCustomMadeFormat(buffer: ArrayBuffer, filename?: string): bool
   // ── CustomMade (cm./rk./rkb.) binary scan ────────────────────────────────
   if (filename !== undefined) {
     const base = (filename.split('/').pop() ?? filename).toLowerCase();
-    if (!base.startsWith('cm.') && !base.startsWith('rk.') && !base.startsWith('rkb.')) {
-      return false;
-    }
+    const named = ['cm', 'rk', 'rkb'].some((x) => base.startsWith(`${x}.`) || base.endsWith(`.${x}`));
+    if (!named) return false;
   }
 
   // Need at least 8 bytes for the header checks
@@ -172,7 +171,7 @@ export async function parseCustomMadeFile(
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "cm.", "rk.", or "rkb." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^(cm|rk|rkb)\./i, '') || baseName;
+  const moduleName = baseName.replace(/^(cm|rk|rkb)\.|\.(cm|rk|rkb)$/i, '') || baseName;
 
   // ── Detect sub-variant ────────────────────────────────────────────────────
 
