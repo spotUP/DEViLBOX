@@ -437,3 +437,66 @@ export function swapChannelsHelper(pattern: Pattern, aIdx: number, bIdx: number)
   pattern.channels[aIdx].rows = pattern.channels[bIdx].rows.map((r) => ({ ...r }));
   pattern.channels[bIdx].rows = tempRows;
 }
+
+// ---------------------------------------------------------------------------
+// Value operations on any numeric column (Furnace editOptions: invert, scale,
+// transpose values, with nibble mode for split xy effect parameters)
+// ---------------------------------------------------------------------------
+
+export type ValueColumn = 'instrument' | 'volume' | 'effParam' | 'effParam2';
+export type NibbleMode = 'both' | 'high' | 'low';
+
+const VALUE_FIELD: Record<ValueColumn, { field: 'instrument' | 'volume' | 'eff' | 'eff2'; typ?: 'effTyp' | 'effTyp2' }> = {
+  instrument: { field: 'instrument' },
+  volume: { field: 'volume' },
+  effParam: { field: 'eff', typ: 'effTyp' },
+  effParam2: { field: 'eff2', typ: 'effTyp2' },
+};
+
+/** Cursor column types that carry a plain value these operations can change. */
+export function valueColumnOf(columnType: CursorPosition['columnType']): ValueColumn | null {
+  return columnType === 'instrument' || columnType === 'volume' || columnType === 'effParam' || columnType === 'effParam2'
+    ? columnType
+    : null;
+}
+
+/** Applies fn(value, max) to every non-empty value of the column inside the selection; fn sees 0..255 or, in nibble mode, 0..15. */
+export function mapColumnValues(
+  pattern: Pattern,
+  sel: BlockSelection,
+  column: ValueColumn,
+  nibble: NibbleMode,
+  fn: (value: number, max: number) => number,
+): void {
+  const { field, typ } = VALUE_FIELD[column];
+  const clamp = (v: number, max: number) => Math.max(0, Math.min(max, Math.round(v)));
+  const minCh = Math.min(sel.startChannel, sel.endChannel);
+  const maxCh = Math.max(sel.startChannel, sel.endChannel);
+  const minRow = Math.min(sel.startRow, sel.endRow);
+  const maxRow = Math.max(sel.startRow, sel.endRow);
+  for (let ch = minCh; ch <= maxCh; ch++) {
+    for (let r = minRow; r <= maxRow; r++) {
+      const cell = pattern.channels[ch]?.rows[r];
+      if (!cell) continue;
+      const v = (cell[field] as number) ?? 0;
+      if (typ ? (cell[typ] ?? 0) === 0 && v === 0 : v === 0) continue;
+      if (nibble === 'both') cell[field] = clamp(fn(v, 0xFF), 0xFF);
+      else if (nibble === 'high') cell[field] = (clamp(fn(v >> 4, 15), 15) << 4) | (v & 15);
+      else cell[field] = (v & 0xF0) | clamp(fn(v & 15, 15), 15);
+    }
+  }
+}
+
+export const invertValuesHelper = (p: Pattern, sel: BlockSelection, c: ValueColumn, n: NibbleMode = 'both'): void =>
+  mapColumnValues(p, sel, c, n, (v, max) => max - v);
+
+export const scaleValuesHelper = (p: Pattern, sel: BlockSelection, c: ValueColumn, percent: number, n: NibbleMode = 'both'): void =>
+  mapColumnValues(p, sel, c, n, (v) => (v * percent) / 100);
+
+export const transposeValuesHelper = (p: Pattern, sel: BlockSelection, c: ValueColumn, amount: number, n: NibbleMode = 'both'): void =>
+  mapColumnValues(p, sel, c, n, (v) => v + amount);
+
+/** Deterministic through the injected rng so tests can fix it. */
+export const randomizeValuesHelper = (
+  p: Pattern, sel: BlockSelection, c: ValueColumn, min: number, max: number, n: NibbleMode = 'both', rng: () => number = Math.random,
+): void => mapColumnValues(p, sel, c, n, () => min + Math.floor(rng() * (max - min + 1)));

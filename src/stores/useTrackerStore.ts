@@ -445,6 +445,8 @@ import {
   applyInstrumentToSelectionHelper, transposeSelectionHelper, remapInstrumentHelper,
   interpolateSelectionHelper, humanizeSelectionHelper, strumSelectionHelper, legatoSelectionHelper,
   scaleVolumeHelper, fadeVolumeHelper, amplifySelectionHelper, swapChannelsHelper,
+  invertValuesHelper, scaleValuesHelper, transposeValuesHelper, randomizeValuesHelper,
+  type ValueColumn, type NibbleMode,
 } from './tracker/patternEditActions';
 import {
   copySelectionHelper, cutSelectionHelper, swapSelectionHelper,
@@ -608,6 +610,10 @@ interface TrackerStore {
   toggleChannelMute: (channelIndex: number) => void;
   toggleChannelSolo: (channelIndex: number) => void;
   toggleChannelCollapse: (channelIndex: number) => void;
+  /** Minimize (true) or maximize (false) every channel of every pattern at once. */
+  setAllChannelsCollapsed: (collapsed: boolean) => void;
+  /** Value operations on the selection's column; 'invert' = max minus value. */
+  editSelectionValues: (op: { kind: 'invert' } | { kind: 'scale'; percent: number } | { kind: 'transpose'; amount: number } | { kind: 'randomize'; min: number; max: number }, column: ValueColumn, nibble?: NibbleMode) => void;
   setChannelVolume: (channelIndex: number, volume: number) => void;
   setChannelPan: (channelIndex: number, pan: number) => void;
   setChannelColor: (channelIndex: number, color: string | null) => void;
@@ -1903,6 +1909,27 @@ export const useTrackerStore = create<TrackerStore>()(
           useUIStore.getState().setStatusMessage(!currentlySoloed ? 'SOLO ON' : 'SOLO OFF');
         });
       }
+    },
+
+    setAllChannelsCollapsed: (collapsed) =>
+      set((state) => {
+        state.patterns.forEach((pattern) => pattern.channels.forEach((ch) => { ch.collapsed = collapsed; }));
+      }),
+
+    editSelectionValues: (op, column, nibble = 'both') => {
+      const selection = useCursorStore.getState().selection;
+      const { currentPatternIndex } = get();
+      if (!selection) return;
+      const beforePattern = get().patterns[currentPatternIndex];
+      set((state) => {
+        const pat = state.patterns[state.currentPatternIndex];
+        if (op.kind === 'invert') invertValuesHelper(pat, selection, column, nibble);
+        else if (op.kind === 'scale') scaleValuesHelper(pat, selection, column, op.percent, nibble);
+        else if (op.kind === 'transpose') transposeValuesHelper(pat, selection, column, op.amount, nibble);
+        else randomizeValuesHelper(pat, selection, column, op.min, op.max, nibble);
+      });
+      pushEditAction('AMPLIFY', `${op.kind} ${column}`, currentPatternIndex, beforePattern, get().patterns[currentPatternIndex]);
+      syncBulkEdit(currentPatternIndex, get().patterns[currentPatternIndex], beforePattern);
     },
 
     toggleChannelCollapse: (channelIndex) =>

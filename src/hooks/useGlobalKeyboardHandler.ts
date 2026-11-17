@@ -79,6 +79,7 @@ import {
   doubleBlockLength, halveBlockLength, doubleBlock, halveBlock,
   scaleVolumeTrack, scaleVolumePattern, scaleVolumeBlock, swapChannels, splitPattern,
   joinBlocks, setPatternLength, patternLengthDialog, setBpm, setSpeed, setTempo, appendBlock, insertBlock,
+  invertValues, transposeValuesUp, transposeValuesDown, scaleValuesUp, scaleValuesDown, minimizeChannels, maximizeChannels,
   splitBlock, gotoBlock, findSample, findReplace, findNext, gotoDialog, quantizeSettings
 } from '@engine/keyboard/commands/advanced';
 import {
@@ -477,6 +478,13 @@ function initializeRegistry() {
     { name: 'scale_volume_track', contexts: ['pattern'], handler: scaleVolumeTrack, description: 'Scale volume (track)' },
     { name: 'scale_volume_pattern', contexts: ['pattern'], handler: scaleVolumePattern, description: 'Scale volume (pattern)' },
     { name: 'scale_volume_block', contexts: ['pattern'], handler: scaleVolumeBlock, description: 'Scale volume (block)' },
+    { name: 'invert_values', contexts: ['pattern'], handler: invertValues, description: 'Invert values (max minus value) in selection column' },
+    { name: 'transpose_values_up', contexts: ['pattern'], handler: transposeValuesUp, description: 'Transpose values up 1 in selection column' },
+    { name: 'transpose_values_down', contexts: ['pattern'], handler: transposeValuesDown, description: 'Transpose values down 1 in selection column' },
+    { name: 'scale_values_up', contexts: ['pattern'], handler: scaleValuesUp, description: 'Scale values to 110 percent in selection column' },
+    { name: 'scale_values_down', contexts: ['pattern'], handler: scaleValuesDown, description: 'Scale values to 90 percent in selection column' },
+    { name: 'minimize_channels', contexts: ['pattern'], handler: minimizeChannels, description: 'Minimize all channels' },
+    { name: 'maximize_channels', contexts: ['pattern'], handler: maximizeChannels, description: 'Maximize all channels' },
     { name: 'swap_channels', contexts: ['pattern'], handler: swapChannels, description: 'Swap channels' },
     { name: 'split_pattern', contexts: ['pattern'], handler: splitPattern, description: 'Split pattern' },
     { name: 'join_blocks', contexts: ['pattern'], handler: joinBlocks, description: 'Join blocks' },

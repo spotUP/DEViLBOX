@@ -6,6 +6,38 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useUIStore } from '@stores/useUIStore';
+import { valueColumnOf } from '@stores/tracker/patternEditActions';
+
+type ValueOp = Parameters<ReturnType<typeof useTrackerStore.getState>['editSelectionValues']>[0];
+
+/** Applies a value operation to the cursor's column inside the selection; the single path the commands below share. */
+function editValues(op: ValueOp, label: string): boolean {
+  const { selection, cursor } = useCursorStore.getState();
+  const column = valueColumnOf(cursor.columnType);
+  const ui = useUIStore.getState();
+  if (!selection) { ui.setStatusMessage('Select a range first', false, 1500); return true; }
+  if (!column) { ui.setStatusMessage('Put the cursor in an instrument, volume or effect value column', false, 2000); return true; }
+  useTrackerStore.getState().editSelectionValues(op, column);
+  ui.setStatusMessage(label, false, 1000);
+  return true;
+}
+
+export const invertValues = (): boolean => editValues({ kind: 'invert' }, 'Values inverted');
+export const transposeValuesUp = (): boolean => editValues({ kind: 'transpose', amount: 1 }, 'Values +1');
+export const transposeValuesDown = (): boolean => editValues({ kind: 'transpose', amount: -1 }, 'Values -1');
+export const scaleValuesUp = (): boolean => editValues({ kind: 'scale', percent: 110 }, 'Values scaled to 110 percent');
+export const scaleValuesDown = (): boolean => editValues({ kind: 'scale', percent: 90 }, 'Values scaled to 90 percent');
+
+export function minimizeChannels(): boolean {
+  useTrackerStore.getState().setAllChannelsCollapsed(true);
+  useUIStore.getState().setStatusMessage('All channels minimized', false, 1000);
+  return true;
+}
+export function maximizeChannels(): boolean {
+  useTrackerStore.getState().setAllChannelsCollapsed(false);
+  useUIStore.getState().setStatusMessage('All channels maximized', false, 1000);
+  return true;
+}
 
 export function interpolateVolume(): boolean {
   useUIStore.getState().openDialogCommand('interpolate-volume');
