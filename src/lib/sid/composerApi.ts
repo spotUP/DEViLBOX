@@ -25,6 +25,8 @@ export interface ComposerProfile {
   csdbType: string;
   csdbId: number | null;
   photoUrl: string | null;
+  brandUrl: string | null;
+  brandDarkUrl: string | null;
   links: { name: string; url: string }[];
   tuneCount: number;
   activeYears: number[];

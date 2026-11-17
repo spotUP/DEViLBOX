@@ -212,6 +212,10 @@ router.get('/composer', (req: Request, res: Response) => {
   const photoPath = path.join(IMAGES_DIR, 'composers', photoFile);
   const hasPhoto = fs.existsSync(photoPath);
 
+  const brandUrl = (file: string) =>
+    file && fs.existsSync(path.join(IMAGES_DIR, 'brand', path.basename(file)))
+      ? `/api/deepsid/image/brand/${path.basename(file)}` : null;
+
   // Strip HTML from handles (DeepSID uses <del> for old handles)
   const cleanHandles = composer.handles
     .replace(/<del>/g, '').replace(/<\/del>/g, '')
@@ -248,6 +252,8 @@ router.get('/composer', (req: Request, res: Response) => {
     csdbType: composer.csdbtype,
     csdbId: composer.csdbid || null,
     photoUrl: hasPhoto ? `/api/deepsid/image/composers/${photoFile}` : null,
+    brandUrl: brandUrl(composer.brand),
+    brandDarkUrl: brandUrl(composer.branddark),
     links,
     tuneCount: tuneCount.cnt,
     activeYears: years,
@@ -547,7 +553,7 @@ router.get('/stats', (_req: Request, res: Response) => {
 
 router.get('/image/:type/:filename', (req: Request, res: Response) => {
   const { type, filename } = req.params;
-  if (!['composers', 'countries'].includes(type)) {
+  if (!['composers', 'countries', 'brand'].includes(type)) {
     return res.status(400).json({ error: 'Invalid image type' });
   }
 

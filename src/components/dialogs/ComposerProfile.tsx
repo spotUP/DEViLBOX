@@ -16,6 +16,8 @@ interface ComposerProfileProps {
 
 export const ComposerProfile: React.FC<ComposerProfileProps> = ({ composer }) => {
   const photoUrl = getComposerPhotoUrl(composer.photoUrl);
+  // The app UI is dark; fall back to the light brand image when no dark variant exists.
+  const brandUrl = getComposerPhotoUrl(composer.brandDarkUrl ?? composer.brandUrl);
   const birthYear = composer.born ? parseInt(composer.born.slice(0, 4)) : null;
   const deathYear = composer.died ? parseInt(composer.died.slice(0, 4)) : null;
   const currentAge = birthYear && !deathYear
@@ -49,7 +51,18 @@ export const ComposerProfile: React.FC<ComposerProfileProps> = ({ composer }) =>
 
         {/* Info */}
         <div className="flex-1 min-w-0 space-y-1">
-          <h3 className="text-sm font-bold text-blue-200 truncate">{composer.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-blue-200 truncate">{composer.name}</h3>
+            {brandUrl && (
+              <img
+                src={brandUrl}
+                alt={composer.affiliation ?? 'Brand'}
+                title={composer.affiliation ?? undefined}
+                className="h-4 w-auto shrink-0"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            )}
+          </div>
           {composer.handles.length > 0 && (
             <p className="text-xs text-blue-300/70 truncate">
               aka {composer.handles.join(', ')}

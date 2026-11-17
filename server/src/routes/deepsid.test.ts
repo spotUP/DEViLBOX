@@ -23,6 +23,9 @@ const get = async (p: string) => {
 beforeAll(async () => {
   fs.mkdirSync(path.join(dir, 'deepsid-images', 'composers'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'deepsid-images', 'composers', 'musicians_h_hubbard_rob.jpg'), 'x');
+  fs.mkdirSync(path.join(dir, 'deepsid-images', 'brand'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'deepsid-images', 'brand', 'ea.png'), 'x');
+  fs.writeFileSync(path.join(dir, 'deepsid-images', 'brand', 'ea_dark.png'), 'x');
   fs.mkdirSync(path.join(dir, 'deepsid-import'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'deepsid-import', 'Version_HVSC_83.txt'), 'The version of the High Voltage SID Collection in this database archive is 83.');
   const db = new Database(path.join(dir, 'deepsid.db'));
@@ -40,7 +43,7 @@ beforeAll(async () => {
     CREATE TABLE players_lookup (player TEXT, playerid INTEGER);
     CREATE TABLE players_info (id INTEGER, title TEXT, search TEXT, description TEXT, developer TEXT, startyear INTEGER, endyear INTEGER);
     INSERT INTO composers VALUES (1, '${HV}', '', 'Robert Hubbard', 'Rob', 'Rob Hubbard, <del>Old</del>', '', 1,
-      '1955-01-01', '0000-00-00', '', 'Legend', 'UK', 'Gremlin|1985-1987', '', '', '', 'sceners', 7, '');
+      '1955-01-01', '0000-00-00', '', 'Legend', 'UK', 'Gremlin|1985-1987', '', 'ea.png', 'ea_dark.png', 'sceners', 7, '');
     INSERT INTO composers_links VALUES (1, 1, 'Home', 'http://example.com');
     INSERT INTO hvsc_files VALUES (10, '${HV}/Commando.sid', 'Hubbard', '1:30', 'PSID', '2', 'PAL', 'MOS6581', 1, 1,
       'Commando', 'Rob Hubbard', '1985 Elite');
@@ -72,7 +75,7 @@ afterAll(async () => {
 describe('/api/deepsid', () => {
   it('composer: found by path with links, tune count, tags and photo', async () => {
     const { body } = await get(`/composer?path=${encodeURIComponent(HV)}`);
-    expect(body).toMatchObject({ found: true, id: 1, tuneCount: 2, died: null, photoUrl: '/api/deepsid/image/composers/musicians_h_hubbard_rob.jpg' });
+    expect(body).toMatchObject({ found: true, id: 1, tuneCount: 2, died: null, photoUrl: '/api/deepsid/image/composers/musicians_h_hubbard_rob.jpg', brandUrl: '/api/deepsid/image/brand/ea.png', brandDarkUrl: '/api/deepsid/image/brand/ea_dark.png' });
     expect(body.handles).toEqual(['Rob Hubbard', 'Old']);
     expect(body.links).toEqual([{ name: 'Home', url: 'http://example.com' }]);
     expect(body.tags).toEqual([{ name: 'Rock', type: 'music' }]);
@@ -122,6 +125,11 @@ describe('/api/deepsid', () => {
     expect(r.status).toBe(200);
     expect(r.headers.get('content-type')).toBe('image/jpeg');
     expect((await get('/image/evil/x.jpg')).status).toBe(400);
+    const b = await fetch(`${base}/image/brand/ea.png`);
+    expect(b.status).toBe(200);
+    expect(b.headers.get('content-type')).toBe('image/png');
+    expect((await get('/image/brand/..%2Fcomposers%2Fmusicians_h_hubbard_rob.jpg')).status).toBe(404);
+    expect((await get('/image/brand%2F..%2Fcomposers/musicians_h_hubbard_rob.jpg')).status).toBe(400);
     expect((await get('/image/composers/missing.jpg')).status).toBe(404);
   });
   it('tags and tags/:fileId', async () => {
