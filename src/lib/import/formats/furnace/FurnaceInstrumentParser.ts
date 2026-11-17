@@ -462,8 +462,9 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           if (!inst.fm) inst.fm = { ...DEFAULT_FURNACE, operators: [], macros: [], opMacros: [], wavetables: [] };
           const neUse = reader.readUint8() !== 0;
           if (neUse) {
-            const dMap: Array<{ freq: number; delta: number }> = [];
-            for (let n = 0; n < 120; n++) dMap.push({ freq: reader.readUint8(), delta: reader.readUint8() });
+            // instrument.cpp readFeatureNE: 180 notes from v246, else notes 60-179; indexed by Furnace note (C-4 = 108).
+            const dMap: Array<{ freq: number; delta: number }> = Array.from({ length: 180 }, () => ({ freq: -1, delta: -1 }));
+            for (let n = insVersion >= 246 ? 0 : 60; n < 180; n++) dMap[n] = { freq: reader.readInt8(), delta: reader.readInt8() };
             if (!inst.fm.nes) inst.fm.nes = { dutyNoise: 0, envMode: 'env', envValue: 15, sweepEnabled: false, sweepPeriod: 0, sweepNegate: false, sweepShift: 0 };
             inst.fm.nes.dpcmNoteMap = true;
             inst.fm.nes.dpcmMap = dMap;
@@ -1766,7 +1767,7 @@ export function encodeInstrumentAsINS2(inst: FurnaceInstrument, formatVersion: n
     const nes = inst.fm.nes as any;
     const lenPos = startFeature('NE');
     writeUint8(1);
-    for (let i = 0; i < 120; i++) { writeUint8(nes.dpcmMap?.[i]?.freq ?? 0); writeUint8(nes.dpcmMap?.[i]?.delta ?? 0); }
+    for (let i = version >= 246 ? 0 : 60; i < 180; i++) { writeUint8(nes.dpcmMap?.[i]?.freq ?? 0); writeUint8(nes.dpcmMap?.[i]?.delta ?? 0); }
     endFeature(lenPos);
   }
 

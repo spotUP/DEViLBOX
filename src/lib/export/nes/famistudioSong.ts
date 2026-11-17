@@ -262,17 +262,32 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   // DPCM mappings (sample, pitch, loop, delta) by first use; note byte = 1 + index.
   const dpcmMap = new Map<string, number>();
   const dpcmList: Array<{ sample: number; pitch: number; delta: number }> = [];
+  let lastDpcmPitch = 0;
   const dpcmNote = (ins: FurnaceInstrument | undefined, flat: number): number => {
     // Furnace DivInstrumentAmiga defaults to initSample 0 (instrument.h:607); nes.cpp:538-540 pitch = note & 15.
     let sample = ins?.amiga?.initSample ?? 0;
     let pitch = flat & 15;
-    const delta = -1;
+    let delta = -1;
     if (ins?.amiga?.useNoteMap && ins.amiga.noteMap) {
       const e = ins.amiga.noteMap[flat + 60];
-      if (e) { sample = e.map; if (e.freq >= 0 && e.freq <= 15) pitch = e.freq; }
-      lossy.add('DPCM note-map delta (parser keeps no dpcmDelta)');
+      if (e) sample = e.map;
+    }
+    // nes.cpp:529-534: with a note map the DPCM rate and delta come from the NE feature (dpcmFreq/dpcmDelta), not the Amiga freq;
+    // out of 0..15 keeps the previous rate (lastDPCMFreq).
+    const nm = ins?.fm?.nes?.dpcmNoteMap ? ins.fm.nes.dpcmMap?.[flat + 60] : undefined;
+    if (nm) {
+      if (nm.freq >= 0 && nm.freq <= 15) lastDpcmPitch = nm.freq;
+      pitch = lastDpcmPitch;
+      if (nm.delta >= 0 && nm.delta <= 63) delta = nm.delta;
     }
     if (sample < 0 || !m.samples[sample]) { lossy.add('DPCM note without a sample'); return -1; }
+    // nes.cpp:425-456: a non-NES-type (Amiga/sample) instrument writes calcDPCMRate(min(sample rate at the note, 48000)) to $4010.
+    if (ins && ins.type !== 34) {
+      const hz = Math.min(48000, (m.samples[sample].c4Rate || 0) * 2 ** ((flat - 48) / 12));
+      const T = [4450, 5000, 5400, 5900, 6650, 7450, 8100, 8800, 10200, 11700, 13300, 15900, 18900, 23500, 29000];
+      const b = T.findIndex((t) => hz < t);
+      pitch = b < 0 ? 15 : b;
+    }
     const key = `${sample}_${pitch}_${delta}`;
     if (!dpcmMap.has(key)) {
       if (dpcmList.length >= 63) { lossy.add('DPCM mappings past 63'); return -1; }
@@ -619,7 +634,7 @@ export function famistudioText(s: string, len: number): Uint8Array {
 export function buildFamistudioRom(player: Uint8Array, meta: FamistudioMeta, song: FamistudioSong, text: { title?: string } & NesScreenInfo = {}, subsongCount = 1): Uint8Array {
   if (song.music.length > meta.musicCap) throw new Error(`song data ${song.music.length} bytes > ${meta.musicCap}`);
   if (song.dpcm.length > meta.dpcmCap) throw new Error(`DPCM ${song.dpcm.length} bytes > ${meta.dpcmCap}`);
-  const rom = player.slice();
+  const rom = new Uint8Array(player); // copy: Buffer.slice() is a view, retuneNoteTable would write into the caller's player
   rom.set(song.music, meta.prgOffset + meta.musicAddr - 0x8000);
   rom.set(song.dpcm, meta.prgOffset + meta.dpcmAddr - 0x8000);
   if (text.title) rom.set(famistudioText(text.title, meta.textLen), meta.prgOffset + meta.titleAddr - 0x8000);
