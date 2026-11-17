@@ -355,6 +355,13 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
       const r = exportFurnaceModule({ ...s, extendedFm, ...furnaceSettingsForExport(useProjectStore.getState().metadata) });
       return { data: r.bytes, filename: `${(s.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_')}.fur`, warnings: r.warnings };
     } },
+  // A Furnace song without Neo Geo voices has no module writer: say so rather than hand back the unedited original.
+  { id: 'furNoWriter', matches: (s) => !!s.furnaceNative,
+    run: async (s, baseName) => {
+      const own = s.uadeEditableFileData && { data: new Uint8Array(s.uadeEditableFileData), filename: `${baseName}.fur`, warnings: [] as string[] };
+      const raw = own || await rawOriginalBytes(baseName);
+      return raw && { ...raw, warnings: ['Furnace export is only available for Neo Geo songs: this is the original file, your edits are not included.'] };
+    } },
   { id: 'dtm', matches: (s) => songIds(s).layoutFormatId === 'dtm_204' || songIds(s).layoutFormatId === 'dtm_pt',
     run: async (s) => { const { exportDTM } = await import('./DTMExporter'); return exportDTM(s); } },
   // The OpenMPT-parsed PC trackers carry no layout; the general OpenMPT writer is their export.
@@ -370,7 +377,10 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
     run: async (s) => {
       const { exportSongToMOD } = await import('./modExport');
       const modResult = await exportSongToMOD(s, { bakeSynths: true });
-      return { data: modResult.blob, filename: modResult.filename, warnings: modResult.warnings };
+      // MODParser tags layout 'mod'; a layout-less 'MOD' song was parsed from another format (amf, a driver-based Amiga format):
+      // the ProTracker writer converts it, which is not that format's own file.
+      const converted = songIds(s).layoutFormatId ? [] : ['This song was not loaded from a ProTracker module: it was converted to a ProTracker MOD, not saved in its original format.'];
+      return { data: modResult.blob, filename: modResult.filename, warnings: [...converted, ...modResult.warnings] };
     } },
   { id: 'fc', matches: (s) => songIds(s).format === 'FC',
     run: async (s, baseName) => { const { exportFC } = await import('./FCExporter'); return { data: exportFC(s), filename: `${baseName}.fc`, warnings: [] }; } },
