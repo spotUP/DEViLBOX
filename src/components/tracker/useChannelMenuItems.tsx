@@ -269,6 +269,17 @@ export function useChannelMenuItems(
           onClick: () => useTrackerStore.getState().setChannelMeta(channelIndex, { noteCols: n }),
         })),
       },
+      {
+        id: 'effect-columns',
+        label: 'Effect Columns',
+        icon: <Columns size={14} />,
+        submenu: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
+          id: `effectcols-${n}`,
+          label: n === 1 ? '1 Column' : `${n} Columns`,
+          checked: (channel?.channelMeta?.effectCols ?? 2) === n,
+          onClick: () => useTrackerStore.getState().setChannelEffectCols(channelIndex, n),
+        })),
+      },
       ...(!isFormatMode && channelCount < MAX_CHANNELS ? [{
         id: 'add-channel',
         label: 'Add Channel',
