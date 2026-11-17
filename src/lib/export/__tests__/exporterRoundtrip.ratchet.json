@@ -512,6 +512,14 @@
       "cells": 999,
       "bytes": 999
     },
+    "lme": {
+      "exporter": "LMEExporter.exportLME",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 7510,
+      "bytes": 7510
+    },
     "forgottenWorlds": {
       "exporter": "ForgottenWorldsExporter.exportForgottenWorlds",
       "tier": "byte-exact",
