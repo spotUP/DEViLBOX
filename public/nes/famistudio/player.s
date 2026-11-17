@@ -12,6 +12,12 @@ FAMISTUDIO_USE_FAMITRACKER_TEMPO = 1
 FAMISTUDIO_USE_VOLUME_TRACK      = 1
 FAMISTUDIO_USE_RELEASE_NOTES     = 1
 FAMISTUDIO_USE_DUTYCYCLE_EFFECT  = 1
+FAMISTUDIO_USE_VIBRATO = 1
+FAMISTUDIO_USE_ARPEGGIO = 1
+FAMISTUDIO_USE_PITCH_TRACK = 1
+FAMISTUDIO_USE_SLIDE_NOTES = 1
+FAMISTUDIO_USE_VOLUME_SLIDES = 1
+FAMISTUDIO_USE_FAMITRACKER_DELAYED_NOTES_OR_CUTS = 1
 FAMISTUDIO_DPCM_OFF              = $c000
 
 .include "famistudio_ca65.s"
@@ -51,6 +57,13 @@ fs_reset:
     bne :-
 :   bit $2002
     bpl :-
+    lda #$3f                    ; backdrop $3F00 = black: rendering is off, so the screen shows this colour
+    sta $2006
+    stx $2006
+    lda #$0f
+    sta $2007
+    stx $2006
+    stx $2006
     lda #1                      ; NTSC
     ldx #<fs_music
     ldy #>fs_music
