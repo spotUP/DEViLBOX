@@ -1,5 +1,5 @@
 // Headless check, NES FamiStudio route: .fur -> furnaceToFamistudio -> buildFamistudioRom -> Mesen2 APU bus-write log.
-// Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/nes-famistudio-check.ts [--only <name>] [--failed] [--ticks N]
+// Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/nes-famistudio-check.ts [--only <name>] [--failed] [--ticks N] [--out <dir>]
 // Results: test-data/nes-famistudio-check.json (skips songs whose input hash matches a recorded verdict).
 // FamiStudio is lossy against Furnace by design (plan "FamiStudio route"), so no register diff: the verdict is
 //   pass = the ROM ran the requested NMI ticks and every 2A03 channel that has notes in the song sounded in some frame
@@ -24,6 +24,7 @@ interface Verdict { inputHash: string; pass: boolean; ticks: number; got: number
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : undefined;
 const failedOnly = args.includes('--failed');
+const OUT = args.includes('--out') ? args[args.indexOf('--out') + 1] : undefined;
 const TICKS = args.includes('--ticks') ? Number(args[args.indexOf('--ticks') + 1]) : 900;
 
 /** Frames per channel (pulse 1, pulse 2, triangle, noise, DPCM) where the channel sounds; pulse 1 first sounding Hz. */
@@ -53,6 +54,7 @@ for (const name of names) {
     const m = await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
     const song = furnaceToFamistudio(m, 0, META.dpcmCap);
     const rom = buildFamistudioRom(PLAYER, META, song);
+    if (OUT) writeFileSync(path.join(OUT, `${name}.nes`), rom);
     const run = mesen(rom, TICKS, Math.ceil(TICKS / 60) + 20, undefined, { tickAddress: META.tickAddr, region: 'Ntsc' });
     const s = sounding(run.writes);
     const wantHz = song.firstNotes[0] >= 0 ? Math.round(440 * 2 ** ((song.firstNotes[0] - 57) / 12)) : undefined;
