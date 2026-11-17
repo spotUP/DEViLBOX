@@ -677,4 +677,64 @@ int fur_ins_to_dmp(int i, uint8_t* buf, size_t bufLen) {
   remove(path);
   return ret;
 }
+
+// ============================================================
+// Wavetable files (.fuw .dmw, raw binary): Furnace's own DivEngine::waveFromFile / DivWavetable::save / saveDMP-style writers.
+// ============================================================
+static DivWavetable* g_waveFile=NULL;
+
+// Returns the wavetable length, or -1 on error. The extension-less content decides the format (Furnace sniffs magic / .dmw layout / raw).
+int fur_wave_load(const uint8_t* data, size_t len, const char* fileName) {
+  ensureInit();
+  delete g_waveFile;
+  g_waveFile=NULL;
+  const char* base=strrchr(fileName,'/');
+  base=base?base+1:fileName;
+  std::string path=std::string("/")+base;
+  FILE* f=fopen(path.c_str(),"wb");
+  if (!f) return -1;
+  fwrite(data,1,len,f);
+  fclose(f);
+  g_waveFile=g_engine.waveFromFile(path.c_str(),true);
+  remove(path.c_str());
+  if (!g_waveFile) {
+    snprintf(g_errorBuf,sizeof(g_errorBuf),"%s",g_engine.getError().c_str());
+    return -1;
+  }
+  return g_waveFile->len;
+}
+
+// Sets the slot from the editor's values (len 1..256) so the writers below save the CURRENT edited wavetable.
+int fur_wave_set(const int32_t* values, int len, int max) {
+  ensureInit();
+  if (len<1 || len>256) return -1;
+  delete g_waveFile;
+  g_waveFile=new DivWavetable;
+  g_waveFile->len=len;
+  g_waveFile->max=max;
+  for (int i=0; i<len; i++) g_waveFile->data[i]=values[i];
+  return len;
+}
+
+int fur_wave_get_max() { return g_waveFile?g_waveFile->max:-1; }
+int fur_wave_get_value(int pos) { return (g_waveFile && pos>=0 && pos<g_waveFile->len)?g_waveFile->data[pos]:0; }
+
+// fmt 0 = .fuw, 1 = .dmw; NULL buf returns the size.
+int fur_wave_to_file(int fmt, uint8_t* buf, size_t bufLen) {
+  if (!g_waveFile) return -1;
+  const char* path="/__wave_out.bin";
+  if (!(fmt==0?g_waveFile->save(path):g_waveFile->saveDMW(path))) return -1;
+  FILE* f=fopen(path,"rb");
+  if (!f) return -1;
+  fseek(f,0,SEEK_END);
+  long sz=ftell(f);
+  fseek(f,0,SEEK_SET);
+  int ret=(int)sz;
+  if (buf) {
+    if ((long)bufLen<sz || fread(buf,1,sz,f)!=(size_t)sz) ret=-1;
+  }
+  fclose(f);
+  remove(path);
+  return ret;
+}
 } // extern "C"

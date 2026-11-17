@@ -91,6 +91,11 @@ interface FurnaceFileOpsAPI {
   fur_get_system_pan_fr(idx: number): number;
   fur_ins_load_file(dataPtr: number, len: number, namePtr: number): number;
   fur_ins_from_ins2(buf: number, len: number): number;
+  fur_wave_load(dataPtr: number, len: number, namePtr: number): number;
+  fur_wave_set(valuesPtr: number, len: number, max: number): number;
+  fur_wave_get_max(): number;
+  fur_wave_get_value(pos: number): number;
+  fur_wave_to_file(fmt: number, buf: number, bufLen: number): number;
   fur_ins_get_name(i: number): string;
   fur_ins_get_type(i: number): number;
   fur_ins_to_fui(i: number, buf: number, bufLen: number): number;
@@ -149,6 +154,11 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_get_system_pan_fr: m.cwrap('fur_get_system_pan_fr', 'number', ['number']),
     fur_ins_load_file: m.cwrap('fur_ins_load_file', 'number', ['number', 'number', 'number']),
     fur_ins_from_ins2: m.cwrap('fur_ins_from_ins2', 'number', ['number', 'number']),
+    fur_wave_load: m.cwrap('fur_wave_load', 'number', ['number', 'number', 'number']),
+    fur_wave_set: m.cwrap('fur_wave_set', 'number', ['number', 'number', 'number']),
+    fur_wave_get_max: m.cwrap('fur_wave_get_max', 'number', []),
+    fur_wave_get_value: m.cwrap('fur_wave_get_value', 'number', ['number']),
+    fur_wave_to_file: m.cwrap('fur_wave_to_file', 'number', ['number', 'number', 'number']),
     fur_ins_get_name: m.cwrap('fur_ins_get_name', 'string', ['number']),
     fur_ins_get_type: m.cwrap('fur_ins_get_type', 'number', ['number']),
     fur_ins_to_fui: m.cwrap('fur_ins_to_fui', 'number', ['number', 'number', 'number']),
@@ -632,4 +642,46 @@ export async function instrumentFromIns2Wasm(ins2: Uint8Array): Promise<FurnaceI
   m._free(ptr);
   if (n < 0) throw new Error(`Furnace instrument read failed: ${api.fur_get_error()}`);
   return readInstrumentSlot(m, api, 0);
+}
+
+export interface FurnaceWavetableFile { data: number[]; max: number }
+
+/** A .fuw / .dmw / raw binary wavetable read by Furnace's own DivEngine::waveFromFile. */
+export async function wavetableFromFileWasm(buffer: ArrayBuffer, fileName: string): Promise<FurnaceWavetableFile> {
+  const m = await getModule();
+  if (!cachedAPI) cachedAPI = getAPI(m);
+  const api = cachedAPI;
+  const data = new Uint8Array(buffer);
+  const dataPtr = m._malloc(data.length);
+  m.HEAPU8.set(data, dataPtr);
+  const nameBytes = new TextEncoder().encode(fileName + '\0');
+  const namePtr = m._malloc(nameBytes.length);
+  m.HEAPU8.set(nameBytes, namePtr);
+  const len = api.fur_wave_load(dataPtr, data.length, namePtr);
+  m._free(dataPtr);
+  m._free(namePtr);
+  if (len < 0) throw new Error(`Furnace wavetable load failed: ${api.fur_get_error()}`);
+  const values: number[] = [];
+  for (let i = 0; i < len; i++) values.push(api.fur_wave_get_value(i));
+  return { data: values, max: api.fur_wave_get_max() };
+}
+
+/** The wavetable as .fuw or .dmw bytes written by Furnace's DivWavetable::save / saveDMW. */
+export async function wavetableToFileWasm(wave: FurnaceWavetableFile, format: 'fuw' | 'dmw'): Promise<Uint8Array> {
+  const m = await getModule();
+  if (!cachedAPI) cachedAPI = getAPI(m);
+  const api = cachedAPI;
+  const vPtr = m._malloc(wave.data.length * 4);
+  new Int32Array(m.HEAPU8.buffer, vPtr, wave.data.length).set(wave.data);
+  const n = api.fur_wave_set(vPtr, wave.data.length, wave.max);
+  m._free(vPtr);
+  if (n < 0) throw new Error('Wavetable length must be 1 to 256 for Furnace files');
+  const fmt = format === 'fuw' ? 0 : 1;
+  const size = api.fur_wave_to_file(fmt, 0, 0);
+  if (size < 0) throw new Error('Furnace could not write the wavetable');
+  const ptr = m._malloc(size);
+  api.fur_wave_to_file(fmt, ptr, size);
+  const bytes = m.HEAPU8.slice(ptr, ptr + size);
+  m._free(ptr);
+  return bytes;
 }

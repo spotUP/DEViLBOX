@@ -166,7 +166,11 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      if (file.name.endsWith('.h')) {
+      if (/\.(fuw|dmw|bin)$/i.test(file.name)) {
+        const { wavetableFromFileWasm } = await import('@lib/import/wasm/FurnaceFileOps');
+        const w = await wavetableFromFileWasm(await file.arrayBuffer(), file.name);
+        onChange({ ...wavetable, data: w.data, len: w.data.length, max: w.max });
+      } else if (file.name.endsWith('.h')) {
         const text = await file.text();
         const values = text.split(/[\s,]+/).map((v) => parseInt(v)).filter((v) => !isNaN(v));
         if (values.length > 0) {
@@ -190,6 +194,17 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
       console.error('Failed to import wavetable:', err);
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const saveWave = async (format: 'fuw' | 'dmw') => {
+    try {
+      const { wavetableToFileWasm } = await import('@lib/import/wasm/FurnaceFileOps');
+      const bytes = await wavetableToFileWasm({ data: wavetable.data, max: maxValue }, format);
+      const FileSaver = await import('file-saver');
+      FileSaver.saveAs(new Blob([bytes.slice().buffer]), `wavetable-${wavetable.id}.${format}`);
+    } catch (err) {
+      console.error('Failed to save wavetable:', err);
+    }
   };
 
   // Generator shortcuts
@@ -293,17 +308,31 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
           <button
             onClick={() => fileInputRef.current?.click()}
             className="p-1 text-accent-highlight hover:bg-accent-highlight/20 rounded"
-            title="Import .wav or .h wave"
+            title="Import .fuw, .dmw, .bin, .wav or .h wave"
           >
             <FileUp size={14} />
           </button>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".wav,.h,.fuw"
+            accept=".wav,.h,.fuw,.dmw,.bin"
             onChange={handleImport}
             className="hidden"
           />
+          <button
+            onClick={() => void saveWave('fuw')}
+            className="px-1 text-[10px] font-mono text-accent-highlight hover:bg-accent-highlight/20 rounded"
+            title="Save as Furnace wavetable (.fuw)"
+          >
+            Save .fuw
+          </button>
+          <button
+            onClick={() => void saveWave('dmw')}
+            className="px-1 text-[10px] font-mono text-accent-highlight hover:bg-accent-highlight/20 rounded"
+            title="Save as DefleMask wavetable (.dmw)"
+          >
+            Save .dmw
+          </button>
           {/* Generator dropdown (Compact quick access) */}
           <div className="relative">
             <button
