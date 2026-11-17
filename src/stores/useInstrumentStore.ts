@@ -39,6 +39,7 @@ import {
   DEFAULT_BUZZMACHINE,
 } from '@typedefs/instrument';
 import type { SynthType } from '@typedefs/instrument';
+import type { Pattern } from '@/types/tracker';
 
 import { getDefaultFurnaceConfig } from '@engine/factories/furnaceDefaultConfig';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -46,7 +47,8 @@ import { touchesToneVoice } from '@engine/tone/toneSynthKnobs';
 import { peekTrackerReplayer } from '@engine/TrackerReplayer';
 import * as OpenMPTEditBridge from '@engine/libopenmpt/OpenMPTEditBridge';
 import { recognizeCinter4Instruments } from '@engine/cinter4/cinter4Recognize';
-import { getFormatStoreRefOrNull, registerInstrumentStore } from './storeAccess';
+import { getFormatStoreRefOrNull, getTrackerStoreRef, registerInstrumentStore } from './storeAccess';
+import { applyWavesampleIdMap } from '@engine/musicline/wavesampleCleanup';
 import { isSynthAllowed, formatDisplayName } from '@/lib/formats/EditableFormatRegistry';
 import { notify } from './useNotificationStore';
 import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
@@ -190,6 +192,12 @@ interface InstrumentStore {
    * the caller remaps the pattern cells first.
    */
   removeInstrumentsRenumbered: (ids: number[]) => void;
+  /**
+   * Move an instrument one place up or down the list: it swaps numbers with its
+   * neighbour and every pattern cell follows, so the song sounds the same
+   * (Furnace INS_LIST_MOVE_UP / MOVE_DOWN).
+   */
+  moveInstrument: (id: number, direction: 'up' | 'down') => void;
   cloneInstrument: (id: number) => number;
     resetInstrument: (id: number) => void;
     bakeInstrument: (id: number, bakeType?: 'lite' | 'pro') => Promise<void>;
@@ -1282,6 +1290,26 @@ export const useInstrumentStore = create<InstrumentStore>()(
         state.currentInstrumentId = current ?? kept[0].id;
       });
       disposeEngineInstruments(stale);
+      triggerWasmReexport();
+    },
+
+    moveInstrument: (id, direction) => {
+      const list = get().instruments;
+      const i = list.findIndex((inst) => inst.id === id);
+      const j = direction === 'up' ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= list.length) return;
+      const other = list[j].id;
+      // Engine synths are keyed by id: both would answer to the wrong instrument.
+      disposeEngineInstruments([id, other]);
+      getTrackerStoreRef().setState((draft: { patterns: Pattern[] }) => {
+        applyWavesampleIdMap(draft.patterns, new Map([[id, other], [other, id]]));
+      });
+      set((state) => {
+        const a = state.instruments[i];
+        const b = state.instruments[j];
+        [a.id, b.id] = [b.id, a.id];
+        [state.instruments[i], state.instruments[j]] = [b, a];
+      });
       triggerWasmReexport();
     },
 

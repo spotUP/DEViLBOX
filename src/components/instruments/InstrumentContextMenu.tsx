@@ -12,6 +12,8 @@ import {
   ClipboardCopy,
   Save,
   RotateCcw,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { ContextMenu, useContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import { RenameDialog } from '@components/common/RenameDialog';
@@ -39,6 +41,7 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
   const setCurrentInstrument = useInstrumentStore((s) => s.setCurrentInstrument);
   const cloneInstrument = useInstrumentStore((s) => s.cloneInstrument);
   const deleteInstrument = useInstrumentStore((s) => s.deleteInstrument);
+  const moveInstrument = useInstrumentStore((s) => s.moveInstrument);
   const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
 
 
@@ -86,6 +89,20 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
         label: 'Duplicate',
         icon: <Copy size={14} />,
         onClick: () => cloneInstrument(instrumentId),
+      },
+      {
+        id: 'move-up',
+        label: 'Move Up',
+        icon: <ArrowUp size={14} />,
+        disabled: instruments[0]?.id === instrumentId,
+        onClick: () => moveInstrument(instrumentId, 'up'),
+      },
+      {
+        id: 'move-down',
+        label: 'Move Down',
+        icon: <ArrowDown size={14} />,
+        disabled: instruments[instruments.length - 1]?.id === instrumentId,
+        onClick: () => moveInstrument(instrumentId, 'down'),
       },
       // Delete
       {
@@ -161,6 +178,8 @@ export const InstrumentContextMenu: React.FC<InstrumentContextMenuProps> = ({
     setCurrentInstrument,
     cloneInstrument,
     deleteInstrument,
+    moveInstrument,
+    instruments,
     updateInstrument,
     onEdit,
     onSavePreset,
