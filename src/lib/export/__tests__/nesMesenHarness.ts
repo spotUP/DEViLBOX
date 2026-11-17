@@ -44,3 +44,30 @@ ${opts.irqBoard ? '' : `emu.addMemoryCallback(function() n=n+1 print(string.form
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
+
+export type BusWrite = [number, number];
+
+/** Capture address -> the bus writes the player must make (VRC7 / N163 / 5B capture register numbers, not bus addresses). */
+export function busWrites(chip: string, a: number, v: number): BusWrite[] {
+  switch (chip) {
+    case 'vrc7': return [[0x9010, a], [0x9030, v]];
+    case 'n163': return [[0xf800, a | 0x80], [0x4800, v]];
+    case 's5b': return [[0xc000, a], [0xe000, v]];
+    default: return [[a, v]];
+  }
+}
+
+/** Per-tick (order, address, value) diff of wanted vs logged bus writes; `first` describes the first mismatch. */
+export function diffWrites(want: BusWrite[][], got: BusWrite[][]): { diffs: number; first?: string } {
+  let diffs = 0, first: string | undefined;
+  const hex = (w?: BusWrite) => (w ? w.map((n) => n.toString(16)).join(':') : 'none');
+  for (let t = 0; t < Math.max(want.length, got.length); t++) {
+    const a = want[t] ?? [], b = got[t] ?? [];
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      if (a[i]?.[0] === b[i]?.[0] && a[i]?.[1] === b[i]?.[1]) continue;
+      diffs++;
+      first ??= `tick ${t} write ${i}: want ${hex(a[i])} got ${hex(b[i])}`;
+    }
+  }
+  return { diffs, first };
+}

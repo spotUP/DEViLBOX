@@ -11,7 +11,7 @@ import type { NesCapture, NesChip, NesEvent } from '../src/lib/export/nes/nesCap
 import { buildNesRom } from '../src/lib/export/nes/nesExport';
 import type { NesPlayer } from '../src/lib/export/nes/nesCartridge';
 import { CHIP_ORDER, nesCaptureToTicks } from '../src/lib/export/nes/nesStream';
-import { MESEN, mesen } from '../src/lib/export/__tests__/nesMesenHarness';
+import { MESEN, busWrites as bus, diffWrites, mesen } from '../src/lib/export/__tests__/nesMesenHarness';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const RESULTS = path.join(ROOT, 'test-data/nes-rom-check.json');
@@ -33,16 +33,6 @@ const SONGS: Record<string, () => NesCapture> = {
   ]).flat()),
 };
 
-/** Capture address -> the bus writes the player must make (same table as nesChipWritersMesen.test.ts). */
-function bus(chip: NesChip, a: number, v: number): Array<[number, number]> {
-  switch (chip) {
-    case 'vrc7': return [[0x9010, a], [0x9030, v]];
-    case 'n163': return [[0xf800, a | 0x80], [0x4800, v]];
-    case 's5b': return [[0xc000, a], [0xe000, v]];
-    default: return [[a, v]];
-  }
-}
-
 function check(name: string): Verdict {
   const capture = SONGS[name]();
   const inputHash = createHash('sha1').update(JSON.stringify(capture)).update(readFileSync(path.join(ROOT, 'public/nes/player.bin'))).digest('hex').slice(0, 12);
@@ -53,15 +43,7 @@ function check(name: string): Verdict {
     const ticks = nesCaptureToTicks(capture);
     const want = ticks.map((t) => CHIP_ORDER.flatMap((c) => (t.writes[c] ?? []).flatMap(([a, v]) => bus(c, a, v))));
     const got = mesen(rom.rom, ticks.length + 3, 60, RANGES).writes;
-    let diffs = 0, first: string | undefined;
-    for (let t = 0; t < Math.max(want.length, got.length); t++) {
-      const a = want[t] ?? [], b = got[t] ?? [];
-      for (let i = 0; i < Math.max(a.length, b.length); i++) {
-        if (a[i]?.[0] === b[i]?.[0] && a[i]?.[1] === b[i]?.[1]) continue;
-        diffs++;
-        first ??= `tick ${t} write ${i}: want ${a[i] ? a[i].map((n) => n.toString(16)).join(':') : 'none'} got ${b[i] ? b[i].map((n) => n.toString(16)).join(':') : 'none'}`;
-      }
-    }
+    const { diffs, first } = diffWrites(want, got);
     return { ...base, pass: diffs === 0, ticks: ticks.length, wanted: want.flat().length, got: got.flat().length, diffs, first, romBytes: rom.rom.length };
   } catch (e) { return { ...base, error: String((e as Error).message).split('\n')[0] }; }
 }
