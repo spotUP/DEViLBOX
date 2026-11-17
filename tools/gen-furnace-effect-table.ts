@@ -176,7 +176,7 @@ static const EffectHandler* furnaceFindEffect(int kind, int sys, int effect) {
   return { header, maxSys };
 }
 
-type Lane = Record<number, [number, number, number]>;
+type Lane = Record<number, [number, number, number, string]>;
 interface Dump {
   systems: Record<string, { effect: Lane; post: Lane; pre: Lane }>;
   pool: (number | null)[][];
@@ -190,7 +190,16 @@ function dumpNative(header: string): Dump {
 #include <vector>
 #include <cstring>
 #include "table.h"
-struct DivSysDefStub;
+static void jstr(const char* s) {
+  putchar('"');
+  for (; s && *s; s++) {
+    unsigned char c = *s;
+    if (c == '"' || c == '\\\\') printf("\\\\%c", c);
+    else if (c < 32) printf("\\\\u%04x", c);
+    else putchar(c);
+  }
+  putchar('"');
+}
 int main() {
   std::vector<std::vector<int>> pool;
   auto poolId = [&](EffectValConversion* f, int effect) -> int {
@@ -218,7 +227,9 @@ int main() {
       printf("%s\\"%s\\":{", k ? "," : "", names[k]);
       bool first = true;
       for (auto& e : sorted) {
-        printf("%s\\"%d\\":[%d,%d,%d]", first ? "" : ",", e.first, (int)e.second->dispatchCmd, poolId(e.second->val, e.first), poolId(e.second->val2, e.first));
+        printf("%s\\"%d\\":[%d,%d,%d,", first ? "" : ",", e.first, (int)e.second->dispatchCmd, poolId(e.second->val, e.first), poolId(e.second->val2, e.first));
+        jstr(e.second->description);
+        printf("]");
         first = false;
       }
       printf("}");
@@ -264,7 +275,13 @@ function buildTs(dump: Dump): string {
     Object.keys(l)
       .map(Number)
       .sort((a, b) => a - b)
-      .map((k) => `${k}:[${l[k].join(',')}]`)
+      .map((k) => `${k}:[${l[k].slice(0, 3).join(',')}]`)
+      .join(',');
+  const text = (l: Lane) =>
+    Object.keys(l)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map((k) => `${k}:${JSON.stringify(l[k][3])}`)
       .join(',');
   const systems = Object.keys(dump.systems)
     .map(Number)
@@ -272,6 +289,14 @@ function buildTs(dump: Dump): string {
     .map((s) => {
       const d = dump.systems[s];
       return `  ${s}:{effect:{${lane(d.effect)}},post:{${lane(d.post)}},pre:{${lane(d.pre)}}},`;
+    })
+    .join('\n');
+  const texts = Object.keys(dump.systems)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((s) => {
+      const d = dump.systems[s];
+      return `  ${s}:{effect:{${text(d.effect)}},post:{${text(d.post)}},pre:{${text(d.pre)}}},`;
     })
     .join('\n');
   const cmds = [...cmdNames].map(([k, v]) => `${k}:'${v}'`).join(',');
@@ -292,6 +317,11 @@ export const FURNACE_EFFECT_POOL: ReadonlyArray<ReadonlyArray<number | null>> = 
 
 export const FURNACE_EFFECT_TABLE: Readonly<Record<number, FurnaceSystemEffects>> = {
 ${systems}
+};
+
+/** Furnace's own help string (EffectHandler.description) for every handler in FURNACE_EFFECT_TABLE. */
+export const FURNACE_EFFECT_TEXT: Readonly<Record<number, { effect: Readonly<Record<number, string>>; post: Readonly<Record<number, string>>; pre: Readonly<Record<number, string>> }>> = {
+${texts}
 };
 
 export const FURNACE_DISPATCH_CMD_NAMES: Readonly<Record<number, string>> = {${cmds}};
