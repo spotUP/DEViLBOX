@@ -422,7 +422,7 @@ screen: jsr Intensity_5F
         lda scrt
         inca
         sta scrt
-        cmpa #2
+        cmpa #8          ; one character per 8 frames (6.25 characters per second; 2 was unreadable)
         blo scd
         clr scrt
         lda scr
