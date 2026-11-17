@@ -38,6 +38,7 @@ region   = $19              ; 0 NTSC, 1 PAL, 2 Dendy
 ra       = $1A              ; raw loop delay loop counts (5 and 7 cycle loops)
 rb       = $1B
 endp     = $1C              ; raw block end address, 2 bytes
+wvec     = $1E              ; chip writer of the current block (jmp (wvec)), 2 bytes
 ; Phase 8 screen state (separate zero page block)
 s_ptr    = $20              ; text source pointer, 2 bytes
 fc       = $22              ; frame counter within the second
@@ -615,12 +616,28 @@ dict:                       ; A = dictionary index; run the entry as a tick reco
   sta ptr+1
   rts
 
+; Hot path (Phase 8c): stream bytes are read inline (no JSR rd), the chip writer is chosen once per chip block through
+; wvec, and the writers take X = register index, A = value, return with Y = 0. Same stream format as before.
+.macro RDB
+  lda (ptr),y
+  inc ptr
+  bne :+
+  inc ptr+1
+:
+.endmacro
+
 do_record:                  ; A = chip mask
   sta mask
   lda #0
   sta chip
 : lsr mask
   bcc :+
+  ldy chip
+  lda wtab_lo,y
+  sta wvec
+  lda wtab_hi,y
+  sta wvec+1
+  ldy #0
   jsr block
 : inc chip
   lda mask
@@ -628,61 +645,44 @@ do_record:                  ; A = chip mask
   rts
 
 block:                      ; one chip block; chip index = bit number in the tick mask (CHIP_ORDER in nesStream.ts)
-  jsr rd
+  RDB
   cmp #$FF
   beq @done
   cmp #$80                  ; cmp #$FF leaves N set for A >= $7F, so test the high bit separately
   bcs @run
-  sta ri
-  jsr rd
-  sta rv
-  jsr wr
+  tax
+  RDB
+  jsr wcall
   jmp block
 @run:
   sta kind
-  jsr rd
+  RDB
   sta ri
-  jsr rd
+  RDB
   sta len
-: jsr rd
-  sta rv
-  jsr wr
+: RDB
+  ldx ri
+  jsr wcall
   lda kind
   cmp #$80
   bne :+
   inc ri                    ; $80 ascending run; $81 repeats the same register
 : dec len
-  bne :--
+  bne :---              ; back to the loop label (RDB holds one anonymous label)
   jmp block
 @done:
   rts
 
-; Chip writers (Phase 5). ri = register index as the stream stores it, rv = value; Y = 0 on entry and exit.
+; Chip writers (Phase 5). X = register index as the stream stores it, A = value; Y = 0 on entry and exit.
 ; Canonical non-mirrored ports only. Chip 0 2A03, 1 VRC6, 2 VRC7, 3 FDS, 4 MMC5, 5 N163, 6 5B.
 ; Wave-enable windows (FDS $4089 bit 7, N163 channel regs) are not synthesised: the capture holds those writes and the
 ; stream replays them in order. Chips are written in tick-mask order, not interleaved as captured.
-wr:
-  jsr wdisp
-  ldy #0
+wcall:
+  jmp (wvec)
+wnone:
   rts
-wdisp:
-  ldx ri
-  lda rv
-  ldy chip
-  beq w2a03
-  dey
-  beq wvrc6
-  dey
-  beq wvrc7
-  dey
-  beq wfds
-  dey
-  beq wmmc5
-  dey
-  beq wn163
-  dey
-  beq w5b
-  rts
+wtab_lo: .byte <w2a03, <wvrc6, <wvrc7, <wfds, <wmmc5, <wn163, <w5b, <wnone
+wtab_hi: .byte >w2a03, >wvrc6, >wvrc7, >wfds, >wmmc5, >wn163, >w5b, >wnone
 w2a03:
   sta shadow,x
   sta $4000,x

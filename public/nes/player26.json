@@ -17,8 +17,8 @@
  "scrollLength": 128,
  "subsongCountOffset": 28900,
  "nmiEndAddress": 61986,
- "nsfInitAddress": 65002,
- "nsfPlayAddress": 65033,
+ "nsfInitAddress": 65025,
+ "nsfPlayAddress": 65056,
  "bankSize": 4096,
  "maxStreamBanks": 255
 }
