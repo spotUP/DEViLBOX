@@ -29,8 +29,14 @@ describe('effect help comes from Furnace sysDef.cpp strings', () => {
 
   it('a synth type resolves to its chip\'s list', () => {
     for (const [synth, id] of Object.entries(SYNTH_TO_DISPATCH)) {
+      if (!FURNACE_EFFECT_TEXT[id]) continue;
       expect(getAllFurnaceEffects(synth), synth).toEqual(getFurnaceSystemEffects(id));
     }
+    // Genesis and Arcade are compounds: their FM part's list stands in.
+    expect(getAllFurnaceEffects('FurnaceOPN')).toEqual(getFurnaceSystemEffects(20));
+    expect(getAllFurnaceEffects('Furnace')).toEqual(getFurnaceSystemEffects(20));
+    expect(getAllFurnaceEffects('FurnaceOPM')).toEqual(getFurnaceSystemEffects(19));
+    expect(getAllFurnaceEffects('FurnaceOPM').length).toBeGreaterThan(0);
     expect(getAllFurnaceEffects('NotAFurnaceSynth')).toEqual([]);
   });
 });

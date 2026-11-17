@@ -4,7 +4,7 @@
  */
 
 import { FURNACE_EFFECT_TEXT } from '../engine/furnace-dispatch/furnaceEffectTable.gen';
-import { SYNTH_TO_DISPATCH } from '../engine/furnace-dispatch/synthPlatforms';
+import { STAND_INS, SYNTH_TO_DISPATCH } from '../engine/furnace-dispatch/synthPlatforms';
 
 export type EffectCategory = 'pitch' | 'volume' | 'panning' | 'timing' | 'global' | 'sample' | 'misc' | 'opl';
 
@@ -429,7 +429,10 @@ export function getFurnaceSystemEffects(systemId: number): EffectDescription[] {
 /** Furnace chip effect list for a synth type; empty when the synth is not a Furnace chip. */
 export function getAllFurnaceEffects(synthType?: string): EffectDescription[] {
   const systemId = synthType ? SYNTH_TO_DISPATCH[synthType] : undefined;
-  return systemId === undefined ? [] : getFurnaceSystemEffects(systemId);
+  if (systemId === undefined) return [];
+  // Compound systems (Genesis, Arcade) have no handlers of their own; their FM part plays the instrument.
+  const own = FURNACE_EFFECT_TEXT[systemId] ? systemId : STAND_INS[systemId]?.find((id) => FURNACE_EFFECT_TEXT[id]);
+  return own === undefined ? [] : getFurnaceSystemEffects(own);
 }
 
 /** Get Furnace platform-specific effect description (first lane that defines the code wins) */
