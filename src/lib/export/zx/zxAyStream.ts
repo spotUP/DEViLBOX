@@ -14,17 +14,45 @@ export const ZX_CTRL_LOOP = 0xFE;
 /** One 50 Hz tick: the registers written in it (last write wins; reg 13 counts as written even if unchanged). */
 export type AyFrame = Array<number | undefined>;
 
+/**
+ * Writes -> 50 Hz frames. Writes within 1 ms are one song tick; a tick lands on its nearest frame. Two ticks never
+ * share a frame while the next frame is free within half a frame of error (60 Hz songs beat against 50 Hz); when
+ * they must merge (above 50 Hz), the last value per register wins, except register 13: an envelope retrigger that
+ * would be overwritten moves to the next tick's frame when that tick writes no retrigger of its own, else it is lost.
+ * Frames stay anchored to real time: no tick ever lands more than half a frame from its exact position.
+ */
 export function captureToFrames(writes: readonly RegisterWrite[], sampleRate: number): AyFrame[] {
   const ay = writes.filter((w) => w.chipType === FurnaceChipType.AY && (w.port & 0x1FF) < AY_REG_COUNT);
   if (ay.length === 0) return [];
-  const origin = ay.reduce((m, w) => Math.min(m, w.timestamp), Infinity);
+  ay.sort((a, b) => a.timestamp - b.timestamp); // stable: same-timestamp order kept
+  const origin = ay[0].timestamp;
+  const gap = sampleRate / 1000;
   const frames: AyFrame[] = [];
-  for (const w of ay) {
-    const n = Math.round((w.timestamp - origin) * ZX_FRAME_HZ / sampleRate);
+  let last = -1;
+  let pend13: number | undefined; // retrigger bumped out of frame `last`
+  for (let i = 0; i < ay.length;) {
+    let j = i;
+    while (j + 1 < ay.length && ay[j + 1].timestamp - ay[i].timestamp <= gap) j++;
+    const exact = (ay[i].timestamp - origin) * ZX_FRAME_HZ / sampleRate;
+    let n = Math.round(exact);
+    if (n <= last) n = last + 1 - exact <= 0.5 ? last + 1 : last;
     while (frames.length <= n) frames.push([]);
-    frames[n][w.port & 0x1FF] = w.data & 0xFF;
+    const f = frames[n];
+    let own13 = false;
+    for (let k = i; k <= j; k++) own13 ||= (ay[k].port & 0x1FF) === 13;
+    if (pend13 !== undefined && n > last) {
+      if (!own13) f[13] = pend13; // a later retrigger of this tick supersedes it
+      pend13 = undefined;
+    }
+    for (let k = i; k <= j; k++) {
+      const reg = ay[k].port & 0x1FF, v = ay[k].data & 0xFF;
+      if (reg === 13 && n === last && f[13] !== undefined) pend13 = v;
+      else f[reg] = v;
+    }
+    last = n;
+    i = j + 1;
   }
-  return frames;
+  return frames; // a retrigger still pending after the last tick is dropped: the loop length stays anchored
 }
 
 /** Delta-encode: a register is sent when its value differs from the chip's current one (reg 13 whenever written). */
