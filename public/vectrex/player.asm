@@ -7,7 +7,7 @@
 ; (rows alternate direction so the beam never returns; mirrored font for the right-to-left rows), bars at one scale.
 ; The title (16 upper case characters, space padded) is patched in by the exporter at symbol title.
 Wait_Recal    equ $F192
-Intensity_5F  equ $F2A5
+Intensity_7F  equ $F2A9
 Sound_Byte    equ $F256
 Reset0Ref     equ $F354
 Moveto_d      equ $F312
@@ -357,7 +357,7 @@ vw:     bitb <$0D
         dec vcnt
         bne vlist
         rts
-screen: jsr Intensity_5F
+screen: jsr Intensity_7F       ; brightest preset: BIOS-style dot text reads dashed at $5F
         jsr Reset0Ref
         lda #$7F        ; at scale $FF 112,-120 is off the screen (the logo was never seen)
         sta <$04
