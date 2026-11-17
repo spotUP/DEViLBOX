@@ -9,8 +9,9 @@ W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
 cd "$ROOT/public/nes"
 # Three builds of the same source: player.bin (mapper 31), player24.bin (mapper 24 / VRC6 original cart, -D VRC6) and player26.bin (mapper 26 / VRC6b, A0/A1 swapped, -D VRC6 -D VRC6B).
-for V in "" 24 26; do
+for V in "" 24 26 69 19 85 5; do
 D=""; [ "$V" = 24 ] && D="-D VRC6"; [ "$V" = 26 ] && D="-D VRC6 -D VRC6B"
+[ "$V" = 69 ] && D="-D FME7"; [ "$V" = 19 ] && D="-D N163"; [ "$V" = 85 ] && D="-D VRC7"; [ "$V" = 5 ] && D="-D MMC5"
 ca65 $D player.s -o "$W/player.o"
 ld65 -C nes.cfg -Ln "$W/player.lbl" "$W/player.o" -o "$W/player.bin"
 cp "$W/player.bin" "player$V.bin"

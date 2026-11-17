@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { NesCapture, NesChip, NesEvent } from '../nes/nesCapture';
-import { buildVrc6Cartridge, type NesPlayer } from '../nes/nesCartridge';
+import { buildBoardCartridge, buildVrc6Cartridge, type NesPlayer } from '../nes/nesCartridge';
 
 const DIR = join(__dirname, '../../../../public/nes');
 const ready = existsSync(join(DIR, 'player24.bin'));
@@ -35,5 +35,14 @@ describe.skipIf(!existsSync(join(DIR, 'player26.bin')))('VRC6b cartridge (mapper
     const p: NesPlayer = { ...JSON.parse(readFileSync(join(DIR, 'player26.json'), 'utf8')), bytes: Uint8Array.from(readFileSync(join(DIR, 'player26.bin'))) };
     const { rom } = buildVrc6Cartridge([{ ntsc: song('vrc6') }], p, 'vrc6b test');
     expect(((rom[7] & 0xf0) | (rom[6] >> 4))).toBe(26);
+  });
+});
+
+describe.skipIf(!existsSync(join(DIR, 'player69.bin')))('Sunsoft 5B cartridge (mapper 69)', () => {
+  it('emits a mapper-69 image and refuses other chips; the Mesen2 bus check is `tools/nes-rom-check.ts --target fme7cart`', () => {
+    const p: NesPlayer = { ...JSON.parse(readFileSync(join(DIR, 'player69.json'), 'utf8')), bytes: Uint8Array.from(readFileSync(join(DIR, 'player69.bin'))) };
+    const { rom } = buildBoardCartridge('fme7', [{ ntsc: cap(Array.from({ length: 1500 }, (_, t) => [w(t, 'nes', 0x4002, t & 255), w(t, 's5b', 0x01, t & 15)]).flat()) }], p, '5b test');
+    expect(((rom[7] & 0xf0) | (rom[6] >> 4))).toBe(69);
+    expect(() => buildBoardCartridge('fme7', [{ ntsc: song('vrc6', 10) }], p)).toThrow(/2A03 and Sunsoft 5B only/);
   });
 });

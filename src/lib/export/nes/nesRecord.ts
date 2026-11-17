@@ -2,10 +2,10 @@
 import { useTransportStore, useTrackerStore, useFormatStore } from '@stores';
 import { FurnaceDispatchEngine } from '../../../engine/furnace-dispatch/FurnaceDispatchEngine';
 import { nesCaptureFromBatches, type NesCapture } from './nesCapture';
-import { fetchNesPlayer, buildVrc6Cartridge } from './nesCartridge';
+import { fetchNesPlayer, buildBoardCartridge } from './nesCartridge';
 import { buildNsfe } from './nsfe';
 import { NES_REGIONS, type NesRegion, type NesSubsongInput } from './nesStream';
-import { buildNesRom, isSunsoft, nesChipsOf, wantsVrc6Cartridge, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
+import { buildNesRom, isSunsoft, nesChipsOf, wantsFme7Cartridge, wantsVrc6Cartridge, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
 import { switchSubsong } from '../../tracker/subsongSwitch';
 import { orderPassLength } from '../vectrex/vectrexCapture';
 
@@ -84,10 +84,18 @@ export async function recordNesRom(choice: NesRegionChoice, title: string, autho
   if (wantsVrc6Cartridge(chips)) {
     try {
       const mapper = vrc6Board === 'vrc6b' ? 26 : 24;
-      const v = buildVrc6Cartridge(subsongs, await fetchNesPlayer(vrc6Board === 'vrc6b' ? 'player26' : 'player24'), title, { author, comments, chipName: 'VRC6' });
+      const v = buildBoardCartridge('vrc6', subsongs, await fetchNesPlayer(vrc6Board === 'vrc6b' ? 'player26' : 'player24'), title, { author, comments, chipName: 'VRC6' });
       return { ...v, warnings: [`Built the original VRC6 cartridge (mapper ${mapper}).`], tickRateHz: first.tickRateHz };
     } catch (e) {
       warnings.push(`Built the custom cartridge (mapper 31), not the original VRC6 board: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  if (wantsFme7Cartridge(chips)) {
+    try {
+      const v = buildBoardCartridge('fme7', subsongs, await fetchNesPlayer('player69'), title, { author, comments, chipName: '5B' });
+      return { ...v, warnings: ['Built the original Sunsoft 5B cartridge (mapper 69).'], tickRateHz: first.tickRateHz };
+    } catch (e) {
+      warnings.push(`Built the custom cartridge (mapper 31), not the original Sunsoft 5B board: ${e instanceof Error ? e.message : e}`);
     }
   }
   const rom = buildNesRom(subsongs, await fetchNesPlayer(), info);

@@ -87,11 +87,66 @@ NBARS    = 28               ; NES_BAR_BUDGET in the plan: 5 (2A03) + 3 (VRC6) + 
   bne :----
 .endmacro
 
+; Original-board builds (-D FME7 mapper 69, -D N163 mapper 19, -D VRC7 mapper 85, -D MMC5 mapper 5) and VRC6 share the 8 KB scheme:
+; $8000 window = the subsong's first bank (dictionary), $C000 window = the current stream bank, $E000 = fixed last bank.
+.ifdef VRC6
+BANK8 = 1
+.endif
+.if .defined(FME7) .or .defined(N163) .or .defined(VRC7) .or .defined(MMC5)
+BANK8 = 1
+.endif
+.macro setc                 ; A = 8 KB bank into the $C000 window (A kept)
+.ifdef FME7
+  pha
+  lda #$0B
+  sta $8000
+  pla
+  sta $A000
+.elseif .defined(N163)
+  sta $F000
+.elseif .defined(VRC7)
+  sta $9000
+.elseif .defined(MMC5)
+  pha
+  ora #$80
+  sta $5116
+  pla
+.else
+  sta $C000
+.endif
+.endmacro
+.macro setd                 ; A = 8 KB bank into the $8000 window (A kept); not used by the VRC6 build
+.ifdef FME7
+  pha
+  lda #$09
+  sta $8000
+  pla
+  sta $A000
+.elseif .defined(N163)
+  sta $E000
+.elseif .defined(VRC7)
+  sta $8000
+.elseif .defined(MMC5)
+  pha
+  ora #$80
+  sta $5114
+  pla
+.endif
+.endmacro
+
 .segment "HEADER"
 .ifdef VRC6B
   .byte "NES",$1A,2,0,$A0,$18,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 26 (VRC6b: A0/A1 swapped), PRG size patched by the cartridge builder
 .elseif .defined(VRC6)
   .byte "NES",$1A,2,0,$80,$18,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 24 (VRC6), PRG size patched by the cartridge builder
+.elseif .defined(FME7)
+  .byte "NES",$1A,2,0,$50,$48,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 69 (Sunsoft FME-7 / 5B)
+.elseif .defined(N163)
+  .byte "NES",$1A,2,0,$30,$18,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 19 (Namco 163)
+.elseif .defined(VRC7)
+  .byte "NES",$1A,2,0,$50,$58,$20,0,0,0,0,0,0,0 ; NES 2.0, mapper 85 submapper 2 (VRC7a: $8010, audio $9010/$9030)
+.elseif .defined(MMC5)
+  .byte "NES",$1A,2,0,$50,$08,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 5 (MMC5)
 .else
   .byte "NES",$1A,2,0,$F0,$18,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 31, PRG size patched by the cartridge builder
 .endif
@@ -121,6 +176,36 @@ reset:
 .ifdef VRC6
   sta $8000                 ; mapper 24: $8000 16 KB select, $C000 8 KB select (the 8 KB last bank is fixed)
   sta $C000
+.elseif .defined(FME7)
+  ldx #9                    ; commands 9, A, B = banks at $8000, $A000, $C000; C = mirroring (vertical)
+: stx $8000
+  sta $A000
+  inx
+  cpx #$0D
+  bne :-
+.elseif .defined(N163)
+  sta $E000
+  sta $E800
+  sta $F000
+  lda #$E0                  ; nametables 0/1 = CIRAM page 0, 2/3 = page 1
+  sta $C000
+  sta $C800
+  lda #$E1
+  sta $D000
+  sta $D800
+.elseif .defined(VRC7)
+  sta $8000
+  sta $8010
+  sta $9000
+.elseif .defined(MMC5)
+  lda #3                    ; PRG mode 3: four 8 KB windows
+  sta $5100
+  lda #0
+  sta $5105                 ; all nametables = CIRAM page 0
+  lda #$80
+  sta $5114
+  sta $5115
+  sta $5116
 .else
   ldx #6
 : sta $5FF8,x
@@ -205,14 +290,18 @@ restart:
   lda rbank
 .ifdef VRC6
   lsr a                     ; mapper 24 build: stream banks are 8 KB; the region start is even, so the table sits at $8000
-.endif
   sta $5FF8                 ; the subsong table is in the first bank of the region stream
+.elseif .defined(BANK8)
+  setd                      ; the subsong table is in the first bank of the region stream
+.else
+  sta $5FF8                 ; the subsong table is in the first bank of the region stream
+.endif
   lda STREAM+6,y
   sta period
   lda STREAM+7,y
   sta period+1
   lda STREAM+2,y            ; offset mid byte: bank = high nibble (offsets are bank aligned; builder keeps them < 1 MB)
-.ifdef VRC6
+.ifdef BANK8
   ldx STREAM+3,y            ; offset high byte: 8 KB bank = offset bits 13-20
   lsr a
   lsr a
@@ -245,6 +334,14 @@ restart:
   bcc :+
   lda #>STREAM+$20
 : sta base+1
+.elseif .defined(BANK8)
+  setc                      ; $C000 8 KB window = the stream bank
+  setd                      ; $8000 8 KB window = the dictionary (first bank of the subsong)
+  lda #0
+  sta base
+  sta pendf
+  lda #>STREAM
+  sta base+1
 .else
   sta $5FF8
   lda #0
@@ -279,7 +376,7 @@ restart:
   dex
   bne :-
 @done:
-.ifdef VRC6
+.ifdef BANK8
   lda ptr+1                 ; the records after the dictionary are read through the stream window
   and #$1F
   ora #$C0
@@ -375,7 +472,7 @@ tick:
   cmp #$83
   beq @bank
   cmp #$84
-.ifdef VRC6
+.ifdef BANK8
   bne @n84                  ; @raw is out of branch range in the VRC6 build
   jmp @raw
 @n84:
@@ -408,8 +505,8 @@ tick:
   jsr rd                    ; bank relative to the subsong start, shown in window 1
   clc
   adc sbase
-.ifdef VRC6
-  sta $C000
+.ifdef BANK8
+  setc
   lda #0
   sta ptr
   lda #$C0
@@ -427,7 +524,7 @@ tick:
   jsr rd
   sta tmp+1
   jsr rd
-.ifdef VRC6
+.ifdef BANK8
   asl a                     ; u24 target: 8 KB bank = bits 13-20, offset in bank = bits 0-12
   asl a
   asl a
@@ -447,7 +544,7 @@ tick:
   ora tmp+2
   clc
   adc sbase
-  sta $C000
+  setc
   jmp @decode
 .endif
   lda tmp

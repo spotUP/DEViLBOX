@@ -39,7 +39,7 @@ export interface NesPlayer {
   maxStreamBanks: number;
 }
 
-export async function fetchNesPlayer(name: 'player' | 'player24' | 'player26' = 'player'): Promise<NesPlayer> {
+export async function fetchNesPlayer(name: 'player' | 'player24' | 'player26' | 'player69' = 'player'): Promise<NesPlayer> {
   const base = import.meta.env.BASE_URL;
   const [bin, meta] = await Promise.all([
     fetch(`${base}nes/${name}.bin`).then((r) => r.arrayBuffer()),
@@ -102,28 +102,36 @@ export function buildNesCartridge(subsongs: readonly NesSubsongInput[], player: 
   return { rom, banks, streamBytes: stream.length, seconds: subsongs.map((s) => { const c = s[region] ?? s.ntsc; return c.events.length ? Math.max(...c.events.map((e) => e.sample)) / c.sampleRate : 0; }) };
 }
 
+/** Original boards that carry 2A03 plus one expansion chip, each with its own player build (player<mapper>.bin, `-D` define in player.s). maxBanks = stream banks the mapper's PRG registers address (one 8 KB bank is the fixed player). */
+export type NesBoard = 'vrc6' | 'fme7';
+const BOARDS: Record<NesBoard, { chip: string; label: string; maxBanks: number }> = {
+  vrc6: { chip: 'vrc6', label: 'VRC6', maxBanks: 255 },
+  fme7: { chip: 's5b', label: 'Sunsoft 5B', maxBanks: 63 },
+};
+
 /**
- * VRC6 original cartridge (iNES mapper 24, player build player24.bin). Stream banks are 8 KB: the player shows the current stream bank at $C000
- * (8 KB select, $C000) and the subsong's first bank (dictionary, region table) through the 16 KB select at $8000; the last 8 KB ($E000, player code)
+ * Original cartridge (VRC6 iNES mapper 24/26, Sunsoft 5B mapper 69; player build per board). Stream banks are 8 KB: the player shows the current stream bank at $C000
+ * and the subsong's first bank (dictionary, region table) at $8000 (VRC6: through its 16 KB select); the last 8 KB ($E000, player code)
  * is fixed. Region streams start on an even bank so the table sits at the start of a 16 KB bank. No DPCM bank switching ($C000-$DFFF is the stream
- * window) and no cycle-IRQ tick (the board IRQ is custom): the builder refuses such songs. Only 2A03 and VRC6 writes are allowed.
+ * window) and no cycle-IRQ tick (the board IRQ is custom): the builder refuses such songs. Only 2A03 and the board's chip writes are allowed.
  */
-export function buildVrc6Cartridge(subsongs: readonly NesSubsongInput[], player: NesPlayer, title = 'devilbox', info: NesScreenInfo = {}): NesCartridgeResult {
+export function buildBoardCartridge(board: NesBoard, subsongs: readonly NesSubsongInput[], player: NesPlayer, title = 'devilbox', info: NesScreenInfo = {}): NesCartridgeResult {
+  const { chip, label, maxBanks } = BOARDS[board];
   if (!subsongs.length) throw new Error('No NES capture to export. Play an NES-family song through while recording.');
   for (const s of subsongs) for (const r of NES_REGIONS) {
     const c = s[r] ?? s.ntsc;
     if (r !== 'ntsc' && !s[r]) continue; // a region without its own capture plays the NTSC stream at the console's frame rate
-    const other = c.events.find((e) => e.kind === 'write' && e.chip !== 'nes' && e.chip !== 'vrc6');
-    if (other && other.kind === 'write') throw new Error(`A VRC6 cartridge carries 2A03 and VRC6 only; the song also writes ${other.chip}. Use the custom cartridge or NSFe.`);
-    if (c.events.some((e) => e.kind === 'control' && e.control === 4)) throw new Error('A VRC6 cartridge cannot switch DPCM banks; the song does.');
-    if (Math.abs(c.tickRateHz - NES_REGION_TIMING[r].frameHz) / NES_REGION_TIMING[r].frameHz > 0.005) throw new Error(`The song ticks at ${c.tickRateHz.toFixed(2)} Hz, not the ${r.toUpperCase()} frame rate; a VRC6 cartridge ticks on the frame (the cycle timer exists on the custom board only).`);
+    const other = c.events.find((e) => e.kind === 'write' && e.chip !== 'nes' && e.chip !== chip);
+    if (other && other.kind === 'write') throw new Error(`A ${label} cartridge carries 2A03 and ${label} only; the song also writes ${other.chip}. Use the custom cartridge or NSFe.`);
+    if (c.events.some((e) => e.kind === 'control' && e.control === 4)) throw new Error(`A ${label} cartridge cannot switch DPCM banks; the song does.`);
+    if (Math.abs(c.tickRateHz - NES_REGION_TIMING[r].frameHz) / NES_REGION_TIMING[r].frameHz > 0.005) throw new Error(`The song ticks at ${c.tickRateHz.toFixed(2)} Hz, not the ${r.toUpperCase()} frame rate; a ${label} cartridge ticks on the frame (the cycle timer exists on the custom board only).`);
   }
   const bank = 8192;
   const regionStreams = encodeNesStreams(subsongs, bank);
   const regbank = NES_REGIONS.map(() => 0);
   let streamBanks = 0;
   for (const [i, r] of NES_REGIONS.entries()) { regbank[i] = streamBanks; streamBanks += Math.ceil(regionStreams[r].length / bank); streamBanks += streamBanks & 1; }
-  if (streamBanks > 255) throw new Error(`The song needs ${streamBanks} banks of 8 KB; the VRC6 player addresses 255 (2 MB).`);
+  if (streamBanks > maxBanks) throw new Error(`The song needs ${streamBanks} banks of 8 KB; the ${label} player addresses ${maxBanks}.`);
   const total = Math.ceil((streamBanks + 1) / 2) * 2; // PRG in 16 KB units: stream banks, padding, the fixed player bank last
   const rom = new Uint8Array(16 + total * bank);
   rom.set(player.bytes.subarray(0, 16));
@@ -134,3 +142,5 @@ export function buildVrc6Cartridge(subsongs: readonly NesSubsongInput[], player:
   patchPlayerScreen(rom, rom.length - bank, fixed, player, title, 0, info, subsongs.length, regbank);
   return { rom, banks: total, streamBytes: streamBanks * bank, seconds: subsongs.map((s) => { const c = s.ntsc; return c.events.length ? Math.max(...c.events.map((e) => e.sample)) / c.sampleRate : 0; }) };
 }
+
+export const buildVrc6Cartridge = (subsongs: readonly NesSubsongInput[], player: NesPlayer, title?: string, info?: NesScreenInfo): NesCartridgeResult => buildBoardCartridge('vrc6', subsongs, player, title, info);

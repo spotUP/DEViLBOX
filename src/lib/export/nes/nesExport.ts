@@ -68,6 +68,11 @@ export function buildNesRom(subsongs: readonly NesSubsongInput[], player: NesPla
   return { ...cart, warnings };
 }
 
+/** The original Sunsoft 5B (FME-7, mapper 69) board carries 2A03 + 5B only. */
+export function wantsFme7Cartridge(chips: readonly string[]): boolean {
+  return chips.includes('s5b') && chips.every((c) => c === 'nes' || c === 's5b');
+}
+
 /** The original VRC6 board carries 2A03 + VRC6 only; any song with a VRC6 and no other expansion chip may try it. */
 export function wantsVrc6Cartridge(chips: readonly string[]): boolean {
   return chips.includes('vrc6') && chips.every((c) => c === 'nes' || c === 'vrc6');
