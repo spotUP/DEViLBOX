@@ -332,6 +332,8 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
     run: async (s) => { const { exportActionamics } = await import('./ActionamicsExporter'); return exportActionamics(s); } },
   { id: 'activisionPro', matches: (s) => songIds(s).formatId === 'activisionPro',
     run: async (s) => { const { exportActivisionPro } = await import('./ActivisionProExporter'); return exportActivisionPro(s); } },
+  { id: 'musicMaker', matches: (s) => s.format === 'MusicMaker' && !!s.musicMakerFileData,
+    run: async (s) => { const { exportMusicMaker } = await import('./MusicMakerExporter'); return exportMusicMaker(s); } },
   { id: 'tfmMusicMaker', matches: (s) => !!s.tfmFileData,
     run: async (s) => { const { exportTfmMusicMaker } = await import('./TfmMusicMakerExporter'); return exportTfmMusicMaker(s); } },
   // Digital Sound Studio keeps format 'MOD' (no chip-RAM layout: its samples are native Sampler instruments); the grid's edits are the export.

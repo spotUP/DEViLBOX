@@ -700,6 +700,8 @@ export const MM_OP = {
 export interface MusicMakerEvent {
   t: number;
   op: number;
+  /** sdata offset of the triple this event decodes (after an $F8 bank prefix) and its bank. */
+  at?: number; bank?: number;
   /** The voice was reset first (first event after the 999 loop). */
   reset?: boolean;
   inst?: number; note?: number; vol?: number; loop?: boolean; legato?: boolean;
@@ -742,14 +744,14 @@ function walkVoice(song: MusicMakerSongData, v: number, fromLoop: boolean): { ev
     const durByte = (next0 === 0xf2 || next0 === 0xfb || b0 === 0xf8) ? byte(mp + 5) : byte(mp + 2);
     const dur = ((durByte & 0x3f) + 1) * 2;
     let bank = 0;
-    const ev: MusicMakerEvent = { t, op: MM_OP.NOP };
+    const ev: MusicMakerEvent = { t, op: MM_OP.NOP, at: mp };
     if (reset) { ev.reset = true; reset = false; }
     if (b0 > 0xf1 && b0 === 0xf4) { ev.op = MM_OP.LOUDNESS; ev.value = b1 ? 1 : 0; }
     else if (b0 > 0xf1 && (b0 === 0xfd || b0 === 0xf5)) { ev.op = MM_OP.NOP; }
     else if (b0 > 0xf1 && b0 === 0xf6) { ev.op = MM_OP.FADE; ev.value = s8(b1); }
     else if (b0 > 0xf1 && b0 === 0xf7) { ev.op = MM_OP.FADE_STATE; ev.value = b1 ? 256 : 8192; }
     else {
-      if (b0 === 0xf8) { bank = b1; mp += 3; b0 = byte(mp); b1 = byte(mp + 1); }
+      if (b0 === 0xf8) { bank = b1; mp += 3; b0 = byte(mp); b1 = byte(mp + 1); ev.at = mp; ev.bank = bank; }
       const b2 = byte(mp + 2);
       if (b0 > 0xf1 && b0 === 0xf9) {
         const d = s8(b1);
@@ -865,6 +867,86 @@ function sideNames(bytes: ArrayBuffer | undefined): string[] {
 
 const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
 
+/** Where a grid cell came from: the sdata offset of its NOTE/OFF triple and that triple's bank. */
+export interface MusicMakerCellSource { at: number; bank: number; legato: boolean; note: boolean }
+
+export interface MusicMakerGrid {
+  patterns: Pattern[];
+  /** sources[pattern][voice][row]: the triple behind a cell, or null for an empty one. */
+  sources: (MusicMakerCellSource | null)[][][];
+  ref: number; gridSpeed: number; bpm: number;
+}
+
+/** The tick grid of a song (shared by the importer and the exporter, which diffs an edited grid against it). */
+export function buildMusicMakerGrid(song: MusicMakerSongData): MusicMakerGrid {
+  const timelines = Array.from({ length: song.voices }, (_, v) => compileMusicMakerVoice(song, v));
+  // Pattern boundaries: the positions of the enabled voice that runs longest.
+  let ref = -1;
+  for (let v = 0; v < song.voices; v++) {
+    if (!((song.channelsEnabled >> v) & 1)) continue;
+    if (ref < 0 || timelines[v].introTicks > timelines[ref].introTicks) ref = v;
+  }
+  const bounds = [...timelines[ref].positionTicks, timelines[ref].introTicks];
+  const patternCount = Math.max(1, bounds.length - 1);
+  const ext = song.kind === 'ext';
+  const pan = (v: number) => ([-50, 50, 50, -50][ext ? v >> 1 : v]);
+  const patterns: Pattern[] = Array.from({ length: patternCount }, (_, p) => {
+    const length = Math.max(1, Math.round((bounds[p + 1] - bounds[p]) / 2));
+    return {
+      id: `p${p}`, name: `Position ${p}`, length,
+      channels: Array.from({ length: song.voices }, (_, v): ChannelData => ({
+        id: `ch${v}`, name: `Voice ${v + 1}`, muted: false, solo: false, collapsed: false, volume: 100, pan: pan(v),
+        instrumentId: null, color: null, rows: Array.from({ length }, emptyCell),
+      })),
+    };
+  });
+
+  const rowMs = 2 * musicMakerTickSeconds(song.speed) * 1000;
+  const { speed: gridSpeed, bpm } = tempoForRowMs(rowMs);
+  const sources = patterns.map((pt) => pt.channels.map((ch) => ch.rows.map((): MusicMakerCellSource | null => null)));
+  const cellAt = (v: number, t: number): { cell: TrackerCell; src: (MusicMakerCellSource | null)[]; row: number } | null => {
+    if (t >= bounds[bounds.length - 1]) return null;
+    let p = 0;
+    while (p + 1 < bounds.length - 1 && bounds[p + 1] <= t) p++;
+    const row = Math.floor((t - bounds[p]) / 2);
+    const cell = patterns[p].channels[v].rows[row];
+    return cell ? { cell, src: sources[p][v], row } : null;
+  };
+  for (let v = 0; v < song.voices; v++) {
+    const tl = timelines[v];
+    // The grid covers the reference voice's first pass; a shorter voice loops.
+    const end = bounds[bounds.length - 1];
+    let base = 0, list = tl.intro, len = tl.introTicks;
+    for (let guard = 0; base < end && guard < 10000; guard++) {
+      for (const e of list) {
+        const hit = cellAt(v, base + e.t);
+        if (!hit) continue;
+        const cell = hit.cell;
+        if (e.op === MM_OP.NOTE) {
+          cell.note = periodToNote(MM_NOTE_PERIODS[e.note ?? 0]);
+          cell.instrument = e.legato ? 0 : (e.inst ?? 0) + 1;
+          cell.volume = 0x10 + MM_VOLUMES[e.vol ?? 0];
+          hit.src[hit.row] = { at: e.at ?? 0, bank: e.bank ?? 0, legato: !!e.legato, note: true };
+        } else if (e.op === MM_OP.OFF) {
+          cell.note = 97;
+          hit.src[hit.row] = { at: e.at ?? 0, bank: e.bank ?? 0, legato: false, note: false };
+        } else if (e.op === MM_OP.SPEED && e.value2) {
+          const cs = ext
+            ? Math.min(song.speed, Math.max(600, Math.floor(song.speed * (e.value ?? 0) / e.value2)))
+            : Math.min(2800, Math.max(300, Math.floor(song.speed * (e.value ?? 0) / e.value2)));
+          cell.effTyp = 0x0f;
+          cell.eff = bpmForRowMs(2 * musicMakerTickSeconds(cs) * 1000, gridSpeed);
+        }
+      }
+      if (!tl.cycle.length || tl.cycleTicks <= 0) break;
+      base += len;
+      list = tl.cycle; len = tl.cycleTicks;
+    }
+  }
+
+  return { patterns, sources, ref, gridSpeed, bpm };
+}
+
 /**
  * A MusicMaker V8 song (`<tune>.sdata` + `<tune>.ip`/`.i`) for MusicMakerEngine.
  * The grid is one pattern per melody position of the longest voice, a row per
@@ -885,66 +967,7 @@ export function parseMusicMakerSongFile(
   const instruments = decodeMusicMakerInstruments(instBytes, !!companion(companions, stem, 'ip'));
   const names = sideNames(companion(companions, stem, 'ip.n') ?? companion(companions, stem, 'i.n'));
 
-  const timelines = Array.from({ length: song.voices }, (_, v) => compileMusicMakerVoice(song, v));
-  // Pattern boundaries: the positions of the enabled voice that runs longest.
-  let ref = -1;
-  for (let v = 0; v < song.voices; v++) {
-    if (!((song.channelsEnabled >> v) & 1)) continue;
-    if (ref < 0 || timelines[v].introTicks > timelines[ref].introTicks) ref = v;
-  }
-  const bounds = [...timelines[ref].positionTicks, timelines[ref].introTicks];
-  const patternCount = Math.max(1, bounds.length - 1);
-
-  const ext = song.kind === 'ext';
-  const pan = (v: number) => ([-50, 50, 50, -50][ext ? v >> 1 : v]);
-  const patterns: Pattern[] = Array.from({ length: patternCount }, (_, p) => {
-    const length = Math.max(1, Math.round((bounds[p + 1] - bounds[p]) / 2));
-    return {
-      id: `p${p}`, name: `Position ${p}`, length,
-      channels: Array.from({ length: song.voices }, (_, v): ChannelData => ({
-        id: `ch${v}`, name: `Voice ${v + 1}`, muted: false, solo: false, collapsed: false, volume: 100, pan: pan(v),
-        instrumentId: null, color: null, rows: Array.from({ length }, emptyCell),
-      })),
-    };
-  });
-
-  const rowMs = 2 * musicMakerTickSeconds(song.speed) * 1000;
-  const { speed: gridSpeed, bpm } = tempoForRowMs(rowMs);
-  const cellAt = (v: number, t: number): TrackerCell | null => {
-    if (t >= bounds[bounds.length - 1]) return null;
-    let p = 0;
-    while (p + 1 < bounds.length - 1 && bounds[p + 1] <= t) p++;
-    const row = Math.floor((t - bounds[p]) / 2);
-    return patterns[p].channels[v].rows[row] ?? null;
-  };
-  for (let v = 0; v < song.voices; v++) {
-    const tl = timelines[v];
-    // The grid covers the reference voice's first pass; a shorter voice loops.
-    const end = bounds[bounds.length - 1];
-    let base = 0, list = tl.intro, len = tl.introTicks;
-    for (let guard = 0; base < end && guard < 10000; guard++) {
-      for (const e of list) {
-        const cell = cellAt(v, base + e.t);
-        if (!cell) continue;
-        if (e.op === MM_OP.NOTE) {
-          cell.note = periodToNote(MM_NOTE_PERIODS[e.note ?? 0]);
-          cell.instrument = e.legato ? 0 : (e.inst ?? 0) + 1;
-          cell.volume = 0x10 + MM_VOLUMES[e.vol ?? 0];
-        } else if (e.op === MM_OP.OFF) {
-          cell.note = 97;
-        } else if (e.op === MM_OP.SPEED && e.value2) {
-          const cs = ext
-            ? Math.min(song.speed, Math.max(600, Math.floor(song.speed * (e.value ?? 0) / e.value2)))
-            : Math.min(2800, Math.max(300, Math.floor(song.speed * (e.value ?? 0) / e.value2)));
-          cell.effTyp = 0x0f;
-          cell.eff = bpmForRowMs(2 * musicMakerTickSeconds(cs) * 1000, gridSpeed);
-        }
-      }
-      if (!tl.cycle.length || tl.cycleTicks <= 0) break;
-      base += len;
-      list = tl.cycle; len = tl.cycleTicks;
-    }
-  }
+  const { patterns, ref, gridSpeed, bpm } = buildMusicMakerGrid(song);
 
   const instrumentConfigs: InstrumentConfig[] = [];
   for (let i = 0; i < instruments.count; i++) {
