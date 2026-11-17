@@ -250,6 +250,62 @@ export class WaveformProcessor {
     return out;
   }
 
+  /** Paste over existing audio starting at position (length grows only if the paste runs past the end). */
+  public static pasteReplace(buffer: AudioBuffer, position: number, pasteBuffer: AudioBuffer): AudioBuffer {
+    return this.pasteCombine(buffer, position, pasteBuffer, false);
+  }
+
+  /** Paste summed onto existing audio starting at position, clamped to [-1, 1]. */
+  public static pasteMix(buffer: AudioBuffer, position: number, pasteBuffer: AudioBuffer): AudioBuffer {
+    return this.pasteCombine(buffer, position, pasteBuffer, true);
+  }
+
+  private static pasteCombine(buffer: AudioBuffer, position: number, pasteBuffer: AudioBuffer, mix: boolean): AudioBuffer {
+    const ch = buffer.numberOfChannels;
+    const out = this.createBuffer(Math.max(buffer.length, position + pasteBuffer.length), ch, buffer.sampleRate);
+    this.copyRegion(buffer, out, 0, 0, buffer.length);
+    for (let c = 0; c < ch; c++) {
+      const p = pasteBuffer.getChannelData(Math.min(c, pasteBuffer.numberOfChannels - 1));
+      const o = out.getChannelData(c);
+      for (let i = 0; i < pasteBuffer.length; i++) {
+        o[position + i] = mix ? Math.max(-1, Math.min(1, o[position + i] + p[i])) : p[i];
+      }
+    }
+    return out;
+  }
+
+  /** Resize to a frame count: truncates, or pads with silence at the end. */
+  public static resize(buffer: AudioBuffer, frames: number): AudioBuffer {
+    const out = this.createBuffer(frames, buffer.numberOfChannels, buffer.sampleRate);
+    this.copyRegion(buffer, out, 0, 0, Math.min(buffer.length, out.length));
+    return out;
+  }
+
+  /** Insert a run of silent frames at position. */
+  public static insertSilence(buffer: AudioBuffer, position: number, frames: number): AudioBuffer {
+    const out = this.createBuffer(buffer.length + frames, buffer.numberOfChannels, buffer.sampleRate);
+    this.copyRegion(buffer, out, 0, 0, position);
+    this.copyRegion(buffer, out, position, position + frames, buffer.length - position);
+    return out;
+  }
+
+  /** Plain linear-interpolation resample to a new sample rate (pitch is kept, frame count scales). */
+  public static resample(buffer: AudioBuffer, newRate: number): AudioBuffer {
+    const ratio = newRate / buffer.sampleRate;
+    const out = this.createBuffer(Math.round(buffer.length * ratio), buffer.numberOfChannels, newRate);
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const s = buffer.getChannelData(c);
+      const o = out.getChannelData(c);
+      for (let i = 0; i < out.length; i++) {
+        const pos = i / ratio;
+        const i0 = Math.min(Math.floor(pos), s.length - 1);
+        const i1 = Math.min(i0 + 1, s.length - 1);
+        o[i] = s[i0] + (s[i1] - s[i0]) * (pos - i0);
+      }
+    }
+    return out;
+  }
+
   /**
    * Crop: return only the selected range
    */

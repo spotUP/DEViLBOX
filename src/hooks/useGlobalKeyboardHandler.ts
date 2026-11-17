@@ -1441,7 +1441,10 @@ function initializeRegistry() {
     { name: 'set_sample_bank_c', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Sample bank C', false, 800); return true; }, description: 'Set sample bank C' },
     { name: 'sample_bank_modifier', contexts: ['pattern'], handler: () => { useUIStore.getState().setStatusMessage('Sample bank modifier', false, 800); return true; }, description: 'Sample bank modifier' },
     { name: 'delete_sample', contexts: ['global'], handler: () => {
-      useUIStore.getState().setStatusMessage('Delete sample: use instrument panel', false, 1500);
+      const { currentInstrumentId, deleteInstrument } = useInstrumentStore.getState();
+      if (currentInstrumentId == null) return true;
+      deleteInstrument(currentInstrumentId);
+      useUIStore.getState().setStatusMessage('Sample deleted', false, 1500);
       return true;
     }, description: 'Delete sample' },
     { name: 'paste_sample', contexts: ['global'], handler: () => {

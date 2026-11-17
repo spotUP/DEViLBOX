@@ -114,6 +114,12 @@ export interface SampleEditorState {
   doReverse: () => Promise<void>;
   doNormalize: () => Promise<void>;
   doDcRemoval: () => Promise<void>;
+  doPasteReplace: () => Promise<void>;
+  doPasteMix: () => Promise<void>;
+  doAmplify: (percent: number) => Promise<void>;
+  doResize: (frames: number) => Promise<void>;
+  doInsertSilence: (frames: number) => Promise<void>;
+  doResample: (rate: number) => Promise<void>;
   doUndo: () => void;
   doRedo: () => void;
   doExportWav: () => Promise<void>;
@@ -394,6 +400,44 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     }
   }, [audioBuffer, hasSelection, selectionStart, selectionEnd, applyOperation]);
 
+  const doPasteReplace = useCallback(async () => {
+    if (!clipboardBuffer || !audioBuffer) return;
+    const pos = hasSelection ? selectionStart : 0;
+    await applyOperation('Paste Replace', buf => WaveformProcessor.pasteReplace(buf, pos, clipboardBuffer));
+  }, [clipboardBuffer, audioBuffer, hasSelection, selectionStart, applyOperation]);
+
+  const doPasteMix = useCallback(async () => {
+    if (!clipboardBuffer || !audioBuffer) return;
+    const pos = hasSelection ? selectionStart : 0;
+    await applyOperation('Paste Mix', buf => WaveformProcessor.pasteMix(buf, pos, clipboardBuffer));
+  }, [clipboardBuffer, audioBuffer, hasSelection, selectionStart, applyOperation]);
+
+  /** Amplify the selection (or the whole sample) by an arbitrary percentage, 100 = unchanged. */
+  const doAmplify = useCallback(async (percent: number) => {
+    if (!audioBuffer) return;
+    const gain = percent / 100;
+    await applyOperation(`Amplify ${percent}%`, buf =>
+      hasSelection ? WaveformProcessor.adjustVolume(buf, selectionStart, selectionEnd, gain) : WaveformProcessor.applyGain(buf, gain));
+  }, [audioBuffer, hasSelection, selectionStart, selectionEnd, applyOperation]);
+
+  const doResize = useCallback(async (frames: number) => {
+    await applyOperation('Resize', buf => WaveformProcessor.resize(buf, frames));
+    clearSelection();
+    showAll();
+  }, [applyOperation, clearSelection, showAll]);
+
+  const doInsertSilence = useCallback(async (frames: number) => {
+    if (!audioBuffer) return;
+    const pos = hasSelection ? selectionStart : audioBuffer.length;
+    await applyOperation('Insert Silence', buf => WaveformProcessor.insertSilence(buf, pos, frames));
+  }, [audioBuffer, hasSelection, selectionStart, applyOperation]);
+
+  const doResample = useCallback(async (rate: number) => {
+    await applyOperation('Resample', buf => WaveformProcessor.resample(buf, rate));
+    clearSelection();
+    showAll();
+  }, [applyOperation, clearSelection, showAll]);
+
   const doExportWav = useCallback(async () => {
     if (!audioBuffer) return;
     try {
@@ -469,6 +513,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     doCut, doCopy, doPaste, doCrop, doDelete, doSilence,
     doFadeIn, doFadeOut, doVolumeUp, doVolumeDown,
     doReverse, doNormalize, doDcRemoval,
+    doPasteReplace, doPasteMix, doAmplify, doResize, doInsertSilence, doResample,
     doUndo, doRedo, doExportWav, doFindLoop, doSnapLoopToZero,
     params, updateParam,
   };
