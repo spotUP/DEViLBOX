@@ -71,4 +71,46 @@ describe('exportNativeSong reaches the existing exporter', () => {
     expect(out!.filename).toMatch(/\.fur$/);
     expect([...out!.data]).toEqual([1, 2, 3]);
   });
+
+  // Formats libopenmpt-family songs are parsed from: the in-place layout patch writes them, never the raw original unseen.
+  it.each([
+    ['mtm', 'anonymous in 4ce.mtm'],
+    ['stm', 'slideshow i.stm'],
+    ['ptm', 'rew_vibr.ptm'],
+    ['gdm', "breakin's chipsong.gdm"],
+    ['ult', 'seasons.ult'],
+    ['669', 'fonetag.669'],
+  ])('%s is written by the layout patch / layout exporter', async (ext, name) => {
+    const rel = `public/data/songs/formats/${name}`;
+    const bytes = readFixture(rel);
+    const song = { ...(await load(rel)), uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), uadeEditableFileName: name } as TrackerSong;
+    const out = await exportNativeSong(song);
+    expect(out).not.toBeNull();
+    expect(out!.filename).toMatch(new RegExp(`\\.${ext}$`));
+  });
+
+  it('psm (parsed as S3M) goes to the OpenMPT writer', async () => {
+    openMpt.mockResolvedValueOnce({ data: new Blob(['s3m']), filename: 'x.s3m', warnings: [] });
+    const song = await load('public/data/songs/formats/Epic Pinball - Song 0 - Title.psm');
+    expect(selectNativeExporter(song)?.id).toBe('openMpt');
+    await exportNativeSong(song);
+    expect(openMpt).toHaveBeenLastCalledWith(song.patterns, song.instruments, song.songPositions, expect.objectContaining({ format: 's3m' }));
+  });
+
+  it('amf (parsed as MOD, no layout) is converted by the ProTracker writer and says so', async () => {
+    const song = await load('public/data/songs/formats/avoid.amf');
+    expect(selectNativeExporter(song)?.id).toBe('mod');
+    const out = await exportNativeSong(song);
+    expect(out!.warnings.join(' ')).toMatch(/converted to a ProTracker MOD/);
+  });
+
+  it('fur without Neo Geo voices warns instead of returning the original silently', async () => {
+    const { parseFurnaceFile } = await import('@lib/import/parsers/FurnaceToSong');
+    const bytes = readFixture('public/data/songs/furnace/misc/Inner Machinations YM2610B.fur');
+    const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    const song = { ...(await parseFurnaceFile(buf, 'x.fur')), uadeEditableFileData: buf, uadeEditableFileName: 'x.fur' } as TrackerSong;
+    expect(selectNativeExporter(song)?.id).toBe('furNoWriter');
+    const out = await exportNativeSong(song);
+    expect(out!.warnings.join(' ')).toMatch(/edits are not included/);
+  });
 });
