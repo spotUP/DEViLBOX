@@ -39,7 +39,7 @@ export interface NesPlayer {
   maxStreamBanks: number;
 }
 
-export async function fetchNesPlayer(name: 'player' | 'player24' = 'player'): Promise<NesPlayer> {
+export async function fetchNesPlayer(name: 'player' | 'player24' | 'player26' = 'player'): Promise<NesPlayer> {
   const base = import.meta.env.BASE_URL;
   const [bin, meta] = await Promise.all([
     fetch(`${base}nes/${name}.bin`).then((r) => r.arrayBuffer()),

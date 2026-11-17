@@ -8,9 +8,9 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
 cd "$ROOT/public/nes"
-# Two builds of the same source: player.bin (mapper 31) and player24.bin (mapper 24 / VRC6 original cart, -D VRC6).
-for V in "" 24; do
-if [ -n "$V" ]; then D="-D VRC6"; else D=""; fi
+# Three builds of the same source: player.bin (mapper 31), player24.bin (mapper 24 / VRC6 original cart, -D VRC6) and player26.bin (mapper 26 / VRC6b, A0/A1 swapped, -D VRC6 -D VRC6B).
+for V in "" 24 26; do
+D=""; [ "$V" = 24 ] && D="-D VRC6"; [ "$V" = 26 ] && D="-D VRC6 -D VRC6B"
 ca65 $D player.s -o "$W/player.o"
 ld65 -C nes.cfg -Ln "$W/player.lbl" "$W/player.o" -o "$W/player.bin"
 cp "$W/player.bin" "player$V.bin"

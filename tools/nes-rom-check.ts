@@ -1,5 +1,5 @@
 // Headless check: capture -> buildNesRom -> Mesen2 bus-write log -> diff against the capture's per-tick writes (nesCaptureToTicks).
-// Usage: nice -n 19 npx tsx tools/nes-rom-check.ts [--only <name>] [--failed] [--target cart|nsfe|vrc6cart]  (vrc6cart = mapper-24 original cart, player24.bin, 2A03 + VRC6 songs only; nsfe results are keyed "<name>/nsfe"; FDS songs are refused by NSFe)
+// Usage: nice -n 19 npx tsx tools/nes-rom-check.ts [--only <name>] [--failed] [--target cart|nsfe|vrc6cart|vrc6bcart]  (vrc6bcart = mapper-26 (player26.bin, VRC6 register address lines A0/A1 swapped, so the bus sees $x001<->$x002 vs the capture), vrc6cart = mapper-24 original cart, player24.bin, 2A03 + VRC6 songs only; nsfe results are keyed "<name>/nsfe"; FDS songs are refused by NSFe)
 // Results: test-data/nes-rom-check.json (skips songs whose input hash matches a recorded verdict).
 // LIMIT: a real song's capture comes from the browser worklet (no node-side path), so "songs" are synthetic captures. Cycle position is not compared,
 // only (order, address, value) per tick; chips whose capture address is a register number (vrc7, n163, s5b) are mapped to their bus ports as in nesChipWritersMesen.test.ts.
@@ -48,7 +48,9 @@ const SONGS: Record<string, () => NesCapture> = {
   ]).flat()),
 };
 
-const playerName = (target: string) => (target === 'vrc6cart' ? 'player24' : 'player');
+// Mapper 26 wires VRC6 A0/A1 swapped: the capture's $x001 reaches the bus as $x002.
+const vrc6bSwap = (a: number) => (a & ~3) | ((a & 1) << 1) | ((a >> 1) & 1);
+const playerName = (target: string) => (target === 'vrc6cart' ? 'player24' : target === 'vrc6bcart' ? 'player26' : 'player');
 const hashOf = (song: string, target: string) => createHash('sha1').update(JSON.stringify(SONGS[song]())).update(target).update(readFileSync(path.join(ROOT, `public/nes/${playerName(target)}.bin`))).digest('hex').slice(0, 12);
 
 function check(name: string, target: string): Verdict {
@@ -58,10 +60,10 @@ function check(name: string, target: string): Verdict {
   try {
     const player: NesPlayer = { ...JSON.parse(readFileSync(path.join(ROOT, `public/nes/${playerName(target)}.json`), 'utf8')), bytes: Uint8Array.from(readFileSync(path.join(ROOT, `public/nes/${playerName(target)}.bin`))) };
     const info = { title: name.slice(0, 16), chips: [...new Set(capture.events.flatMap((e) => (e.kind === 'write' ? [e.chip] : [])))] };
-    const rom = target === 'vrc6cart' ? { rom: buildVrc6Cartridge([{ ntsc: capture }], player, info.title, { chipName: 'VRC6' }).rom } : target === 'nsfe' ? { rom: buildNsfe([{ ntsc: capture }], player, info).nsfe } : buildNesRom([{ ntsc: capture }], player, info);
+    const rom = (target === 'vrc6cart' || target === 'vrc6bcart') ? { rom: buildVrc6Cartridge([{ ntsc: capture }], player, info.title, { chipName: 'VRC6' }).rom } : target === 'nsfe' ? { rom: buildNsfe([{ ntsc: capture }], player, info).nsfe } : buildNesRom([{ ntsc: capture }], player, info);
     const ticks = nesCaptureToTicks(capture);
-    const want = ticks.map((t) => CHIP_ORDER.flatMap((c) => (t.writes[c] ?? []).flatMap(([a, v]) => bus(c, a, v))));
-    const got = mesen(rom.rom, ticks.length + 3, 60, target === 'vrc6cart' ? VRC6_RANGES : RANGES, target === 'nsfe' ? { fileName: 'p.nsfe', tickAddress: player.nsfPlayAddress } : target === 'vrc6cart' ? { tickAddress: player.nmiAddress } : {}).writes;
+    const want = ticks.map((t) => CHIP_ORDER.flatMap((c) => (t.writes[c] ?? []).flatMap(([a, v]) => bus(c, c === 'vrc6' && target === 'vrc6bcart' ? vrc6bSwap(a) : a, v))));
+    const got = mesen(rom.rom, ticks.length + 3, 60, (target === 'vrc6cart' || target === 'vrc6bcart') ? VRC6_RANGES : RANGES, target === 'nsfe' ? { fileName: 'p.nsfe', tickAddress: player.nsfPlayAddress } : (target === 'vrc6cart' || target === 'vrc6bcart') ? { tickAddress: player.nmiAddress } : {}).writes;
     const { diffs, first } = diffWrites(want, got);
     return { ...base, pass: diffs === 0, ticks: ticks.length, wanted: want.flat().length, got: got.flat().length, diffs, first, romBytes: rom.rom.length };
   } catch (e) { return { ...base, error: String((e as Error).message).split('\n')[0] }; }
@@ -70,7 +72,7 @@ function check(name: string, target: string): Verdict {
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : null;
 const target = args.includes('--target') ? args[args.indexOf('--target') + 1] : 'cart';
-if (target !== 'cart' && target !== 'nsfe' && target !== 'vrc6cart') throw new Error(`Unknown target ${target}`);
+if (target !== 'cart' && target !== 'nsfe' && target !== 'vrc6cart' && target !== 'vrc6bcart') throw new Error(`Unknown target ${target}`);
 const failedOnly = args.includes('--failed');
 if (!existsSync(MESEN)) throw new Error(`Mesen2 not installed at ${MESEN}`);
 if (only && !SONGS[only]) throw new Error(`Unknown song ${only}; have ${Object.keys(SONGS).join(', ')}`);

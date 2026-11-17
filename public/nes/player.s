@@ -87,7 +87,9 @@ NBARS    = 28               ; NES_BAR_BUDGET in the plan: 5 (2A03) + 3 (VRC6) + 
 .endmacro
 
 .segment "HEADER"
-.ifdef VRC6
+.ifdef VRC6B
+  .byte "NES",$1A,2,0,$A0,$18,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 26 (VRC6b: A0/A1 swapped), PRG size patched by the cartridge builder
+.elseif .defined(VRC6)
   .byte "NES",$1A,2,0,$80,$18,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 24 (VRC6), PRG size patched by the cartridge builder
 .else
   .byte "NES",$1A,2,0,$F0,$18,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 31, PRG size patched by the cartridge builder
@@ -694,6 +696,10 @@ wvrc6:                      ; index = (bank-9)*4 + (addr&3), banks $9000 / $A000
   sta tmp
   txa
   and #3
+.ifdef VRC6B
+  tay                       ; mapper 26: register address lines A0/A1 swapped ($x001 <-> $x002)
+  lda vrc6bswap,y
+.endif
   sta wp
   txa
   lsr a
@@ -709,6 +715,9 @@ wvrc6:                      ; index = (bank-9)*4 + (addr&3), banks $9000 / $A000
   ldy #0
   sta (wp),y
   rts
+.ifdef VRC6B
+vrc6bswap: .byte 0,2,1,3
+.endif
 wvrc7:                      ; $9010 register select, >= 6 cycles, $9030 data, >= 42 cycles
   sta $0380,x
   sta tmp

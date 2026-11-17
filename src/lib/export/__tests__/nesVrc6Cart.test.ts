@@ -29,3 +29,11 @@ describe.skipIf(!ready)('VRC6 cartridge (mapper 24)', () => {
     expect(() => buildVrc6Cartridge([{ ntsc: cap(song('vrc6', 10).events, 75) }], player())).toThrow(/frame rate/);
   });
 });
+
+describe.skipIf(!existsSync(join(DIR, 'player26.bin')))('VRC6b cartridge (mapper 26)', () => {
+  it('emits a mapper-26 image; the Mesen2 bus check is `tools/nes-rom-check.ts --target vrc6bcart`', () => {
+    const p: NesPlayer = { ...JSON.parse(readFileSync(join(DIR, 'player26.json'), 'utf8')), bytes: Uint8Array.from(readFileSync(join(DIR, 'player26.bin'))) };
+    const { rom } = buildVrc6Cartridge([{ ntsc: song('vrc6') }], p, 'vrc6b test');
+    expect(((rom[7] & 0xf0) | (rom[6] >> 4))).toBe(26);
+  });
+});
