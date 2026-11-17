@@ -243,12 +243,16 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
 
         {/* Footer Action */}
         <div className="p-4 bg-black/40 flex flex-col items-center gap-3">
-          <Toggle
-            label="Do not show this again"
-            value={!welcomeDialogEnabled}
-            onChange={(v) => setWelcomeDialogEnabled(!v)}
-            size="sm"
-          />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-secondary">Do not show this again</span>
+            <Toggle
+              label="Do not show this again"
+              hideLabel
+              value={!welcomeDialogEnabled}
+              onChange={(v) => setWelcomeDialogEnabled(!v)}
+              size="sm"
+            />
+          </div>
           <button 
             onClick={onClose}
             className="w-full py-3 rounded-lg font-bold text-sm transition-all uppercase tracking-widest bg-accent-primary text-dark-bg hover:opacity-90"
