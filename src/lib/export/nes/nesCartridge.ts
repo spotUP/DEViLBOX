@@ -3,6 +3,14 @@
  * Structure follows vectrex/vectrexCartridge.ts. The player image is an 8 bank (32 KB) mapper-31 ROM whose last 4 KB bank
  * holds code, vectors, title and start subsong; the cartridge keeps that bank last and puts the stream in the banks before it.
  * Mapper 31 selects 4 KB banks through an 8 bit register, so PRG is at most 1 MB (256 banks, the last one is the player).
+ *
+ * Expansion chips (Phase 5). The player writes the capture's chips at their canonical, non-mirrored addresses: VRC6 $9000-$B002,
+ * VRC7 $9010 select / $9030 data (>=6 cycles between, >=42 after the data write), FDS $4040-$408A, MMC5 $5000-$5015,
+ * N163 $F800 (bit 7 = autoincrement) / $4800, 5B $C000 select / $E000 data. A cartridge carrying several chips at once is a
+ * custom multi-chip board: NES 2.0 submapper note, mapper 31 banking plus every chip's registers decoded by the board. Its
+ * decode must (a) take bank registers at $5FF8-$5FFF only, so MMC5's $5000-$5015 is not a bank write (Mesen2's mapper 31 decodes
+ * all of $5000-$5FFF, so MMC5 aliases the bank windows there), and (b) ignore writes to $8000-$FFFF as banking (mapper 31 does).
+ * No emulator models this combined board: it is unverified; each chip is checked only as bus writes on the mapper-31 cart.
  */
 import { encodeNesStreams, NES_REGIONS, type NesRegion, type NesSubsongInput } from './nesStream';
 
