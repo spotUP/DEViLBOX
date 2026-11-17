@@ -768,6 +768,10 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         }
         break;
       }
+      case 'seqSetArpLen': {
+        if (this.wasm) this.wasm.seqSetArpLen(data.arpLen || 1);
+        break;
+      }
       case 'seqSetTempo': {
         if (this.wasm) this.wasm.seqSetTempo(data.virtualN || 150, data.virtualD || 150);
         break;
@@ -953,6 +957,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         seqSetSpeed: this.module._furnace_seq_set_speed,
         seqSetSpeedPattern: this.module._furnace_seq_set_speed_pattern,
         seqSetTempo: this.module._furnace_seq_set_tempo,
+        seqSetArpLen: this.module._furnace_seq_set_arp_len,
         seqSetGroove: this.module._furnace_seq_set_groove,
         seqSetGrooveEntry: this.module._furnace_seq_set_groove_entry,
         seqSetRepeatPattern: this.module._furnace_seq_set_repeat_pattern,

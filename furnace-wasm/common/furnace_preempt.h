@@ -368,7 +368,7 @@ struct DivCompatFlags {
     oldArpStrategy=false; brokenPortaLegato=false; brokenFMOff=false;
     preNoteNoEffect=false; oldDPCM=false; resetArpPhaseOnNewNote=false;
     ceilVolumeScaling=false; oldAlwaysSetVolume=false; oldSampleOffset=false;
-    oldCenterRate=true; noVolSlideReset=false; arpSpeedGlobal=false;
+    oldCenterRate=false; noVolSlideReset=false; arpSpeedGlobal=false;
   }
   bool areDefaults() { DivCompatFlags d; d.setDefaults(); return memcmp(this, &d, sizeof(DivCompatFlags)) == 0; }
   bool readData(SafeReader& reader) { return true; }

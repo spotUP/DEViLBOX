@@ -342,6 +342,17 @@ describe('exportFurnaceModule', () => {
     expect((mod.chipFlags ?? []).join('')).not.toMatch(/fmVol=(?!256)/);
   });
 
+  it('chip config (sysConf flags, volume, pan) survives export then parse, and a second export of the parsed module is identical', async () => {
+    const parse = (bytes: Uint8Array) => parseFurnaceSong(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
+    const flags = 'ssgVol=100\nfmVol=200\nclockSel=1\n';
+    const r = exportFurnaceModule({ ...song(), chipFlags: flags, systemVol: 0.5, systemPan: -0.5, systemPanFR: 0.25 });
+    const mod = await parse(r.bytes);
+    expect(mod.chipFlags).toEqual([flags]);
+    expect(mod.systemVol?.[0]).toBeCloseTo(0.5);
+    expect(mod.systemPan?.[0]).toBeCloseTo(-0.5);
+    expect(mod.systemPanFR?.[0]).toBeCloseTo(0.25);
+  });
+
   it('keeps the second speed, the grooves and the compat flags of a loaded Furnace module', async () => {
     const r = exportFurnaceModule({
       ...song(),

@@ -105,6 +105,15 @@ export interface FurnaceModuleSong {
   virtualTempoD?: number;
   /** Second speed of the speed pattern (Furnace alternates speed 1 and speed 2 per row). */
   speed2?: number;
+  /** Full speed pattern (1-16 entries, Furnace cycles them per row). Wins over initialSpeed/speed2 when set. */
+  speedPattern?: number[];
+  /** Arpeggio speed (ticks per arpeggio step, 1-255). */
+  arpSpeed?: number;
+  /** Song info of the module: author, album (Furnace "category"), system name (empty = Neo Geo MVS), A-4 tuning in Hz. */
+  author?: string;
+  album?: string;
+  systemName?: string;
+  tuning?: number;
   /** Compat flags of a loaded module (Furnace key names); absent = Furnace defaults. */
   compatFlags?: Record<string, unknown>;
   /** AY Scramble export only: keep effects, macro codes, release points and macro modes the old player contract
@@ -112,6 +121,11 @@ export interface FurnaceModuleSong {
   keepOutsideContract?: boolean;
   /** Groove patterns of a loaded module, 16 entries each, unused entries 0. */
   grooves?: number[][];
+  /** Chip config of a loaded module: sysConf flag string (key=value lines), volume (1 = 1.0), pan and front/rear pan (-1..1). Absent = Neo Geo defaults. */
+  chipFlags?: string;
+  systemVol?: number;
+  systemPan?: number;
+  systemPanFR?: number;
   /** Write the extended-FM chip (0xa6, 17 channels): channels 1-4 are FM 2 OP1-OP4. */
   extendedFm?: boolean;
 }
@@ -543,11 +557,15 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   const hz = song.hz ?? 60;
   const vN = song.virtualTempoN ?? Math.max(1, Math.min(65535, Math.round(song.initialBPM)));
   const vD = song.virtualTempoD ?? 150;
-  const speed1 = Math.max(1, song.initialSpeed);
-  const speed2 = song.speed2 && song.speed2 > 0 && song.speed2 !== speed1 ? song.speed2 : 0;
-  if (speed1 > 255 || speed2 > 255) throw new Error(`Cannot export a Furnace module: speed ${Math.max(speed1, speed2)} is over the 255 Furnace 0.6.8.3 stores`);
+  const speeds = song.speedPattern && song.speedPattern.length > 0
+    ? song.speedPattern.slice(0, 16).map((v) => Math.max(1, Math.round(v)))
+    : [Math.max(1, song.initialSpeed), ...(song.speed2 && song.speed2 > 0 && song.speed2 !== Math.max(1, song.initialSpeed) ? [song.speed2] : [])];
+  const speed1 = speeds[0], speed2 = speeds[1] ?? 0;
+  if (speeds.some((v) => v > 255)) throw new Error(`Cannot export a Furnace module: speed ${Math.max(...speeds)} is over the 255 Furnace 0.6.8.3 stores`);
+  const arpSpeed = Math.max(1, Math.min(255, Math.round(song.arpSpeed ?? 1)));
   const grooves = (song.grooves ?? []).slice(0, 255);
   if (grooves.some((g) => g.some((v) => v > 255))) throw new Error('Cannot export a Furnace module: a groove entry is over the 255 Furnace 0.6.8.3 stores');
+  const sysVol = song.systemVol ?? 1, sysPan = song.systemPan ?? 0, sysPanFR = song.systemPanFR ?? 0;
   const compat = infoCompatFlags(song.compatFlags ?? {}, warnings);
 
   const userSamples = collectUserSamples(neo.map((inst) => inst.furnace as FurnaceConfig));
@@ -557,21 +575,21 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   // Chip flags of the YM2610 (fur.cpp, "CHIP FLAGS": key=value lines, zero-terminated). Furnace
   // loads a module without this block at SSG volume 128, half the level of the chip, which
   // furtool then compensates in the wrong amount (see FUR_NEO_GEO_CHIP_FLAGS).
-  const flag = block('FLAG', new Bytes().str(FUR_NEO_GEO_CHIP_FLAGS));
+  const flag = block('FLAG', new Bytes().str(song.chipFlags ?? FUR_NEO_GEO_CHIP_FLAGS));
   // Asset directories (instruments, waves, samples): one empty directory each.
   const adir = block('ADIR', new Bytes().u32(0));
 
   // Layout: header, INFO, FLAG, ADIR x3, INS2..., SMP2..., PATN... (fur.cpp v0.6.8.3, old INFO reader).
   const buildInfo = (flagPtr: number, adirPtrs: number[], insPtrs: number[], smpPtrs: number[], patPtrs: number[]): Uint8Array => {
     const b = new Bytes()
-      .u8(0).u8(speed1).u8(speed2 || speed1).u8(1) // time base, speeds, arpeggio speed
+      .u8(0).u8(speed1).u8(speed2 || speed1).u8(arpSpeed) // time base, speeds, arpeggio speed
       .f32(hz).u16(patLen).u16(song.songPositions.length).u8(4).u8(16)
       .u16(ins2.length).u16(0).u16(smp2.length).u32(patnBlocks.length);
     for (let i = 0; i < 32; i++) b.u8(i === 0 ? system : 0);
-    for (let i = 0; i < 32; i++) b.u8(i === 0 ? 64 : 0); // chip volume, 64 = 1.0
-    for (let i = 0; i < 32; i++) b.u8(0); // chip panning
+    for (let i = 0; i < 32; i++) b.u8(i === 0 ? Math.round(sysVol * 64) : 0); // chip volume, 64 = 1.0
+    for (let i = 0; i < 32; i++) b.u8(i === 0 ? Math.round(sysPan * 127) : 0); // chip panning
     for (let i = 0; i < 32; i++) b.u32(i === 0 ? flagPtr : 0);
-    b.str(song.name).str('').f32(440);
+    b.str(song.name).str(song.author ?? '').f32(song.tuning ?? 440);
     compat[0].forEach((v) => b.u8(v));
     insPtrs.forEach((p) => b.u32(p));
     smpPtrs.forEach((p) => b.u32(p));
@@ -588,13 +606,13 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
     compat[1].forEach((v) => b.u8(v));
     b.u16(vN).u16(vD);
     b.str('').str('').u8(0).u8(0).u8(0).u8(0); // first subsong name and notes, no more subsongs, reserved
-    b.str('Neo Geo MVS').str('').str('').str('').str('').str('');
-    b.f32(1).f32(0).f32(0); // chip volume, panning, front/rear panning
+    b.str(song.systemName || 'Neo Geo MVS').str(song.album ?? '').str('').str('').str('').str('');
+    b.f32(sysVol).f32(sysPan).f32(sysPanFR); // chip volume, panning, front/rear panning
     b.u32(0).u8(1); // patchbay: no connections, automatic
     compat[2].forEach((v) => b.u8(v));
     // Speed pattern: length byte, 16 x u8. Two entries = Furnace alternates them per row.
-    b.u8(speed2 ? 2 : 1);
-    for (let i = 0; i < 16; i++) b.u8(i === 0 ? speed1 : i === 1 ? speed2 : 0);
+    b.u8(speeds.length);
+    for (let i = 0; i < 16; i++) b.u8(speeds[i] ?? 0);
     b.u8(grooves.length);
     for (const g of grooves) b.bytes(grooveBody(g).toUint8Array());
     adirPtrs.forEach((p) => b.u32(p));

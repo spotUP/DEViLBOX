@@ -100,6 +100,7 @@ export async function uploadFurnaceToSequencer(
     virtualN: sub.virtualTempoN,
     virtualD: sub.virtualTempoD
   });
+  engine.seqPostMessage({ type: 'seqSetArpLen', arpLen: sub.arpLen ?? 1 });
   // Set tick rate (hz) — controls how often ticks fire (e.g. 60 for NTSC, 50 for PAL)
   // This updates both the sequencer divider AND the worklet's samplesPerTick
   engine.seqPostMessage({ type: 'setTickRate', hz: sub.hz || 60 });

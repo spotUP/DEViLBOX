@@ -342,6 +342,7 @@ struct FurnaceSequencer {
 
   // --- Tempo / timing ---
   SeqGroovePattern speeds;      // groove-based speed
+  uint8_t arpLen = 1;           // subsong arp speed; channels start at this (engine.cpp MAX(1,arpLen))
   int16_t virtualTempoN;        // virtual tempo numerator (default 150)
   int16_t virtualTempoD;        // virtual tempo denominator (default 150)
   int16_t tempoAccum;           // fractional tick accumulator
@@ -423,6 +424,7 @@ struct FurnaceSequencer {
 
     speeds.reset();
     virtualTempoN = 150;
+    arpLen = 1;
     virtualTempoD = 150;
     tempoAccum = 0;
     divider = 60.0;
@@ -509,6 +511,7 @@ void furnace_seq_set_speed(int speed1, int speed2);
 
 // Set virtual tempo numerator and denominator.
 void furnace_seq_set_tempo(int tempoN, int tempoD);
+void furnace_seq_set_arp_len(int arpLen);
 
 // Set groove pattern (array of up to SEQ_MAX_GROOVE speed values).
 void furnace_seq_set_groove(const uint16_t* values, int len);

@@ -236,6 +236,11 @@ int fur_get_virtual_tempo(int subsong, int which) {
   return g_engine.song.subsong[subsong]->virtualTempoD;
 }
 
+int fur_get_arp_len(int subsong) {
+  if (subsong < 0 || subsong >= (int)g_engine.song.subsong.size()) return 1;
+  return g_engine.song.subsong[subsong]->arpLen;
+}
+
 int fur_get_groove(int subsong, int grooveIdx, int pos) {
   if (grooveIdx < 0 || grooveIdx >= (int)g_engine.song.grooves.size()) return -1;
   if (pos < 0 || pos >= (int)g_engine.song.grooves[grooveIdx].len) return -1;

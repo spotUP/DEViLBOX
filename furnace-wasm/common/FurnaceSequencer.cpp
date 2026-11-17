@@ -1575,7 +1575,7 @@ static bool seqNextTick() {
             g_seq.curSpeed = 0;
             g_seq.ticks = 1;
             g_seq.tempoAccum = 0;
-            for (int c = 0; c < g_seq.numChannels; c++) g_seq.chan[c].arpSpeed = 1;
+            for (int c = 0; c < g_seq.numChannels; c++) g_seq.chan[c].arpSpeed = g_seq.arpLen;
             g_seq.nextSpeed = g_seq.speeds.val[0];
             g_seq.prevSpeed = g_seq.nextSpeed;
             memset(g_seq.walked, 0, sizeof(g_seq.walked));
@@ -2158,6 +2158,11 @@ void furnace_seq_set_speed_pattern(const uint16_t* values, int len) {
   }
   g_seq.curSpeed = 0;
   g_seq.nextSpeed = g_seq.speeds.val[0];
+}
+
+EMSCRIPTEN_KEEPALIVE
+void furnace_seq_set_arp_len(int arpLen) {
+  g_seq.arpLen = arpLen > 1 ? (uint8_t)arpLen : 1;
 }
 
 EMSCRIPTEN_KEEPALIVE

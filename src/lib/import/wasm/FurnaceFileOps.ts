@@ -65,6 +65,7 @@ interface FurnaceFileOpsAPI {
   fur_get_tempo(subsong: number): number;
   fur_get_hz(subsong: number): number;
   fur_get_virtual_tempo(subsong: number, which: number): number;
+  fur_get_arp_len(subsong: number): number;
   fur_get_groove(subsong: number, grooveIdx: number, pos: number): number;
   fur_get_song_name(): string;
   fur_get_song_author(): string;
@@ -115,6 +116,7 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_get_tempo: m.cwrap('fur_get_tempo', 'number', ['number']),
     fur_get_hz: m.cwrap('fur_get_hz', 'number', ['number']),
     fur_get_virtual_tempo: m.cwrap('fur_get_virtual_tempo', 'number', ['number', 'number']),
+    fur_get_arp_len: m.cwrap('fur_get_arp_len', 'number', ['number']),
     fur_get_groove: m.cwrap('fur_get_groove', 'number', ['number', 'number', 'number']),
     fur_get_song_name: m.cwrap('fur_get_song_name', 'string', []),
     fur_get_song_author: m.cwrap('fur_get_song_author', 'string', []),
@@ -347,6 +349,7 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
       hz,
       virtualTempoN,
       virtualTempoD,
+      arpLen: api.fur_get_arp_len(s),
     };
     if (speedPattern) {
       subsongData.speedPattern = speedPattern;

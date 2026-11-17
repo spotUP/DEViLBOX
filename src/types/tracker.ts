@@ -633,6 +633,7 @@ export interface FurnaceSubsong {
   hz: number;
   virtualTempoN: number;
   virtualTempoD: number;
+  arpLen?: number;                   // Per-channel arp speed at play start (Furnace engine.cpp: MAX(1, arpLen))
   speedPattern?: number[];           // Groove-style speed pattern (1-16 entries)
 }
 
