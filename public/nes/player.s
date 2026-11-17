@@ -262,16 +262,15 @@ nmi:
   pha
   tya
   pha
+  jsr screen                ; PPU writes first, while the whole vblank is free; a heavy tick would push them past it
   lda period
   ora period+1
-  bne @scr                  ; IRQ board: the cycle IRQ ticks
+  bne nmiend                ; IRQ board: the cycle IRQ ticks
   lda paused
-  bne @scr
+  bne nmiend
   ldy #0
   jsr dpcm_apply
   jsr tick
-@scr:
-  jsr screen
 nmiend:
   pla
   tay

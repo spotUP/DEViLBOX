@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCES = {'public/nes/player.s', 'public/nes/nes.cfg', 'tools/build-nes-player.sh'}
+SOURCES = {'public/nes/player.s', 'public/nes/nes.cfg', 'public/nes/screen.chr', 'tools/build-nes-player.sh'}
 ARTIFACTS = {'public/nes/player.bin', 'public/nes/player.json'}
 
 
