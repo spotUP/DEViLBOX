@@ -64,3 +64,43 @@ describe('parseCustomMadeFile — suffix-named .cm', () => {
     expect(notes.length).toBeGreaterThan(0);
   });
 });
+
+describe('Custom Made note on an empty row', () => {
+  it('lands in the song bytes at that row and leaves every other row alone; an unedited export is byte-identical', async () => {
+    const { patchModuleByLayout } = await import('@/lib/export/layoutPatch');
+    const { setGridBaseline, baselineOf } = await import('@/lib/song/gridBaseline');
+    const buf = loadBuf(resolve(REF, 'formats/cm.viking_child'));
+    const song = await parseCustomMadeFile(buf, 'cm.viking_child');
+    setGridBaseline(baselineOf(song.patterns));
+    const same = patchModuleByLayout(song.uadeEditableFileData!, song.uadePatternLayout!, song.patterns);
+    expect(Buffer.from(same.bytes).equals(Buffer.from(buf))).toBe(true);
+
+    // First blank row directly under a note, on a voice with notes.
+    let target: { p: number; ch: number; r: number } | null = null;
+    for (let p = 0; p < song.patterns.length && !target; p++) {
+      for (let ch = 0; ch < 4 && !target; ch++) {
+        const rows = song.patterns[p].channels[ch].rows;
+        for (let r = 1; r < 63; r++) if (rows[r - 1].note > 0 && rows[r].note === 0 && rows[r + 1].note === 0) { target = { p, ch, r }; break; }
+      }
+    }
+    expect(target).not.toBeNull();
+    const { p, ch, r } = target!;
+    const note = song.patterns[p].channels[ch].rows[r - 1].note;
+    // Same pitch as the row above can't tell a new event from the hold: pick another playable one.
+    const other = song.patterns.flatMap((q) => q.channels.flatMap((c) => c.rows)).find((c) => c.note > 0 && c.note !== note)!.note;
+    const edited = song.patterns.map((pt, pi) => pi !== p ? pt : { ...pt, channels: pt.channels.map((c, ci) => ci !== ch ? c : { ...c, rows: c.rows.map((cell, ri) => ri === r ? { ...cell, note: other } : cell) }) });
+    const out = patchModuleByLayout(song.uadeEditableFileData!, song.uadePatternLayout!, edited);
+    expect(out.unplaced).toEqual([]);
+    setGridBaseline(null);
+    const back = await parseCustomMadeFile(out.bytes.buffer.slice(out.bytes.byteOffset, out.bytes.byteOffset + out.bytes.byteLength) as ArrayBuffer, 'cm.viking_child');
+    expect(back.patterns[p].channels[ch].rows[r].note).toBe(other);
+    // The track is shared by every repeat of it (propagateSharedCells), so the new event shows at each repeat; every other row is untouched.
+    const changed: string[] = [];
+    for (let pi = 0; pi < song.patterns.length; pi++) for (let ci = 0; ci < 4; ci++) for (let ri = 0; ri < 64; ri++) {
+      if (back.patterns[pi].channels[ci].rows[ri].note !== song.patterns[pi].channels[ci].rows[ri].note) changed.push(`${pi}:${ci}:${ri}`);
+    }
+    expect(changed).toContain(`${p}:${ch}:${r}`);
+    expect(changed.every((k) => k.split(':')[1] === String(ch) && +k.split(':')[2] === r || back.patterns[+k.split(':')[0]].channels[ch].rows[+k.split(':')[2]].note === other)).toBe(true);
+    expect(changed.every((k) => k.split(':')[1] === String(ch))).toBe(true);
+  });
+});

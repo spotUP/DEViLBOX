@@ -20,7 +20,7 @@ export interface LayoutPatchResult {
 }
 
 export function patchModuleByLayout(source: ArrayBuffer | Uint8Array, layout: UADEPatternLayout, patterns: readonly Pattern[]): LayoutPatchResult {
-  const buf = new Uint8Array(source instanceof Uint8Array ? source : new Uint8Array(source)).slice();
+  let buf: Uint8Array = new Uint8Array(source instanceof Uint8Array ? source : new Uint8Array(source)).slice();
   const unplaced: LayoutPatchResult['unplaced'] = [];
   let patched = 0;
   for (const { pattern, row, channel, cell } of editedCells(patterns)) {
@@ -36,6 +36,15 @@ export function patchModuleByLayout(source: ArrayBuffer | Uint8Array, layout: UA
     const encoded = encodeStoredCell(layout, pattern, row, channel, cell, stored);
     if (!encoded) { unplaced.push({ pattern, row, channel }); continue; }
     for (let i = 0; i < encoded.length; i++) if (buf[offset + i] !== encoded[i]) { buf[offset + i] = encoded[i]; patched++; }
+  }
+  // Inserts go last: they copy the track, and the in-place edits above must already be in it.
+  if (layout.insertNote) {
+    const edited = new Map(editedCells(patterns).map((e) => [`${e.pattern}:${e.row}:${e.channel}`, e.cell]));
+    for (let i = unplaced.length - 1; i >= 0; i--) {
+      const u = unplaced[i];
+      const grown = layout.insertNote(buf, u.pattern, u.row, u.channel, edited.get(`${u.pattern}:${u.row}:${u.channel}`)!);
+      if (grown) { buf = grown; patched++; unplaced.splice(i, 1); }
+    }
   }
   return { bytes: buf, patched, unplaced };
 }

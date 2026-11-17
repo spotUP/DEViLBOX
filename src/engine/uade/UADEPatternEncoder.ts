@@ -119,6 +119,8 @@ export interface UADEPatternLayout {
    * leave the note bytes alone instead of re-deriving them from the grid note). Applied by patchModuleByLayout
    * and the chip-RAM cell writer next to encodeCell.
    */
+  /** A note on a row the layout has no byte for, put in by growing the module: the new module bytes, or null when the row takes no note. */
+  insertNote?: (bytes: Uint8Array, pattern: number, row: number, channel: number, cell: TrackerCell) => Uint8Array | null;
   effectPatches?: (pattern: number, row: number, channel: number, cell: TrackerCell) => { patches: Array<[number, number]>; noteUnchanged: boolean };
   writeCell?: (pattern: number, row: number, channel: number, cell: TrackerCell) => Array<{ offset: number; bytes: Uint8Array }>;
   /**

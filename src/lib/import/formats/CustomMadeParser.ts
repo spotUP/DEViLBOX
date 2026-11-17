@@ -364,10 +364,12 @@ export async function parseCustomMadeFile(
       propagateSharedCells: true,
       encodeOverStored: true,
       encodeCell: (_cell: TrackerCell, stored?: Uint8Array) => stored ?? new Uint8Array(1),
+      insertNote: (bytes: Uint8Array, pattern: number, row: number, channel: number, cell: TrackerCell) => insertCustomMadeNote(bytes, channel, pattern * 64 + row, cell.note),
       // shortcut: only the note is written back; the instrument comes from $82 commands shared by many notes and needs a command editor.
       effectPatches: (pattern: number, row: number, channel: number, cell: TrackerCell) => {
         const ev = eventAt(pattern, row, channel);
-        if (!ev || !grid || !(cell.note > 0)) return { patches: [], noteUnchanged: true };
+        if (!grid || !(cell.note > 0)) return { patches: [], noteUnchanged: true };
+        if (!ev) return { patches: [], noteUnchanged: false }; // a row inside a held note: layoutPatch hands it to insertNote
         const index = grid.indexOfGridNote(cell.note);
         const value = index - ev.transpose;
         if (index < 0 || value < 0 || value > 0x7F) return { patches: [], noteUnchanged: true };
@@ -379,10 +381,14 @@ export async function parseCustomMadeFile(
 
 // ── Grid decoder (CustomMade_v1.asm InitPlayer scan + per-voice track walk) ─
 
-interface CustomMadeEvent { noteOffset: number; index: number; transpose: number; instrument: number }
+interface CustomMadeEvent { noteOffset: number; index: number; transpose: number; instrument: number; durOffset: number; trackStart: number }
 export interface CustomMadeGrid {
   channels: Array<{ rows: number; events: Map<number, CustomMadeEvent> }>;
   bpm: number;
+  /** Address the module is loaded at minus its file offset 0 (a file offset + base is a track pointer). */
+  base: number;
+  /** Every voice-list entry: where its track pointer sits in the file and the track it plays. */
+  entries: Array<{ at: number; track: number }>;
   gridNote: (index: number) => number;
   indexOfGridNote: (note: number) => number;
 }
@@ -446,6 +452,7 @@ export function decodeCustomMadeGrid(buf: Uint8Array): CustomMadeGrid | null {
   const notes = periods.map((p) => periodToGridNote(p));
   const fileOff = (ptr: number) => ptr - base;
 
+  const entries: CustomMadeGrid['entries'] = [];
   const channels = [0, 1, 2, 3].map((voice) => {
     const events = new Map<number, CustomMadeEvent>();
     const list = fileOff(u32BE(buf, songsTab + voice * 4));
@@ -457,6 +464,7 @@ export function decodeCustomMadeGrid(buf: Uint8Array): CustomMadeGrid | null {
     walk: while (entry + 12 <= len && u32BE(buf, entry) !== 0xFFFFFFFF) {
       const track = fileOff(u32BE(buf, entry));
       const transpose = s16(buf, entry + 6);
+      entries.push({ at: entry, track });
       let repeat = u16BE(buf, entry + 10);
       if (repeat === 0x270F) repeat = 0x3E;
       repeat = Math.max(1, repeat);
@@ -468,7 +476,7 @@ export function decodeCustomMadeGrid(buf: Uint8Array): CustomMadeGrid | null {
           let b = buf[p];
           if (b === 0x80) { p += 2; b = buf[p]; }
           if (b === 0x81) {
-            events.set(tick / 4, { noteOffset: p + 1, index: buf[p + 1] + transpose, transpose, instrument });
+            events.set(tick / 4, { noteOffset: p + 1, index: buf[p + 1] + transpose, transpose, instrument, durOffset: p + 3, trackStart: track });
             tick += ((buf[p + 3] * 4 - 1) & 0xFF) + 1;
             p += 4;
             continue;
@@ -480,7 +488,7 @@ export function decodeCustomMadeGrid(buf: Uint8Array): CustomMadeGrid | null {
           if (b & 0x80) break; // track end
           const dur = buf[p + 1];
           if (dur !== 0) {
-            events.set(tick / 4, { noteOffset: p, index: b + transpose, transpose, instrument });
+            events.set(tick / 4, { noteOffset: p, index: b + transpose, transpose, instrument, durOffset: p + 1, trackStart: track });
             tick += ((dur * 4 - 1) & 0xFF) + 1;
           }
           p += 2;
@@ -494,7 +502,58 @@ export function decodeCustomMadeGrid(buf: Uint8Array): CustomMadeGrid | null {
   return {
     channels,
     bpm: timer > 0 ? Math.round(1773447 / timer) : 125,
+    base,
+    entries,
     gridNote: (index) => (index >= 0 && index < notes.length ? notes[index] : 0),
     indexOfGridNote: (note) => notes.indexOf(note),
   };
+}
+
+/** File offset just past a track's terminator (the same walk as decodeCustomMadeGrid). */
+function customMadeTrackEnd(buf: Uint8Array, start: number): number {
+  let p = start;
+  for (let guard = 0; guard < 0x10000 && p + 1 < buf.length; guard++) {
+    let b = buf[p];
+    if (b === 0x80) { p += 2; b = buf[p]; }
+    if (b === 0x81) { p += 4; continue; }
+    if (b === 0x82) { p += 2; b = buf[p]; }
+    if (b === 0x83) return Math.min(buf.length, p + 1);
+    if (b === 0x84) { p += 2; b = buf[p]; }
+    if (b === 0x85 || (b & 0x80)) return Math.min(buf.length, p + 2);
+    p += 2;
+  }
+  return buf.length;
+}
+
+/**
+ * A note typed on a row inside a held note: the covering event is cut at that row and a new event for the rest of its length is written
+ * behind it. The track grows by two bytes, so it is copied to the end of the module (pointers are absolute, nothing behind it moves) and
+ * every voice-list entry that played the old track points at the copy. Returns null when the row has no covering event to cut.
+ */
+export function insertCustomMadeNote(bytes: Uint8Array, channel: number, row: number, note: number): Uint8Array | null {
+  const grid = decodeCustomMadeGrid(bytes);
+  const ch = grid?.channels[channel];
+  if (!grid || !ch || row >= ch.rows) return null;
+  let r0 = row;
+  while (r0 >= 0 && !ch.events.has(r0)) r0--;
+  const ev = ch.events.get(r0);
+  const index = grid.indexOfGridNote(note);
+  if (!ev || r0 === row) return null;
+  const dur = bytes[ev.durOffset];
+  const value = index - ev.transpose;
+  if (index < 0 || value < 0 || value > 0x7F || dur > 63 || r0 + dur <= row) return null;
+  const evEnd = ev.durOffset + 1;
+  const trackEnd = customMadeTrackEnd(bytes, ev.trackStart);
+  const copy = new Uint8Array(trackEnd - ev.trackStart + 2);
+  copy.set(bytes.subarray(ev.trackStart, evEnd));
+  copy[ev.durOffset - ev.trackStart] = row - r0;
+  copy.set([value, dur - (row - r0)], evEnd - ev.trackStart);
+  copy.set(bytes.subarray(evEnd, trackEnd), evEnd - ev.trackStart + 2);
+  const at = (bytes.length + 1) & ~1;
+  const out = new Uint8Array(at + copy.length);
+  out.set(bytes);
+  out.set(copy, at);
+  const dv = new DataView(out.buffer);
+  for (const e of grid.entries) if (e.track === ev.trackStart) dv.setUint32(e.at, at + grid.base);
+  return out;
 }
