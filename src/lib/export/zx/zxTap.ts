@@ -75,7 +75,7 @@ const codeBlocks = (name: string, address: number, data: Uint8Array) =>
   [tapBlock(0x00, header(3, name, data.length, address, 32768)), tapBlock(0xFF, data)];
 
 type BasicItem = number | string; // number = token byte, string = literal text
-const TOK = { CLEAR: 0xFD, OUT: 0xDF, LOAD: 0xEF, CODE: 0xAF, RANDOMIZE: 0xF9, USR: 0xC0 };
+const TOK = { CLEAR: 0xFD, POKE: 0xF4, OUT: 0xDF, LOAD: 0xEF, CODE: 0xAF, RANDOMIZE: 0xF9, USR: 0xC0 };
 
 /** A number in a BASIC line: digits, then 0x0E and the 5-byte integer form. */
 function num(n: number): number[] {
@@ -88,7 +88,11 @@ function basicLine(lineNo: number, items: BasicItem[]): number[] {
   return [lineNo >> 8, lineNo & 0xFF, content.length & 0xFF, content.length >> 8, ...content];
 }
 
-/** CLEAR 32767; LOAD ""CODE 32768; per bank OUT 32765,16+bank: LOAD ""CODE 49152; RANDOMIZE USR 32768. Tape block order must match. */
+/**
+ * CLEAR 32767; LOAD ""CODE 32768; per bank POKE 23388,16+bank: OUT 32765,16+bank: LOAD ""CODE 49152; RANDOMIZE USR 32768.
+ * Tape block order must match. The POKE keeps BANK_M (23388) in step: 128 BASIC (the Tape Loader) re-pages port 32765
+ * from BANK_M around LOAD, so a bare OUT is undone and every bank lands in bank 0.
+ */
 export function basicLoader(banks: number[], p: Pick<ZxPlayer, 'loadAddress' | 'entry' | 'dataAddress'>): Uint8Array {
   const colon = ':';
   const load = (addr: number) => [TOK.LOAD, '""', TOK.CODE, ...num(addr)];
@@ -97,7 +101,7 @@ export function basicLoader(banks: number[], p: Pick<ZxPlayer, 'loadAddress' | '
   lines.push(...basicLine(10, flat([TOK.CLEAR, ...num(p.loadAddress - 1)])));
   lines.push(...basicLine(20, flat(load(p.loadAddress))));
   banks.forEach((b, i) => {
-    lines.push(...basicLine(30 + i * 10, flat([TOK.OUT, ...num(32765), ',', ...num(16 + b), colon, ...load(p.dataAddress)])));
+    lines.push(...basicLine(30 + i * 10, flat([TOK.POKE, ...num(23388), ',', ...num(16 + b), colon, TOK.OUT, ...num(32765), ',', ...num(16 + b), colon, ...load(p.dataAddress)])));
   });
   lines.push(...basicLine(30 + banks.length * 10, flat([TOK.RANDOMIZE, TOK.USR, ...num(p.entry)])));
   return Uint8Array.from(lines);

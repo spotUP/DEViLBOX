@@ -82,6 +82,10 @@ describe('ZX .tap', () => {
     expect(blocks[0].flag).toBe(0x00);
     expect(blocks[0].data[0]).toBe(0); // program
     expect(blocks[1].data[blocks[1].data.length - 1]).toBe(0x0D);
+    // each bank is paged with POKE 23388 (BANK_M) before OUT 32765, else 128 BASIC re-pages bank 0 around LOAD
+    const basic = String.fromCharCode(...blocks[1].data);
+    const pagings = [...basic.matchAll(/\xF423388\x0E[\s\S]{5},(\d+)\x0E[\s\S]{5}:\xDF32765\x0E[\s\S]{5},(\d+)\x0E/g)];
+    expect(pagings.map((m) => [Number(m[1]), Number(m[2])])).toEqual(player.usableBanks.slice(0, r.banks).map((b) => [16 + b, 16 + b]));
     expect(blocks[3].data.length).toBe(player.bytes.length);
     // bank table patched with ROM 1 + bank numbers
     const code = blocks[3].data;
