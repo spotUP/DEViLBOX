@@ -97,4 +97,15 @@ describe.skipIf(!ready)('NES player in Mesen2 (APU writes per tick vs capture)',
     expect(first).toBeGreaterThan(40);  // 4081 bytes at the fastest rate take about 59 ticks from tick 8
     expect(window.slice(first).every((v) => v === 0xa5)).toBe(true);
   }, 90000);
+
+  it('switches the DPCM window at once while the DMC loops ($4010 bit 6)', () => {
+    const ctl = (tick: number, value: number): NesEvent => ({ kind: 'control', chip: 'nes', sample: at(tick), control: NES_CONTROL.DPCM_BANK, channel: 0, value });
+    const cap: NesCapture = { events: [ctl(2, 3), w(8, 0x4010, 0x4f), w(8, 0x4012, 0x00), w(8, 0x4013, 0xff), w(8, 0x4015, 0x10), ctl(12, 5), w(40, 0x4000, 0x01)], sampleRate: SR, tickRateHz: TR };
+    const cart = buildNesCartridge([{ ntsc: cap }], player(), 'dpcm loop test');
+    cart.rom[16 + 3 * 4096] = 0xa3;
+    cart.rom[16 + 5 * 4096] = 0xa5;
+    const { window } = mesen(cart.rom, 50);
+    expect(window[10]).toBe(0xa3);
+    expect(window[20]).toBe(0xa5);      // a looping DMC never clears $4015 bit 4: the switch must not wait for it
+  }, 90000);
 });

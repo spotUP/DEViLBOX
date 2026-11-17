@@ -561,9 +561,13 @@ tick:
 dpcm_apply:
   lda pendf
   beq @no
+  lda shadow+$10            ; $4010 bit 6 = loop: the DMC never finishes, so bit 4 stays set; switch at once (the next restart reads the new bank)
+  and #$40
+  bne @go
   lda $4015
   and #$10
   bne @no
+@go:
   lda pendb
   sta $5FFC
   clc
