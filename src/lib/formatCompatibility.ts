@@ -268,7 +268,7 @@ export function getActiveFormatLimits(): FormatConstraints | null {
       fmt.jamCrackerFileData || fmt.futurePlayerFileData || fmt.preTrackerFileData ||
       fmt.maFileData || fmt.hippelFileData || fmt.sonixFileData || fmt.pxtoneFileData ||
       fmt.organyaFileData || fmt.sawteethFileData || fmt.eupFileData || fmt.sc68FileData || fmt.zxtuneFileData ||
-      fmt.pumaTrackerFileData || fmt.artOfNoiseFileData || fmt.qsfFileData || fmt.bdFileData ||
+      fmt.pumaTrackerFileData || fmt.protracker4FileData || fmt.artOfNoiseFileData || fmt.qsfFileData || fmt.bdFileData ||
       fmt.sd2FileData || fmt.symphonieFileData || fmt.v2mFileData || fmt.ayFileData || fmt.piyoPiyoFileData ||
       fmt.tfmFileData || fmt.sndhFileData || fmt.hippelStFileData || fmt.gmeFileData || fmt.s98FileData || fmt.stoneTrackerFileData || fmt.musicMakerFileData || fmt.eaglePlayerFileData || fmt.nuadeFileData
     );

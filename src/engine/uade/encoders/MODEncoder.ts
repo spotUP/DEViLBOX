@@ -59,6 +59,7 @@ registerPatternEncoder('stk', () => encodeMODCell);
 registerPatternEncoder('gmc', () => encodeMODCell);
 registerPatternEncoder('ice', () => encodeMODCell);
 registerPatternEncoder('pt36', () => encodeMODCell);
+registerPatternEncoder('pt41', () => encodeMODCell);
 registerPatternEncoder('mfp', () => encodeMODCell);
 
 export { xmNoteToPeriod };

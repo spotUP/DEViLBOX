@@ -343,6 +343,8 @@ export interface TrackerSong {
   sc68FileData?: ArrayBuffer;
   /** Raw PumaTracker .puma binary for loading into the PumaTrackerEngine WASM */
   pumaTrackerFileData?: ArrayBuffer;
+  /** ProTracker 4.1 module (MOD with PT4X samples, dynamic loops or a PT41 footer), played by libpt4. */
+  protracker4FileData?: ArrayBuffer;
   /** Raw Steve Turner binary for loading into the SteveTurnerEngine WASM */
   steveTurnerFileData?: ArrayBuffer;
   /** Raw SidMon 1.0 (.sid1/.smn) binary for SidMon1ReplayerEngine WASM playback */

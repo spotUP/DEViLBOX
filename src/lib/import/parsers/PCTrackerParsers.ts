@@ -33,6 +33,11 @@ export async function tryPCTrackerParse(
   // the file's bytes ride along as libopenmptFileData, as on the OpenMPT path.
   if (/\.(mod|m15)$/i.test(filename) || /\.xm$/i.test(filename)) {
     try {
+      if (!/\.xm$/i.test(filename)) {
+        // A MOD with ProTracker 4.1 additions: libpt4 plays it, so no libopenmptFileData.
+        const { isProTracker4Format, parseProTracker4File } = await import('@lib/import/formats/ProTracker4Parser');
+        if (isProTracker4Format(buffer)) return await parseProTracker4File(buffer, originalFileName);
+      }
       const song = /\.xm$/i.test(filename)
         ? await (async () => {
             const { isXMFormat, parseXMFile } = await import('@lib/import/formats/XMParser');

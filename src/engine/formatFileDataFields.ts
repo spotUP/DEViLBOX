@@ -48,6 +48,7 @@ export const FILE_DATA_FIELDS = [
   'sc68FileData',
   'zxtuneFileData',
   'pumaTrackerFileData',
+  'protracker4FileData',
   'steveTurnerFileData',
   'sidmon1WasmFileData',
   'artOfNoiseFileData',

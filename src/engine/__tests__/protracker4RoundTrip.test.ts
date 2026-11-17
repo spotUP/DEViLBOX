@@ -1,0 +1,51 @@
+/**
+ * ProTracker 4.1: the grid is the file's, an unedited song exports byte for byte, and one edited cell changes only that
+ * cell's 4 bytes. Fixtures are libpt4's own feature-test modules (zlib licence): one with PT4X samples 32+, one with a
+ * dynamic-loop envelope.
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { isProTracker4Format, parseProTracker4File, scanProTracker4 } from '@lib/import/formats/ProTracker4Parser';
+import { exportProTracker4 } from '@lib/export/ProTracker4Exporter';
+import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
+
+const load = (name: string): ArrayBuffer => {
+  const f = readFileSync(resolve(process.cwd(), 'public/data/songs/formats', name));
+  return f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
+};
+
+describe.each(['libpt4-pt4x_40.mod', 'libpt4-dyn_loop.mod'])('ProTracker 4: %s', (name) => {
+  it('loads its real grid, exports byte-exact, and an edit changes one cell', async () => {
+    const bytes = load(name);
+    expect(isProTracker4Format(bytes)).toBe(true);
+    const song = await parseProTracker4File(bytes, name);
+    expect(song.protracker4FileData?.byteLength).toBe(bytes.byteLength);
+    expect(song.libopenmptFileData).toBeUndefined();
+    expect(song.instruments.length).toBe(scanProTracker4(bytes)!.samples.length);
+
+    const notes: Array<{ p: number; ch: number; row: number }> = [];
+    song.patterns.forEach((pat, p) => pat.channels.forEach((c, ch) => c.rows.forEach((cell, row) => { if (cell.note > 0 && cell.note < 97) notes.push({ p, ch, row }); })));
+    expect(notes.length, 'the grid has notes').toBeGreaterThan(0);
+
+    setGridBaseline(baselineOf(song.patterns));
+    const original = new Uint8Array(bytes);
+    expect(Buffer.from(exportProTracker4(song).data).equals(Buffer.from(original)), 'unedited export is the file').toBe(true);
+
+    const at = notes[0];
+    const cell = song.patterns[at.p].channels[at.ch].rows[at.row];
+    song.patterns[at.p].channels[at.ch].rows[at.row] = { ...cell, note: cell.note + 2, period: undefined };
+    const edited = exportProTracker4(song).data;
+    expect(edited.length).toBe(original.length);
+    const changed: number[] = [];
+    edited.forEach((v, i) => { if (v !== original[i]) changed.push(i); });
+    const cellOffset = 1084 + (at.p * 64 + at.row) * song.numChannels * 4 + at.ch * 4;
+    expect(changed.length).toBeGreaterThan(0);
+    expect(changed.every((i) => i >= cellOffset && i < cellOffset + 4), `only the cell at ${cellOffset} changed, got ${changed}`).toBe(true);
+
+    // The edited file is still a PT4 module and reads back with the new note.
+    const again = await parseProTracker4File(edited.buffer.slice(edited.byteOffset, edited.byteOffset + edited.byteLength) as ArrayBuffer, name);
+    expect(again.patterns[at.p].channels[at.ch].rows[at.row].note).toBe(cell.note + 2);
+    setGridBaseline(null);
+  });
+});

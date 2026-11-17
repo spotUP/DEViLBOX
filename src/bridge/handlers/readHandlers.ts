@@ -1685,6 +1685,7 @@ export function getFormatState(): Record<string, unknown> {
       format.sc68FileData && 'sc68',
       format.zxtuneFileData && 'zxtune',
       format.pumaTrackerFileData && 'pumatracker',
+      format.protracker4FileData && 'protracker4',
       format.artOfNoiseFileData && 'artofnoise',
       format.qsfFileData && 'qsf',
       format.bdFileData && 'bendaglish',
