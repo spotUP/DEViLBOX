@@ -528,6 +528,14 @@
       "cells": 11448,
       "bytes": 11448
     },
+    "synthPack": {
+      "exporter": "SynthPackExporter.exportSynthPack",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 1950,
+      "bytes": 1950
+    },
     "pierreAdane": {
       "exporter": "PierreAdaneExporter.exportPierreAdane",
       "tier": "byte-exact",
@@ -535,6 +543,14 @@
       "matchPct": 1,
       "cells": 1998,
       "bytes": 1998
+    },
+    "peterVerswyvelenPacker": {
+      "exporter": "PeterVerswyvelenPackerExporter.exportPeterVerswyvelenPacker",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 114686,
+      "bytes": 114686
     },
     "forgottenWorlds": {
       "exporter": "ForgottenWorldsExporter.exportForgottenWorlds",

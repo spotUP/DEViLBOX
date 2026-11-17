@@ -255,7 +255,7 @@ describe('UADE exporter round-trip harness (real fixtures)', () => {
 
     expect(rows.length).toBeGreaterThan(0);
     expect(existsSync(RATCHET_PATH), 'ratchet file must be committed').toBe(true);
-  }, 120000);
+  }, 600000); // runs every exporter; grows with each new format
 
   it('every target has a ratchet baseline (no undocumented exporter)', async () => {
     await runAll;

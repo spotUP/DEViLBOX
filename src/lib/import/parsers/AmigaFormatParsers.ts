@@ -2103,8 +2103,10 @@ export async function tryRouteFormat(
 
   // ── Peter Verswyvelen Packer (PVP.* prefix) ───────────────────────────────
   if (matchesExt(filename, ['pvp'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['pvp']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
+    const { isPeterVerswyvelenPackerFormat, parsePeterVerswyvelenPackerFile } = await import('@lib/import/formats/PeterVerswyvelenPackerParser');
+    return withNativeThenUADE('peterVerswyvelenPacker', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPeterVerswyvelenPackerFormat(buf as ArrayBuffer)) return parsePeterVerswyvelenPackerFile(buf as ArrayBuffer, name); return null; },
+      'PeterVerswyvelenPackerParser', { injectUADE: true });
   }
 
   // ── Wally Beben (WB.* prefix) ─────────────────────────────────────────────

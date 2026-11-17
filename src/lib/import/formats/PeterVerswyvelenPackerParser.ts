@@ -109,9 +109,9 @@ export function isPeterVerswyvelenPackerFormat(buffer: ArrayBuffer | Uint8Array)
   if ((songLen & 0x8000) !== 0) return false;
   if ((songLen & 1) !== 0) return false;
 
-  // offset 252: val252 — songLen must be strictly less than val252
+  // offset 252: val252 - the player faults when songLen <= val252 (asm Check2: cmp.w (A0)+,D2; bls Fault)
   const val252 = u16BE(buf, 252);
-  if (songLen >= val252) return false;
+  if (songLen <= val252) return false;
 
   // offset 254: limit — non-zero, bit 15 clear
   const limit = u16BE(buf, 254);
@@ -171,7 +171,7 @@ function extractPVPPatterns(
   buf: Uint8Array,
   patCount: number,
   songLen: number,
-): { patterns: Pattern[]; songPositions: number[]; instrumentCount: number } | null {
+): { patterns: Pattern[]; songPositions: number[]; instrumentCount: number; patternOffsets: number[] } | null {
   const stepCount = patCount >= 2 ? patCount - 2 : 0;
   const stepTableStart = 0x100; // offset 256
   const patternDataStart = stepTableStart + stepCount * 2;
@@ -205,12 +205,14 @@ function extractPVPPatterns(
   // Parse each unique pattern
   const patternSize = ROWS_PER_PATTERN * NUM_CHANNELS * BYTES_PER_CELL; // 1024 bytes
   const patterns: Pattern[] = [];
+  const patternOffsets: number[] = [];
   let maxInstrument = 0;
 
   for (let p = 0; p < uniqueOffsets.length; p++) {
     // The step entry offset may be a shifted value — try as direct byte offset first
     const dataOff = patternDataStart + uniqueOffsets[p];
     if (dataOff + patternSize > buf.length) continue;
+    patternOffsets.push(dataOff);
 
     const channels: ChannelData[] = [];
     for (let ch = 0; ch < NUM_CHANNELS; ch++) {
@@ -232,6 +234,7 @@ function extractPVPPatterns(
           eff: cell.eff,
           effTyp2: 0,
           eff2: 0,
+          period: cell.period, // carrier: an off-table period survives the export byte-exact (cellPeriod)
         });
       }
       channels.push({
@@ -269,7 +272,7 @@ function extractPVPPatterns(
   }
   if (totalNotes === 0) return null;
 
-  return { patterns, songPositions, instrumentCount: maxInstrument };
+  return { patterns, songPositions, instrumentCount: maxInstrument, patternOffsets };
 }
 
 // ── Main parser ─────────────────────────────────────────────────────────────
@@ -306,11 +309,13 @@ export function parsePeterVerswyvelenPackerFile(buffer: ArrayBuffer, filename: s
   // ── Extract patterns ──────────────────────────────────────────────────────
   let patterns: Pattern[] = [];
   let songPositions: number[] = [0];
+  let patternOffsets: number[] = [];
 
   const extracted = extractPVPPatterns(buf, patCount, songLen);
   if (extracted) {
     patterns = extracted.patterns;
     songPositions = extracted.songPositions;
+    patternOffsets = extracted.patternOffsets;
 
     // Ensure we have at least as many instruments as referenced in patterns
     while (instruments.length < extracted.instrumentCount) {
@@ -381,14 +386,16 @@ export function parsePeterVerswyvelenPackerFile(buffer: ArrayBuffer, filename: s
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadePatternLayout: {
-      formatId: 'mod',
-      patternDataFileOffset: 1084,
+      formatId: 'peterVerswyvelenPacker',
+      patternDataFileOffset: patternOffsets[0] ?? 0,
       bytesPerCell: 4,
       rowsPerPattern: ROWS_PER_PATTERN,
       numChannels: NUM_CHANNELS,
       numPatterns: patterns.length,
       moduleSize: buffer.byteLength,
       encodeCell: encodeMODCell,
+      // Patterns sit at step-table offsets, not back to back after a header; the empty fallback pattern has no file place.
+      getCellFileOffset: (pat, row, ch) => (patternOffsets[pat] === undefined ? -1 : patternOffsets[pat] + (row * NUM_CHANNELS + ch) * BYTES_PER_CELL),
     } satisfies UADEPatternLayout,
   };
 }

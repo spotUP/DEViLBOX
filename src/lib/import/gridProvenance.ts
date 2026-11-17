@@ -496,6 +496,7 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   paulShields: 'G11-paulShields',
   paulRobotham: 'G11-paulRobotham',
   pierreAdane: 'G11-pierreAdane',
+  peterVerswyvelenPacker: 'G11-peterVerswyvelenPacker',
   andrewParton: 'G11-andrewParton',
   jesperOlsen: 'U18',
   kimChristensen: 'G11-kimChristensen',
