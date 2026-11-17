@@ -11,9 +11,8 @@ import {
   EFFECT_CATEGORY_COLORS,
   type EffectCategory,
   type EffectDescription,
-  hasFurnaceEffects,
-  getAllFurnaceEffects,
 } from '@utils/ft2EffectDescriptions';
+import { hasFurnaceEffects, getAllFurnaceEffects } from '@utils/furnaceEffectDescriptions';
 import { HelpCircle } from 'lucide-react';
 
 interface EffectPickerProps {

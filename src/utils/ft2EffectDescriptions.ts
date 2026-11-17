@@ -3,8 +3,8 @@
  * Provides human-readable descriptions for FT2 effect commands
  */
 
-import { FURNACE_EFFECT_TEXT } from '../engine/furnace-dispatch/furnaceEffectTable.gen';
-import { STAND_INS, SYNTH_TO_DISPATCH } from '../engine/furnace-dispatch/synthPlatforms';
+// Leaf module: the API server imports it (Dockerfile.backend copies this one file). Furnace chip
+// help lives in furnaceEffectDescriptions.ts.
 
 export type EffectCategory = 'pitch' | 'volume' | 'panning' | 'timing' | 'global' | 'sample' | 'misc' | 'opl';
 
@@ -334,9 +334,8 @@ export const FT2_E_COMMAND_DESCRIPTIONS: Record<string, EffectDescription> = {
 /**
  * Get description for an FT2 effect command
  * @param effectString - Effect string like "A00" or "10F0"
- * @param synthType - Optional synth type for platform-specific effects
  */
-export function getFT2EffectDescription(effectString: string | null, synthType?: string): EffectDescription | null {
+export function getFT2EffectDescription(effectString: string | null): EffectDescription | null {
   if (!effectString || effectString === '...' || effectString.length < 3) {
     return null;
   }
@@ -358,8 +357,6 @@ export function getFT2EffectDescription(effectString: string | null, synthType?:
 
   const command = effectString[0].toUpperCase();
   const param1 = effectString[1].toUpperCase();
-  const param2 = effectString[2].toUpperCase();
-  void param2; // Second parameter byte (used for detailed effect descriptions)
 
   // Check for E-command (extended)
   if (command === 'E') {
@@ -381,78 +378,15 @@ export function getFT2EffectDescription(effectString: string | null, synthType?:
     return desc;
   }
 
-  // Check for Furnace platform-specific effects (0x10+)
-  const effectCode = parseInt(command + param1, 16);
-  if (effectCode >= 0x10) {
-    const furnaceDesc = getFurnaceEffectDescription(effectCode, synthType);
-    if (furnaceDesc) {
-      const desc = { ...furnaceDesc };
-      desc.command = effectString;
-      return desc;
-    }
-  }
-
   return null;
-}
-
-// ============================================================================
-// FURNACE PLATFORM-SPECIFIC EFFECTS (0x10+)
-// Effects vary by chip type - see FurnaceEffectRouter for routing
-// ============================================================================
-
-/**
- * Furnace's own help text for a chip's effects (EffectHandler.description in sysDef.cpp, via
- * furnaceEffectTable.gen.ts). Lanes are Furnace's effect, post-note and pre-note handler maps.
- */
-export function getFurnaceSystemEffects(systemId: number): EffectDescription[] {
-  const lanes = FURNACE_EFFECT_TEXT[systemId];
-  if (!lanes) return [];
-  return [lanes.effect, lanes.post, lanes.pre].flatMap((lane) =>
-    Object.keys(lane)
-      .map(Number)
-      .sort((a, b) => a - b)
-      .map((code) => {
-        const text = lane[code];
-        const sep = text.indexOf(': ');
-        return {
-          command: sep > 0 ? text.slice(0, sep) : text,
-          name: sep > 0 ? text.slice(sep + 2) : text,
-          description: text,
-          parameters: '',
-          tick: 'both' as const,
-          category: 'misc' as const,
-        };
-      }),
-  );
-}
-
-/** Furnace chip effect list for a synth type; empty when the synth is not a Furnace chip. */
-export function getAllFurnaceEffects(synthType?: string): EffectDescription[] {
-  const systemId = synthType ? SYNTH_TO_DISPATCH[synthType] : undefined;
-  if (systemId === undefined) return [];
-  // Compound systems (Genesis, Arcade) have no handlers of their own; their FM part plays the instrument.
-  const own = FURNACE_EFFECT_TEXT[systemId] ? systemId : STAND_INS[systemId]?.find((id) => FURNACE_EFFECT_TEXT[id]);
-  return own === undefined ? [] : getFurnaceSystemEffects(own);
-}
-
-/** Get Furnace platform-specific effect description (first lane that defines the code wins) */
-export function getFurnaceEffectDescription(effectCode: number, synthType?: string): EffectDescription | null {
-  const prefix = effectCode.toString(16).toUpperCase().padStart(2, '0');
-  return getAllFurnaceEffects(synthType).find((e) => e.command.toUpperCase().startsWith(prefix)) ?? null;
-}
-
-/** Check if a synth type has platform-specific effects */
-export function hasFurnaceEffects(synthType: string): boolean {
-  return getAllFurnaceEffects(synthType).length > 0;
 }
 
 /**
  * Format effect description for tooltip display
  * @param effectString - Effect string like "A00" or "10F0"
- * @param synthType - Optional synth type for platform-specific effects
  */
-export function formatEffectTooltip(effectString: string | null, synthType?: string): string | null {
-  const desc = getFT2EffectDescription(effectString, synthType);
+export function formatEffectTooltip(effectString: string | null): string | null {
+  const desc = getFT2EffectDescription(effectString);
   if (!desc) return null;
 
   let tooltip = `${desc.command}: ${desc.name}\n`;
@@ -466,10 +400,9 @@ export function formatEffectTooltip(effectString: string | null, synthType?: str
 /**
  * Get short effect name for display
  * @param effectString - Effect string like "A00" or "10F0"
- * @param synthType - Optional synth type for platform-specific effects
  */
-export function getEffectShortName(effectString: string | null, synthType?: string): string | null {
-  const desc = getFT2EffectDescription(effectString, synthType);
+export function getEffectShortName(effectString: string | null): string | null {
+  const desc = getFT2EffectDescription(effectString);
   return desc ? desc.name : null;
 }
 
@@ -485,10 +418,9 @@ export function getAllFT2EffectCommands(): EffectDescription[] {
 /**
  * Get color class for an FT2 effect command (by category)
  * @param effectString - Effect string like "A00" or "10F0"
- * @param synthType - Optional synth type for platform-specific effects
  */
-export function getEffectColorClass(effectString: string | null, synthType?: string): string {
-  const desc = getFT2EffectDescription(effectString, synthType);
+export function getEffectColorClass(effectString: string | null): string {
+  const desc = getFT2EffectDescription(effectString);
   if (!desc) return 'text-orange-400'; // default
   return EFFECT_CATEGORY_COLORS[desc.category];
 }

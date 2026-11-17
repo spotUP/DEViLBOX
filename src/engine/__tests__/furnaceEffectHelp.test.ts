@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { FURNACE_EFFECT_TABLE, FURNACE_EFFECT_TEXT } from '../furnace-dispatch/furnaceEffectTable.gen';
 import { SYNTH_TO_DISPATCH } from '../furnace-dispatch/synthPlatforms';
-import { getAllFurnaceEffects, getFurnaceSystemEffects } from '../../utils/ft2EffectDescriptions';
+import { getAllFurnaceEffects, getFurnaceSystemEffects } from '../../utils/furnaceEffectDescriptions';
 
 const lanes = ['effect', 'post', 'pre'] as const;
 

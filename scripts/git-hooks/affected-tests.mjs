@@ -91,6 +91,10 @@ for (const f of staged) {
   }
 }
 
+// Any src/ change can add an import to a file the API server pulls in (ft2EffectDescriptions gained Furnace
+// imports and broke the backend image build in CI); this guard is a few seconds, so it always runs.
+if (staged.some((f) => f.startsWith('src/') && !isTest(f))) set.add('src/lib/import/__tests__/serverImportsStayLeaf.test.ts');
+
 // Suites too long for a hook (tools/test-tiers/push-only.json) run in CI, never here.
 const pushOnlyPath = join(root, 'tools/test-tiers/push-only.json');
 const pushOnly = new Set(existsSync(pushOnlyPath) ? JSON.parse(readFileSync(pushOnlyPath, 'utf8')).files.map((f) => f.file) : []);
