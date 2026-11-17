@@ -12,7 +12,7 @@ import { useMixerStore } from '@stores/useMixerStore';
 import { useVoicePreviewStore } from '@stores/useVoicePreviewStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
-import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, channelAreaWidth, ADD_CHANNEL_BUTTON_PX, subscribeChannelLayout, type ChannelLayout } from './channelLayout';
+import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, channelAreaWidth, ADD_CHANNEL_BUTTON_PX, subscribeChannelLayout, publishSharedScrollLeft, type ChannelLayout } from './channelLayout';
 import { resolveWasmPattern } from './wasmPatternHold';
 import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
@@ -3112,7 +3112,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
             // Post directly to worker — no React re-render needed for canvas
             scrollLeftRef.current = newScrollLeft;
-            layoutOut.scrollLeft = newScrollLeft; notifyChannelLayout();
+            layoutOut.scrollLeft = newScrollLeft;
+            // An aligned matrix publishes the shared position; the main editor adopts it below.
+            if (alignToMainLayout) publishSharedScrollLeft(newScrollLeft);
+            else notifyChannelLayout();
             bridgeRef.current?.post({ type: 'scroll', x: newScrollLeft });
 
             setScrollLeft(newScrollLeft);
@@ -3167,6 +3170,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     follow();
     return subscribeChannelLayout(follow);
   }, [alignToMainLayout, layoutOut]);
+
+  // The main editor owns the one scrollbar; it adopts a position the aligned matrix scrolled to.
+  useEffect(() => {
+    if (alignToMainLayout || hideVUMeters) return;
+    return subscribeChannelLayout(() => {
+      const left = channelLayout.scrollLeft;
+      if (left === scrollLeftRef.current) return;
+      scrollLeftRef.current = left;
+      bridgeRef.current?.post({ type: 'scroll', x: left });
+      setScrollLeft(left);
+      if (headerScrollRef.current) headerScrollRef.current.scrollLeft = left;
+      if (bottomScrollRef.current) bottomScrollRef.current.scrollLeft = left;
+    });
+  }, [alignToMainLayout, hideVUMeters]);
 
   // NOTE: webglUnsupported (iOS) no longer short-circuits here.
   // The main-thread Canvas2D renderer effect above creates a canvas in containerRef
@@ -3258,7 +3275,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           <div
             ref={bottomScrollRef}
             onScroll={handleBottomScroll}
-            className={`flex-shrink-0 h-3 bg-dark-bgTertiary border-b border-dark-border overflow-x-auto scrollbar-always ${allChannelsFit ? 'hidden' : ''}`}
+            className={`flex-shrink-0 h-3 bg-dark-bgTertiary border-b border-dark-border overflow-x-auto scrollbar-always ${allChannelsFit || alignToMainLayout ? 'hidden' : ''}`}
             style={{ paddingLeft: lnwPx }}
           >
             <div style={{ width: totalChannelsWidth + addChannelPx, height: 1 }} />

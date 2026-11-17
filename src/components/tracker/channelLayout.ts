@@ -24,6 +24,12 @@ export function notifyChannelLayout(): void {
   for (const fn of layoutListeners) fn();
 }
 
+/** An aligned sub-editor (order matrix) scrolled sideways: the main editor adopts this position. */
+export function publishSharedScrollLeft(left: number): void {
+  channelLayout.scrollLeft = left;
+  notifyChannelLayout();
+}
+
 export function subscribeChannelLayout(fn: () => void): () => void {
   layoutListeners.add(fn);
   return () => { layoutListeners.delete(fn); };
