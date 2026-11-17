@@ -11,6 +11,8 @@ import { useModlandResultStore } from '@stores/useModlandResultStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useShallow } from 'zustand/react/shallow';
 import { X, Disc3, Database, Zap, Settings, MessageSquare } from 'lucide-react';
+import { FurnaceSongInfoEditor } from './FurnaceSongInfoEditor';
+import { furnaceModuleExportAvailable } from '@/lib/export/FurnaceModuleExporter';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface Props {
@@ -187,6 +189,14 @@ export const ModuleInfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
           <InfoRow label="BPM" value={String(info.bpm)} />
           {info.amigaPeriods !== undefined && (
             <InfoRow label="Freq. Table" value={info.amigaPeriods ? 'Amiga Periods' : 'Linear'} />
+          )}
+
+          {/* Furnace module settings: Neo Geo songs the .fur export takes */}
+          {furnaceModuleExportAvailable(instruments) && (
+            <>
+              <SectionHeader icon={<Settings size={12} />} title="Furnace Module" />
+              <FurnaceSongInfoEditor />
+            </>
           )}
 
           {/* Song Message */}

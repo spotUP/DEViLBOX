@@ -2,6 +2,23 @@
  * Project Types - Project Metadata & UI State
  */
 
+/** Furnace module settings the song info editor sets and the .fur export writes (absent = Furnace defaults). */
+export interface FurnaceSongSettings {
+  album?: string;
+  systemName?: string;
+  /** A-4 tuning in Hz. */
+  tuning?: number;
+  /** Speed pattern, 1-16 entries; empty = the song's own speed. */
+  speedPattern?: number[];
+  arpSpeed?: number;
+  virtualTempoN?: number;
+  virtualTempoD?: number;
+  /** Tick rate in Hz. */
+  hz?: number;
+  /** Groove patterns (up to 16 entries each). */
+  grooves?: number[][];
+}
+
 export interface ProjectMetadata {
   id: string;
   name: string;
@@ -10,6 +27,7 @@ export interface ProjectMetadata {
   createdAt: string;
   modifiedAt: string;
   version: string;
+  furnace?: FurnaceSongSettings;
 }
 
 export interface ProjectState {

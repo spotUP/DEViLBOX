@@ -16,6 +16,7 @@
 import { liveTrackerSong } from '@/lib/song/liveSong';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { FurnaceDispatchPlatform } from '@/engine/furnace-dispatch/platforms';
+import { furnaceSettingsForExport } from './furnaceSongSettings';
 import { exportFurnaceModule, type FurnaceModuleResult } from './FurnaceModuleExporter';
 import { exportFurnaceAyScramble, ayScrambleTempoWarning, type AyScrambleTarget, type FurnaceAyScrambleResult } from './FurnaceExporter';
 import { exportWithOpenMPT, type OpenMPTExportOptions, type OpenMPTExportResult } from './OpenMPTExporter';
@@ -106,7 +107,7 @@ export function exportFurnaceModuleFile(): FurnaceModuleResult {
   const song = liveTrackerSong();
   // An imported extended-FM module (0xa6) keeps its 17-channel layout on export.
   const extendedFm = song.furnaceNative?.chipIds.includes(FurnaceDispatchPlatform.YM2610_EXT) ?? false;
-  return exportFurnaceModule({ ...song, extendedFm });
+  return exportFurnaceModule({ ...song, extendedFm, ...furnaceSettingsForExport(useProjectStore.getState().metadata) });
 }
 
 /** AY-3-8910 song as a Furnace .fur for the BossGame Scramble player, from the live song. Warnings include the tempo check. */

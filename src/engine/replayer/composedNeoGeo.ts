@@ -8,6 +8,8 @@
  */
 import type { TrackerSong } from '../TrackerReplayer';
 import type { InstrumentConfig } from '@typedefs/instrument';
+import { useProjectStore } from '@/stores/useProjectStore';
+import { furnaceSettingsForExport } from '@/lib/export/furnaceSongSettings';
 import { isNeoGeoInstrument, type FurnaceModuleSong } from '@/lib/export/FurnaceModuleExporter';
 import { deriveFurnaceNativeFromSong, type DerivedFurnaceNative } from '@/lib/export/deriveFurnaceNative';
 
@@ -30,6 +32,7 @@ export function composedNeoGeoModuleSong(
     songPositions: song.songPositions,
     initialSpeed: song.initialSpeed,
     initialBPM: song.initialBPM,
+    ...furnaceSettingsForExport(useProjectStore.getState().metadata),
   };
 }
 

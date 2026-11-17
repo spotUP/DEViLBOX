@@ -1924,8 +1924,8 @@ async function parseOldFormat(
   // Additional metadata
   // Reference: fur.cpp:1569-1580
   if (version >= 103) {
-    readString(reader); // systemName
-    readString(reader); // category
+    module.systemName = readString(reader);
+    module.category = readString(reader);
     readString(reader); // nameJ
     readString(reader); // authorJ
     readString(reader); // systemNameJ
