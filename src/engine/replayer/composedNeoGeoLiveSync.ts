@@ -17,7 +17,7 @@
  */
 import type { TrackerCell, ChannelData, Pattern } from '@/types/tracker';
 import {
-  cellToFile, FILE_NOTE_OFF, NEO_GEO_SYNTH_TYPE, trackerArpStopAt, trackerArpDependents, type FurnaceModuleSong,
+  cellToFile, neoGeoChannelVolMax, FILE_NOTE_OFF, NEO_GEO_SYNTH_TYPE, trackerArpStopAt, trackerArpDependents, type FurnaceModuleSong,
 } from '@/lib/export/FurnaceModuleExporter';
 import { effectNotationOf } from '@/lib/tracker/effectNotation';
 
@@ -55,7 +55,8 @@ export function derivedCellSeqWrites(
   const insIndexById = new Map<number, number>();
   instrumentIds.forEach((id, i) => insIndexById.set(id, i));
   const problems: string[] = [];
-  const f = cellToFile(cell, insIndexById, `pattern ${pat} channel ${ch + 1} row ${row}`, problems, effectNotationOf(channelMeta), [], arpStop);
+  const f = cellToFile(cell, insIndexById, `pattern ${pat} channel ${ch + 1} row ${row}`, problems, effectNotationOf(channelMeta), [], arpStop,
+    neoGeoChannelVolMax(ch, false)); // a composed song is the plain YM2610 (no extendedFm)
   const writes: SeqCellWrite[] = [];
   const put = (col: number, val: number) => writes.push({ ch, pat, row, col, val });
   put(0, seqNoteOfFile(f.note));

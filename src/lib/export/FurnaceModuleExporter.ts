@@ -269,7 +269,7 @@ export function trackerArpDependents(
  * (the same 0-64 to 0-127 scale as the volume column). Furnace-notation channels keep their codes.
  */
 /** Volume maximum of a Neo Geo channel on the plain or extended-FM chip. */
-function neoGeoChannelVolMax(ch: number, ext: boolean): number {
+export function neoGeoChannelVolMax(ch: number, ext: boolean): number {
   return maxVolumeOfChannel(ext ? FurnaceDispatchPlatform.YM2610_FULL_EXT : FurnaceDispatchPlatform.YM2610_FULL, ch);
 }
 
