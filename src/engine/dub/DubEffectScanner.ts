@@ -17,6 +17,7 @@
 
 import { fireFromEffectCommand } from './DubRouter';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useFormatStore } from '@/stores/useFormatStore';
 import { isDubEffectTypeForDisplay } from './moveTable';
 
 let _lastRowFired = -1;
@@ -36,6 +37,16 @@ function isDubEffTyp(effTyp: number | undefined): boolean {
 }
 
 /**
+ * Dub slots 36-42 exist only in the XM-style effTyp numbering. Furnace songs
+ * keep raw Furnace codes in effTyp (29xy = 41, 24xx = 36 ...), so there the
+ * slots are ordinary chip effects: firing them made AY 29xy auto-envelope
+ * cells play ghostReverb and mute their channel.
+ */
+export function dubCellSlotsAvailable(): boolean {
+  return useFormatStore.getState().editorMode !== 'furnace';
+}
+
+/**
  * Scan the currently-playing pattern at `row` for dub effect commands
  * and fire each through `DubRouter.fireFromEffectCommand`. Safe to call
  * when no song loaded — degrades to a no-op.
@@ -43,6 +54,7 @@ function isDubEffTyp(effTyp: number | undefined): boolean {
 export function scanDubEffectsForRow(row: number): void {
   if (row === _lastRowFired) return;
   _lastRowFired = row;
+  if (!dubCellSlotsAvailable()) return;
 
   try {
     const trackerState = useTrackerStore.getState();

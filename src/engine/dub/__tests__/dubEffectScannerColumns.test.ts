@@ -12,6 +12,7 @@ import { encodeDubEffect } from '../moveTable';
 import { scanDubEffectsForRow, resetDubEffectScanner } from '../DubEffectScanner';
 import { subscribeDubRouter, setDubBusForRouter, type DubFireEvent } from '../DubRouter';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useFormatStore } from '@/stores/useFormatStore';
 
 /**
  * Tolerant bus stub. Moves call wildly different bus methods, and a move that
@@ -112,6 +113,18 @@ describe('DubEffectScanner — every effect column dispatches', () => {
     loadPatternWithCell({ effTyp: 0x0A, eff: 0x08, effTyp3: 0x0C, eff3: 0x40 });
     scanDubEffectsForRow(0);
     expect(fires).toEqual([]);
+  });
+
+  it('Furnace songs: raw 29xy (effTyp 41) is an AY effect, never a dub move', () => {
+    // demoscenetypebeat CH 2: 352 auto-envelope cells fired ghostReverb and muted it.
+    useFormatStore.setState({ editorMode: 'furnace' } as never);
+    try {
+      loadPatternWithCell({ effTyp: 0x29, eff: 0x21 });
+      scanDubEffectsForRow(0);
+      expect(fires).toEqual([]);
+    } finally {
+      useFormatStore.setState({ editorMode: 'classic' } as never);
+    }
   });
 
   it('dedupes repeated calls for the same row', () => {

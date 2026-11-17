@@ -26,6 +26,7 @@ import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { DUB_MOVE_KINDS } from '@/midi/performance/parameterRouter';
 import { encodeDubEffect } from './moveTable';
+import { dubCellSlotsAvailable } from './DubEffectScanner';
 import { currentSongIsTimeBasedLane } from './laneMode';
 import type { AutomationParameter } from '@/types/automation';
 
@@ -268,7 +269,9 @@ export function startDubRecorder(): () => void {
         // pattern.channels (Hively/AHX, MusicLine, GTUltra, TFMX) — the
         // cell would be invisible. Curve-only output makes AutoDub fires
         // show up in the per-channel automation lane instead.
-        && !songRendersFromNativeData();
+        && !songRendersFromNativeData()
+        // Furnace cells hold raw Furnace codes: a dub slot would be a chip effect.
+        && dubCellSlotsAvailable();
       let cellWritten = false;
       if (canWriteCell) {
         const chId = fireEvent.channelId as number;
