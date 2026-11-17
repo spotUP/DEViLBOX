@@ -164,7 +164,8 @@ registerVariableEncoder(sonixEncoder);
  * fidelity, not byte-exact reproduction of the original durations).
  */
 function encodeTinyVoiceStream(rows: TrackerCell[], _channel: number): Uint8Array {
-  const words: number[] = [];
+  // Every TINY voice stream opens with three zero words; the format detector (isTinyFormat) rejects a file without them.
+  const words: number[] = [0, 0, 0];
   let lastInstr = 1; // 1-based, matching parser default
 
   let i = 0;

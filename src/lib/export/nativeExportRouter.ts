@@ -196,6 +196,7 @@ export async function nativeExportAvailable(song: TrackerSong | null): Promise<b
   if (resolved === 'cinter') return true;
   if (selectNativeExporter(resolved)) return true;
   if (layoutPatchSource(resolved)) return true;
+  if (resolved.uadeVariableLayout && resolved.uadeEditableFileData) return true;
   if (songLayoutFormatId(resolved)) return (await chipRamModuleSize(resolved)) > 0;
   return rawOriginalAvailable();
 }
@@ -459,6 +460,19 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
           : [],
       };
     }
+  }
+
+  // A format of variable-length packed blocks and no exporter of its own (Sonix): the loaded module with each edited voice stream
+  // re-encoded over its slot (the same writer the next play uses). A stream that outgrows its slot is refused and reported.
+  if (!result && song.uadeVariableLayout && song.uadeEditableFileData) {
+    const { patchModuleByVariableLayout } = await import('./layoutPatch');
+    const patched = patchModuleByVariableLayout(song.uadeEditableFileData, song.uadeVariableLayout, song.patterns);
+    const ext = (song.uadeEditableFileName ?? '').split('.').pop() || 'bin';
+    result = {
+      data: patched.bytes,
+      filename: `${baseName}.${ext}`,
+      warnings: patched.refused.map((r) => `pattern ${r.pattern} voice ${r.channel + 1}: the edited stream (${r.encoded} bytes) does not fit its ${r.slot}-byte slot; not saved`),
+    };
   }
 
   // Chip-RAM readback — captures live pattern edits for any running UADE format.

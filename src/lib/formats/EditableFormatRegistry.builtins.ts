@@ -138,7 +138,7 @@ registerEditableFormat({ formatId: "sidMon2", label: "SidMon II", patternCodec: 
 registerEditableFormat({ formatId: "sonicArranger", label: "Sonic Arranger", newSong: { template: "templates/sonicArranger.sa" }, patternCodec: { kind: "fixed" }, exporter: { module: "SonicArrangerExporter", fn: "exportSonicArranger", byLayout: true } });
 registerEditableFormat({ formatId: "sonicArrangerSas", label: "Sonic Arranger SAS", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "sonixMusicDriver", label: "", patternCodec: { kind: "variable" }, synth: { synthType: "SonixSynth", controls: "SonixControls" } });
-registerEditableFormat({ formatId: "sonixMusicDriverTiny", label: "", patternCodec: { kind: "variable" } });
+registerEditableFormat({ formatId: "sonixMusicDriverTiny", label: "", patternCodec: { kind: "variable" }, synth: { synthType: "SonixSynth", controls: "SonixControls" } });
 registerEditableFormat({ formatId: "soundControl", label: "Sound Control", newSong: { template: "templates/soundControl.sc" }, patternCodec: { kind: "fixed" }, exporter: { module: "SoundControlExporter", fn: "exportSoundControl", byLayout: true } });
 registerEditableFormat({ formatId: "soundFactory", label: "Sound Factory", newSong: { template: "templates/soundFactory.psf" }, patternCodec: { kind: "fixed" }, exporter: { module: "SoundFactoryExporter", fn: "exportSoundFactory", byLayout: true } });
 registerEditableFormat({ formatId: "soundFactoryStub", label: "", patternCodec: { kind: "fixed" } });
