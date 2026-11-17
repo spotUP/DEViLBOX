@@ -8,6 +8,7 @@
 
 import { furnaceModuleExportAvailable } from '@/lib/export/FurnaceModuleExporter';
 import { furnaceAyScrambleExportAvailable, ayScrambleTempoWarning, type AyScrambleTarget } from '@/lib/export/FurnaceExporter';
+import { nesRomExportAvailable, nesTempoWarning, type NesRegionChoice } from '@/lib/export/nes/nesExport';
 import { FURNACE_SNES_CHIP_ID } from '@/lib/export/tad/tadSongWriter';
 import { useState, useEffect, useCallback } from 'react';
 import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
@@ -38,7 +39,7 @@ import { saveFurFileWasm } from '@lib/import/wasm/FurnaceFileOps';
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'vectrexCart' | 'tad';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'vectrexCart' | 'nesRom' | 'tad';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -83,6 +84,7 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   zxTap: '.tap',
   zxBeeperTap: '.tap',
   vectrexCart: '.bin',
+  nesRom: '.nes',
   tad: '.zip',
 };
 
@@ -323,6 +325,32 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     }
   }, [metadata]);
 
+  // Phase 10 (NSFe, per-chip ROMs) is not built: the custom mapper-31 cartridge is the only NES target.
+  const nesRomAvailable = nesRomExportAvailable(furnaceNative?.chipIds, furnaceNative?.chipFlags);
+  const [nesRegion, setNesRegion] = useState<NesRegionChoice>('ntsc');
+  const nesRomTempoWarning = nesTempoWarning(bpm, nesRegion === 'all' ? undefined : [nesRegion]);
+  const [nesRomBusy, setNesRomBusy] = useState(false);
+
+  const handleExportNesRom = useCallback(async (
+    downloadFn: (blob: Blob, filename: string) => void,
+    onClose: () => void,
+  ) => {
+    setNesRomBusy(true);
+    try {
+      const { recordNesRom } = await import('@lib/export/nes/nesRecord');
+      const author = metadata.author && metadata.author !== 'Unknown' ? metadata.author : undefined;
+      const r = await recordNesRom(nesRegion, metadata.name || 'song', author, metadata.description || undefined);
+      downloadFn(new Blob([r.rom as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.nes`);
+      notify.success(`NES ROM exported (${r.rom.byteLength} bytes).`);
+      r.warnings.forEach((w) => notify.warning(w));
+      onClose();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'NES ROM export failed.');
+    } finally {
+      setNesRomBusy(false);
+    }
+  }, [metadata, nesRegion]);
+
   const [zxBeeperReport, setZxBeeperReport] = useState<{ warnings: string[]; seconds: number } | null>(null);
 
   // Preview: build the tape when the tile is selected so the dialog can list what is dropped.
@@ -543,6 +571,12 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportVectrexCart,
     vectrexCartTempoWarning,
     vectrexCartBusy,
+    handleExportNesRom,
+    nesRomAvailable,
+    nesRegion,
+    setNesRegion,
+    nesRomTempoWarning,
+    nesRomBusy,
     handleExportZxBeeperTap,
     zxBeeperReport,
     handleExportTad,

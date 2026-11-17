@@ -14,6 +14,8 @@ import { MidiExportPanel } from './MidiExportPanel';
 import { ModuleExportPanel } from './ModuleExportPanel';
 import { ChipExportPanel } from './ChipExportPanel';
 import { notify } from '@stores/useNotificationStore';
+import { CustomSelect } from '@components/common/CustomSelect';
+import { NES_REGION_LABELS, type NesRegionChoice } from './nes/nesExport';
 import { AY_SCRAMBLE_TARGETS, type AyScrambleTarget } from './FurnaceExporter';
 
 interface ExportDialogProps {
@@ -91,6 +93,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
           return await ex.handleExportZxTap((b, n) => saveAs(b, n), onClose);
         case 'vectrexCart':
           return await ex.handleExportVectrexCart((b, n) => saveAs(b, n), onClose);
+        case 'nesRom':
+          return await ex.handleExportNesRom((b, n) => saveAs(b, n), onClose);
         case 'zxBeeperTap':
           return await ex.handleExportZxBeeperTap((b, n) => saveAs(b, n), onClose);
         case 'furAy':
@@ -388,6 +392,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Vectrex Cartridge (AY-3-8910)</div>
                     </button>
                   )}
+                  {ex.nesRomAvailable && (
+                    <button
+                      onClick={() => ex.setExportMode('nesRom')}
+                      className={`
+                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        ${ex.exportMode === 'nesRom'
+                          ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                          : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                        }
+                      `}
+                    >
+                      <FileMusic size={24} className="mx-auto mb-2" />
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">NES Cartridge (.nes)</div>
+                    </button>
+                  )}
                   {ex.furnaceAyAvailable.zxbeeper && (
                     <button
                       onClick={() => ex.setExportMode('zxBeeperTap')}
@@ -631,6 +650,26 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
+              {ex.exportMode === 'nesRom' && (
+                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+                    NES cartridge (.nes)
+                  </h3>
+                  <div className="space-y-3 text-sm font-mono text-text-secondary">
+                    <div>Plays the song once per region in real time and records the sound chip register writes. The cartridge (mapper 31) runs on an emulator or a custom board and shows the title on screen. Only the current subsong is recorded.</div>
+                    <CustomSelect
+                      value={ex.nesRegion}
+                      onChange={(v) => ex.setNesRegion(v as NesRegionChoice)}
+                      options={(Object.keys(NES_REGION_LABELS) as NesRegionChoice[]).map((r) => ({ value: r, label: NES_REGION_LABELS[r] }))}
+                    />
+                    {ex.nesRomTempoWarning && (
+                      <div className="text-xs font-mono text-accent-warning">{ex.nesRomTempoWarning}</div>
+                    )}
+                    {ex.nesRomBusy && <div className="text-xs font-mono text-accent-primary">Recording the song. Wait for it to finish.</div>}
+                  </div>
+                </div>
+              )}
+
               {ex.exportMode === 'zxTap' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
@@ -849,6 +888,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : ex.exportMode === 'fur' || ex.exportMode === 'furAy' ? '.fur'
                   : ex.exportMode === 'zxTap' || ex.exportMode === 'zxBeeperTap' ? '.tap'
                   : ex.exportMode === 'vectrexCart' ? '.bin'
+                  : ex.exportMode === 'nesRom' ? '.nes'
                   : ex.exportMode === 'tad' ? '.zip'
                   : `.${ex.exportMode}.json`
                 }`

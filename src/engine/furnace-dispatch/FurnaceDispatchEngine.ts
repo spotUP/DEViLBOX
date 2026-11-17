@@ -1882,6 +1882,11 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
     this.workletNode?.port.postMessage({ type: 'setRegCapture', enable: false });
   }
 
+  /** The raw captured batches (NES native export: control events and every platform are kept). */
+  getRegCaptureBatches(): readonly DispatchRegBatch[] {
+    return this._regCaptureBatches;
+  }
+
   /**
    * The captured writes as VGMExporter log entries (timestamp in samples at
    * the worklet sample rate; chips with no VGM mapping are left out).
