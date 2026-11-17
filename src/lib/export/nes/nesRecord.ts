@@ -4,8 +4,9 @@ import { FurnaceDispatchEngine } from '../../../engine/furnace-dispatch/FurnaceD
 import { nesCaptureFromBatches, type NesCapture } from './nesCapture';
 import { fetchNesPlayer, buildVrc6Cartridge } from './nesCartridge';
 import { buildNsfe } from './nsfe';
-import { NES_REGIONS, type NesRegion } from './nesStream';
+import { NES_REGIONS, type NesRegion, type NesSubsongInput } from './nesStream';
 import { buildNesRom, isSunsoft, nesChipsOf, wantsVrc6Cartridge, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
+import { switchSubsong } from '../../tracker/subsongSwitch';
 import { orderPassLength } from '../vectrex/vectrexCapture';
 
 const MAX_RECORD_MS = 10 * 60 * 1000;
@@ -47,20 +48,32 @@ export async function recordRegion(region: NesRegion, sunsoft: boolean): Promise
   return nesCaptureFromBatches(batches.map((b) => ({ ...b, sample: b.sample - origin })), d.regCaptureSampleRate, tickRateHz, { sunsoft });
 }
 
+export type NesSubsongChoice = 'current' | 'all';
 export type NesExportFormat = 'nes' | 'nsfe';
 
-export async function recordNesRom(choice: NesRegionChoice, title: string, author?: string, comments?: string, format: NesExportFormat = 'nes'): Promise<NesRomResult & { tickRateHz: number }> {
+export async function recordNesRom(choice: NesRegionChoice, title: string, author?: string, comments?: string, format: NesExportFormat = 'nes', subsongChoice: NesSubsongChoice = 'current'): Promise<NesRomResult & { tickRateHz: number }> {
   const native = useFormatStore.getState().furnaceNative;
   const chips = nesChipsOf(native?.chipIds, native?.chipFlags);
   if (!chips.length) throw new Error('This song has no NES-family sound chip.');
   const sunsoft = (native?.chipFlags ?? []).some(isSunsoft);
   const regions: NesRegion[] = choice === 'all' ? [...NES_REGIONS] : [choice];
-  const caps: Partial<Record<NesRegion, NesCapture>> = {};
-  for (const r of regions) caps[r] = await recordRegion(r, sunsoft);
-  const first = caps[regions[0]]!;
-  // The ntsc slot is the fallback of the other regions: a single recorded region fills it.
+  const fmt = useFormatStore.getState();
+  const startSubsong = fmt.furnaceActiveSubsong;
+  const indices = subsongChoice === 'all' && fmt.furnaceSubsongs?.length ? fmt.furnaceSubsongs.map((_, i) => i) : [startSubsong];
+  const subsongs: NesSubsongInput[] = [];
+  try {
+    for (const i of indices) {
+      if (indices.length > 1) await switchSubsong(i);
+      const caps: Partial<Record<NesRegion, NesCapture>> = {};
+      for (const r of regions) caps[r] = await recordRegion(r, sunsoft);
+      // The ntsc slot is the fallback of the other regions: a single recorded region fills it.
+      subsongs.push({ ntsc: caps[regions[0]]!, pal: caps.pal, dendy: caps.dendy });
+    }
+  } finally {
+    if (indices.length > 1) await switchSubsong(startSubsong);
+  }
+  const first = subsongs[0].ntsc;
   const info: NesRomInfo = { title, author, comments, chips };
-  const subsongs = [{ ntsc: first, pal: caps.pal, dendy: caps.dendy }];
   if (format === 'nsfe') {
     const n = buildNsfe(subsongs, await fetchNesPlayer(), info);
     return { rom: n.nsfe, banks: 0, streamBytes: 0, seconds: [], warnings: n.warnings, tickRateHz: first.tickRateHz };

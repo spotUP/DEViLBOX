@@ -704,12 +704,19 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   </h3>
                   <div className="space-y-3 text-sm font-mono text-text-secondary">
                     {ex.exportMode === 'nsfe' && <div>An NSFe music file for NSF players and emulators. It plays at the console frame rate, and FDS songs are not supported.</div>}
-                    <div>Plays the song once per region in real time and records the sound chip register writes.{ex.exportMode === 'nesRom' && ' The cartridge (mapper 31, or the original VRC6 board for 2A03 and VRC6 songs at the frame rate) runs on an emulator or a custom board and shows the title on screen.'} Only the current subsong is recorded.</div>
+                    <div>Plays the song once per region in real time and records the sound chip register writes.{ex.exportMode === 'nesRom' && ' The cartridge (mapper 31, or the original VRC6 board for 2A03 and VRC6 songs at the frame rate) runs on an emulator or a custom board and shows the title on screen.'}</div>
                     <CustomSelect
                       value={ex.nesRegion}
                       onChange={(v) => ex.setNesRegion(v as NesRegionChoice)}
                       options={(Object.keys(NES_REGION_LABELS) as NesRegionChoice[]).map((r) => ({ value: r, label: NES_REGION_LABELS[r] }))}
                     />
+                    {ex.nesSubsongCount > 1 && (
+                      <CustomSelect
+                        value={ex.nesSubsongs}
+                        onChange={(v) => ex.setNesSubsongs(v as 'current' | 'all')}
+                        options={[{ value: 'current', label: 'Current subsong' }, { value: 'all', label: `All ${ex.nesSubsongCount} subsongs (choose on the title screen)` }]}
+                      />
+                    )}
                     {ex.nesRomTempoWarning && (
                       <div className="text-xs font-mono text-accent-warning">{ex.nesRomTempoWarning}</div>
                     )}

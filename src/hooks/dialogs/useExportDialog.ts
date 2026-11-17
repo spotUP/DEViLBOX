@@ -156,6 +156,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   const editorMode = useFormatStore((s) => s.editorMode);
   const originalModuleData = useFormatStore((s) => s.originalModuleData);
   const furnaceNative = useFormatStore((s) => s.furnaceNative);
+  const furnaceSubsongs = useFormatStore((s) => s.furnaceSubsongs);
   const uadeEditableFileData = useFormatStore((s) => s.uadeEditableFileData);
   const uadeEditableFileName = useFormatStore((s) => s.uadeEditableFileName);
 
@@ -349,6 +350,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   const nesRomAvailable = nesRomExportAvailable(furnaceNative?.chipIds, furnaceNative?.chipFlags);
   const [nesRegion, setNesRegion] = useState<NesRegionChoice>('ntsc');
   const nesRomTempoWarning = nesTempoWarning(bpm, nesRegion === 'all' ? undefined : [nesRegion]);
+  const [nesSubsongs, setNesSubsongs] = useState<'current' | 'all'>('current');
   const [nesRomBusy, setNesRomBusy] = useState(false);
 
   const exportNes = useCallback(async (
@@ -360,7 +362,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     try {
       const { recordNesRom } = await import('@lib/export/nes/nesRecord');
       const author = metadata.author && metadata.author !== 'Unknown' ? metadata.author : undefined;
-      const r = await recordNesRom(nesRegion, metadata.name || 'song', author, metadata.description || undefined, format);
+      const r = await recordNesRom(nesRegion, metadata.name || 'song', author, metadata.description || undefined, format, nesSubsongs);
       const label = format === 'nsfe' ? 'NSFe' : 'NES ROM';
       downloadFn(new Blob([r.rom as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.${format === 'nsfe' ? 'nsfe' : 'nes'}`);
       notify.success(`${label} exported (${r.rom.byteLength} bytes).`);
@@ -371,7 +373,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     } finally {
       setNesRomBusy(false);
     }
-  }, [metadata, nesRegion]);
+  }, [metadata, nesRegion, nesSubsongs]);
   const handleExportNesRom = useCallback((d: (blob: Blob, filename: string) => void, c: () => void) => exportNes('nes', d, c), [exportNes]);
   const handleExportNsfe = useCallback((d: (blob: Blob, filename: string) => void, c: () => void) => exportNes('nsfe', d, c), [exportNes]);
 
@@ -601,6 +603,9 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     nesRomAvailable,
     nesRegion,
     setNesRegion,
+    nesSubsongs,
+    setNesSubsongs,
+    nesSubsongCount: furnaceSubsongs?.length ?? 1,
     nesRomTempoWarning,
     nesRomBusy,
     handleExportZxBeeperTap,
