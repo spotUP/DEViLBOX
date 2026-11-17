@@ -159,10 +159,13 @@ registerVariableEncoder(sonixEncoder);
  *   0xNNdd       note on: high = note index (1-127), low = duration in ticks
  *
  * Inverse of parseTinyVoiceStream. Since the raw-block carrier emits unedited
- * streams verbatim, this only runs on edited channels; each note is emitted as
- * a 1-tick event and trailing empty rows collapse to rest opcodes (edit-path
- * fidelity, not byte-exact reproduction of the original durations).
+ * streams verbatim, this only runs on edited channels; each note carries the hold rows after it as its duration;
+ * empty rows before the first note collapse to rest opcodes (a note followed by an explicit rest in the original re-encodes as one longer note).
  */
+function isTinyEmptyRow(r: TrackerCell): boolean {
+  return (r.note ?? 0) === 0 && (r.instrument ?? 0) === 0 && (r.volume ?? 0) === 0;
+}
+
 function encodeTinyVoiceStream(rows: TrackerCell[], _channel: number): Uint8Array {
   // Every TINY voice stream opens with three zero words; the format detector (isTinyFormat) rejects a file without them.
   const words: number[] = [0, 0, 0];
@@ -200,7 +203,12 @@ function encodeTinyVoiceStream(rows: TrackerCell[], _channel: number): Uint8Arra
 
     if (note > 0) {
       const noteIndex = Math.max(1, Math.min(127, note));
-      words.push((noteIndex << 8) | 0x01); // duration 1 tick (rests carry the hold)
+      // The parser expands a note of duration d into its row plus d-1 hold rows, so the hold rows after this note fold back into its duration (cap 255, the low byte).
+      let dur = 1;
+      while (dur < 255 && i + dur < rows.length && isTinyEmptyRow(rows[i + dur])) dur++;
+      words.push((noteIndex << 8) | dur);
+      i += dur;
+      continue;
     }
     i++;
   }

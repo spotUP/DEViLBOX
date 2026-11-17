@@ -47,5 +47,10 @@ describe('Sonix TINY export', () => {
     expect(Buffer.from(data).equals(Buffer.from(raw))).toBe(false);
     const again = await parseSonixFile(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer, 'maintitle.tiny');
     expect(again.patterns[p].channels[c].rows[r].note).toBe(was + 2);
+    // The edited voice keeps every other row: same notes on the same rows, holds stay holds.
+    const noteRows = (rows: { note?: number }[]) => rows.map(x => x.note ?? 0);
+    const want = noteRows(song.patterns[p].channels[c].rows);
+    const got = noteRows(again.patterns[p].channels[c].rows);
+    expect(got.slice(0, want.length)).toEqual(want);
   });
 });
