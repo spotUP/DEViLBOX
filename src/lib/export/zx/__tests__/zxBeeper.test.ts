@@ -96,7 +96,12 @@ describe('ZX beeper tap', () => {
     const blocks = parseTap(buildZxBeeperTap(player, d.drums, m.banks, 'beeper'));
     expect(blocks.every((b) => b.ok)).toBe(true);
     expect(blocks.map((b) => b.flag)).toEqual([0, 0xFF, 0, 0xFF, 0, 0xFF]);
-    expect(blocks[3].data.subarray(0, player.dataOffset)).toEqual(player.bytes);
+    // Everything but the 32 character title and author blocks is the player unchanged.
+    const expected = player.bytes.slice();
+    const shown = (o: number, t: string) => expected.set(Buffer.from(t.toUpperCase().padEnd(player.textLength, ' ')), o);
+    shown(player.titleOffset, 'beeper');
+    shown(player.authorOffset, '');
+    expect(blocks[3].data.subarray(0, player.dataOffset)).toEqual(expected);
     expect(blocks[5].data).toEqual(m.banks[0]);
   });
 

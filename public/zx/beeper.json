@@ -1,9 +1,9 @@
 {
  "loadAddress": 32768,
  "entry": 32768,
- "size": 1024,
- "dataOffset": 1024,
- "maxDrumBytes": 15360,
+ "size": 1953,
+ "dataOffset": 1953,
+ "maxDrumBytes": 14431,
  "dataAddress": 49152,
  "bankSize": 16384,
  "usableBanks": [
@@ -14,6 +14,10 @@
   6,
   7
  ],
+ "titleOffset": 1305,
+ "authorOffset": 1337,
+ "textLength": 32,
+ "screenStatic": 33812,
  "iterT": 363,
  "drumByteT": 504,
  "clock": 3546900

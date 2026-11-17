@@ -10,7 +10,7 @@ import { buildZxTap, fetchZxPlayer, type ZxTapResult } from './zxTap';
 const MAX_RECORD_MS = 10 * 60 * 1000;
 
 /** Play the song once from the start (looping off), record the AY writes, restore the transport. */
-export async function recordZxTap(title: string): Promise<ZxTapResult> {
+export async function recordZxTap(title: string, author = ''): Promise<ZxTapResult> {
   const transport = useTransportStore.getState();
   const wasPlaying = transport.isPlaying;
   const wasLooping = transport.isLooping;
@@ -26,5 +26,5 @@ export async function recordZxTap(title: string): Promise<ZxTapResult> {
   const log = await session.stopRecording();
   useTransportStore.getState().stop();
   useTransportStore.getState().setIsLooping(wasLooping);
-  return buildZxTap(parseRegisterLog(log), VGM_SAMPLE_RATE, await fetchZxPlayer(), title);
+  return buildZxTap(parseRegisterLog(log), VGM_SAMPLE_RATE, await fetchZxPlayer(), title, author);
 }

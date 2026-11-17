@@ -315,7 +315,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     setZxTapBusy(true);
     try {
       const { recordZxTap } = await import('@lib/export/zx/zxTapCapture');
-      const r = await recordZxTap((metadata.name || 'song').slice(0, 10));
+      const r = await recordZxTap(metadata.name || 'song', metadata.author && metadata.author !== 'Unknown' ? metadata.author : '');
       downloadFn(new Blob([r.tap as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.tap`);
       notify.success(`ZX Spectrum 128 tape exported (${r.frames} frames, ${Math.round(r.seconds)} s, ${r.tap.byteLength} bytes).`);
       onClose();
@@ -399,7 +399,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   ) => {
     try {
       const { exportZxBeeperTapFile } = await import('@lib/export/moduleExportService');
-      const r = await exportZxBeeperTapFile((metadata.name || 'song').slice(0, 10));
+      const r = await exportZxBeeperTapFile(metadata.name || 'song', metadata.author && metadata.author !== 'Unknown' ? metadata.author : '');
       downloadFn(new Blob([r.tap as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.tap`);
       notify.success(`ZX Spectrum beeper tape exported (${r.rows} rows, ${Math.round(r.seconds)} s, ${r.tap.byteLength} bytes).`);
       onClose();

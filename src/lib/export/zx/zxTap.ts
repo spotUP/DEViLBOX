@@ -13,6 +13,24 @@ export interface ZxPlayer {
   maxBanks: number;
   dataAddress: number;
   usableBanks: number[];
+  /** Offsets of the 32 character title and author blocks (screen.inc) and their length. */
+  titleOffset: number; authorOffset: number; textLength: number;
+}
+
+/** Upper case ASCII 0x20-0x5F only (the screen font has 64 tiles), truncated and space padded to `length`. */
+export function screenText(text: string, length: number): Uint8Array {
+  const out = new Uint8Array(length).fill(0x20);
+  Array.from(text.toUpperCase().slice(0, length)).forEach((ch, i) => {
+    const c = ch.charCodeAt(0);
+    out[i] = c >= 0x20 && c <= 0x5F ? c : 0x20;
+  });
+  return out;
+}
+
+/** Writes the song title and author into the player's screen text blocks. */
+export function patchScreenText(code: Uint8Array, p: Pick<ZxPlayer, 'titleOffset' | 'authorOffset' | 'textLength'>, title: string, author: string): void {
+  code.set(screenText(title, p.textLength), p.titleOffset);
+  code.set(screenText(author, p.textLength), p.authorOffset);
 }
 
 export function loadZxPlayerFrom(bin: Uint8Array, meta: Omit<ZxPlayer, 'bytes'>): ZxPlayer {
@@ -85,12 +103,13 @@ export function basicLoader(banks: number[], p: Pick<ZxPlayer, 'loadAddress' | '
 
 export interface ZxTapResult { tap: Uint8Array; frames: number; banks: number; dataBytes: number; seconds: number }
 
-export function buildZxTap(writes: readonly RegisterWrite[], sampleRate: number, player: ZxPlayer, title = 'devilbox'): ZxTapResult {
+export function buildZxTap(writes: readonly RegisterWrite[], sampleRate: number, player: ZxPlayer, title = 'devilbox', author = ''): ZxTapResult {
   const frames = captureToFrames(writes, sampleRate);
   if (frames.length === 0) throw new Error('No AY register writes were captured. Play a ZX Spectrum 128 (AY-3-8910) song through while recording.');
   const banks = packBanks(encodeFrames(frames), player.usableBanks.length);
   const code = Uint8Array.from(player.bytes);
   banks.forEach((_, i) => { code[player.bankTableOffset + i] = 0x10 | player.usableBanks[i]; });
+  patchScreenText(code, player, title, author);
   const name = title.replace(/[^\x20-\x7E]/g, '?').slice(0, 10);
   const loader = basicLoader(player.usableBanks.slice(0, banks.length), player);
   const parts = [
@@ -112,6 +131,7 @@ export interface ZxBeeperPlayer {
   /** Record stream: one 16K bank per usable bank, paged in at dataAddress. */
   dataAddress: number; bankSize: number; usableBanks: number[];
   iterT: number; drumByteT: number; clock: number;
+  titleOffset: number; authorOffset: number; textLength: number;
 }
 
 /** Fetch public/zx/beeper.bin + beeper.json (browser). */
@@ -125,12 +145,13 @@ export async function fetchZxBeeperPlayer(): Promise<ZxBeeperPlayer> {
 }
 
 /** 128K tap: BASIC loader, one CODE block of player + drum bits, then one CODE block per stream bank (player banktab order). */
-export function buildZxBeeperTap(player: ZxBeeperPlayer, drums: Uint8Array, banks: readonly Uint8Array[], title = 'devilbox'): Uint8Array {
+export function buildZxBeeperTap(player: ZxBeeperPlayer, drums: Uint8Array, banks: readonly Uint8Array[], title = 'devilbox', author = ''): Uint8Array {
   if (drums.length > player.maxDrumBytes) throw new Error(`The drum samples need ${drums.length} bytes; the player has room for ${player.maxDrumBytes}.`);
   if (banks.length > player.usableBanks.length) throw new Error(`The song needs ${banks.length} banks; the player has ${player.usableBanks.length}.`);
   const code = new Uint8Array(player.dataOffset + drums.length);
   code.set(player.bytes.subarray(0, player.dataOffset));
   code.set(drums, player.dataOffset);
+  patchScreenText(code, player, title, author);
   const name = title.replace(/[^\x20-\x7E]/g, '?').slice(0, 10);
   const used = player.usableBanks.slice(0, banks.length);
   const loader = basicLoader(used, player);

@@ -22,6 +22,8 @@ assert sym['drumdata'] - load == size, (sym['drumdata'], size)
 meta = {
     'loadAddress': load, 'entry': sym['entry'], 'size': size, 'dataOffset': size,
     'maxDrumBytes': 0xC000 - load - size, 'dataAddress': 0xC000, 'bankSize': 16384, 'usableBanks': [0, 1, 3, 4, 6, 7],
+    'titleOffset': sym['title_str'] - load, 'authorOffset': sym['author_str'] - load, 'textLength': 32,
+    'screenStatic': sym['screen_static'],
     'iterT': sym['ITER_T'], 'drumByteT': sym['DRUM_BYTE_T'], 'clock': 3546900,
 }
 json.dump(meta, open(sys.argv[3], 'w'), indent=1)

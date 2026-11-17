@@ -25,6 +25,8 @@ DRUM_BYTE_T	equ 504		; T-states per drum byte (8 bits of 63 T)
 	org #8000
 entry
 	di
+	ld sp,#8000		; the screen routine calls; the tone loop uses SP as a scratch register afterwards
+	call screen_static
 	xor a
 	jp setbank
 
@@ -239,5 +241,9 @@ v = 0
 	db v
 v = v + 1
 	edup
+
+chiptxt	db "ZX SPECTRUM BEEPER  "
+
+	include "screen.inc"
 
 drumdata			; the exporter appends the drum bits here
