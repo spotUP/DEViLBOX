@@ -90,6 +90,7 @@ interface FurnaceFileOpsAPI {
   fur_get_system_pan(idx: number): number;
   fur_get_system_pan_fr(idx: number): number;
   fur_ins_load_file(dataPtr: number, len: number, namePtr: number): number;
+  fur_ins_from_ins2(buf: number, len: number): number;
   fur_ins_get_name(i: number): string;
   fur_ins_get_type(i: number): number;
   fur_ins_to_fui(i: number, buf: number, bufLen: number): number;
@@ -147,6 +148,7 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_get_system_pan: m.cwrap('fur_get_system_pan', 'number', ['number']),
     fur_get_system_pan_fr: m.cwrap('fur_get_system_pan_fr', 'number', ['number']),
     fur_ins_load_file: m.cwrap('fur_ins_load_file', 'number', ['number', 'number', 'number']),
+    fur_ins_from_ins2: m.cwrap('fur_ins_from_ins2', 'number', ['number', 'number']),
     fur_ins_get_name: m.cwrap('fur_ins_get_name', 'string', ['number']),
     fur_ins_get_type: m.cwrap('fur_ins_get_type', 'number', ['number']),
     fur_ins_to_fui: m.cwrap('fur_ins_to_fui', 'number', ['number', 'number', 'number']),
@@ -596,7 +598,13 @@ export async function instrumentsFromFileWasm(buffer: ArrayBuffer, fileName: str
   m._free(namePtr);
   if (count < 0) throw new Error(`Furnace instrument load failed: ${api.fur_get_error()}`);
 
-  const out = (write: (i: number, ptr: number, len: number) => number, i: number): Uint8Array | null => {
+  const result: FurnaceInstrumentFile[] = [];
+  for (let i = 0; i < count; i++) result.push(readInstrumentSlot(m, api, i));
+  return result;
+}
+
+function readInstrumentSlot(m: WasmModule, api: FurnaceFileOpsAPI, i: number): FurnaceInstrumentFile {
+  const out = (write: (i: number, ptr: number, len: number) => number): Uint8Array | null => {
     const size = write(i, 0, 0);
     if (size < 0) return null;
     const ptr = m._malloc(size);
@@ -605,11 +613,23 @@ export async function instrumentsFromFileWasm(buffer: ArrayBuffer, fileName: str
     m._free(ptr);
     return bytes;
   };
-  const result: FurnaceInstrumentFile[] = [];
-  for (let i = 0; i < count; i++) {
-    const fui = out(api.fur_ins_to_fui, i);
-    if (!fui) throw new Error(`Furnace instrument ${i} could not be written as .fui`);
-    result.push({ name: api.fur_ins_get_name(i), type: api.fur_ins_get_type(i), fui, dmp: out(api.fur_ins_to_dmp, i) });
-  }
-  return result;
+  const fui = out(api.fur_ins_to_fui);
+  if (!fui) throw new Error(`Furnace instrument ${i} could not be written as .fui`);
+  return { name: api.fur_ins_get_name(i), type: api.fur_ins_get_type(i), fui, dmp: out(api.fur_ins_to_dmp) };
+}
+
+/**
+ * The editor's instrument as an INS2 block (encodeInstrumentAsINS2) read by Furnace's own readInsData, then written
+ * back by Furnace as .fui and .dmp: the files carry the CURRENT edited state, written by Furnace's C++.
+ */
+export async function instrumentFromIns2Wasm(ins2: Uint8Array): Promise<FurnaceInstrumentFile> {
+  const m = await getModule();
+  if (!cachedAPI) cachedAPI = getAPI(m);
+  const api = cachedAPI;
+  const ptr = m._malloc(ins2.length);
+  m.HEAPU8.set(ins2, ptr);
+  const n = api.fur_ins_from_ins2(ptr, ins2.length);
+  m._free(ptr);
+  if (n < 0) throw new Error(`Furnace instrument read failed: ${api.fur_get_error()}`);
+  return readInstrumentSlot(m, api, 0);
 }

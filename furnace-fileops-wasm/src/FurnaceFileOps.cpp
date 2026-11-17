@@ -613,6 +613,28 @@ int fur_ins_load_file(const uint8_t* data, size_t len, const char* fileName) {
   return (int)g_insFile.size();
 }
 
+// Reads the INS2 block the editor writes from its own instrument state (encodeInstrumentAsINS2) with Furnace's
+// DivInstrument::readInsData, into slot 0, so fur_ins_to_fui / fur_ins_to_dmp save the CURRENT edited instrument.
+int fur_ins_from_ins2(const uint8_t* data, size_t len) {
+  ensureInit();
+  clearInsFile();
+  DivInstrument* ins=new DivInstrument;
+  try {
+    SafeReader reader(data,len);
+    if (ins->readInsData(reader,232,NULL)!=DIV_DATA_SUCCESS) {
+      delete ins;
+      snprintf(g_errorBuf,sizeof(g_errorBuf),"invalid INS2 instrument data");
+      return -1;
+    }
+  } catch (EndOfFileException& e) {
+    delete ins;
+    snprintf(g_errorBuf,sizeof(g_errorBuf),"premature end of INS2 data");
+    return -1;
+  }
+  g_insFile.push_back(ins);
+  return 1;
+}
+
 const char* fur_ins_get_name(int i) {
   if (i<0 || i>=(int)g_insFile.size()) return "";
   return g_insFile[i]->name.c_str();

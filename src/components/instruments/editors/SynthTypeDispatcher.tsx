@@ -153,6 +153,7 @@ const WasmInfoEditor = lazy(() => import('../controls/WasmInfoEditor').then(m =>
 const Cinter4Controls = lazy(() => import('../controls/Cinter4Controls').then(m => ({ default: m.Cinter4Controls })));
 import { CZ101PatchBrowser } from '../controls/CZ101PatchBrowser';
 import { FurnaceLoadInstrumentButton } from '../controls/FurnaceLoadInstrumentButton';
+import { FurnaceSaveInstrumentButtons } from '../controls/FurnaceSaveInstrumentButtons';
 const KlysControls = lazy(() => import('../controls/KlysControls').then(m => ({ default: m.KlysControls })));
 const SonixControls = lazy(() => import('../controls/SonixControls').then(m => ({ default: m.SonixControls })));
 const GTUltraControls = lazy(() => import('../controls/GTUltraControls').then(m => ({ default: m.GTUltraControls })));
@@ -867,6 +868,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           customHeaderControls={
             <>
             <FurnaceLoadInstrumentButton synthType={instrument.synthType} instrumentId={instrument.id} />
+            <FurnaceSaveInstrumentButtons instrumentId={instrument.id} />
             {hasFurnaceHardware ? (
               <button
                 onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
