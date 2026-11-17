@@ -108,3 +108,4 @@ import './XMEncoder';
 import './XMFEncoder';
 import './XTrackerEncoder';
 import './ZoundMonitorEncoder';
+import './MajorTomEncoder';

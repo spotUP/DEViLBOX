@@ -1788,6 +1788,18 @@ export async function tryRouteFormat(
 
 
 
+  // ── Major Tom (.arp) — stored-cell grid; UADE handles audio.
+  if (matchesExt(filename, ['arp'])) {
+    const { isMajorTomFormat, parseMajorTomFile } = await import('@lib/import/formats/MajorTomParser');
+    return withNativeThenUADE('majortom', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
+        if (isMajorTomFormat(buf)) return parseMajorTomFile(ab, name);
+        return null;
+      },
+      'MajorTomParser', { injectUADE: true });
+  }
+
   // ── TME — native parser provides detection; UADE handles audio.
   if (matchesExt(filename, ['tme'])) {
     const { isTMEFormat, parseTMEFile } = await import('@lib/import/formats/TMEParser');

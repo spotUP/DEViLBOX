@@ -312,6 +312,14 @@
       "matchPct": 1,
       "cells": 87
     },
+    "majortom": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 3584
+    },
     "maniacsOfNoise": {
       "kind": "variable",
       "method": "encode-pattern",

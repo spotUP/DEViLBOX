@@ -76,6 +76,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "glueMon", fixture: "public/data/songs/formats/memphis.glue", kind: "fixed" },
   { formatId: "multiMediaSound", fixture: "public/data/songs/multimedia-sound/bottle popper.mms", kind: "fixed" },
   { formatId: "tme", fixture: "public/data/songs/the-musical-enlightenment/64 conversion.tme", kind: "fixed" },
+  { formatId: "majortom", fixture: "public/data/songs/formats/pseudofever.arp", kind: "fixed" },
   { formatId: "hippelCoSo", fixture: "public/data/songs/formats/prehistoric_tale.hipc", kind: "variable" },
   { formatId: "hivelyAHX", fixture: "public/data/songs/ahx/amanda.ahx", kind: "fixed" },
   { formatId: "hivelyHVL", fixture: "public/data/songs/formats/hexplosion.hvl", kind: "variable" },

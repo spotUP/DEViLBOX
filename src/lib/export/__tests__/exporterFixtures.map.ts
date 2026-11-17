@@ -42,6 +42,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   glueMon: 'public/data/songs/formats/memphis.glue',
   multiMediaSound: 'public/data/songs/multimedia-sound/bottle popper.mms',
   tme: 'public/data/songs/the-musical-enlightenment/64 conversion.tme',
+  majortom: 'public/data/songs/formats/pseudofever.arp',
   coreDesign: 'public/data/songs/core-design/dynamite dux.core',
   anders0land: 'public/data/songs/anders-oland/primemover 07.hot',
   format669: 'public/data/songs/composer-669/speed fighter.669',

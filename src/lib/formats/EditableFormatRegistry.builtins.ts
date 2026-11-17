@@ -226,3 +226,4 @@ const WITH_SYNTH: Record<string, SynthType[]> = {
   tfmx: ['TFMXSynth', 'TFMXModuleSynth'],
 };
 for (const [id, types] of Object.entries(WITH_SYNTH)) setFormatInstruments(id, [...SAMPLED, ...types]);
+registerEditableFormat({ formatId: "majortom", label: "Major Tom", patternCodec: { kind: "fixed" }, exporter: { module: "MajorTomExporter", fn: "exportMajorTom", byLayout: true } });

@@ -1658,6 +1658,18 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     customDispatch: true, // Must exclude mon_old.* (handled by jeroenTel)
   },
   {
+    key: 'majortom',
+    label: 'Major Tom',
+    description: 'Major Tom (.arp / arp.* prefix)',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.arp$/i,
+    prefixes: ['arp.'],
+    prefKey: 'majortom',
+    nativeParser: { module: '@lib/import/formats/MajorTomParser', parseFn: 'parseMajorTomFile', detectFn: 'isMajorTomFormat' },
+    uadeFallback: true,
+  },
+  {
     key: 'jxs',
     label: 'JayTrax',
     description: 'JayTrax (.jxs) - native parser and own WASM player.',
