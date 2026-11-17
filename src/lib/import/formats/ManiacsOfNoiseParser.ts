@@ -11,7 +11,10 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { maniacsOfNoiseEncoder } from '@/engine/uade/encoders/ManiacsOfNoiseEncoder';
+import { buildManiacsOfNoiseGrid, MANIACS_OF_NOISE_ROWS_PER_PATTERN } from './maniacsOfNoiseGrid';
 
 function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
@@ -48,6 +51,41 @@ export function parseManiacsOfNoiseFile(buffer: ArrayBuffer, filename: string): 
 
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^mon\./i, '').replace(/\.mon$/i, '') || baseName;
+
+  // A recognised module (maniacsOfNoiseGrid.ts) opens as an editable tick grid; anything else keeps the stub below.
+  const grid = buildManiacsOfNoiseGrid(buf, filename);
+  if (grid) {
+    const R = MANIACS_OF_NOISE_ROWS_PER_PATTERN;
+    return {
+      name: `${moduleName} [Maniacs of Noise]`, format: 'MOD' as TrackerFormat,
+      patterns: grid.patterns,
+      instruments: Array.from({ length: Math.max(1, grid.instrumentCount) }, (_, i) => ({
+        id: i + 1, name: '', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+      } as InstrumentConfig)),
+      songPositions: grid.patterns.map((_, i) => i), songLength: grid.patterns.length, restartPosition: 0,
+      numChannels: 4, initialSpeed: 1, initialBPM: 125, linearPeriods: false,
+      uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+      uadeEditableFileName: filename,
+      uadePlayerTickGrid: true,
+      uadeVariableLayout: {
+        formatId: 'maniacsOfNoise',
+        numChannels: grid.voices,
+        numFilePatterns: grid.blockRows.length,
+        rowsPerPattern: R,
+        moduleSize: buffer.byteLength,
+        encoder: maniacsOfNoiseEncoder,
+        filePatternAddrs: grid.filePatternAddrs,
+        filePatternSizes: grid.filePatternSizes,
+        trackMap: grid.trackMap,
+        blockRows: grid.blockRows,
+        propagateSharedCells: true,
+        noteBytes: grid.placements.map(pl => ({
+          pattern: Math.floor(pl.tick / R), channel: pl.voice, row: pl.tick % R,
+          offset: pl.offset, note: pl.note, base: pl.delta,
+        })),
+      } as UADEVariablePatternLayout,
+    };
+  }
 
   // ── Scan for instrument/sample data ───────────────────────────────────────
   //

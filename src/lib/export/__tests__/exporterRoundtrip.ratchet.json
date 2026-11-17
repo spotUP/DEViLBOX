@@ -504,6 +504,14 @@
       "cells": 2044,
       "bytes": 2044
     },
+    "maniacsOfNoise": {
+      "exporter": "ManiacsOfNoiseExporter.exportManiacsOfNoise",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 7788,
+      "bytes": 7788
+    },
     "paulShields": {
       "exporter": "PaulShieldsExporter.exportPaulShields",
       "tier": "byte-exact",
