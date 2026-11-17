@@ -86,6 +86,7 @@
 #define SEQ_COMPAT_RESET_ARP_PHASE_ON_NEW_NOTE (1u << 27)
 #define SEQ_COMPAT_OLD_ALWAYS_SET_VOLUME      (1u << 28)
 #define SEQ_COMPAT_PRE_NOTE_NO_EFFECT         (1u << 29)
+#define SEQ_COMPAT_ARP_SPEED_GLOBAL           (1u << 30)
 
 // Extended compat flags (second word) for fields needing >1 bit
 // linearPitch (0-2), pitchSlideSpeed (0-2), loopModality (0-2),
@@ -157,6 +158,7 @@ struct SeqChannelState {
   uint8_t arp;
   uint8_t arpStage;
   uint8_t arpTicks;
+  uint8_t arpSpeed;
   uint8_t panL;
   uint8_t panR;
   uint8_t panRL;
@@ -223,6 +225,7 @@ struct SeqChannelState {
     arp = 0;
     arpStage = 0xff; // -1 as unsigned
     arpTicks = 1;
+    arpSpeed = 1;
     panL = 255;
     panR = 255;
     panRL = 0;

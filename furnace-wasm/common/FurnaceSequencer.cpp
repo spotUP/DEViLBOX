@@ -135,8 +135,6 @@ static void initTables() {
 
 static FurnaceSequencer g_seq;
 
-// Arp length (global, matches Furnace's curSubSong->arpLen)
-static int g_arpLen = 1;
 
 // firstTick flag (set by nextRow, cleared after per-tick processing)
 static bool firstTick = false;
@@ -925,8 +923,14 @@ static void seqProcessRow(int i, bool afterDelay) {
 
       // --- Arp speed ---
       case 0xe0:
-        if (effectVal > 0) g_arpLen = effectVal;
-        dispatchCmd(DIV_CMD_HINT_ARP_TIME, i, g_arpLen);
+        if (effectVal > 0) {
+          if (COMPAT(SEQ_COMPAT_ARP_SPEED_GLOBAL)) {
+            for (int c = 0; c < g_seq.numChannels; c++) g_seq.chan[c].arpSpeed = effectVal;
+          } else {
+            ch.arpSpeed = effectVal;
+          }
+          dispatchCmd(DIV_CMD_HINT_ARP_TIME, i, effectVal);
+        }
         break;
 
       // --- Shorthand portamento ---
@@ -1571,7 +1575,7 @@ static bool seqNextTick() {
             g_seq.curSpeed = 0;
             g_seq.ticks = 1;
             g_seq.tempoAccum = 0;
-            g_arpLen = 1;
+            for (int c = 0; c < g_seq.numChannels; c++) g_seq.chan[c].arpSpeed = 1;
             g_seq.nextSpeed = g_seq.speeds.val[0];
             g_seq.prevSpeed = g_seq.nextSpeed;
             memset(g_seq.walked, 0, sizeof(g_seq.walked));
@@ -1937,7 +1941,7 @@ static bool seqNextTick() {
 
       if (ch.arp != 0 && !ch.arpYield && ch.portaSpeed < 1) {
         if (--ch.arpTicks < 1) {
-          ch.arpTicks = g_arpLen;
+          ch.arpTicks = ch.arpSpeed;
           ch.arpStage++;
           if (ch.arpStage > 2) ch.arpStage = 0;
           switch (ch.arpStage) {
@@ -1994,7 +1998,6 @@ void furnace_seq_load_song(int numChannels, int patLen, int ordersLen) {
   }
 
   // Reset global state
-  g_arpLen = 1;
   firstTick = false;
   endOfSong = false;
   shallStopSched = false;

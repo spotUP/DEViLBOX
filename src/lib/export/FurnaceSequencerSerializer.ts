@@ -221,6 +221,7 @@ function packCompatFlags(cf: Record<string, unknown>): { flags: number; flagsExt
   if (cf.resetArpPhaseOnNewNote) flags |= (1 << 27);
   if (cf.oldAlwaysSetVolume)     flags |= (1 << 28);
   if (cf.preNoteNoEffect)        flags |= (1 << 29);
+  if (cf.arpSpeedGlobal)         flags |= (1 << 30);
 
   // Extended flags: multi-bit values packed into uint32
   let flagsExt = 0;

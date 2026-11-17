@@ -1581,6 +1581,7 @@ void furnace_dispatch_set_compat_flags(int handle, unsigned char* data, int data
   f.oldSampleOffset = data[i++];
   f.oldCenterRate = data[i++];
   f.noVolSlideReset = data[i++];
+  if (i < dataLen) f.arpSpeedGlobal = data[i++]; // 58th field; older 57-byte callers keep the default
   it->second->dispatch->notifyPitchTable(-1); // pitch tables depend on linearPitch
 }
 
@@ -1654,6 +1655,7 @@ void furnace_dispatch_set_compat_flag(int handle, int flagIndex, int value) {
     case 54: f.oldSampleOffset = value; break;
     case 55: f.oldCenterRate = value; break;
     case 56: f.noVolSlideReset = value; break;
+    case 57: f.arpSpeedGlobal = value; break;
   }
   it->second->dispatch->notifyPitchTable(-1); // pitch tables depend on linearPitch
 }

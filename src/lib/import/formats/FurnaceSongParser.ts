@@ -1233,7 +1233,7 @@ export async function parseFurnaceSong(buffer: ArrayBuffer): Promise<FurnaceModu
       buggyPortaAfterSlide: false,
       gbInsAffectsEnvelope: true,
       sharedExtStat: true,
-      ignoreDACModeOutsideChannel: false,
+      ignoreDACModeOutsideIntendedChannel: false,
       e1e2AlsoTakePriority: false,
       newSegaPCM: true,
       fbPortaPause: false,
@@ -1258,6 +1258,9 @@ export async function parseFurnaceSong(buffer: ArrayBuffer): Promise<FurnaceModu
       ceilVolumeScaling: false,
       oldAlwaysSetVolume: false,
       oldSampleOffset: false,
+      oldCenterRate: false,
+      noVolSlideReset: false,
+      arpSpeedGlobal: false,
     };
     // New format (INF2)
     await parseNewFormat(reader, module, version);
@@ -1873,7 +1876,7 @@ async function parseOldFormat(
     compatFlags.buggyPortaAfterSlide = version >= 72 ? !!reader.readUint8() : (reader.readUint8(), false);// 4
     compatFlags.gbInsAffectsEnvelope = version >= 72 ? !!reader.readUint8() : (reader.readUint8(), false);// 5
     compatFlags.sharedExtStat = version >= 78 ? !!reader.readUint8() : (reader.readUint8(), false);     // 6
-    compatFlags.ignoreDACModeOutsideChannel = version >= 83 ? !!reader.readUint8() : (reader.readUint8(), false);// 7
+    compatFlags.ignoreDACModeOutsideIntendedChannel = version >= 83 ? !!reader.readUint8() : (reader.readUint8(), false);// 7
     compatFlags.e1e2AlsoTakePriority = version >= 83 ? !!reader.readUint8() : (reader.readUint8(), false);// 8
     compatFlags.newSegaPCM = version >= 84 ? !!reader.readUint8() : (reader.readUint8(), false);        // 9
     compatFlags.fbPortaPause = version >= 85 ? !!reader.readUint8() : (reader.readUint8(), false);      // 10

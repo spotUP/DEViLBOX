@@ -502,7 +502,7 @@ export interface CompatFlags {
   buggyPortaAfterSlide?: boolean;
   gbInsAffectsEnvelope?: boolean;
   sharedExtStat?: boolean;
-  ignoreDACModeOutsideChannel?: boolean;
+  ignoreDACModeOutsideIntendedChannel?: boolean;
   e1e2AlsoTakePriority?: boolean;
   newSegaPCM?: boolean;
   fbPortaPause?: boolean;
@@ -529,6 +529,7 @@ export interface CompatFlags {
   oldSampleOffset?: boolean;
   oldCenterRate?: boolean;
   noVolSlideReset?: boolean;
+  arpSpeedGlobal?: boolean;
 }
 
 /**
@@ -1658,7 +1659,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
     if (!this.workletNode) return;
 
     // Convert flags object to byte array in struct order
-    const flagArray = new Uint8Array(57);
+    const flagArray = new Uint8Array(58);
     flagArray[0] = flags.limitSlides ? 1 : 0;
     flagArray[1] = flags.linearPitch ?? 2; // Default to full linear
     flagArray[2] = flags.pitchSlideSpeed ?? 0;
@@ -1689,7 +1690,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
     flagArray[27] = flags.buggyPortaAfterSlide ? 1 : 0;
     flagArray[28] = flags.gbInsAffectsEnvelope ? 1 : 0;
     flagArray[29] = flags.sharedExtStat ? 1 : 0;
-    flagArray[30] = flags.ignoreDACModeOutsideChannel ? 1 : 0;
+    flagArray[30] = flags.ignoreDACModeOutsideIntendedChannel ? 1 : 0;
     flagArray[31] = flags.e1e2AlsoTakePriority ? 1 : 0;
     flagArray[32] = flags.newSegaPCM ? 1 : 0;
     flagArray[33] = flags.fbPortaPause ? 1 : 0;
@@ -1716,6 +1717,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
     flagArray[54] = flags.oldSampleOffset ? 1 : 0;
     flagArray[55] = flags.oldCenterRate ? 1 : 0;
     flagArray[56] = flags.noVolSlideReset ? 1 : 0;
+    flagArray[57] = flags.arpSpeedGlobal ? 1 : 0;
 
     this.workletNode.port.postMessage({ type: 'setCompatFlags', flags: flagArray, platformType });
   }

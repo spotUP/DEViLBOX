@@ -77,6 +77,15 @@ function song() {
 }
 
 describe('exportFurnaceModule', () => {
+  it('compat flags survive export then parse; flags the 0.6.8.3 INFO layout lacks are reported', async () => {
+    const s = { ...song(), compatFlags: { limitSlides: true, pitchSlideSpeed: 9, arpSpeedGlobal: true } };
+    const r = exportFurnaceModule(s);
+    const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+    expect(mod.compatFlags.limitSlides).toBe(true);
+    expect(mod.compatFlags.pitchSlideSpeed).toBe(9);
+    expect(r.warnings.some((w) => w.includes('arpSpeedGlobal'))).toBe(true);
+  });
+
   it('writes a YM2610 module that the Furnace parser reads back', async () => {
     const result = exportFurnaceModule(song());
     const mod = await parseFurnaceSong(result.bytes.buffer.slice(result.bytes.byteOffset, result.bytes.byteOffset + result.bytes.byteLength) as ArrayBuffer);
