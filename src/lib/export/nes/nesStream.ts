@@ -184,19 +184,21 @@ function eventBytes(evs: readonly NesTickEvent[]): number[] {
 }
 
 /** Static frame dictionary: records repeated often enough to beat their own table cost, most used first (short refs). */
-function buildDictionary(records: ReadonlyArray<number[]>): number[][] {
+function buildDictionary(records: ReadonlyArray<number[]>, budget = Infinity): number[][] {
   const count = new Map<string, { rec: number[]; n: number }>();
   for (const r of records) if (r.length > 2 && r.length < 256) { const k = r.join(','); const e = count.get(k); if (e) e.n++; else count.set(k, { rec: r, n: 1 }); }
   return [...count.values()]
     .filter((e) => e.n * (e.rec.length - 2) > e.rec.length + 3)
     .sort((a, b) => b.n * b.rec.length - a.n * a.rec.length)
-    .slice(0, 255).sort((a, b) => b.n - a.n).map((e) => e.rec);
+    .slice(0, 255).sort((a, b) => b.n - a.n).map((e) => e.rec)
+    // Banked: the dictionary sits in the first bank; keep the most used entries that fit (the rest go out inline).
+    .filter((r) => (budget -= 3 + r.length) >= 0);
 }
 
 export function encodeNesSubsong(cap: NesCapture, opts: NesEncodeOptions = {}): Uint8Array {
   const ticks = nesCaptureToTicks(cap, opts.region);
   const records = ticks.map(tickRecord);
-  const dict = buildDictionary(records);
+  const dict = buildDictionary(records, (opts.bankSize ?? 0) ? (opts.bankSize as number) - 16 - 1 : Infinity);
   const dictIndex = new Map(dict.map((r, i) => [r.join(','), i]));
   const out: number[] = [dict.length];
   let off = 1 + 2 * dict.length;

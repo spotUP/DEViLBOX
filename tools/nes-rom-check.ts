@@ -20,7 +20,7 @@ const RESULTS = path.join(ROOT, 'test-data/nes-rom-check.json');
 const SR = 48000, TR = 60;
 const RANGES: Array<[number, number]> = [[0x4000, 0x4013], [0x4015, 0x4015], [0x4017, 0x4017], [0x4040, 0x408a], [0x4800, 0x4800], [0x5000, 0x5015], [0x8000, 0xffff]];
 
-interface Verdict { inputHash: string; pass: boolean; ticks: number; wanted: number; got: number; diffs: number; first?: string; romBytes?: number; error?: string }
+interface Verdict { inputHash: string; pass: boolean; ticks: number; wanted: number; got: number; diffs: number; first?: string; romBytes?: number; error?: string; refused?: string }
 
 const w = (tick: number, chip: NesChip, addr: number, value: number): NesEvent => ({ kind: 'write', chip, sample: Math.round(tick * SR / TR), addr, value });
 const cap = (events: NesEvent[]): NesCapture => ({ events, sampleRate: SR, tickRateHz: TR });
@@ -78,6 +78,8 @@ const CARTS: Record<string, { board: NesBoard; player: string; ranges: Array<[nu
 const playerName = (target: string) => CARTS[target]?.player ?? 'player';
 const hashOf = (song: string, target: string) => createHash('sha1').update(JSON.stringify(SONGS[song]())).update(target).update(readFileSync(path.join(ROOT, `public/nes/${playerName(target)}.bin`))).digest('hex').slice(0, 12);
 
+const REFUSALS = /^(NSFe export does not support FDS|A VRC6 cartridge carries 2A03 and VRC6 only)/;
+
 function check(name: string, target: string): Verdict {
   const capture = SONGS[name]();
   const inputHash = hashOf(name, target);
@@ -92,7 +94,11 @@ function check(name: string, target: string): Verdict {
     const got = mesen(rom.rom, ticks.length + 3, 60, cart ? cart.ranges : RANGES, target === 'nsfe' ? { fileName: 'p.nsfe', tickAddress: player.nsfPlayAddress } : cart ? { tickAddress: player.nmiAddress } : {}).writes;
     const { diffs, first } = diffWrites(want, got);
     return { ...base, pass: diffs === 0, ticks: ticks.length, wanted: want.flat().length, got: got.flat().length, diffs, first, romBytes: rom.rom.length };
-  } catch (e) { return { ...base, error: String((e as Error).message).split('\n')[0] }; }
+  } catch (e) {
+    const msg = String((e as Error).message).split('\n')[0];
+    // Deliberate export refusals (owner policy) are the expected verdict, not a failure.
+    return REFUSALS.test(msg) ? { ...base, pass: true, refused: msg } : { ...base, error: msg };
+  }
 }
 
 const args = process.argv.slice(2);
@@ -112,5 +118,5 @@ for (const song of Object.keys(SONGS)) {
   results[name] = check(song, target);
   writeFileSync(RESULTS, JSON.stringify(results, null, 2) + '\n');
   const r = results[name];
-  console.log(name.padEnd(16), r.pass ? 'PASS' : 'FAIL', `ticks=${r.ticks} wanted=${r.wanted} got=${r.got} diffs=${r.diffs} ${r.first ?? ''} ${r.error ?? ''}`);
+  console.log(name.padEnd(16), r.pass ? 'PASS' : 'FAIL', `ticks=${r.ticks} wanted=${r.wanted} got=${r.got} diffs=${r.diffs} ${r.first ?? ''} ${r.error ?? ''}${r.refused ? `refused: ${r.refused}` : ''}`);
 }
