@@ -34,9 +34,9 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, Pattern } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { encodeThomasHermannCell, decodeThomasHermannCell } from '@/engine/uade/encoders/ThomasHermannEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
@@ -188,22 +188,25 @@ export async function parseThomasHermannFile(
     } as InstrumentConfig);
   }
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
+  // ── Patterns: one grid pattern per song position, 4 voices x (last row + 1) x 3 bytes (thm_module.c) ──
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
+  const ROWS = buf[0x29] + 1;
+  const base = u32BE(buf, 0x2e);
+  const numPositions = buf[0x21] + 1;
+  const cellOffset = (p: number, row: number, ch: number): number => {
+    if (p < 0 || p >= numPositions || row < 0 || row >= ROWS || ch < 0 || ch >= 4) return -1;
+    const off = ((u32BE(buf, 0x40 + ch * 0x400 + p * 4) - base) >>> 0) + row * 3;
+    return off + 3 <= buf.length ? off : -1;
+  };
+  const cellAt = (p: number, r: number, ch: number) => {
+    const off = cellOffset(p, r, ch);
+    return decodeThomasHermannCell(off < 0 ? new Uint8Array([0xff, 0, 0]) : buf.subarray(off, off + 3));
+  };
 
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
+  const patterns: Pattern[] = Array.from({ length: numPositions }, (_, p) => ({
+    id: `pattern-${p}`,
+    name: `Position ${p}`,
+    length: ROWS,
     channels: Array.from({ length: 4 }, (_, ch) => ({
       id: `channel-${ch}`,
       name: `Channel ${ch + 1}`,
@@ -214,25 +217,25 @@ export async function parseThomasHermannFile(
       pan: (ch === 0 || ch === 3) ? -50 : 50,
       instrumentId: null,
       color: null,
-      rows: emptyRows,
+      rows: Array.from({ length: ROWS }, (_, r) => cellAt(p, r, ch)),
     })),
     importMetadata: {
       sourceFormat: 'MOD' as const,
       sourceFile: filename,
       importedAt: new Date().toISOString(),
       originalChannelCount: 4,
-      originalPatternCount: 1,
+      originalPatternCount: numPositions,
       originalInstrumentCount: instruments.length,
     },
-  };
+  }));
 
   return {
     name: `${moduleName} [Thomas Hermann]`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions: patterns.map((_, i) => i),
+    songLength: numPositions,
     restartPosition: 0,
     numChannels: 4,
     initialSpeed: 6,
@@ -243,13 +246,16 @@ export async function parseThomasHermannFile(
     uadePatternLayout: {
       formatId: 'thomasHermann',
       patternDataFileOffset: 0,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
+      bytesPerCell: 3,
+      rowsPerPattern: ROWS,
       numChannels: 4,
-      numPatterns: 1,
+      numPatterns: numPositions,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
-    } as UADEPatternLayout,
+      encodeCell: encodeThomasHermannCell,
+      encodeOverStored: true,
+      decodeCell: decodeThomasHermannCell,
+      getCellFileOffset: cellOffset,
+      propagateSharedCells: true,
+    } satisfies UADEPatternLayout,
   };
 }

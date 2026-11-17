@@ -16,6 +16,7 @@ import type { SynthType } from '@typedefs/instrument';
 
 registerEditableFormat({ formatId: "actionamics", label: "", newSong: { template: "templates/actionamics.ast", name: "Actionamics" }, patternCodec: { kind: "variable" }, exporter: { module: "ActionamicsExporter", fn: "exportActionamics", byLayout: true } });
 registerEditableFormat({ formatId: "jxs", label: "JayTrax", patternCodec: { kind: "fixed" }, exporter: { module: "JxsExporter", fn: "exportJxs", byLayout: true } });
+registerEditableFormat({ formatId: "pt41", label: "ProTracker 4", patternCodec: { kind: "fixed" }, exporter: { module: "ProTracker4Exporter", fn: "exportProTracker4", byLayout: true } });
 registerEditableFormat({ formatId: "davidHanney", label: "David Hanney", patternCodec: { kind: "fixed" }, exporter: { module: "DavidHanneyExporter", fn: "exportDavidHanney", byLayout: true } });
 registerEditableFormat({ formatId: "ems", label: "EMS", patternCodec: { kind: "fixed" }, exporter: { module: "EmsExporter", fn: "exportEms", byLayout: true } });
 registerEditableFormat({ formatId: "fashionTracker", label: "Fashion Tracker", patternCodec: { kind: "fixed" }, exporter: { module: "FashionTrackerExporter", fn: "exportFashionTracker", byLayout: true } });
@@ -42,6 +43,7 @@ registerEditableFormat({ formatId: "activisionPro", label: "Activision Pro", new
 registerEditableFormat({ formatId: "adplug", label: "AdPlug", newSong: { template: "templates/adplug.rad" }, exporter: { module: "AdPlugExporter", fn: "exportAdPlug" } });
 registerEditableFormat({ formatId: "amf", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "psa", label: "", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "thomasHermann", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "amosMusicBank", label: "AMOS Music Bank", newSong: { template: "templates/amosMusicBank.abk" }, patternCodec: { kind: "variable" }, exporter: { module: "AMOSMusicBankExporter", fn: "exportAMOSMusicBank", ext: "abk", byLayout: true } });
 registerEditableFormat({ formatId: "ams", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "artOfNoise", label: "Art of Noise", patternCodec: { kind: "fixed" }, exporter: { module: "ArtOfNoiseExporter", fn: "exportArtOfNoise", byLayout: true } });
