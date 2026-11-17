@@ -41,6 +41,7 @@ registerEditableFormat({ formatId: "ansiMusic", label: "ANSI Music", newSong: { 
 registerEditableFormat({ formatId: "activisionPro", label: "Activision Pro", newSong: { template: "templates/activisionPro.avp" }, patternCodec: { kind: "fixed" }, exporter: { module: "ActivisionProExporter", fn: "exportActivisionPro", byLayout: true } });
 registerEditableFormat({ formatId: "adplug", label: "AdPlug", newSong: { template: "templates/adplug.rad" }, exporter: { module: "AdPlugExporter", fn: "exportAdPlug" } });
 registerEditableFormat({ formatId: "amf", label: "", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "psa", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "amosMusicBank", label: "AMOS Music Bank", newSong: { template: "templates/amosMusicBank.abk" }, patternCodec: { kind: "variable" }, exporter: { module: "AMOSMusicBankExporter", fn: "exportAMOSMusicBank", ext: "abk", byLayout: true } });
 registerEditableFormat({ formatId: "ams", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "artOfNoise", label: "Art of Noise", patternCodec: { kind: "fixed" }, exporter: { module: "ArtOfNoiseExporter", fn: "exportArtOfNoise", byLayout: true } });
