@@ -450,7 +450,7 @@ import {
 } from './tracker/patternEditActions';
 import {
   copySelectionHelper, cutSelectionHelper, swapSelectionHelper,
-  pasteHelper, pasteMixHelper, pasteFloodHelper, pastePushForwardHelper,
+  pasteHelper, pasteMixHelper, clipboardWithInstrument, pasteFloodHelper, pastePushForwardHelper,
   copyTrackHelper, cutTrackHelper, pasteTrackHelper,
   copyCommandsHelper, cutCommandsHelper, pasteCommandsHelper,
   killToEndHelper, killToStartHelper,
@@ -501,6 +501,8 @@ interface TrackerStore {
   paste: () => void;
   swapSelection: () => void;
   // Advanced paste modes (OpenMPT-style)
+  /** Paste with every pasted note set to instrumentId; mix = only fill empty cells (Furnace foreground / background paste). */
+  pasteWithInstrument: (instrumentId: number, mix?: boolean) => void;
   pasteMix: () => void;           // Only fill empty cells
   pasteFlood: () => void;         // Paste until pattern end
   pastePushForward: () => void;   // Insert and shift down
@@ -1083,6 +1085,22 @@ export const useTrackerStore = create<TrackerStore>()(
       });
       refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('SWAP_SELECTION', 'Swap selection', patternIndex, beforePattern, get().patterns[patternIndex]);
+      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
+    },
+
+    pasteWithInstrument: (instrumentId, mix = false) => {
+      if (!get().clipboard) return;
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
+      set((state) => {
+        if (!state.clipboard) return;
+        const pattern = state.patterns[state.currentPatternIndex];
+        const cursor = useCursorStore.getState().cursor;
+        const clip = clipboardWithInstrument(state.clipboard, instrumentId);
+        (mix ? pasteMixHelper : pasteHelper)(pattern, cursor, clip, useEditorStore.getState().pasteMask);
+      });
+      refuseWrongKindCells(patternIndex, beforePattern);
+      pushEditAction('PASTE', mix ? 'Paste with instrument (background)' : 'Paste with instrument', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
 

@@ -294,6 +294,14 @@ export function swapSelectionHelper(
   return temp;
 }
 
+/** Copy of the clipboard whose notes all use `instrumentId` (Furnace "paste with instrument"). */
+export function clipboardWithInstrument(clipboard: ClipboardData, instrumentId: number): ClipboardData {
+  return {
+    ...clipboard,
+    data: clipboard.data.map((ch) => ch.map((c) => (c.note !== 0 ? { ...c, instrument: instrumentId } : c))),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Paste Mix — only fill empty cells
 // ---------------------------------------------------------------------------

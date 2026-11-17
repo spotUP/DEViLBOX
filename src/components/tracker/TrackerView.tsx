@@ -14,6 +14,7 @@ import { useModuleImport } from '@hooks/tracker/useModuleImport';
 import { SongLoadPanel } from './SongLoadPanel';
 import { ImportDialogHost } from '@components/dialogs/ImportDialogHost';
 import { InterpolateDialog } from '@components/dialogs/InterpolateDialog';
+import { ValueOpsDialog, type ValueOpKind } from '@components/dialogs/ValueOpsDialog';
 import { HumanizeDialog } from '@components/dialogs/HumanizeDialog';
 import { FindReplaceDialog } from '@components/dialogs/FindReplaceDialog';
 import { ImportAudioDialog } from '@components/dialogs/ImportAudioDialog';
@@ -223,6 +224,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // Dialog state
   const [showInterpolate, setShowInterpolate] = useState(false);
   const [showHumanize, setShowHumanize] = useState(false);
+  const [valueOp, setValueOp] = useState<ValueOpKind | null>(null);
   const [showFindReplace, setShowFindReplace] = useState(false);
   const [showShortcutSheet, setShowShortcutSheet] = useState(false);
   const [showStrum, setShowStrum] = useState(false);
@@ -293,6 +295,15 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         break;
       case 'humanize':
         setShowHumanize(true);
+        break;
+      case 'scale-values':
+        setValueOp('scale');
+        break;
+      case 'transpose-values':
+        setValueOp('transpose');
+        break;
+      case 'randomize-values':
+        setValueOp('randomize');
         break;
       case 'find-replace':
         setShowFindReplace(true);
@@ -744,6 +755,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
 
       {/* Dialogs */}
       <InterpolateDialog isOpen={showInterpolate} onClose={() => setShowInterpolate(false)} />
+      <ValueOpsDialog isOpen={valueOp !== null} onClose={() => setValueOp(null)} initialOp={valueOp ?? 'scale'} />
       <HumanizeDialog isOpen={showHumanize} onClose={() => setShowHumanize(false)} />
       <FindReplaceDialog isOpen={showFindReplace} onClose={() => setShowFindReplace(false)} />
       <KeyboardShortcutSheet isOpen={showShortcutSheet} onClose={() => setShowShortcutSheet(false)} />

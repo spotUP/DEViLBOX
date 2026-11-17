@@ -36,7 +36,8 @@ import {
   chordNotes, invertChord, chordLabel, arpLabel,
   xmNoteShortName,
 } from '@/lib/chordDefinitions';
-import { Layers } from 'lucide-react';
+import { Layers, SlidersHorizontal } from 'lucide-react';
+import { invertValues, minimizeChannels, maximizeChannels } from '@/engine/keyboard/commands/advanced';
 import { useChannelMenuItems, type ChannelMenuHandlers } from './useChannelMenuItems';
 
 interface CellContextMenuProps {
@@ -123,6 +124,14 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   const buildChannelItems = useChannelMenuItems(channelIndex, pattern?.channels[channelIndex], pattern?.id ?? '', channelMenuHandlers);
 
   // Block handlers
+  const applyCurrentInstrumentId = useCallback(() => {
+    const id = useInstrumentStore.getState().currentInstrumentId;
+    if (id) useTrackerStore.getState().applyInstrumentToSelection(id);
+  }, []);
+  const pasteWithCurrentInstrument = useCallback((mix: boolean) => {
+    const id = useInstrumentStore.getState().currentInstrumentId;
+    if (id) useTrackerStore.getState().pasteWithInstrument(id, mix);
+  }, []);
   const handleCopyBlock = useCallback(() => {
     if (!hasSelection) return;
     copySelection();
@@ -409,6 +418,16 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
         onClick: handlePasteBlock,
       },
       {
+        id: 'block-paste-instrument',
+        label: 'Paste with Instrument',
+        onClick: () => { pasteWithCurrentInstrument(false); onClose(); },
+      },
+      {
+        id: 'block-paste-instrument-bg',
+        label: 'Paste Mix with Instrument',
+        onClick: () => { pasteWithCurrentInstrument(true); onClose(); },
+      },
+      {
         id: 'block-transpose',
         label: 'Transpose Block',
         icon: <TrendingUp size={14} />,
@@ -429,6 +448,22 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
           { id: 'interp-eff2', label: 'Interpolate Effect 2', onClick: () => handleInterpolateBlock('effParam2') },
           { id: 'interp-cutoff', label: 'Interpolate Cutoff', onClick: () => handleInterpolateBlock('cutoff') },
           { id: 'interp-res', label: 'Interpolate Resonance', onClick: () => handleInterpolateBlock('resonance') },
+        ]
+      },
+      {
+        id: 'block-set-instrument',
+        label: 'Set Instrument of Selection',
+        onClick: () => { applyCurrentInstrumentId(); onClose(); },
+      },
+      {
+        id: 'block-values',
+        label: 'Change Values',
+        icon: <SlidersHorizontal size={14} />,
+        submenu: [
+          { id: 'values-invert', label: 'Invert Values', onClick: () => { invertValues(); onClose(); } },
+          { id: 'values-scale', label: 'Scale Values...', onClick: () => { useUIStore.getState().openDialogCommand('scale-values'); onClose(); } },
+          { id: 'values-transpose', label: 'Transpose Values...', onClick: () => { useUIStore.getState().openDialogCommand('transpose-values'); onClose(); } },
+          { id: 'values-randomize', label: 'Randomize Values...', onClick: () => { useUIStore.getState().openDialogCommand('randomize-values'); onClose(); } },
         ]
       },
       {
@@ -511,6 +546,9 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       shortcut: 'Backspace',
       onClick: handleDeleteRow,
     },
+    { type: 'divider' },
+    { id: 'minimize-channels', label: 'Minimize Channels', onClick: () => { minimizeChannels(); onClose(); } },
+    { id: 'maximize-channels', label: 'Maximize Channels', onClick: () => { maximizeChannels(); onClose(); } },
     { type: 'divider' },
     // Interpolate/Humanize
     {
