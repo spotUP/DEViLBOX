@@ -166,7 +166,8 @@ describe('server modules imported by root src/ need no server-only package', () 
     }
     expect(seen.size).toBeGreaterThan(0);
     expect(offenders).toEqual([]);
-  });
+    // Repo-wide git grep is IO-bound: with the endpoint scanner busy it took 96 s in the pre-commit hook.
+  }, 240_000);
 });
 
 describe('Dockerfile.backend copies every frontend file the server reaches', () => {
