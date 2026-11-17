@@ -78,4 +78,53 @@ describe('TME parser and exporter', () => {
     setGridBaseline(null);
     expect(again.patterns[p].channels[c].rows[r].note).toBe(edited);
   });
+
+  /** Edit one cell field, export, and return the file offsets that changed plus the re-imported cell. */
+  async function editField(pick: (raw: Uint8Array, off: number) => boolean, mutate: (c: { instrument: number; effTyp: number; eff: number; effTyp2: number; eff2: number }) => void) {
+    const { ab, raw } = load();
+    const song = parseTMEFile(ab, '64 conversion.tme');
+    const layout = song.uadePatternLayout!;
+    let at: [number, number, number] | null = null;
+    outer: for (let p = 0; p < layout.numPatterns; p++) for (let c = 0; c < 4; c++) for (let r = 0; r < 32; r++) {
+      const off = getCellFileOffset(layout, p, r, c);
+      if (off >= 0 && (raw[off] & 0x7f) > 0 && (raw[off] & 0x7f) < 0x7e && pick(raw, off)) { at = [p, r, c]; break outer; }
+    }
+    expect(at).not.toBeNull();
+    const [p, r, c] = at!;
+    setGridBaseline(baselineOf(song.patterns));
+    mutate(song.patterns[p].channels[c].rows[r] as never);
+    const out = await exportTME(song);
+    setGridBaseline(null);
+    const diff: number[] = [];
+    for (let i = 0; i < raw.length; i++) if (raw[i] !== out.data[i]) diff.push(i);
+    const again = parseTMEFile(out.data.buffer.slice(out.data.byteOffset, out.data.byteOffset + out.data.byteLength) as ArrayBuffer, 'x.tme');
+    return { diff, off: getCellFileOffset(layout, p, r, c), cell: again.patterns[p].channels[c].rows[r], was: song.patterns[p].channels[c].rows[r] };
+  }
+
+  it('an instrument edit changes only the instrument byte (track transpose undone) and re-imports as typed', async () => {
+    const r = await editField((raw, off) => raw[off + 1] !== 0, (c) => { c.instrument = c.instrument === 7 ? 8 : 7; });
+    expect(r.diff).toEqual([r.off + 1]);
+    expect(r.cell.instrument).toBe(r.was.instrument);
+  });
+
+  it('a volume edit (effect 2 = 0C) changes only the volume byte', async () => {
+    const r = await editField(() => true, (c) => { c.effTyp2 = 0x0c; c.eff2 = 0x35; });
+    expect(r.diff.every((d) => d === r.off + 3)).toBe(true);
+    expect(r.cell.effTyp2).toBe(0x0c);
+    expect(r.cell.eff2).toBe(0x35);
+  });
+
+  it('a portamento edit (effect 1 = 3xx) changes only flags and param bytes', async () => {
+    const r = await editField((raw, off) => (raw[off + 4] & 0x13) === 0, (c) => { c.effTyp = 3; c.eff = 9; });
+    expect(r.diff.every((d) => d === r.off + 4 || d === r.off + 5)).toBe(true);
+    expect(r.cell.effTyp).toBe(3);
+    expect(r.cell.eff).toBe(9);
+  });
+
+  it('a slide up edit stores a negative param, shown back as effect 1', async () => {
+    const r = await editField((raw, off) => (raw[off + 4] & 0x13) === 0, (c) => { c.effTyp = 1; c.eff = 4; });
+    expect(r.cell.effTyp).toBe(1);
+    expect(r.cell.eff).toBe(4);
+    expect(r.diff.some((d) => d === r.off + 5)).toBe(true);
+  });
 });

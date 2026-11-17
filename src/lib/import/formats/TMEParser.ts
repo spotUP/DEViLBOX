@@ -29,7 +29,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, Pattern } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { decodeTmeCell, encodeTmeCell, tmeStoredNote, TME_STEP_SIZE } from '@/engine/uade/encoders/TMEEncoder';
+import { decodeTmeCell, encodeTmeCell, tmeFieldPatches, tmeStoredNote, TME_STEP_SIZE } from '@/engine/uade/encoders/TMEEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -50,6 +50,7 @@ const POSITION_SIZE = VOICES * 3;
 const ROWS = 32;
 const TRACK_SIZE = ROWS * TME_STEP_SIZE;
 const FLAG_ABSOLUTE_NOTE = 0x04;
+const FLAG_ABSOLUTE_INSTRUMENT = 0x08;
 
 /** Maximum subsong count (slots 0-15 → max 16 subsongs). */
 const MAX_SUBSONGS = 16;
@@ -164,6 +165,11 @@ export function parseTMEFile(buffer: ArrayBuffer, filename: string): TrackerSong
     return (buf[POSITIONS_OFFSET + pattern * POSITION_SIZE + channel * 3 + 2] << 24) >> 24;
   };
 
+  // The track's instrument transpose moves a step's instrument number (mod 32) unless the step is absolute (select_instrument).
+  const instrumentShift = (pattern: number, off: number, channel: number): number =>
+    buf[off + 4] & FLAG_ABSOLUTE_INSTRUMENT ? 0 : (buf[POSITIONS_OFFSET + pattern * POSITION_SIZE + channel * 3 + 1] << 24) >> 24;
+  const shownInstrument = (raw: number, shift: number): number => (raw === 0 || shift === 0 ? raw : ((raw - 1 + shift) & 31) + 1);
+
   const empty = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
   const patterns: Pattern[] = Array.from({ length: positionCount }, (_, pos) => ({
     id: `pattern-${pos}`,
@@ -184,6 +190,7 @@ export function parseTMEFile(buffer: ArrayBuffer, filename: string): TrackerSong
         if (off < 0) return { ...empty };
         const cell = decodeTmeCell(buf.subarray(off, off + TME_STEP_SIZE));
         const shift = noteOffset(pos, row, ch) ?? 0;
+        cell.instrument = shownInstrument(cell.instrument, instrumentShift(pos, off, ch));
         if (cell.note > 0 && shift !== 0) cell.note = Math.min(96, Math.max(1, cell.note + shift));
         return cell;
       }),
@@ -211,6 +218,23 @@ export function parseTMEFile(buffer: ArrayBuffer, filename: string): TrackerSong
     getCellFileOffset: stepAt,
     propagateSharedCells: true,
     noteOffset,
+    effectPatches: (pattern, row, channel, cell) => {
+      const off = stepAt(pattern, row, channel);
+      if (off < 0) return { patches: [], noteUnchanged: false };
+      const shift = instrumentShift(pattern, off, channel);
+      const inst = cell.instrument ?? 0;
+      const kept = shownInstrument(buf[off + 1], shift) === inst; // unchanged: keep the stored byte
+      const raw = kept ? buf[off + 1] : inst === 0 || shift === 0 ? inst : ((inst - 1 - shift) & 31) + 1;
+      const step = buf.subarray(off, off + TME_STEP_SIZE);
+      const fields = tmeFieldPatches(step, cell, raw);
+      // The note byte goes in here too (the generic encode would write the carrier over the field patches).
+      const shiftNote = noteOffset(pattern, row, channel);
+      if (shiftNote !== null) {
+        const nb = encodeTmeCell({ ...cell, note: (cell.note ?? 0) > 0 && (cell.note ?? 0) < 97 ? (cell.note ?? 0) - shiftNote : cell.note, period: decodeTmeCell(step).period })[0];
+        if (nb !== step[0]) fields.set(0, nb);
+      }
+      return { patches: [...fields].map(([i, v]) => [off + i, v] as [number, number]), noteUnchanged: true };
+    },
   };
 
   const nameParts: string[] = [`${moduleName} [TME]`];
