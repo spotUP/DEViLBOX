@@ -1,5 +1,5 @@
 // Headless check: capture -> buildNesRom -> Mesen2 bus-write log -> diff against the capture's per-tick writes (nesCaptureToTicks).
-// Usage: nice -n 19 npx tsx tools/nes-rom-check.ts [--only <name>] [--failed]
+// Usage: nice -n 19 npx tsx tools/nes-rom-check.ts [--only <name>] [--failed] [--target cart|nsfe]  (nsfe results are keyed "<name>/nsfe"; FDS songs are refused by NSFe)
 // Results: test-data/nes-rom-check.json (skips songs whose input hash matches a recorded verdict).
 // LIMIT: a real song's capture comes from the browser worklet (no node-side path), so "songs" are synthetic captures. Cycle position is not compared,
 // only (order, address, value) per tick; chips whose capture address is a register number (vrc7, n163, s5b) are mapped to their bus ports as in nesChipWritersMesen.test.ts.
@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { NesCapture, NesChip, NesEvent } from '../src/lib/export/nes/nesCapture';
 import { buildNesRom } from '../src/lib/export/nes/nesExport';
+import { buildNsfe } from '../src/lib/export/nes/nsfe';
 import type { NesPlayer } from '../src/lib/export/nes/nesCartridge';
 import { CHIP_ORDER, nesCaptureToTicks } from '../src/lib/export/nes/nesStream';
 import { MESEN, busWrites as bus, diffWrites, mesen } from '../src/lib/export/__tests__/nesMesenHarness';
@@ -31,18 +32,26 @@ const SONGS: Record<string, () => NesCapture> = {
     w(t, 'nes', 0x4002, (t * 7) & 0xff), w(t, 'nes', 0x4003, 0x08 | (t & 7)), w(t, 'vrc6', 0x9001, (t * 5) & 0xff), w(t, 'vrc6', 0xa002, t & 0xff),
     w(t, 'fds', 0x4082, (t * 3) & 0xff), w(t, 'mmc5', 0x5002, (t * 11) & 0xff),
   ]).flat()),
+  // No FDS (NSFe refuses it): 2A03 + VRC6 + MMC5 + N163 + 5B, VRC7 included.
+  'synthetic-nofds': () => cap(Array.from({ length: 40 }, (_, t) => [
+    w(t, 'nes', 0x4002, (t * 7) & 0xff), w(t, 'nes', 0x4003, 0x08 | (t & 7)), w(t, 'vrc6', 0x9001, (t * 5) & 0xff), w(t, 'vrc6', 0xa002, t & 0xff),
+    w(t, 'mmc5', 0x5002, (t * 11) & 0xff), w(t, 'n163', 0x78, (t * 3) & 0xff), w(t, 's5b', 0x01, t & 0x0f), w(t, 'vrc7', 0x10, (t * 9) & 0xff),
+  ]).flat()),
 };
 
-function check(name: string): Verdict {
+const hashOf = (song: string, target: string) => createHash('sha1').update(JSON.stringify(SONGS[song]())).update(target).update(readFileSync(path.join(ROOT, 'public/nes/player.bin'))).digest('hex').slice(0, 12);
+
+function check(name: string, target: string): Verdict {
   const capture = SONGS[name]();
-  const inputHash = createHash('sha1').update(JSON.stringify(capture)).update(readFileSync(path.join(ROOT, 'public/nes/player.bin'))).digest('hex').slice(0, 12);
+  const inputHash = hashOf(name, target);
   const base: Verdict = { inputHash, pass: false, ticks: 0, wanted: 0, got: 0, diffs: 0 };
   try {
     const player: NesPlayer = { ...JSON.parse(readFileSync(path.join(ROOT, 'public/nes/player.json'), 'utf8')), bytes: Uint8Array.from(readFileSync(path.join(ROOT, 'public/nes/player.bin'))) };
-    const rom = buildNesRom([{ ntsc: capture }], player, { title: name.slice(0, 16), chips: [...new Set(capture.events.flatMap((e) => (e.kind === 'write' ? [e.chip] : [])))] });
+    const info = { title: name.slice(0, 16), chips: [...new Set(capture.events.flatMap((e) => (e.kind === 'write' ? [e.chip] : [])))] };
+    const rom = target === 'nsfe' ? { rom: buildNsfe([{ ntsc: capture }], player, info).nsfe } : buildNesRom([{ ntsc: capture }], player, info);
     const ticks = nesCaptureToTicks(capture);
     const want = ticks.map((t) => CHIP_ORDER.flatMap((c) => (t.writes[c] ?? []).flatMap(([a, v]) => bus(c, a, v))));
-    const got = mesen(rom.rom, ticks.length + 3, 60, RANGES).writes;
+    const got = mesen(rom.rom, ticks.length + 3, 60, RANGES, target === 'nsfe' ? { fileName: 'p.nsfe', tickAddress: player.nsfPlayAddress } : {}).writes;
     const { diffs, first } = diffWrites(want, got);
     return { ...base, pass: diffs === 0, ticks: ticks.length, wanted: want.flat().length, got: got.flat().length, diffs, first, romBytes: rom.rom.length };
   } catch (e) { return { ...base, error: String((e as Error).message).split('\n')[0] }; }
@@ -50,16 +59,19 @@ function check(name: string): Verdict {
 
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : null;
+const target = args.includes('--target') ? args[args.indexOf('--target') + 1] : 'cart';
+if (target !== 'cart' && target !== 'nsfe') throw new Error(`Unknown target ${target}`);
 const failedOnly = args.includes('--failed');
 if (!existsSync(MESEN)) throw new Error(`Mesen2 not installed at ${MESEN}`);
 if (only && !SONGS[only]) throw new Error(`Unknown song ${only}; have ${Object.keys(SONGS).join(', ')}`);
 mkdirSync(path.dirname(RESULTS), { recursive: true });
 const results: Record<string, Verdict> = existsSync(RESULTS) ? JSON.parse(readFileSync(RESULTS, 'utf8')) : {};
-for (const name of Object.keys(SONGS)) {
-  if (only && name !== only) continue;
+for (const song of Object.keys(SONGS)) {
+  if (only && song !== only) continue;
+  const name = target === 'cart' ? song : `${song}/${target}`;
   const prev = results[name];
-  if (failedOnly ? !prev || prev.pass : prev && !prev.error && prev.pass && prev.inputHash === createHash('sha1').update(JSON.stringify(SONGS[name]())).update(readFileSync(path.join(ROOT, 'public/nes/player.bin'))).digest('hex').slice(0, 12)) continue;
-  results[name] = check(name);
+  if (failedOnly ? !prev || prev.pass : prev && !prev.error && prev.pass && prev.inputHash === hashOf(song, target)) continue;
+  results[name] = check(song, target);
   writeFileSync(RESULTS, JSON.stringify(results, null, 2) + '\n');
   const r = results[name];
   console.log(name.padEnd(16), r.pass ? 'PASS' : 'FAIL', `ticks=${r.ticks} wanted=${r.wanted} got=${r.got} diffs=${r.diffs} ${r.first ?? ''} ${r.error ?? ''}`);

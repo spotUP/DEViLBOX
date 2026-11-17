@@ -11,12 +11,12 @@ const META = join(import.meta.dirname, '../../../../public/nes/player.json');
 export const APU_RANGES: ReadonlyArray<[number, number]> = [[0x4000, 0x4013], [0x4015, 0x4015], [0x4017, 0x4017]]; // $4014 (OAM DMA) and $4016 (joypad strobe) belong to the screen, not the music;
 
 /** Runs rom in Mesen2 headless for `ticks` NMIs. Returns the $4000-$4017 writes per tick and, per tick, the byte at $C000 (DPCM window). */
-export function mesen(rom: Uint8Array, ticks: number, timeout = 30, ranges: ReadonlyArray<[number, number]> = APU_RANGES, opts: { region?: 'Ntsc' | 'Pal' | 'Dendy'; tickAddress?: number; irqBoard?: boolean; stamps?: boolean } = {}): { writes: Array<Array<[number, number]>>; window: number[]; cycles: number[]; writeCycles: number[][] } {
+export function mesen(rom: Uint8Array, ticks: number, timeout = 30, ranges: ReadonlyArray<[number, number]> = APU_RANGES, opts: { region?: 'Ntsc' | 'Pal' | 'Dendy'; tickAddress?: number; irqBoard?: boolean; stamps?: boolean; fileName?: string } = {}): { writes: Array<Array<[number, number]>>; window: number[]; cycles: number[]; writeCycles: number[][] } {
   const meta = JSON.parse(readFileSync(META, 'utf8'));
   const dir = mkdtempSync(join(tmpdir(), 'nesplayer-'));
   const tick = opts.tickAddress ?? meta.nmiAddress;
   try {
-    writeFileSync(join(dir, 'p.nes'), rom);
+    writeFileSync(join(dir, opts.fileName ?? 'p.nes'), rom);
     // The custom board's cycle IRQ ($4100-$4103) is modelled by no emulator: count CPU cycles here and, from the player's idle loop, enter the IRQ vector by hand (push PC and P, set I, jump to the handler).
     const board = !opts.irqBoard ? '' : `local per,en,nxt,n=0,false,0,0
 emu.addMemoryCallback(function(a,v) if a==0x4100 then per=(per&0xFF00)|v elseif a==0x4101 then per=(per&0xFF)|(v<<8) elseif a==0x4102 then en=(v&1)==1 if en then nxt=emu.getState()["cpu.cycleCount"]+per end end end, emu.callbackType.write, 0x4100, 0x4103)
@@ -30,7 +30,7 @@ ${opts.irqBoard ? '' : `emu.addMemoryCallback(function() n=n+1 print(string.form
     const set = join(homedir(), 'Library/Application Support/Mesen2');
     mkdirSync(set, { recursive: true });
     if (!existsSync(join(set, 'Settings.json'))) writeFileSync(join(set, 'Settings.json'), '{"FirstRun":false}');
-    const out = execFileSync(MESEN, ['--testRunner', `--timeout=${timeout}`, ...(opts.region ? [`--nes.region=${opts.region}`] : []), '--doNotSaveSettings', '--enableStdout', join(dir, 'log.lua'), join(dir, 'p.nes')], { encoding: 'utf8', timeout: timeout * 1000 + 30000, maxBuffer: 1 << 28 });
+    const out = execFileSync(MESEN, ['--testRunner', `--timeout=${timeout}`, ...(opts.region ? [`--nes.region=${opts.region}`] : []), '--doNotSaveSettings', '--enableStdout', join(dir, 'log.lua'), join(dir, opts.fileName ?? 'p.nes')], { encoding: 'utf8', timeout: timeout * 1000 + 30000, maxBuffer: 1 << 28 });
     if (!out.includes('DONE')) throw new Error('Mesen2 run did not reach DONE: ' + out.slice(-300));
     const writes: Array<Array<[number, number]>> = [];
     const window: number[] = [];
