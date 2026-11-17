@@ -78,6 +78,7 @@ import { ViewActiveContext } from '@hooks/useFrameGate';
 
 // Lazy-loaded components for better startup performance
 const HelpModal = lazy(() => import('./components/help/HelpModal').then(m => ({ default: m.HelpModal })));
+const RegisterViewModal = lazy(() => import('@components/dialogs/RegisterViewModal').then(m => ({ default: m.RegisterViewModal })));
 const ExportDialog = lazy(() => import('@lib/export/ExportDialog').then(m => ({ default: m.ExportDialog })));
 const EditInstrumentModal = lazy(() => import('@components/instruments/EditInstrumentModal').then(m => ({ default: m.EditInstrumentModal })));
 const MasterEffectsModal = lazy(() => import('@components/effects').then(m => ({ default: m.MasterEffectsModal })));
@@ -1071,6 +1072,7 @@ function App() {
 
       {/* Modals */}
       <Suspense fallback={null}>
+        {modalOpen === 'register-view' && <RegisterViewModal isOpen={true} onClose={closeModal} />}
         {modalOpen === 'moduleInfo' && <ModuleInfoModal isOpen={true} onClose={closeModal} />}
         {modalOpen === 'settings' && <SettingsModal onClose={closeModal} />}
         {modalOpen === 'help' && <HelpModal isOpen={true} onClose={closeModal} initialTab={(modalData?.initialTab as any) || 'shortcuts'} />}

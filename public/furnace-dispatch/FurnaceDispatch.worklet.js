@@ -412,6 +412,21 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'getRegPool': {
+        // The chip's register pool (DivDispatch::getRegisterPool) as bytes, for the Register View.
+        const chip = this.getChip(data.platformType);
+        let bytes = new Uint8Array(0);
+        if (chip && this.wasm && this.wasm.regPool) {
+          const max = 65536;
+          const ptr = this.module._malloc(max);
+          const size = this.wasm.regPool(chip.handle, ptr, max);
+          if (size > 0) bytes = new Uint8Array(this.module.HEAPU8.subarray(ptr, ptr + Math.min(size, max)));
+          this.module._free(ptr);
+        }
+        this.port.postMessage({ type: 'regPool', platformType: data.platformType, bytes }, [bytes.buffer]);
+        break;
+      }
+
       case 'getMemCompo': {
         // Furnace's own DivDispatch::getMemCompo, as JSON (null when the chip reports none).
         const chip = this.getChip(data.platformType);
@@ -938,6 +953,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         setSample: this.module._furnace_dispatch_set_sample,
         renderSamples: this.module._furnace_dispatch_render_samples,
         sampleMem: this.module._furnace_dispatch_sample_mem,
+        regPool: this.module._furnace_dispatch_reg_pool,
         memCompo: this.module._furnace_dispatch_mem_compo,
         // Macro control functions
         setMacrosEnabled: this.module._furnace_dispatch_set_macros_enabled,

@@ -105,7 +105,7 @@ import {
 import {
   loadLayout1, loadLayout2, loadLayout3, loadLayout4, loadLayout5, loadLayout6, loadLayout7, loadLayout8,
   saveLayout1, saveLayout2, saveLayout3, saveLayout4, saveLayout5, saveLayout6, saveLayout7, saveLayout8,
-  toggleDiskBrowser, toggleInstrumentPanel, toggleSamplePanel, toggleMixerPanel, toggleAutomationPanel,
+  toggleDiskBrowser, toggleInstrumentPanel, toggleSamplePanel, toggleMixerPanel, toggleAutomationPanel, toggleRegisterView,
   toggleTrackScopes, toggleMasterSpectrum, maximizePanel, restorePanelSizes, focusNextPanel, focusPrevPanel,
   toggleBottomFrame, toggleUpperFrame, cycleGlobalView
 } from '@engine/keyboard/commands/layout';
@@ -605,6 +605,7 @@ function initializeRegistry() {
     { name: 'toggle_instrument_panel', contexts: ['global'], handler: toggleInstrumentPanel, description: 'Toggle instrument panel' },
     { name: 'toggle_sample_panel', contexts: ['global'], handler: toggleSamplePanel, description: 'Toggle sample panel' },
     { name: 'toggle_mixer_panel', contexts: ['global'], handler: toggleMixerPanel, description: 'Toggle mixer panel' },
+    { name: 'toggle_register_view', contexts: ['global'], handler: toggleRegisterView, description: 'Toggle register view' },
     { name: 'toggle_automation_panel', contexts: ['global'], handler: toggleAutomationPanel, description: 'Toggle automation panel' },
     { name: 'toggle_track_scopes', contexts: ['global'], handler: toggleTrackScopes, description: 'Toggle track scopes' },
     { name: 'toggle_master_spectrum', contexts: ['global'], handler: toggleMasterSpectrum, description: 'Toggle master spectrum' },

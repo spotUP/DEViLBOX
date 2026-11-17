@@ -797,6 +797,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   // Command log callbacks for automation capture
   private _regCaptureBatches: DispatchRegBatch[] = [];
   private _sampleMemWaiters = new Map<number, (roms: DispatchSampleRom[]) => void>();
+  private _regPoolWaiters = new Map<number, (bytes: Uint8Array) => void>();
   private _memCompoWaiters = new Map<number, (c: FurnaceMemCompo | null) => void>();
   private _cmdLogCallbacks: Set<(entries: Array<{ tick: number; cmd: number; channel: number; value1: number; value2: number }>) => void> = new Set();
 
@@ -1227,6 +1228,13 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
         const wait = this._sampleMemWaiters.get(data.platformType as number);
         this._sampleMemWaiters.delete(data.platformType as number);
         wait?.(data.blocks as DispatchSampleRom[]);
+        break;
+      }
+
+      case 'regPool': {
+        const wait = this._regPoolWaiters.get(data.platformType as number);
+        this._regPoolWaiters.delete(data.platformType as number);
+        wait?.(data.bytes as Uint8Array);
         break;
       }
 
@@ -1905,6 +1913,21 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       const timer = setTimeout(() => { this._sampleMemWaiters.delete(platformType); resolve([]); }, 1000);
       this._sampleMemWaiters.set(platformType, roms => { clearTimeout(timer); resolve(roms); });
       this.workletNode?.port.postMessage({ type: 'getSampleMem', platformType });
+    });
+  }
+
+  /** Platform ids of the running chips, in creation order. */
+  getChipPlatforms(): number[] { return [...this.chips.keys()]; }
+
+  /**
+   * The chip's register pool (DivDispatch::getRegisterPool), a copy; empty when
+   * the chip has none or the worklet does not answer within a second.
+   */
+  getRegisterPool(platformType: number): Promise<Uint8Array> {
+    return new Promise(resolve => {
+      const timer = setTimeout(() => { this._regPoolWaiters.delete(platformType); resolve(new Uint8Array(0)); }, 1000);
+      this._regPoolWaiters.set(platformType, b => { clearTimeout(timer); resolve(b); });
+      this.workletNode?.port.postMessage({ type: 'getRegPool', platformType });
     });
   }
 

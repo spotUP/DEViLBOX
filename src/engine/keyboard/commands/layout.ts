@@ -95,6 +95,12 @@ export function toggleAutomationPanel(): boolean {
   return true;
 }
 
+export function toggleRegisterView(): boolean {
+  const ui = useUIStore.getState();
+  if (ui.modalOpen === 'register-view') ui.closeModal(); else ui.openModal('register-view');
+  return true;
+}
+
 export function toggleTrackScopes(): boolean {
   useUIStore.getState().toggleOscilloscopeVisible();
   const visible = useUIStore.getState().oscilloscopeVisible;
