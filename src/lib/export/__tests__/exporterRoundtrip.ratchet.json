@@ -959,6 +959,14 @@
       "matchPct": 1,
       "cells": 3768,
       "bytes": 3768
+    },
+    "desire": {
+      "exporter": "DesireExporter.exportDesire",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 87852,
+      "bytes": 87852
     }
   },
   "missingFixture": [
