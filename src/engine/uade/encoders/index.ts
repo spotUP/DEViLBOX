@@ -51,6 +51,7 @@ import './MadTracker2Encoder';
 import './MDLEncoder';
 import './MEDEncoder';
 import './MODEncoder';
+import './CoreDesignEncoder';
 import './MTMEncoder';
 import './MultiMediaSoundEncoder';
 import './MusicAssemblerEncoder';

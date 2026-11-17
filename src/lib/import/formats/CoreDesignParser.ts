@@ -35,9 +35,10 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, TrackerCell } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { encodeCoreDesignCell, decodeCoreDesignCell } from '@/engine/uade/encoders/CoreDesignEncoder';
+import { periodToNote } from '@/lib/amiga/periodNotes';
 import { createSamplerInstrument } from './AmigaUtils';
 
 const MIN_FILE_SIZE = 64;
@@ -225,6 +226,99 @@ function extractCoreDesignSamples(buf: Uint8Array, codeStart: number): Instrumen
   return instruments;
 }
 
+
+// ── Pattern streams (third-party/nuade/players/coredesign: cd_module.c locate, cd_driver.c pattern_step) ──
+//
+// The driver finds its tables by scanning its own code; so does this. A pattern is a byte stream: commands from 0x80 on
+// (0x80-0x88 instrument slot, 0x89-0xBF vibrato, 0xC2 none, any other 0xC0-0xFE skips three bytes, 0xFF ends the pattern),
+// then an event: 0x7F rest + ticks, 0x7E period (lo, hi) + length, or a note byte + length. An event lasts `length` ticks
+// (0 = 256). Shortcuts: the order list's transpose and instrument-slot table are not applied (the grid shows the note byte
+// through the period table, the slot number as the instrument), and period events (0x7E) are not editable.
+
+const INSTRUMENT_SLOTS = 9;
+const MAX_TICKS = 8192;
+
+export interface CoreDesignEvent {
+  tick: number;
+  /** File offset of the event byte. */
+  at: number;
+  kind: 'note' | 'rest' | 'period';
+  /** File offset of the instrument-slot command in front of the event, or -1. */
+  instrumentAt: number;
+}
+export interface CoreDesignStream { events: CoreDesignEvent[]; ticks: number }
+export interface CoreDesignGrid {
+  streams: CoreDesignStream[];
+  patternBase: number;
+  periodOf: (noteByte: number) => number;
+  /** The note byte whose period shows as this grid note, or -1 (the table is not in ProTracker tuning, so match by shown note). */
+  indexOfNote: (note: number) => number;
+}
+
+function findWords(m: Uint8Array, from: number, to: number, pat: string): number {
+  const w = pat.split(' ').map((x) => (x === 'xxxx' ? -1 : parseInt(x, 16)));
+  for (let a = from & ~1; a + 2 * w.length <= m.length && a < to; a += 2) {
+    let i = 0;
+    while (i < w.length && (w[i] < 0 || u16BE(m, a + 2 * i) === w[i])) i++;
+    if (i === w.length) return a;
+  }
+  return -1;
+}
+
+function s16BE(m: Uint8Array, o: number): number { return (u16BE(m, o) << 16) >> 16; }
+
+export function readCoreDesignGrid(buf: Uint8Array, base: number): CoreDesignGrid | null {
+  const m = buf.subarray(base);
+  if (m.length < 64 || u32BE(m, 0) !== 0x70ff4e75 || u32BE(m, 4) !== 0x532e5048) return null;
+  const stop = u32BE(m, 24);
+  const end = Math.min(m.length, stop + 0x1000);
+  const pat = findWords(m, stop, end, '41fa xxxx 4880 d040 3030 0000 41fa xxxx d0c0');
+  const per = findWords(m, stop, end, '43fa xxxx 3e31 0000');
+  const note = findWords(m, stop, end, 'd02c 0013 0600 xxxx 1940 0017');
+  if (pat < 0 || per < 0 || note < 0) return null;
+  const offsets = pat + 2 + s16BE(m, pat + 2);
+  const patBase = pat + 14 + s16BE(m, pat + 14);
+  const periods = per + 2 + s16BE(m, per + 2);
+  const noteOffset = m[note + 7];
+  if (offsets >= m.length || patBase >= offsets) return null;
+
+  const periodAt = (i: number) => (periods + 2 * i + 2 <= m.length ? u16BE(m, periods + 2 * i) : 0);
+  const streams: CoreDesignStream[] = [];
+  // The offset table has no stored length; its entries are valid while they point into the pattern area before it.
+  for (let i = 0; i < 256 && offsets + 2 * i + 2 <= m.length; i++) {
+    const off = s16BE(m, offsets + 2 * i);
+    if (off < 0 || patBase + off >= offsets) break;
+    const events: CoreDesignEvent[] = [];
+    let pos = patBase + off, tick = 0, instrumentAt = -1, ended = false;
+    while (pos < m.length && tick <= MAX_TICKS) {
+      const b = m[pos];
+      if (b >= 0x80) {
+        if (b === 0xff) { ended = true; break; }
+        if (b <= 0x88) instrumentAt = base + pos;
+        pos += b >= 0xc0 && b !== 0xc2 ? 4 : 1;
+        continue;
+      }
+      const kind = b === 0x7f ? 'rest' : b === 0x7e ? 'period' : 'note';
+      const length = m[pos + (kind === 'period' ? 3 : 1)] || 256;
+      events.push({ tick, at: base + pos, kind, instrumentAt });
+      instrumentAt = -1;
+      tick += length;
+      pos += kind === 'period' ? 4 : 2;
+    }
+    if (!ended || tick > MAX_TICKS) break;
+    streams.push({ events, ticks: tick });
+  }
+  if (streams.length === 0) return null;
+  return {
+    streams,
+    patternBase: base + patBase,
+    periodOf: (noteByte) => periodAt(noteByte + noteOffset),
+    indexOfNote: (n) => {
+      for (let b = 0; b < 0x7e; b++) { const p = periodAt(b + noteOffset); if (p > 0 && periodToNote(p) === n) return b; }
+      return -1;
+    },
+  };
+}
 export function parseCoreDesignFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   if (!isCoreDesignFormat(buf)) throw new Error('Not a Core Design module');
@@ -278,25 +372,68 @@ export function parseCoreDesignFile(buffer: ArrayBuffer, filename: string): Trac
     } as InstrumentConfig);
   }
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ───────────
+  // ── Pattern streams: one grid pattern per stream, one row per tick, an event on the tick it starts ──
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
+  const grid = codeStart > 0 ? readCoreDesignGrid(buf, codeStart) : null;
+  const streams = grid?.streams ?? [];
+  const rowsOf = (i: number): number => Math.max(streams[i]?.ticks ?? 1, 1);
+  const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 } as TrackerCell);
 
-  const pattern = {
-    id: 'pattern-0', name: 'Pattern 0', length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`, name: `Channel ${ch + 1}`,
-      muted: false, solo: false, collapsed: false,
-      volume: 100, pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null, color: null, rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const, sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1,
-      originalInstrumentCount: instruments.length,
+  const patterns = Array.from({ length: Math.max(streams.length, 1) }, (_, p) => {
+    const rows = Array.from({ length: rowsOf(p) }, emptyCell);
+    for (const ev of streams[p]?.events ?? []) {
+      if (ev.kind === 'period') continue;
+      const period = ev.kind === 'note' && grid ? grid.periodOf(buf[ev.at]) : 0;
+      rows[ev.tick] = {
+        ...emptyCell(),
+        note: periodToNote(period),
+        instrument: ev.instrumentAt >= 0 ? buf[ev.instrumentAt] - 0x80 + 1 : 0,
+        period: buf[ev.at],
+      } as TrackerCell;
+    }
+    return {
+      id: `pattern-${p}`, name: `Pattern ${p}`, length: rows.length,
+      channels: [{
+        id: 'channel-0', name: 'Pattern', muted: false, solo: false, collapsed: false,
+        volume: 100, pan: 0, instrumentId: null, color: null, rows,
+      }],
+      importMetadata: {
+        sourceFormat: 'MOD' as const, sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: 1, originalPatternCount: streams.length,
+        originalInstrumentCount: instruments.length,
+      },
+    };
+  });
+
+  const eventAt = (pattern: number, row: number) => streams[pattern]?.events.find((e) => e.tick === row && e.kind !== 'period');
+
+  const layout: UADEPatternLayout = {
+    formatId: 'coreDesign',
+    patternDataFileOffset: grid?.patternBase ?? 0,
+    bytesPerCell: 1,
+    rowsPerPattern: Math.max(1, ...streams.map((s) => s.ticks)),
+    numChannels: 1,
+    numPatterns: streams.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeCoreDesignCell,
+    decodeCell: decodeCoreDesignCell,
+    getCellFileOffset: (pattern, row) => eventAt(pattern, row)?.at ?? -1,
+    // The note byte and the instrument-slot command in front of it; every other byte of the stream stays as it is.
+    effectPatches: (pattern, row, _channel, cell) => {
+      const ev = eventAt(pattern, row);
+      if (!ev || !grid) return { patches: [], noteUnchanged: false };
+      const patches: Array<[number, number]> = [];
+      const note = cell.note ?? 0;
+      if (ev.kind === 'note' && note !== periodToNote(grid.periodOf(buf[ev.at]))) {
+        const idx = grid.indexOfNote(note);
+        if (idx >= 0) patches.push([ev.at, idx]);
+      }
+      const inst = cell.instrument ?? 0;
+      if (ev.instrumentAt >= 0 && inst >= 1 && inst <= INSTRUMENT_SLOTS && inst !== buf[ev.instrumentAt] - 0x80 + 1) {
+        patches.push([ev.instrumentAt, 0x80 + inst - 1]);
+      }
+      return { patches, noteUnchanged: true };
     },
   };
 
@@ -309,21 +446,11 @@ export function parseCoreDesignFile(buffer: ArrayBuffer, filename: string): Trac
   return {
     name: displayName,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern], instruments,
-    songPositions: [0], songLength: 1, restartPosition: 0,
-    numChannels: 4, initialSpeed: 6, initialBPM: 125, linearPeriods: false,
+    patterns, instruments,
+    songPositions: patterns.map((_, i) => i), songLength: patterns.length, restartPosition: 0,
+    numChannels: 1, initialSpeed: 6, initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
-    uadePatternLayout: {
-      formatId: 'coreDesign',
-      patternDataFileOffset: 0,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
-      numPatterns: 1,
-      moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
-    } as UADEPatternLayout,
+    uadePatternLayout: layout,
   };
 }
