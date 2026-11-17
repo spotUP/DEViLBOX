@@ -83,6 +83,11 @@ export function wantsVrc7Cartridge(chips: readonly string[]): boolean {
   return chips.includes('vrc7') && chips.every((c) => c === 'nes' || c === 'vrc7');
 }
 
+/** The original MMC5 board (mapper 5) carries 2A03 + MMC5 only. */
+export function wantsMmc5Cartridge(chips: readonly string[]): boolean {
+  return chips.includes('mmc5') && chips.every((c) => c === 'nes' || c === 'mmc5');
+}
+
 /** The original VRC6 board carries 2A03 + VRC6 only; any song with a VRC6 and no other expansion chip may try it. */
 export function wantsVrc6Cartridge(chips: readonly string[]): boolean {
   return chips.includes('vrc6') && chips.every((c) => c === 'nes' || c === 'vrc6');

@@ -5,7 +5,7 @@ import { nesCaptureFromBatches, type NesCapture } from './nesCapture';
 import { fetchNesPlayer, buildBoardCartridge } from './nesCartridge';
 import { buildNsfe } from './nsfe';
 import { NES_REGIONS, type NesRegion, type NesSubsongInput } from './nesStream';
-import { buildNesRom, isSunsoft, nesChipsOf, wantsFme7Cartridge, wantsN163Cartridge, wantsVrc6Cartridge, wantsVrc7Cartridge, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
+import { buildNesRom, isSunsoft, nesChipsOf, wantsFme7Cartridge, wantsN163Cartridge, wantsVrc6Cartridge, wantsVrc7Cartridge, wantsMmc5Cartridge, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
 import { switchSubsong } from '../../tracker/subsongSwitch';
 import { orderPassLength } from '../vectrex/vectrexCapture';
 
@@ -112,6 +112,14 @@ export async function recordNesRom(choice: NesRegionChoice, title: string, autho
       return { ...v, warnings: ['Built the original VRC7 cartridge (mapper 85).'], tickRateHz: first.tickRateHz };
     } catch (e) {
       warnings.push(`Built the custom cartridge (mapper 31), not the original VRC7 board: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  if (wantsMmc5Cartridge(chips)) {
+    try {
+      const v = buildBoardCartridge('mmc5', subsongs, await fetchNesPlayer('player5'), title, { author, comments, chipName: 'MMC5' });
+      return { ...v, warnings: ['Built the original MMC5 cartridge (mapper 5).'], tickRateHz: first.tickRateHz };
+    } catch (e) {
+      warnings.push(`Built the custom cartridge (mapper 31), not the original MMC5 board: ${e instanceof Error ? e.message : e}`);
     }
   }
   const rom = buildNesRom(subsongs, await fetchNesPlayer(), info);
