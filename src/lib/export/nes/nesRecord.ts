@@ -50,8 +50,10 @@ export async function recordRegion(region: NesRegion, sunsoft: boolean): Promise
 
 export type NesSubsongChoice = 'current' | 'all';
 export type NesExportFormat = 'nes' | 'nsfe';
+/** Original VRC6 board wiring: VRC6a (mapper 24, Akumajou Densetsu) or VRC6b (mapper 26, Madara / Esper Dream 2; A0 and A1 swapped). */
+export type NesVrc6Board = 'vrc6a' | 'vrc6b';
 
-export async function recordNesRom(choice: NesRegionChoice, title: string, author?: string, comments?: string, format: NesExportFormat = 'nes', subsongChoice: NesSubsongChoice = 'current'): Promise<NesRomResult & { tickRateHz: number }> {
+export async function recordNesRom(choice: NesRegionChoice, title: string, author?: string, comments?: string, format: NesExportFormat = 'nes', subsongChoice: NesSubsongChoice = 'current', vrc6Board: NesVrc6Board = 'vrc6a'): Promise<NesRomResult & { tickRateHz: number }> {
   const native = useFormatStore.getState().furnaceNative;
   const chips = nesChipsOf(native?.chipIds, native?.chipFlags);
   if (!chips.length) throw new Error('This song has no NES-family sound chip.');
@@ -81,8 +83,9 @@ export async function recordNesRom(choice: NesRegionChoice, title: string, autho
   const warnings: string[] = [];
   if (wantsVrc6Cartridge(chips)) {
     try {
-      const v = buildVrc6Cartridge(subsongs, await fetchNesPlayer('player24'), title, { author, comments, chipName: 'VRC6' });
-      return { ...v, warnings: ['Built the original VRC6 cartridge (mapper 24).'], tickRateHz: first.tickRateHz };
+      const mapper = vrc6Board === 'vrc6b' ? 26 : 24;
+      const v = buildVrc6Cartridge(subsongs, await fetchNesPlayer(vrc6Board === 'vrc6b' ? 'player26' : 'player24'), title, { author, comments, chipName: 'VRC6' });
+      return { ...v, warnings: [`Built the original VRC6 cartridge (mapper ${mapper}).`], tickRateHz: first.tickRateHz };
     } catch (e) {
       warnings.push(`Built the custom cartridge (mapper 31), not the original VRC6 board: ${e instanceof Error ? e.message : e}`);
     }

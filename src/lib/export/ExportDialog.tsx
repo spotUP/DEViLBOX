@@ -16,6 +16,7 @@ import { ChipExportPanel } from './ChipExportPanel';
 import { notify } from '@stores/useNotificationStore';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { NES_REGION_LABELS, type NesRegionChoice } from './nes/nesExport';
+import type { NesVrc6Board } from './nes/nesRecord';
 import { AY_SCRAMBLE_TARGETS, type AyScrambleTarget } from './FurnaceExporter';
 
 interface ExportDialogProps {
@@ -715,6 +716,13 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                         value={ex.nesSubsongs}
                         onChange={(v) => ex.setNesSubsongs(v as 'current' | 'all')}
                         options={[{ value: 'current', label: 'Current subsong' }, { value: 'all', label: `All ${ex.nesSubsongCount} subsongs (choose on the title screen)` }]}
+                      />
+                    )}
+                    {ex.exportMode === 'nesRom' && ex.nesVrc6Song && (
+                      <CustomSelect
+                        value={ex.nesVrc6Board}
+                        onChange={(v) => ex.setNesVrc6Board(v as NesVrc6Board)}
+                        options={[{ value: 'vrc6a', label: 'VRC6a board (mapper 24, Akumajou Densetsu)' }, { value: 'vrc6b', label: 'VRC6b board (mapper 26, Madara, Esper Dream 2)' }]}
                       />
                     )}
                     {ex.nesRomTempoWarning && (
