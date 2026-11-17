@@ -16,13 +16,14 @@ import type {
 } from '@typedefs';
 import type { CursorPosition } from '@typedefs';
 import { EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
-import { peekTrackerReplayer, syncFurnaceCellEdit } from '@engine/TrackerReplayer';
+import { peekTrackerReplayer } from '@engine/TrackerReplayer';
 
 /** A cell edit to a Furnace song: via the replayer when it holds one (a composed Neo Geo song), else to the stored native. */
 function syncFurnaceCell(ch: number, pat: number, row: number, cell: Partial<import('@/types/tracker').TrackerCell>): void {
   const replayer = peekTrackerReplayer();
   if (replayer) replayer.syncCellToWasmSequencer(ch, pat, row, cell);
-  else syncFurnaceCellEdit(ch, pat, row, cell);
+  // Store-to-store: no replayer exists before the first Play (and tests mock the engine module).
+  else useFormatStore.getState().applyFurnaceCellEdit(useTrackerStore.getState().patternOrder, pat, ch, row, cell);
 }
 import { sendCellEditsToEngine, changedCells, type LiveCellEdit } from '@engine/replayer/liveCellEdits';
 import { useTransportStore } from './useTransportStore';

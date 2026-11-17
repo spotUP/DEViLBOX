@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('@engine/TrackerReplayer', () => ({
   getTrackerReplayer: () => { throw new Error('no audio'); },
   peekTrackerReplayer: () => null,
-  syncFurnaceCellEdit: () => {},
 }));
 
 import { useTrackerStore } from '../useTrackerStore';

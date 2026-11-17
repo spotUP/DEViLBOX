@@ -4,7 +4,6 @@ const ctor = vi.hoisted(() => ({ n: 0 }));
 vi.mock('@engine/TrackerReplayer', () => ({
   getTrackerReplayer: () => { ctor.n++; throw new Error('AudioBuffer is not defined'); },
   peekTrackerReplayer: () => null,
-  syncFurnaceCellEdit: () => {},
 }));
 
 import { useTrackerStore } from '../useTrackerStore';

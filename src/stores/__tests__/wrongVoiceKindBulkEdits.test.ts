@@ -13,7 +13,6 @@ vi.mock('@/engine/TrackerReplayer', () => ({
     get: (t, k) => (k in t ? (t as Record<string | symbol, unknown>)[k] : () => undefined),
   }),
   peekTrackerReplayer: () => null,
-  syncFurnaceCellEdit: () => {},
 }));
 vi.mock('@engine/ToneEngine', () => {
   const engine = new Proxy({}, { get: () => () => Promise.resolve() });

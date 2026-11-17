@@ -156,12 +156,11 @@ describe('Meaningful Connection (ES5506) in Furnace effect notation', { timeout:
     expect(effCmds.has(0x80) && effCmds.has(0x90)).toBe(true);
 
     // A Furnace code typed in the editor reaches the native row as that code (no letter fold).
-    const { syncFurnaceCellEdit } = await import('@/engine/TrackerReplayer');
     const { useFormatStore } = await import('@/stores/useFormatStore');
     const { useTrackerStore } = await import('@/stores/useTrackerStore');
     useFormatStore.getState().setFurnaceNative(structuredClone(song.furnaceNative) as FurnaceNativeData);
     useTrackerStore.setState({ patternOrder: song.songPositions });
-    syncFurnaceCellEdit(0, 0, 0, { effTyp: 0xE5, eff: 0x80 });
+    useFormatStore.getState().applyFurnaceCellEdit(song.songPositions, 0, 0, 0, { effTyp: 0xE5, eff: 0x80 });
     const sub = useFormatStore.getState().furnaceNative!.subsongs[0];
     const pos = song.songPositions.indexOf(0);
     expect(sub.channels[0].patterns.get(sub.orders[0][pos])!.rows[0].effects[0]).toEqual({ cmd: 0xE5, val: 0x80 });
