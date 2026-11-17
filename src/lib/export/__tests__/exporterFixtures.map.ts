@@ -47,6 +47,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   forgottenWorlds: 'public/data/songs/forgotten-worlds/forgotten worlds intro.fw',
   lme: 'public/data/songs/leggless-music-editor/the punisher gameover.lme',
   silmarils: 'public/data/songs/formats/silmarils_smallest.mok',
+  pierreAdane: 'public/data/songs/formats/Ivanhoe_ivanhoe - bonus.pap',
   coreDesign: 'public/data/songs/core-design/dynamite dux.core',
   anders0land: 'public/data/songs/anders-oland/primemover 07.hot',
   format669: 'public/data/songs/composer-669/speed fighter.669',

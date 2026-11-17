@@ -231,3 +231,4 @@ registerEditableFormat({ formatId: "infogrames", label: "Infogrames", patternCod
 registerEditableFormat({ formatId: "forgottenWorlds", label: "Forgotten Worlds", patternCodec: { kind: "fixed" }, exporter: { module: "ForgottenWorldsExporter", fn: "exportForgottenWorlds", byLayout: true } });
 registerEditableFormat({ formatId: "lme", label: "Leggless Music Editor", patternCodec: { kind: "fixed" }, exporter: { module: "LMEExporter", fn: "exportLME", byLayout: true } });
 registerEditableFormat({ formatId: "silmarils", label: "Silmarils", patternCodec: { kind: "fixed" }, exporter: { module: "SilmarilsExporter", fn: "exportSilmarils", byLayout: true } });
+registerEditableFormat({ formatId: "pierreAdane", label: "Pierre Adane Packer", patternCodec: { kind: "fixed" }, exporter: { module: "PierreAdaneExporter", fn: "exportPierreAdane", byLayout: true } });

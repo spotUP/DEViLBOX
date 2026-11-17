@@ -37,7 +37,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { decodePierreAdaneCell, encodePierreAdaneCell } from '@/engine/uade/encoders/PierreAdaneEncoder';
 
 // We need to read at least 8 bytes of header plus follow the largest offset pointer.
 // Minimum: header 8 bytes + at least one pattern byte + terminator.
@@ -146,6 +146,40 @@ export function isPierreAdaneFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   return true;
 }
 
+const NUM_CH = 4;
+const ROWS = 64;
+const TRACK_LENGTH_MARKER = 0xff;
+
+/**
+ * Walk the four voice lists (grammar: third-party/nuade/players/pierreadane/pa_internal.h). One grid pattern per list
+ * position; each voice's track gives 64 rows. A track entry (optionally behind a 0xFF,n length marker) sits on its first
+ * row and lasts n rows, the following rows are empty and have no file place. Tracks shared by several positions map to
+ * the same file bytes, so an edit reaches every use.
+ */
+function walkTracks(buf: Uint8Array): number[][][] {
+  const list = [0, 2, 4, 6].map((o) => u16BE(buf, o));
+  let count = 0;
+  for (let o = list[0]; o + 1 < list[1] && o + 1 < buf.length && u16BE(buf, o) !== 0; o += 2) count++;
+  const offsets: number[][][] = [];
+  const entryLen = [1, 1, 1, 1]; // rows per entry; carries over between tracks like the player's row_length
+  for (let p = 0; p < count; p++) {
+    const rows: number[][] = Array.from({ length: ROWS }, () => [-1, -1, -1, -1]);
+    for (let c = 0; c < NUM_CH; c++) {
+      let pos = safeU16(buf, list[c] + 2 * p);
+      let row = 0;
+      while (row < ROWS && pos < buf.length) {
+        if (buf[pos] === TRACK_LENGTH_MARKER) { entryLen[c] = Math.max(1, buf[pos + 1]); pos += 2; }
+        if (pos + 4 > buf.length) break;
+        rows[row][c] = pos;
+        pos += 4;
+        row += entryLen[c];
+      }
+    }
+    offsets.push(rows);
+  }
+  return offsets;
+}
+
 export function parsePierreAdaneFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   const _base = filename.split('/').pop()?.toLowerCase() ?? '';
@@ -154,46 +188,57 @@ export function parsePierreAdaneFile(buffer: ArrayBuffer, filename: string): Tra
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^pap\./i, '') || baseName;
 
-  const instruments: InstrumentConfig[] = [{
-    id: 1, name: '', type: 'synth' as const,
-    synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
-  } as InstrumentConfig];
+  const streams = walkTracks(buf);
+  if (streams.length === 0) throw new Error('Pierre Adane: no track list');
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
+  // Instrument records: 8 bytes at 8 * n, n = 1..15, ended by a record starting 0xFF.
+  const instruments: InstrumentConfig[] = [];
+  for (let n = 1; n <= 15 && 8 * n + 8 <= buf.length && buf[8 * n] !== 0xff; n++) {
+    instruments.push({
+      id: n, name: `Pierre Adane ${n}`, type: 'synth' as const,
+      synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+    } as InstrumentConfig);
+  }
+  if (instruments.length === 0) {
+    instruments.push({ id: 1, name: '', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig);
+  }
 
-  const pattern = {
-    id: 'pattern-0', name: 'Pattern 0', length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false,
+  const empty = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+  const patterns = streams.map((rows, k) => ({
+    id: `pattern-${k}`, name: `Pattern ${k}`, length: ROWS,
+    channels: Array.from({ length: NUM_CH }, (_, c) => ({
+      id: `channel-${c}`, name: `Channel ${c + 1}`, muted: false,
       solo: false, collapsed: false, volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null, color: null, rows: emptyRows,
+      pan: c === 0 || c === 3 ? -50 : 50,
+      instrumentId: null, color: null,
+      rows: rows.map((r) => (r[c] < 0 ? empty : decodePierreAdaneCell(buf.subarray(r[c], r[c] + 4)))),
     })),
     importMetadata: {
       sourceFormat: 'MOD' as const, sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 0,
+      originalChannelCount: NUM_CH, originalPatternCount: streams.length, originalInstrumentCount: instruments.length,
     },
-  };
+  }));
 
   return {
     name: `${moduleName} [Pierre Adane]`, format: 'MOD' as TrackerFormat,
-    patterns: [pattern], instruments, songPositions: [0],
-    songLength: 1, restartPosition: 0, numChannels: 4,
+    patterns, instruments, songPositions: patterns.map((_, k) => k),
+    songLength: patterns.length, restartPosition: 0, numChannels: NUM_CH,
     initialSpeed: 6, initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadePatternLayout: {
-      formatId: 'mod',
-      patternDataFileOffset: 1084,
+      formatId: 'pierreAdane',
+      patternDataFileOffset: 0,
       bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
-      numPatterns: 1,
+      rowsPerPattern: ROWS,
+      numChannels: NUM_CH,
+      numPatterns: streams.length,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
+      encodeCell: encodePierreAdaneCell,
+      encodeOverStored: true,
+      decodeCell: decodePierreAdaneCell,
+      getCellFileOffset: (p, r, c) => streams[p]?.[r]?.[c] ?? -1,
     } satisfies UADEPatternLayout,
   };
 }
