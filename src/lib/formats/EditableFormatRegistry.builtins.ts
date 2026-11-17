@@ -227,3 +227,4 @@ const WITH_SYNTH: Record<string, SynthType[]> = {
 };
 for (const [id, types] of Object.entries(WITH_SYNTH)) setFormatInstruments(id, [...SAMPLED, ...types]);
 registerEditableFormat({ formatId: "majortom", label: "Major Tom", patternCodec: { kind: "fixed" }, exporter: { module: "MajorTomExporter", fn: "exportMajorTom", byLayout: true } });
+registerEditableFormat({ formatId: "infogrames", label: "Infogrames", patternCodec: { kind: "fixed" }, exporter: { module: "InfogramesExporter", fn: "exportInfogrames", byLayout: true } });
