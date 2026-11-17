@@ -470,7 +470,7 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
   // plays: Hippel (TFMX/7V and CoSo, patched in place; an unplayable note comes back in `refused`) and Future
   // Player, Custom Made, Major Tom and Infogrames (patched in place through the module's period table). Every other native writer would drop such a note or write it an octave off: refuse the song instead.
   const holdsLowOctave = (!!song.hippelFileData && (layoutFormatId === 'hippelCoSo' || layoutFormatId === 'tfmx7v'))
-    || layoutFormatId === 'futurePlayer' || layoutFormatId === 'customMade' || layoutFormatId === 'majortom' || layoutFormatId === 'infogrames' || layoutFormatId === 'lme';
+    || layoutFormatId === 'futurePlayer' || layoutFormatId === 'customMade' || layoutFormatId === 'majortom' || layoutFormatId === 'infogrames' || layoutFormatId === 'lme' || layoutFormatId === 'silmarils';
   if (!holdsLowOctave) {
     const refusal = lowOctaveExportRefusal(song.patterns ?? [], layoutFormatId || format || 'This format');
     if (refusal) throw new Error(refusal);

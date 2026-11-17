@@ -867,6 +867,18 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
   {
+    key: 'silmarils',
+    label: 'Silmarils',
+    description: 'Silmarils game music (Targhan to Ishar) — 3-voice command stream',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.mok$/i,
+    prefixes: ['mok.'],
+    prefKey: 'silmarils',
+    nativeParser: { module: '@lib/import/formats/SilmarilsParser', parseFn: 'parseSilmarilsFile', detectFn: 'isSilmarilsFormat' },
+    uadeFallback: true,
+  },
+  {
     key: 'infogrames',
     label: 'Infogrames',
     description: 'Infogrames/CPC — Gobliins, Ween, etc.',

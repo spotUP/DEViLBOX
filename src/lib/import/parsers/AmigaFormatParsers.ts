@@ -2619,8 +2619,13 @@ export async function tryRouteFormat(
   // Stub parser: filename-based title + 3 placeholder instruments (3-voice MIDI clone).
   // Enhanced scan gives garbled "mok [CIA unreliable...]" title due to MIDI clone format.
   if (matchesExt(filename, ['mok'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['mok']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
+    const { parseSilmarilsFile } = await import('@lib/import/formats/SilmarilsParser');
+    const mokCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['mok']) };
+    return withNativeThenUADE('silmarils', mokCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        try { return parseSilmarilsFile(buf instanceof Uint8Array ? buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer : buf, name); } catch { return null; }
+      },
+      'SilmarilsParser', { injectUADE: true });
   }
   // ── SunTronic / TSM (.sun / .tsm / tsm.* prefix, V1.3 .src / .pc) ────────
   // The Sun Machine — Amiga synthetic music exe. Raw rips (.sun/.tsm): native

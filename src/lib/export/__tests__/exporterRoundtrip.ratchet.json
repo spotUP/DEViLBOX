@@ -520,6 +520,14 @@
       "cells": 7510,
       "bytes": 7510
     },
+    "silmarils": {
+      "exporter": "SilmarilsExporter.exportSilmarils",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 11448,
+      "bytes": 11448
+    },
     "forgottenWorlds": {
       "exporter": "ForgottenWorldsExporter.exportForgottenWorlds",
       "tier": "byte-exact",
