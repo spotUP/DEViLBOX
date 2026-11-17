@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { NesCapture, NesChip, NesEvent } from '../nes/nesCapture';
 import { NES_CONTROL } from '../nes/nesCapture';
-import { CHIP_ORDER, decodeNesStream, encodeNesStreams, encodeNesSubsong, nesCaptureToTicks, nesSizeReport } from '../nes/nesStream';
+import { CHIP_ORDER, decodeNesStream, encodeNesStreams, encodeNesSubsong, nesCaptureToTicks, nesIrqPeriod, nesSizeReport } from '../nes/nesStream';
 
 const SR = 48000, TR = 60;
 const SPT = SR / TR; // 800 samples per tick
@@ -82,5 +82,18 @@ describe('nesStream round trip', () => {
     const raw = rows.reduce((n, r) => n + r.raw, 0);
     console.log(['chip raw encoded', ...rows.map((r) => `${r.chip} ${r.raw} ${r.encoded}`), `all-chips-together ${raw} ${total}`].join('\n'));
     expect(total).toBeLessThan(raw);
+  });
+});
+
+describe('nesStream tick source table', () => {
+  it('stores rate and IRQ period per region entry (7 bytes) and decodes them', () => {
+    const cap = (rate: number): NesCapture => ({ events: [{ kind: 'write', chip: 'nes', sample: 0, addr: 0x4000, value: 1 }], sampleRate: 48000, tickRateHz: rate });
+    const r = encodeNesStreams([{ ntsc: cap(75), pal: cap(50), dendy: cap(60) }]);
+    expect(decodeNesStream(r.ntsc, 0).irqPeriod).toBe(nesIrqPeriod('ntsc', 75));
+    expect(decodeNesStream(r.pal, 0).irqPeriod).toBe(0);
+    expect(decodeNesStream(r.dendy, 0).irqPeriod).toBe(nesIrqPeriod('dendy', 60));
+    expect(decodeNesStream(r.ntsc, 0).tickRateCentiHz).toBe(7500);
+    const p = nesIrqPeriod('ntsc', 75);
+    expect([r.ntsc[6], r.ntsc[7]]).toEqual([p & 255, p >> 8]);
   });
 });

@@ -11,6 +11,12 @@
  * decode must (a) take bank registers at $5FF8-$5FFF only, so MMC5's $5000-$5015 is not a bank write (Mesen2's mapper 31 decodes
  * all of $5000-$5FFF, so MMC5 aliases the bank windows there), and (b) ignore writes to $8000-$FFFF as banking (mapper 31 does).
  * No emulator models this combined board: it is unverified; each chip is checked only as bus writes on the mapper-31 cart.
+ *
+ * Tick source (Phase 6). Three region streams (NTSC, PAL, Dendy) are stored; the player counts 12-cycle loop iterations between
+ * two vblanks at boot to pick one (regbank[] in the player bank holds each stream's first bank). A song within 0.5 percent of the
+ * region frame rate ticks on NMI. Any other rate (e.g. 75 Hz) ticks on the board's cycle IRQ: $4100 reload low, $4101 reload high
+ * (CPU cycles per tick), $4102 bit 0 enable, $4103 write acknowledges. These sit outside $5000-$5FFF because Mesen2 aliases all of
+ * that range as bank registers. The IRQ board is a spec, not hardware: no emulator models it. The table holds at most 36 subsongs.
  */
 import { encodeNesStreams, NES_REGIONS, type NesRegion, type NesSubsongInput } from './nesStream';
 
@@ -20,6 +26,7 @@ export interface NesPlayer {
   titleOffset: number;
   titleLength: number;
   startSubsongOffset: number;
+  regbankOffset: number;
   nmiAddress: number;
   bankSize: number;
   maxStreamBanks: number;
@@ -46,8 +53,12 @@ export function buildNesCartridge(subsongs: readonly NesSubsongInput[], player: 
   if (!NES_REGIONS.includes(region)) throw new Error(`Unknown region ${region}`);
   if (startSubsong < 0 || startSubsong >= subsongs.length) throw new Error(`Start subsong ${startSubsong} does not exist.`);
   const bank = player.bankSize;
-  const stream = encodeNesStreams(subsongs, bank)[region];
-  const streamBanks = Math.ceil(stream.length / bank);
+  const regionStreams = encodeNesStreams(subsongs, bank);
+  const regbank = NES_REGIONS.map(() => 0);
+  let streamBanks = 0;
+  for (const [i, r] of NES_REGIONS.entries()) { regbank[i] = streamBanks; streamBanks += Math.ceil(regionStreams[r].length / bank); }
+  const stream = new Uint8Array(streamBanks * bank);
+  for (const [i, r] of NES_REGIONS.entries()) stream.set(regionStreams[r], regbank[i] * bank);
   if (streamBanks > player.maxStreamBanks) {
     throw new Error(`The song needs ${streamBanks} banks of ${bank} bytes but mapper 31 addresses ${player.maxStreamBanks} stream banks (1 MB with the player bank); shorten the song.`);
   }
@@ -62,5 +73,6 @@ export function buildNesCartridge(subsongs: readonly NesSubsongInput[], player: 
   rom.set(player.bytes.subarray(playerBankAt), last);
   rom.set(nesTitle(title, player.titleLength), last + player.titleOffset - playerBankAt);
   rom[last + player.startSubsongOffset - playerBankAt] = startSubsong;
+  regbank.forEach((b, i) => { rom[last + player.regbankOffset - playerBankAt + i] = b; });
   return { rom, banks, streamBytes: stream.length, seconds: subsongs.map((s) => { const c = s[region] ?? s.ntsc; return c.events.length ? Math.max(...c.events.map((e) => e.sample)) / c.sampleRate : 0; }) };
 }

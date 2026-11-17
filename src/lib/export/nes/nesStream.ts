@@ -2,7 +2,8 @@
  * NES native player stream: encoder and reference decoder (TypeScript decoder is a TEST ORACLE for the 6502 player,
  * not a playback path). Input is a NesCapture (nesCapture.ts); output is three region streams (NTSC, PAL, Dendy).
  *
- * Region stream:   u8 subsongCount | per subsong: u24 offset (from region start), u16 tick rate in 0.01 Hz |
+ * Region stream:   u8 subsongCount | per subsong (7 bytes): u24 offset (from region start), u16 tick rate in 0.01 Hz,
+ *                  u16 IRQ period in CPU cycles (0 = the song rate is the console frame rate, tick on NMI; see nesIrqPeriod) |
  *                  subsong streams (each aligned to bankSize when bankSize > 0).
  * Subsong stream:  dictionary, then tick records. Offsets inside a subsong (loop, bank n) are from its first byte.
  *   Dictionary:    u8 n | n x u16 entry offset (from dictionary start) | entries, each u8 length + tick record bytes.
@@ -25,13 +26,29 @@ export const CHIP_ORDER: readonly NesChip[] = ['nes', 'vrc6', 'vrc7', 'fds', 'mm
 export const NES_OP = { END: 0x80, LOOP: 0x81, EVENTS: 0x82, SET_BANK: 0x83, DICT_BASE: 0xC0, REPEAT: 0xFE, DICT_LONG: 0xFF } as const;
 export const NES_REGIONS = ['ntsc', 'pal', 'dendy'] as const;
 export type NesRegion = typeof NES_REGIONS[number];
+/** CPU clock (Hz) and frame rate (Hz) per console region. */
+export const NES_REGION_TIMING: Record<NesRegion, { cpuHz: number; frameHz: number }> = {
+  ntsc: { cpuHz: 1789772.7, frameHz: 60.0988 },
+  pal: { cpuHz: 1662607, frameHz: 50.007 },
+  dendy: { cpuHz: 1773447.5, frameHz: 50.007 },
+};
+/** Songs within this fraction of the frame rate tick on NMI (Furnace's 60/50 Hz is the console frame rate). */
+const NMI_TOLERANCE = 0.005;
+/** 0 = tick on NMI; else the cycle IRQ period (CPU cycles per tick) that reproduces the song rate in this region. */
+export function nesIrqPeriod(region: NesRegion, rateHz: number): number {
+  const { cpuHz, frameHz } = NES_REGION_TIMING[region];
+  if (Math.abs(rateHz - frameHz) / frameHz <= NMI_TOLERANCE) return 0;
+  const p = Math.round(cpuHz / rateHz);
+  if (p < 1 || p > 0xffff) throw new Error(`nesStream: song rate ${rateHz} Hz is outside what a 16 bit cycle IRQ reaches in region ${region}`);
+  return p;
+}
 
 export type NesTickEvent =
   | { kind: 'pcm'; chip: NesChip; offset: number; addr: number; value: number }
   | { kind: 'control'; chip: NesChip; offset: number; control: number; channel: number; value: number };
 export interface NesTick { writes: Partial<Record<NesChip, Array<[number, number]>>>; events: NesTickEvent[] }
 export interface NesEncodeOptions { loopTick?: number; bankSize?: number }
-export interface NesDecoded { tickRateCentiHz: number; ticks: NesTick[]; loopTick?: number }
+export interface NesDecoded { tickRateCentiHz: number; irqPeriod: number; ticks: NesTick[]; loopTick?: number }
 
 function regIndex(chip: NesChip, a: number): number {
   let i = -1;
@@ -171,10 +188,11 @@ export function encodeNesStreams(subsongs: readonly NesSubsongInput[], bankSize 
   for (const r of NES_REGIONS) {
     const streams = subsongs.map((s) => ({ cap: s[r] ?? s.ntsc, data: encodeNesSubsong(s[r] ?? s.ntsc, { loopTick: s.loopTick, bankSize }) }));
     const out: number[] = [streams.length];
-    let off = 1 + streams.length * 5;
+    if (streams.length > 36) throw new Error('nesStream: the player table holds at most 36 subsongs');
+    let off = 1 + streams.length * 7;
     if (bankSize) off = Math.ceil(off / bankSize) * bankSize;
     const starts = streams.map((s) => { const o = off; off += s.data.length; if (bankSize) off = Math.ceil(off / bankSize) * bankSize; return o; });
-    streams.forEach((s, i) => { const c = Math.round(s.cap.tickRateHz * 100); out.push(starts[i] & 255, (starts[i] >> 8) & 255, starts[i] >> 16, c & 255, c >> 8); });
+    streams.forEach((s, i) => { const c = Math.round(s.cap.tickRateHz * 100); const p = nesIrqPeriod(r, s.cap.tickRateHz); out.push(starts[i] & 255, (starts[i] >> 8) & 255, starts[i] >> 16, c & 255, c >> 8, p & 255, p >> 8); });
     const buf = new Uint8Array(off);
     buf.set(out);
     streams.forEach((s, i) => buf.set(s.data, starts[i]));
@@ -185,8 +203,10 @@ export function encodeNesStreams(subsongs: readonly NesSubsongInput[], bankSize 
 
 /** Reference decoder (what the 6502 player does). Decodes the whole subsong up to END/LOOP. */
 export function decodeNesStream(region: Uint8Array, subsong: number, bankSize = 0): NesDecoded {
-  const base = region[1 + subsong * 5] | region[2 + subsong * 5] << 8 | region[3 + subsong * 5] << 16;
-  const tickRateCentiHz = region[4 + subsong * 5] | region[5 + subsong * 5] << 8;
+  const e = 1 + subsong * 7;
+  const base = region[e] | region[e + 1] << 8 | region[e + 2] << 16;
+  const tickRateCentiHz = region[e + 3] | region[e + 4] << 8;
+  const irqPeriod = region[e + 5] | region[e + 6] << 8;
   const s = region.subarray(base);
   const nDict = s[0];
   const entry = (i: number) => { const o = s[1 + 2 * i] | s[2 + 2 * i] << 8; return s.subarray(o + 1, o + 1 + s[o]); };
@@ -216,8 +236,8 @@ export function decodeNesStream(region: Uint8Array, subsong: number, bankSize = 
     if (fresh) tickAt.set(p, ticks.length);
     const h = s[p++];
     if (h === NES_OP.END || h === NES_OP.LOOP) {
-      if (h === NES_OP.LOOP) { const target = s[p] | s[p + 1] << 8 | s[p + 2] << 16; return { tickRateCentiHz, ticks, loopTick: tickAt.get(target) }; }
-      return { tickRateCentiHz, ticks };
+      if (h === NES_OP.LOOP) { const target = s[p] | s[p + 1] << 8 | s[p + 2] << 16; return { tickRateCentiHz, irqPeriod, ticks, loopTick: tickAt.get(target) }; }
+      return { tickRateCentiHz, irqPeriod, ticks };
     }
     if (h === NES_OP.SET_BANK) { p = s[p] * bankSize; continue; }
     if (h === NES_OP.EVENTS) {

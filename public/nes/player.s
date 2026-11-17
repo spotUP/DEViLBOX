@@ -6,7 +6,10 @@
 ; Stream format: header comment of src/lib/export/nes/nesStream.ts. The region stream sits at $8000 (patched in).
 ; Decoded: tick masks, chip blocks (items, ascending and constant runs), dictionary refs, repeat, loop, end.
 ; Chip writers for 2A03, VRC6, VRC7, FDS, MMC5, N163, 5B (Phase 5). Events prefix: only DPCM_BANK is acted on (PCM events: Phase 7).
-; Tick rate is the NMI rate: tick rates other than the console frame rate are not honoured yet (Phase 6).
+; Phase 6: region (NTSC/PAL/Dendy) is detected at boot by counting loop iterations between two vblanks; the region's stream starts
+; at ROM bank regbank[region] (patched). A subsong whose table entry has period 0 ticks on NMI (song rate = console frame rate);
+; otherwise the custom board's cycle IRQ ticks it every `period` CPU cycles ($4100/$4101 reload lo/hi, $4102 bit 0 enable, $4103 ack;
+; same idea as the VRC cycle counter) and NMI is off. Subsong table entry (7 bytes): u24 offset, u16 rate in 0.01 Hz, u16 IRQ period.
 STREAM   = $8000
 shadow   = $0200            ; 2A03 register shadow $4000-$4017 (for bars later)
 
@@ -27,14 +30,18 @@ sbase    = $11              ; ROM bank of the current subsong start
 pendf    = $12              ; DPCM bank switch waiting for the sample to finish
 pendb    = $13              ; first ROM bank of the pending DPCM window
 wp       = $14              ; computed write port (VRC6)
+rbank    = $16              ; first ROM bank of the detected region's stream
+period   = $17              ; IRQ period of the current subsong (0 = NMI driven), 2 bytes
+region   = $19              ; 0 NTSC, 1 PAL, 2 Dendy
 
 .segment "HEADER"
   .byte "NES",$1A,2,0,$F0,$18,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 31, PRG size patched by the cartridge builder
 
 .segment "CODE"
-.export title, startsong, nmi
+.export title, startsong, regbank, nmi, irq, idle
 title:     .res 32,$20      ; patched title text
 startsong: .byte 0          ; patched initial subsong
+regbank:   .byte 0,0,0      ; patched: first ROM bank of the NTSC, PAL, Dendy streams
 
 reset:
   sei
@@ -57,10 +64,56 @@ reset:
   bpl :-
 : bit $2002
   bpl :-
+  ldx #0                    ; vblank just started: count 12-cycle iterations until the next one (NTSC ~2482, PAL ~2770, Dendy ~2955)
+  ldy #0
+: inx
+  bne :+
+  iny
+: lda $2002
+  bpl :--
+  sty tmp+1
+  stx tmp
+  lda #0
+  sta region
+  lda tmp+1                 ; 16-bit compare with the midpoints $0A42 (NTSC/PAL) and $0B2E (PAL/Dendy)
+  cmp #$0A
+  bcc @found
+  bne @pal0
+  lda tmp
+  cmp #$42
+  bcc @found
+@pal0:
+  inc region
+  lda tmp+1
+  cmp #$0B
+  bcc @found
+  bne @dendy
+  lda tmp
+  cmp #$2E
+  bcc @found
+@dendy:
+  inc region
+@found:
+  ldx region
+  lda regbank,x
+  sta rbank
   lda startsong
   jsr restart
+  lda period
+  ora period+1
+  bne @irq
   lda #$80
-  sta $2000
+  sta $2000                 ; tick on NMI
+  jmp *
+@irq:
+  lda period
+  sta $4100
+  lda period+1
+  sta $4101
+  lda #1
+  sta $4102
+  cli
+idle:
   jmp *
 
 ; A = subsong. Points ptr past the dictionary of that subsong and clears the repeat state.
@@ -68,16 +121,23 @@ restart:
   sta tmp
   asl a
   asl a
-  clc
-  adc tmp
+  asl a
+  sec
+  sbc tmp                   ; 7 bytes per table entry (builder limits the song to 36 subsongs)
   tay
-  lda #0
-  sta $5FF8                 ; the subsong table is in ROM bank 0
+  lda rbank
+  sta $5FF8                 ; the subsong table is in the first bank of the region stream
+  lda STREAM+6,y
+  sta period
+  lda STREAM+7,y
+  sta period+1
   lda STREAM+2,y            ; offset mid byte: bank = high nibble (offsets are bank aligned; builder keeps them < 1 MB)
   lsr a
   lsr a
   lsr a
   lsr a
+  clc
+  adc rbank
   sta sbase
   sta $5FF8
   lda #0
@@ -137,6 +197,7 @@ nmi:
   pha
   tya
   pha
+nmi_body:
   ldy #0
   jsr dpcm_apply
   jsr tick
@@ -145,8 +206,15 @@ nmi:
   pla
   tax
   pla
-irq:
   rti
+irq:                        ; custom board cycle IRQ: ack, then the same tick as NMI
+  pha
+  txa
+  pha
+  tya
+  pha
+  sta $4103
+  jmp nmi_body
 
 tick:
   lda ended

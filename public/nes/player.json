@@ -5,7 +5,10 @@
  "titleOffset": 28688,
  "titleLength": 32,
  "startSubsongOffset": 28720,
- "nmiAddress": 61638,
+ "regbankOffset": 28721,
+ "nmiAddress": 61740,
+ "irqAddress": 61759,
+ "idleAddress": 61614,
  "bankSize": 4096,
  "maxStreamBanks": 255
 }

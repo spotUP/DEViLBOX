@@ -12,28 +12,35 @@ const META = join(__dirname, '../../../../public/nes/player.json');
 export const APU_RANGES: ReadonlyArray<[number, number]> = [[0x4000, 0x4017]];
 
 /** Runs rom in Mesen2 headless for `ticks` NMIs. Returns the $4000-$4017 writes per tick and, per tick, the byte at $C000 (DPCM window). */
-export function mesen(rom: Uint8Array, ticks: number, timeout = 30, ranges: ReadonlyArray<[number, number]> = APU_RANGES): { writes: Array<Array<[number, number]>>; window: number[] } {
+export function mesen(rom: Uint8Array, ticks: number, timeout = 30, ranges: ReadonlyArray<[number, number]> = APU_RANGES, opts: { region?: 'Ntsc' | 'Pal' | 'Dendy'; tickAddress?: number; irqBoard?: boolean } = {}): { writes: Array<Array<[number, number]>>; window: number[]; cycles: number[] } {
   const meta = JSON.parse(readFileSync(META, 'utf8'));
   const dir = mkdtempSync(join(tmpdir(), 'nesplayer-'));
+  const tick = opts.tickAddress ?? meta.nmiAddress;
   try {
     writeFileSync(join(dir, 'p.nes'), rom);
-    const lua = `local n=0
+    // The custom board's cycle IRQ ($4100-$4103) is modelled by no emulator: count CPU cycles here and, from the player's idle loop, enter the IRQ vector by hand (push PC and P, set I, jump to the handler).
+    const board = !opts.irqBoard ? '' : `local per,en,nxt,n=0,false,0,0
+emu.addMemoryCallback(function(a,v) if a==0x4100 then per=(per&0xFF00)|v elseif a==0x4101 then per=(per&0xFF)|(v<<8) elseif a==0x4102 then en=(v&1)==1 if en then nxt=emu.getState()["cpu.cycleCount"]+per end end end, emu.callbackType.write, 0x4100, 0x4103)
+emu.addMemoryCallback(function() local s=emu.getState() if en and s["cpu.cycleCount"]>=nxt then nxt=nxt+per n=n+1 print(string.format("T %02X %d",emu.read(0xC000, emu.memType.nesMemory),s["cpu.cycleCount"])) if n>=${ticks + 1} then print("DONE") emu.stop(0) end local sp,pc=s["cpu.sp"],s["cpu.pc"] emu.write(0x100+sp,(pc>>8)&0xFF,emu.memType.nesMemory) emu.write(0x100+((sp-1)&0xFF),pc&0xFF,emu.memType.nesMemory) emu.write(0x100+((sp-2)&0xFF),s["cpu.ps"]&0xEF,emu.memType.nesMemory) emu.setState({["cpu.sp"]=(sp-3)&0xFF,["cpu.ps"]=s["cpu.ps"]|4,["cpu.pc"]=${meta.irqAddress}}) end end, emu.callbackType.exec, ${meta.idleAddress}, ${meta.idleAddress})
+`;
+    const lua = `${board}local n=0
 ${ranges.map(([lo, hi]) => `emu.addMemoryCallback(function(a,v) print(string.format("W %04X %02X",a,v&0xFF)) end, emu.callbackType.write, ${lo}, ${hi})`).join('\n')}
-emu.addMemoryCallback(function() n=n+1 print(string.format("T %02X",emu.read(0xC000, emu.memType.nesMemory))) if n>=${ticks + 1} then print("DONE") emu.stop(0) end end, emu.callbackType.exec, ${meta.nmiAddress}, ${meta.nmiAddress})
+${opts.irqBoard ? '' : `emu.addMemoryCallback(function() n=n+1 print(string.format("T %02X %d",emu.read(0xC000, emu.memType.nesMemory),emu.getState()["cpu.cycleCount"])) if n>=${ticks + 1} then print("DONE") emu.stop(0) end end, emu.callbackType.exec, ${tick}, ${tick})`}
 `;
     writeFileSync(join(dir, 'log.lua'), lua);
     const set = join(homedir(), 'Library/Application Support/Mesen2');
     mkdirSync(set, { recursive: true });
     if (!existsSync(join(set, 'Settings.json'))) writeFileSync(join(set, 'Settings.json'), '{"FirstRun":false}');
-    const out = execFileSync(MESEN, ['--testRunner', `--timeout=${timeout}`, '--doNotSaveSettings', '--enableStdout', join(dir, 'log.lua'), join(dir, 'p.nes')], { encoding: 'utf8', timeout: timeout * 1000 + 30000, maxBuffer: 1 << 28 });
+    const out = execFileSync(MESEN, ['--testRunner', `--timeout=${timeout}`, ...(opts.region ? [`--nes.region=${opts.region}`] : []), '--doNotSaveSettings', '--enableStdout', join(dir, 'log.lua'), join(dir, 'p.nes')], { encoding: 'utf8', timeout: timeout * 1000 + 30000, maxBuffer: 1 << 28 });
     expect(out).toContain('DONE');
     const writes: Array<Array<[number, number]>> = [];
     const window: number[] = [];
+    const cycles: number[] = [];
     for (const line of out.split('\n')) {
-      if (line.startsWith('T ')) { writes.push([]); window.push(parseInt(line.slice(2), 16)); }
+      if (line.startsWith('T ')) { writes.push([]); const [, w, c] = line.trim().split(' '); window.push(parseInt(w, 16)); cycles.push(Number(c)); }
       else if (line.startsWith('W ') && writes.length) { const [, a, v] = line.trim().split(' '); writes[writes.length - 1].push([parseInt(a, 16), parseInt(v, 16)]); }
     }
-    return { writes: writes.slice(0, ticks), window: window.slice(0, ticks) };
+    return { writes: writes.slice(0, ticks), window: window.slice(0, ticks), cycles: cycles.slice(0, ticks + 1) };
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
