@@ -49,6 +49,8 @@ function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
 }
 
+const s8 = (v: number): number => (v << 24) >> 24;
+
 function s16BE(buf: Uint8Array, off: number): number {
   const v = (buf[off] << 8) | buf[off + 1];
   return v < 0x8000 ? v : v - 0x10000;
@@ -259,7 +261,7 @@ export function parseDesireFile(buffer: ArrayBuffer, filename: string): TrackerS
 
   // ── Editable grid: the four voice streams of one song, decoded in place ──
 
-  const grid = walkDesire(buf);
+  const grid = walkDesire(buf, ptrs ? ptrs.lengthsOff + 2 * ptrs.count : -1);
   const patterns = grid ? grid.patterns(filename, instruments.length) : [placeholderPattern(filename, instruments.length)];
   const layout: UADEPatternLayout = grid
     ? {
@@ -271,8 +273,9 @@ export function parseDesireFile(buffer: ArrayBuffer, filename: string): TrackerS
         numPatterns: patterns.length,
         moduleSize: buffer.byteLength,
         encodeCell: encodeDesireCell,
+        noteOffset: (p, r, c) => { const it = grid.at.get(`${p}:${r}:${c}`); return it ? it.shift - DESIRE_PITCH_BASE : null; },
         encodeOverStored: true,
-        decodeCell: decodeDesireCell,
+        decodeCell: (raw) => decodeDesireCell(raw, 0),
         getCellFileOffset: (p, r, c) => grid.at.get(`${p}:${r}:${c}`)?.off ?? -1,
         effectPatches: (p, r, c, cell) => {
           const it = grid.at.get(`${p}:${r}:${c}`);
@@ -314,7 +317,14 @@ const DESIRE_ROWS = 64;
 const OPERANDS: Record<number, number> = { 0x80: 1, 0x81: 1, 0x84: 1, 0x85: 5, 0x86: 1, 0x87: 2, 0x88: 1, 0x8a: 1, 0x8b: 1, 0x8c: 1, 0x8f: 2 };
 const VOICE_OFFSET = [0, 0x20, 0x3f, 0x5e]; // T offset of voice v (asm 0x1f4-0x204)
 
-interface DesireItem { off: number; ticks: number; note: number; inst: number; instOff: number }
+interface DesireItem { off: number; ticks: number; note: number; inst: number; instOff: number; shift: number }
+
+/**
+ * Grid note = (byte + 0x84 transpose + instrument transpose) - 24. Measured from the player (asm 0x71e-0x76c): the pitch index is
+ * that sum, +2 semitones, period = 8192 >> octave scaled by the 8-steps-per-semitone table; sum 48 = period 512 = A-1 (PT 508) = note 22
+ * by periodNotes.ts (428 = C-2 = 25). shortcut: the glide/vibrato terms (a0@2, @72, @198) are taken as 0.
+ */
+export const DESIRE_PITCH_BASE = 24;
 
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
 
@@ -331,14 +341,15 @@ function findStreamTables(buf: Uint8Array): { t: number; w: number } | null {
 }
 
 /** One voice from its start to the first terminator: a note/rest per item; loops are read once (shortcut: not expanded). */
-function decodeStream(buf: Uint8Array, start: number): DesireItem[] {
+function decodeStream(buf: Uint8Array, start: number, itrOff: number): DesireItem[] {
   const items: DesireItem[] = [];
-  let pos = start, dur = 1, inst = -1, instOff = -1, loop = -1;
+  let pos = start, dur = 1, inst = -1, instOff = -1, loop = -1, tr = 0;
   while (pos < buf.length && items.length < 20000) {
     const b = buf[pos];
-    if (b < 0x80) { items.push({ off: pos, ticks: dur, note: b, inst, instOff }); pos++; continue; }
+    if (b < 0x80) { items.push({ off: pos, ticks: dur, note: b, inst, instOff, shift: tr + (itrOff >= 0 && inst >= 0 ? s8(buf[itrOff + inst]) : 0) }); pos++; continue; }
     if (b === 0x80) dur = Math.max(1, buf[pos + 1]);
     else if (b === 0x81) loop = buf[pos + 1];
+    else if (b === 0x84) tr = s8(buf[pos + 1]);
     else if (b === 0x88) { inst = buf[pos + 1]; instOff = pos + 1; }
     else if (b === 0x82 && loop <= 0) break; // endless loop (or none open): the stream ends here
     else if (b === 0x83 || b === 0x8c || b === 0x8d) break;
@@ -347,7 +358,7 @@ function decodeStream(buf: Uint8Array, start: number): DesireItem[] {
   return items;
 }
 
-function walkDesire(buf: Uint8Array) {
+function walkDesire(buf: Uint8Array, itrOff: number) {
   const tab = findStreamTables(buf);
   if (!tab) return null;
   // First song with a note on any voice (UADE also skips the silent song 1).
@@ -356,7 +367,7 @@ function walkDesire(buf: Uint8Array) {
     for (let v = 0; v < 4; v++) {
       const w = buf[tab.t + VOICE_OFFSET[v] + song];
       const start = tab.w + 2 * w < buf.length - 1 ? u16BE(buf, tab.w + 2 * w) : 0;
-      voices.push(start > 0 && start < buf.length ? decodeStream(buf, start) : []);
+      voices.push(start > 0 && start < buf.length ? decodeStream(buf, start, itrOff) : []);
     }
     if (!voices.some((it) => it.some((x) => x.note > 0))) continue;
     const g = voices.flat().reduce((a, x) => gcd(a, x.ticks), 0) || 1;
@@ -402,7 +413,7 @@ function buildPatterns(at: Map<string, DesireItem>, count: number, filename: str
       rows: Array.from({ length: DESIRE_ROWS }, (_r, r) => {
         const it = at.get(`${p}:${r}:${ch}`);
         if (!it || it.note === 0) return emptyRow();
-        return { ...emptyRow(), ...decodeDesireCell(new Uint8Array([it.note])), instrument: it.inst >= 0 ? it.inst + 1 : 0 };
+        return { ...emptyRow(), ...decodeDesireCell(new Uint8Array([it.note]), it.shift - DESIRE_PITCH_BASE), instrument: it.inst >= 0 ? it.inst + 1 : 0 };
       }),
     })),
     importMetadata: {

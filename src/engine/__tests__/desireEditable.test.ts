@@ -49,4 +49,40 @@ describe('Desire editable grid', () => {
     const all = again.patterns.flatMap((p, pi) => p.channels.flatMap((c, ci) => c.rows.map((r, ri) => ({ r, o: again.uadePatternLayout!.getCellFileOffset!(pi, ri, ci) }))));
     expect(all.find((x) => x.o === off)!.r.note).toBe(note);
   });
+
+  it('grid note is the sounding pitch: stored byte + transpose - 24, i.e. note 22 (A-1, period 512) at pitch sum 46', async () => {
+    const { periodToNote } = await import('@/lib/amiga/periodNotes');
+    // player (asm 0x71e-0x76c): index = byte + 0x84 + instrument transpose + 2; period = table[index % 12 * 8] >> (index / 12) >> 1 = 8192 / 2^(index / 12)
+    const periodOf = (sum: number) => Math.round(8192 / 2 ** ((sum + 2) / 12));
+    expect(periodToNote(periodOf(46))).toBe(22) // period 512 -> nearest 508 = A-1;
+    const song = parseDesireFile(load(), 'batmanreturns.dsr');
+    const layout = song.uadePatternLayout!;
+    let checked = 0;
+    song.patterns.forEach((p, pi) => p.channels.forEach((c, ci) => c.rows.forEach((r, ri) => {
+      if (r.note === 0) return;
+      const stored = layout.decodeCell!(new Uint8Array([load().byteLength ? new Uint8Array(load())[layout.getCellFileOffset!(pi, ri, ci)] : 0])).note;
+      const sum = stored + layout.noteOffset!(pi, ri, ci)! + 24;
+      expect(r.note).toBe(periodToNote(periodOf(sum)));
+      checked++;
+    })));
+    expect(checked).toBeGreaterThan(20);
+  });
+
+  it('a grid note edit reaches the module UADE is loaded with (editedModuleForPlay); unedited returns null', { timeout: 180000 }, async () => {
+    const song = parseDesireFile(load(), 'batmanreturns.dsr');
+    const g = await import('@/lib/song/gridBaseline');
+    g.setGridBaseline(g.baselineOf(song.patterns), g.extraBaselineOf(song.patterns));
+    const { editedModuleForPlay } = await import('@engine/replayer/editedModuleForPlay');
+    const { WASM_ENGINES } = await import('@engine/replayer/wasmEngineRegistry');
+    const desc = WASM_ENGINES.find((d) => d.key === 'UADEEditable')!;
+    expect(await editedModuleForPlay(song, desc)).toBeNull();
+    const row = song.patterns[0].channels[0].rows.findIndex((x) => x.note > 0);
+    const off = song.uadePatternLayout!.getCellFileOffset!(0, row, 0);
+    song.patterns[0].channels[0].rows[row].note += 2;
+    const played = new Uint8Array((await editedModuleForPlay(song, desc)) as ArrayBuffer);
+    const orig = new Uint8Array(load());
+    const diff = [...played].map((v, i) => (v !== orig[i] ? i : -1)).filter((i) => i >= 0);
+    expect(diff).toEqual([off]);
+    expect(played[off]).toBe(orig[off] + 2);
+  });
 });
