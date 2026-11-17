@@ -20,7 +20,9 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, Pattern } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { decodePSACell, encodePSACell } from '@/engine/uade/encoders/PSAEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -119,43 +121,42 @@ export function parsePSAFile(buffer: ArrayBuffer, filename: string): TrackerSong
       }) as InstrumentConfig,
   );
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
+  // ── Patterns: 1024 bytes each, 64 rows x 4 voices x [note, inst, effect, param] ──
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
+  const NUM_CH = 4;
+  const ROWS = 64;
+  const patStart = u32BE(buf, 48);
+  const posBase = u32BE(buf, 44);
+  const subStart = (n: number): number => 56 + n * 8;
+  // Position table of subsong n: u16 words from [start, end) at posBase (Init / SetPosition).
+  const positionsOf = (n: number): number[] => {
+    const lo = (buf[subStart(n)] << 8) | buf[subStart(n) + 1];
+    const hi = (buf[subStart(n) + 2] << 8) | buf[subStart(n) + 3];
+    const out: number[] = [];
+    for (let o = lo; o < hi && posBase + o + 2 <= buf.length; o += 2) out.push((buf[posBase + o] << 8) | buf[posBase + o + 1]);
+    return out;
+  };
+  const allSubs = Array.from({ length: subsongCount }, (_, n) => positionsOf(n));
+  const fitting = Math.max(0, Math.floor((buf.length - patStart) / 1024));
+  const numPatterns = Math.min(fitting, Math.max(1, ...allSubs.flat().map((p) => p + 1)));
+  const cellOffset = (p: number, row: number, ch: number): number =>
+    p < 0 || p >= numPatterns || row < 0 || row >= ROWS || ch < 0 || ch >= NUM_CH ? -1 : patStart + p * 1024 + row * 16 + ch * 4;
 
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
+  const patterns: Pattern[] = Array.from({ length: numPatterns }, (_, p) => ({
+    id: `pattern-${p}`,
+    name: `Pattern ${p}`,
+    length: ROWS,
+    channels: Array.from({ length: NUM_CH }, (_, ch) => ({
+      id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false, solo: false, collapsed: false, volume: 100,
+      pan: ch === 0 || ch === 3 ? -50 : 50, instrumentId: null, color: null,
+      rows: Array.from({ length: ROWS }, (_, r) => decodePSACell(buf.subarray(cellOffset(p, r, ch), cellOffset(p, r, ch) + 4))),
     })),
     importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: 1,
-      originalInstrumentCount: instrumentCount,
+      sourceFormat: 'MOD' as const, sourceFile: filename, importedAt: new Date().toISOString(),
+      originalChannelCount: NUM_CH, originalPatternCount: numPatterns, originalInstrumentCount: instrumentCount,
     },
-  };
+  }));
+  const order = (allSubs[0] ?? []).filter((p) => p < numPatterns);
 
   const nameParts: string[] = [`${moduleName} [PSA]`];
   if (subsongCount > 1) nameParts.push(`(${subsongCount} subsongs)`);
@@ -164,10 +165,10 @@ export function parsePSAFile(buffer: ArrayBuffer, filename: string): TrackerSong
   return {
     name: nameParts.join(' '),
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions: order.length ? order : [0],
+    songLength: order.length || 1,
     restartPosition: 0,
     numChannels: 4,
     initialSpeed: 6,
@@ -175,5 +176,18 @@ export function parsePSAFile(buffer: ArrayBuffer, filename: string): TrackerSong
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'psa',
+      patternDataFileOffset: patStart,
+      bytesPerCell: 4,
+      rowsPerPattern: ROWS,
+      numChannels: NUM_CH,
+      numPatterns,
+      moduleSize: buffer.byteLength,
+      encodeCell: encodePSACell,
+      encodeOverStored: true,
+      decodeCell: decodePSACell,
+      getCellFileOffset: cellOffset,
+    } satisfies UADEPatternLayout,
   };
 }
