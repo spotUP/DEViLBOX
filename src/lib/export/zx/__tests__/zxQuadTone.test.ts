@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   encodeQuadTone, quadToneVoiceMode, renderQuadToneDrum,
+  quadToneFramesFromBatches, quadToneSampleBits, QUADTONE_PLATFORM,
   QUADTONE_CLOCK, QUADTONE_ITER_T, QUADTONE_DRUM_BYTE_T, type QuadToneFrame,
 } from '../zxQuadToneData';
 
@@ -74,5 +75,24 @@ describe('QuadTone song data', () => {
   it('refuses a drum sample the capture does not contain', () => {
     const r = regs([[0, 128, 0], [0, 128, 0], [0, 128, 0], [0, 128, 0]]);
     expect(() => encodeQuadTone({ frames: [frame(r, 3, 0)], samples: [] }, DRUMS)).toThrow(/sample 3/);
+  });
+});
+
+describe('QuadTone capture decoding', () => {
+  it('decodes a worklet batch into a frame and ignores other chips', () => {
+    const pairs = [0, 7, 1, 2, 16, 11, 0x100, 3, 0x101, 5, 0x102, 60];
+    const [f, ...rest] = quadToneFramesFromBatches([
+      { platformType: QUADTONE_PLATFORM, pairs },
+      { platformType: 3, pairs: [0, 1] },
+    ]);
+    expect(rest).toHaveLength(0);
+    expect(f.regs[0]).toBe(7);
+    expect(f.regs[16]).toBe(11);
+    expect([f.sample, f.pos, f.hz]).toEqual([3, 5, 60]);
+  });
+  it('turns sample data of each depth into 1-bit', () => {
+    expect(quadToneSampleBits({ data: [127, -128, 0, 1], depth: 8 })).toEqual([1, 0, 0, 1]);
+    expect(quadToneSampleBits({ data: [0x4000, -0x4000], depth: 16 })).toEqual([1, 0]);
+    expect(quadToneSampleBits({ data: [0b101], depth: 0, samples: 3 })).toEqual([1, 0, 1]);
   });
 });

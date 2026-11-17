@@ -46,6 +46,9 @@ const POST_AMP = {
   21: 0.5,  // DIV_SYSTEM_TIA
 };
 
+/** FurnaceDispatchPlatform.SFX_BEEPER_QUADTONE */
+const QUADTONE_PLATFORM = 51;
+
 class FurnaceDispatchProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -144,6 +147,22 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
   /** Drain one chip's writes (call right after its tick), stamped at `sample`. */
   drainRegWrites(chip, sample) {
     const cap = this._regCapture;
+    if (chip.platformType === QUADTONE_PLATFORM && this.wasm.regPool && this.wasm.samplePos) {
+      // QuadTone (beeper) has no register writes to log: snapshot its register pool, the drum sample and bit
+      // position, and the tick rate after every tick, as pairs [i, reg i] + [0x100, sample, 0x101, pos, 0x102, hz]
+      // (tools/furnace-audit/render-devilbox.ts --regpool does the same).
+      const m = this.wasm.regPool(chip.handle, cap.ptr, 64);
+      const heap = this.getHeapBuffer();
+      if (m <= 0 || !heap) return;
+      const regs = new Uint8Array(heap, cap.ptr, m).slice();
+      this.wasm.samplePos(chip.handle, 4, cap.ptr);
+      const sp = new Int32Array(heap, cap.ptr, 3).slice();
+      const pairs = new Int32Array(m * 2 + 6);
+      regs.forEach((v, i) => { pairs[i * 2] = i; pairs[i * 2 + 1] = v; });
+      pairs.set([0x100, sp[0], 0x101, sp[1], 0x102, Math.round(this.tickRate)], m * 2);
+      cap.pending.push({ platformType: chip.platformType, sample, pairs });
+      return;
+    }
     const n = this.wasm.regWrites(chip.handle, cap.ptr, cap.max);
     if (n <= 0) return;
     const heapBuf = this.getHeapBuffer();
@@ -957,6 +976,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         renderSamples: this.module._furnace_dispatch_render_samples,
         sampleMem: this.module._furnace_dispatch_sample_mem,
         regPool: this.module._furnace_dispatch_reg_pool,
+        samplePos: this.module._furnace_dispatch_sample_pos,
         memCompo: this.module._furnace_dispatch_mem_compo,
         // Macro control functions
         setMacrosEnabled: this.module._furnace_dispatch_set_macros_enabled,

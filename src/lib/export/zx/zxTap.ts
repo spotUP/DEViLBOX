@@ -150,12 +150,12 @@ export interface ZxBeeperPlayer {
   titleOffset: number; authorOffset: number; textLength: number;
 }
 
-/** Fetch public/zx/beeper.bin + beeper.json (browser). */
-export async function fetchZxBeeperPlayer(): Promise<ZxBeeperPlayer> {
+/** Fetch public/zx/beeper.bin + beeper.json, or quadtone.bin + quadtone.json (same layout; browser). */
+export async function fetchZxBeeperPlayer(name: 'beeper' | 'quadtone' = 'beeper'): Promise<ZxBeeperPlayer> {
   const base = import.meta.env.BASE_URL;
   const [bin, meta] = await Promise.all([
-    fetch(`${base}zx/beeper.bin`).then((r) => r.arrayBuffer()),
-    fetch(`${base}zx/beeper.json`).then((r) => r.json()),
+    fetch(`${base}zx/${name}.bin`).then((r) => r.arrayBuffer()),
+    fetch(`${base}zx/${name}.json`).then((r) => r.json()),
   ]);
   return { ...meta, bytes: new Uint8Array(bin) };
 }

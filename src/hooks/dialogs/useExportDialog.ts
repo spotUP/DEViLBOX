@@ -10,6 +10,7 @@ import { furnaceModuleExportAvailable } from '@/lib/export/FurnaceModuleExporter
 import { furnaceAyScrambleExportAvailable, ayScrambleTempoWarning, type AyScrambleTarget } from '@/lib/export/FurnaceExporter';
 import { nesChipsOf, nesRomExportAvailable, nesTempoWarning, wantsVrc6Cartridge, type NesRegionChoice } from '@/lib/export/nes/nesExport';
 import type { NesVrc6Board } from '@/lib/export/nes/nesRecord';
+import { QUADTONE_PLATFORM } from '@lib/export/zx/zxQuadToneData';
 import { FURNACE_SNES_CHIP_ID } from '@/lib/export/tad/tadSongWriter';
 import { useState, useEffect, useCallback } from 'react';
 import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
@@ -40,7 +41,7 @@ import { saveFurFileWasm, saveFurTextWasm, loadFurFileWasm } from '@lib/import/w
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'vectrexCart' | 'nesRom' | 'nsfe' | 'tad';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'nsfe' | 'tad';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -85,6 +86,7 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   furAy: '.fur',
   zxTap: '.tap',
   zxBeeperTap: '.tap',
+  zxQuadToneTap: '.tap',
   vectrexCart: '.bin',
   nesRom: '.nes',
   nsfe: '.nsfe',
@@ -408,6 +410,29 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     }
   }, [metadata]);
 
+  const quadToneAvailable = (furnaceNative?.chipIds ?? []).includes(QUADTONE_PLATFORM);
+  const [zxQuadToneBusy, setZxQuadToneBusy] = useState(false);
+  const [zxQuadToneReport, setZxQuadToneReport] = useState<{ warnings: string[]; seconds: number } | null>(null);
+
+  const handleExportZxQuadToneTap = useCallback(async (
+    downloadFn: (blob: Blob, filename: string) => void,
+    onClose: () => void,
+  ) => {
+    setZxQuadToneBusy(true);
+    try {
+      const { recordZxQuadToneTap } = await import('@lib/export/zx/zxQuadToneCapture');
+      const r = await recordZxQuadToneTap(metadata.name || 'song', metadata.author && metadata.author !== 'Unknown' ? metadata.author : '');
+      setZxQuadToneReport({ warnings: r.warnings, seconds: r.seconds });
+      downloadFn(new Blob([r.tap as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.tap`);
+      notify.success(`ZX Spectrum QuadTone tape exported (${r.records} records, ${Math.round(r.seconds)} s, ${r.tap.byteLength} bytes).`);
+      onClose();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'ZX Spectrum QuadTone tape export failed.');
+    } finally {
+      setZxQuadToneBusy(false);
+    }
+  }, [metadata]);
+
   const tadAvailable = (furnaceNative?.chipIds ?? []).includes(FURNACE_SNES_CHIP_ID);
   const [tadReport, setTadReport] = useState<{ warnings: string[]; ram: string; rows: { id: string; label: string; bytes: number }[] } | null>(null);
 
@@ -615,6 +640,10 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     nesRomTempoWarning,
     nesRomBusy,
     handleExportZxBeeperTap,
+    handleExportZxQuadToneTap,
+    quadToneAvailable,
+    zxQuadToneBusy,
+    zxQuadToneReport,
     zxBeeperReport,
     handleExportTad,
     tadAvailable,

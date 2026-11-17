@@ -108,6 +108,38 @@ export function renderQuadToneDrum(bits: readonly number[], period: number, furn
   return bytes;
 }
 
+/** FurnaceDispatchPlatform.SFX_BEEPER_QUADTONE: the platformType of the worklet's QuadTone snapshot batches. */
+export const QUADTONE_PLATFORM = 51;
+
+/**
+ * Worklet snapshot batches (FurnaceDispatch.worklet.js drainRegWrites) -> encoder frames: pairs [i, reg i] for the
+ * register pool, then 0x100 = drum sample, 0x101 = its bit position, 0x102 = tick rate.
+ */
+export function quadToneFramesFromBatches(batches: ReadonlyArray<{ platformType: number; pairs: ArrayLike<number> }>): QuadToneFrame[] {
+  const frames: QuadToneFrame[] = [];
+  for (const b of batches) {
+    if (b.platformType !== QUADTONE_PLATFORM) continue;
+    const f: QuadToneFrame = { regs: [], sample: -1, pos: 0, hz: 0 };
+    for (let i = 0; i + 1 < b.pairs.length; i += 2) {
+      const a = b.pairs[i]; const v = b.pairs[i + 1];
+      if (a === 0x100) f.sample = v; else if (a === 0x101) f.pos = v; else if (a === 0x102) f.hz = v; else f.regs[a] = v;
+    }
+    frames.push(f);
+  }
+  return frames;
+}
+
+/** Drum sample bits as the chip plays them: bit = data8 > 0 (zxbeeperquadtone.cpp acquire); depth 0 = 1-bit PCM, LSB first. */
+export function quadToneSampleBits(smp: { data: ArrayLike<number>; depth: number; samples?: number }): number[] {
+  const count = smp.depth === 0 ? (smp.samples ?? smp.data.length * 8) : smp.data.length;
+  const bits: number[] = [];
+  for (let j = 0; j < count; j++) {
+    const v = smp.depth === 16 ? smp.data[j] >> 8 : smp.depth === 0 ? ((smp.data[j >> 3] >> (j & 7)) & 1) * 2 - 1 : (smp.data[j] << 24) >> 24;
+    bits.push(v > 0 ? 1 : 0);
+  }
+  return bits;
+}
+
 export function encodeQuadTone(cap: QuadToneCapture, drumAddress: number): QuadToneData {
   const warnings: string[] = [];
   const furnaceClock = QUADTONE_FURNACE_CLOCK[parseChipFlags(cap.chipFlags).get('clockSel') === '1' ? 1 : 0];
