@@ -119,6 +119,14 @@ const FORMATS: Record<string, FileSubsongFormat> = {
       return !!g && g.placements.length > 0;
     },
   },
+  // Maniacs of Noise (.mon): the module's subsongCount byte; UADE and nuade number the songs from 0 (maniacsOfNoiseGrid).
+  maniacsOfNoise: {
+    key: 'maniacsOfNoise',
+    names: /\.mon$|(^|\/)mon\./,
+    fileDataField: 'uadeEditableFileData',
+    count: async (bytes) => (await import('./formats/maniacsOfNoiseGrid')).maniacsOfNoiseSubsongCount(new Uint8Array(bytes)),
+    audible: async (bytes, subsong) => (await import('./formats/maniacsOfNoiseGrid')).maniacsOfNoiseSubsongAudible(new Uint8Array(bytes), subsong),
+  },
   jxs: {
     key: 'jxs',
     fileDataField: 'jxsFileData',

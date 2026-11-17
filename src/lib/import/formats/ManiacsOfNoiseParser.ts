@@ -14,6 +14,7 @@ import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { maniacsOfNoiseEncoder } from '@/engine/uade/encoders/ManiacsOfNoiseEncoder';
+import { fileSubsongsField, type FileSubsongs } from '../fileSubsongs';
 import { buildManiacsOfNoiseGrid, MANIACS_OF_NOISE_ROWS_PER_PATTERN } from './maniacsOfNoiseGrid';
 
 function u16BE(buf: Uint8Array, off: number): number {
@@ -45,7 +46,7 @@ export function isManiacsOfNoiseFormat(
   return false;
 }
 
-export function parseManiacsOfNoiseFile(buffer: ArrayBuffer, filename: string): TrackerSong {
+export function parseManiacsOfNoiseFile(buffer: ArrayBuffer, filename: string, tunes?: FileSubsongs): TrackerSong {
   if (!isManiacsOfNoiseFormat(buffer, filename)) throw new Error('Not a Maniacs of Noise module');
   const buf = new Uint8Array(buffer);
 
@@ -53,7 +54,7 @@ export function parseManiacsOfNoiseFile(buffer: ArrayBuffer, filename: string): 
   const moduleName = baseName.replace(/^mon\./i, '').replace(/\.mon$/i, '') || baseName;
 
   // A recognised module (maniacsOfNoiseGrid.ts) opens as an editable tick grid; anything else keeps the stub below.
-  const grid = buildManiacsOfNoiseGrid(buf, filename);
+  const grid = buildManiacsOfNoiseGrid(buf, filename, tunes?.current ?? 0);
   if (grid) {
     const R = MANIACS_OF_NOISE_ROWS_PER_PATTERN;
     return {
@@ -67,6 +68,7 @@ export function parseManiacsOfNoiseFile(buffer: ArrayBuffer, filename: string): 
       uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
       uadeEditableFileName: filename,
       uadePlayerTickGrid: true,
+      ...(tunes ? fileSubsongsField(tunes) : {}),
       uadeVariableLayout: {
         formatId: 'maniacsOfNoise',
         numChannels: grid.voices,
@@ -83,6 +85,14 @@ export function parseManiacsOfNoiseFile(buffer: ArrayBuffer, filename: string): 
           pattern: Math.floor(pl.tick / R), channel: pl.voice, row: pl.tick % R,
           offset: pl.offset, note: pl.note, base: pl.delta,
         })),
+        columnBytes: grid.placements.flatMap(pl => {
+          const at = { pattern: Math.floor(pl.tick / R), channel: pl.voice, row: pl.tick % R };
+          return [
+            ...(pl.instrumentAt >= 0 ? [{ ...at, offset: pl.instrumentAt, fields: ['instrument' as const] }] : []),
+            ...(pl.volumeAt >= 0 ? [{ ...at, offset: pl.volumeAt, fields: ['volume' as const] }] : []),
+            ...(pl.slideNoteAt >= 0 ? [{ ...at, offset: pl.slideNoteAt, fields: ['effTyp' as const, 'eff' as const] }, { ...at, offset: pl.slideLengthAt, fields: ['effTyp2' as const, 'eff2' as const] }] : []),
+          ];
+        }),
       } as UADEVariablePatternLayout,
     };
   }

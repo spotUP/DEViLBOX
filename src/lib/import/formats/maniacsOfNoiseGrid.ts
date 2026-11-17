@@ -17,18 +17,26 @@
  * Layers (docs/FORMAT_COMMAND_STREAM_GRID.md): blockRows carry every sequence and pattern a voice reaches byte-exact,
  * one carrier cell per byte (cutoff = 1, period = byte). The display grid is one row per interrupt tick of subsong 1.
  * A stored note byte is played by every repeat that reaches it: `placements`.
+ *
+ * Columns (each is the argument byte of the command in force when the note starts, so every note that command reaches
+ * shows, and an edit writes, the same byte): instrument column = Instrument argument + 1; volume column = Volume
+ * argument + 0x10 (0..64 only); effect 1 (3xx) = the Slide start-note byte and effect 2 (4xx) = the Slide length byte,
+ * on the one note a Slide precedes. Note lengths change the tick count (the rows move), so they are not a column.
+ * Subsongs: `subsong` picks the song record; the count is the module's subsongCount byte.
  */
 import type { Pattern, TrackerCell } from '@/types';
 import { cellFieldsEqual } from '@/engine/uade/UADEPatternEncoder';
 import { periodToNote } from '@/lib/amiga/periodNotes';
 
 export const MANIACS_OF_NOISE_ROWS_PER_PATTERN = 64;
+export const MON_VOLUME_BASE = 0x10;
+export const MON_SLIDE_NOTE_EFFECT = 0x03;
+export const MON_SLIDE_LENGTH_EFFECT = 0x04;
 const MAX_TICKS = 30000;
 const COMMAND_GUARD = 4096;
 const VOICES = 4;
 const INSTRUMENT_BYTES = 64;
 const MAX_SUBSONGS = 0x7f;
-const SUBSONG = 0;
 const MASK_ADDRESS = 0xc;
 const FNV_SEED = 0xcbf29ce484222325n;
 const FNV_PRIME = 0x100000001b3n;
@@ -144,6 +152,12 @@ export interface ManiacsOfNoisePlacement {
   instrument: number;
   transpose: number;
   tuning: number;
+  /** File offset of the Instrument argument in force (-1 = the voice's default instrument). */
+  instrumentAt: number;
+  /** Volume argument in force: its offset (-1 = none yet) and value. */
+  volumeAt: number; volume: number;
+  /** The Slide before this note: offsets and values of its start-note and length bytes (-1 = no slide). */
+  slideNoteAt: number; slideNote: number; slideLengthAt: number; slideLength: number;
 }
 
 export interface ManiacsOfNoiseGrid {
@@ -188,17 +202,19 @@ function patternEnd(b: Uint8Array, version: Version, start: number): number {
 interface Voice {
   running: boolean; track: number; sequence: number; pattern: number; patternStart: number;
   repeat: number; transpose: number; ticksLeft: number; restart: boolean; instrument: number; instrumentNumber: number; swing: number;
+  instrumentAt: number; volumeAt: number; volume: number; slideAt: number;
 }
 
-/** Build the grid of a Maniacs of Noise module (subsong 1); null when it is not one. */
-export function buildManiacsOfNoiseGrid(buf: Uint8Array, sourceFile: string): ManiacsOfNoiseGrid | null {
+/** Build the grid of a Maniacs of Noise module (`subsong`, 0-based); null when it is not one. */
+export function buildManiacsOfNoiseGrid(buf: Uint8Array, sourceFile: string, subsong = 0): ManiacsOfNoiseGrid | null {
   const m = detectManiacsOfNoise(buf);
   if (!m) return null;
   const { version, stride } = m.layout;
   const old = isOld(version);
   const u8 = (o: number): number => (o >= 0 && o < buf.length ? buf[o] : 0);
   const songAt = (offset: number): number => m.songs + s16(offset);
-  const record = m.songs + SUBSONG * stride;
+  if (subsong < 0 || subsong >= m.subsongCount) return null;
+  const record = m.songs + subsong * stride;
   const tracks = Array.from({ length: VOICES }, (_, i) => be16(buf, record + i * 2));
   let tempo = u8(record + 10);
 
@@ -231,6 +247,7 @@ export function buildManiacsOfNoiseGrid(buf: Uint8Array, sourceFile: string): Ma
   const voices: Voice[] = tracks.map(t => ({
     running: t !== 0, track: t !== 0 ? songAt(t) : 0, sequence: t !== 0 ? songAt(t) : 0, pattern: 0, patternStart: 0,
     repeat: 1, transpose: 0, ticksLeft: 0, restart: true, instrument: -1, instrumentNumber: 0, swing: 0,
+    instrumentAt: -1, volumeAt: -1, volume: 0, slideAt: -1,
   }));
   let instrumentRegister = -1;
   let playing = true;
@@ -274,6 +291,25 @@ export function buildManiacsOfNoiseGrid(buf: Uint8Array, sourceFile: string): Ma
     return false;
   };
 
+  const place = (vi: number, v: Voice, tick: number, offset: number, ins: number): void => {
+    const note = gridNote(buf, m, u8(offset), v.transpose, ins);
+    if (note <= 0) return;
+    const cell: TrackerCell = { ...emptyCell(), note, instrument: v.instrumentNumber + 1 };
+    if (v.volumeAt >= 0 && v.volume <= 0x40) cell.volume = MON_VOLUME_BASE + v.volume;
+    const slide = v.slideAt;
+    if (slide >= 0) {
+      cell.effTyp = MON_SLIDE_NOTE_EFFECT; cell.eff = u8(slide);
+      cell.effTyp2 = MON_SLIDE_LENGTH_EFFECT; cell.eff2 = u8(slide + 1);
+      v.slideAt = -1;
+    }
+    timelines[vi][tick] = cell;
+    placements.push({
+      voice: vi, tick, offset, note, delta: note - u8(offset), instrument: v.instrumentNumber + 1, transpose: v.transpose, tuning: ins,
+      instrumentAt: v.instrumentAt, volumeAt: v.volumeAt, volume: v.volume,
+      slideNoteAt: slide, slideNote: slide >= 0 ? u8(slide) : 0, slideLengthAt: slide >= 0 ? slide + 1 : -1, slideLength: slide >= 0 ? u8(slide + 1) : 0,
+    });
+  };
+
   const readPattern = (vi: number, v: Voice, tick: number): boolean => {
     let ins = tuningOf(instrumentRegister);
     let at = v.pattern;
@@ -284,11 +320,7 @@ export function buildManiacsOfNoiseGrid(buf: Uint8Array, sourceFile: string): Ma
       switch (cmd) {
         case 'Note': {
           const length = u8(at++);
-          const note = gridNote(buf, m, byte, v.transpose, ins);
-          if (note > 0) {
-            timelines[vi][tick] = { ...emptyCell(), note, instrument: v.instrumentNumber + 1 };
-            placements.push({ voice: vi, tick, offset: at0, note, delta: note - byte, instrument: v.instrumentNumber + 1, transpose: v.transpose, tuning: ins });
-          }
+          place(vi, v, tick, at0, ins);
           v.ticksLeft = lengthTicks(v, length);
           v.pattern = at;
           return true;
@@ -298,6 +330,7 @@ export function buildManiacsOfNoiseGrid(buf: Uint8Array, sourceFile: string): Ma
           at = v.pattern;
           break;
         case 'Instrument': {
+          v.instrumentAt = at;
           const n = u8(at++);
           v.instrumentNumber = n; maxInstrument = Math.max(maxInstrument, n + 1);
           v.instrument = m.instruments + n * INSTRUMENT_BYTES;
@@ -305,14 +338,10 @@ export function buildManiacsOfNoiseGrid(buf: Uint8Array, sourceFile: string): Ma
           ins = tuningOf(instrumentRegister);
           break;
         }
-        case 'Volume': at += 1; break;
-        case 'Slide': at += 2; break;
+        case 'Volume': v.volumeAt = at; v.volume = u8(at); at += 1; break;
+        case 'Slide': v.slideAt = at; at += 2; break;
         case 'SlideNote': {
-          const note = gridNote(buf, m, u8(at), v.transpose, ins);
-          if (note > 0) {
-            timelines[vi][tick] = { ...emptyCell(), note, instrument: v.instrumentNumber + 1 };
-            placements.push({ voice: vi, tick, offset: at, note, delta: note - u8(at), instrument: v.instrumentNumber + 1, transpose: v.transpose, tuning: ins });
-          }
+          place(vi, v, tick, at, ins);
           v.ticksLeft = lengthTicks(v, u8(at + 2));
           at += 3;
           v.pattern = at;
@@ -384,16 +413,23 @@ export function buildManiacsOfNoiseGrid(buf: Uint8Array, sourceFile: string): Ma
   return { patterns, voices: VOICES, filePatternAddrs: addrs, filePatternSizes: sizes, trackMap, blockRows, placements, ticks, module: m, instrumentCount: maxInstrument };
 }
 
+/** Subsongs the module holds (its subsongCount byte); 0 when it is not a Maniacs of Noise module. */
+export const maniacsOfNoiseSubsongCount = (b: Uint8Array): number => detectManiacsOfNoise(b)?.subsongCount ?? 0;
+
+/** A subsong sounds when its walked grid has a note. */
+export const maniacsOfNoiseSubsongAudible = (b: Uint8Array, subsong: number): boolean =>
+  (buildManiacsOfNoiseGrid(b, '', subsong)?.placements.length ?? 0) > 0;
+
 export interface ManiacsOfNoiseEditResult { data: Uint8Array; patched: number; warnings: string[] }
 
 /**
  * Write the grid's note edits into the module. A changed note cell becomes the stored note byte whose period (with the
  * placement's transpose and instrument tuning) reads as that grid note, nearest to the current byte; the edit is made
  * in place, so an unedited export is byte-identical. Placements that play one byte must agree, else the byte is left
- * and a warning returned. Instruments and lengths are not written.
+ * and a warning returned. Instrument, volume and slide columns are written to their command argument bytes; lengths are not.
  */
-export function applyManiacsOfNoiseGridEdits(source: Uint8Array, edited: Pattern[]): ManiacsOfNoiseEditResult {
-  const base = buildManiacsOfNoiseGrid(source, '');
+export function applyManiacsOfNoiseGridEdits(source: Uint8Array, edited: Pattern[], subsong = 0): ManiacsOfNoiseEditResult {
+  const base = buildManiacsOfNoiseGrid(source, '', subsong);
   const out = new Uint8Array(source);
   const warnings: string[] = [];
   if (!base) return { data: out, patched: 0, warnings: ['the module is not a Maniacs of Noise module'] };
@@ -427,8 +463,23 @@ export function applyManiacsOfNoiseGridEdits(source: Uint8Array, edited: Pattern
       if (byte >= 0) { w.bytes.add(byte); w.edited = true; }
       else { warnings.push(`voice ${pl.voice + 1} tick ${pl.tick}: note ${want} has no stored byte for this instrument or removes the note; not written`); w.bytes.add(current); }
     }
-    if ((cell.instrument ?? 0) !== pl.instrument) {
-      warnings.push(`voice ${pl.voice + 1} tick ${pl.tick}: the instrument comes from an Instrument command shared by other notes; not written`);
+    const where = `voice ${pl.voice + 1} tick ${pl.tick}`;
+    // A column is the argument byte of the command in force; cells sharing the byte must agree (the editor moves them together).
+    const column = (offset: number, shown: number, want: number, byte: number | null, what: string): void => {
+      if (offset < 0 || want === shown) { if (offset >= 0) slot(offset).bytes.add(source[offset]); return; }
+      if (byte === null) { warnings.push(`${where}: ${what} cannot be stored in this command; not written`); if (offset >= 0) slot(offset).bytes.add(source[offset]); return; }
+      const t = slot(offset); t.bytes.add(byte); t.edited = true;
+    };
+    const ins = cell.instrument ?? 0;
+    column(pl.instrumentAt, pl.instrument, ins, ins >= 1 && ins <= 256 ? ins - 1 : null, 'the instrument');
+    const vol = cell.volume ?? 0;
+    const shownVol = pl.volumeAt >= 0 && pl.volume <= 0x40 ? MON_VOLUME_BASE + pl.volume : 0;
+    column(pl.volumeAt, shownVol, vol, vol >= MON_VOLUME_BASE && vol <= MON_VOLUME_BASE + 0xff ? vol - MON_VOLUME_BASE : null, 'the volume');
+    if (pl.slideNoteAt >= 0) {
+      column(pl.slideNoteAt, pl.slideNote, cell.eff ?? 0, (cell.effTyp ?? 0) === MON_SLIDE_NOTE_EFFECT ? cell.eff ?? 0 : null, 'the slide note');
+      column(pl.slideLengthAt, pl.slideLength, cell.eff2 ?? 0, (cell.effTyp2 ?? 0) === MON_SLIDE_LENGTH_EFFECT ? cell.eff2 ?? 0 : null, 'the slide length');
+    } else if ((cell.effTyp ?? 0) !== 0 || (cell.effTyp2 ?? 0) !== 0) {
+      warnings.push(`${where}: no Slide command precedes this note; the effect is not written`);
     }
   }
   let patched = 0;

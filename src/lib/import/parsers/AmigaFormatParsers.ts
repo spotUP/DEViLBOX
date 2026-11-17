@@ -2830,8 +2830,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['mon']) && !matchesExt(filename, ['mon_old'])) {
     const monCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['mon']) };
     const { isManiacsOfNoiseFormat, parseManiacsOfNoiseFile } = await import('@lib/import/formats/ManiacsOfNoiseParser');
+    const monTunes = isManiacsOfNoiseFormat(buffer, filename)
+      ? await chooseFileSubsong(fileSubsongFormatByKey('maniacsOfNoise')!, buffer, originalFileName, requestedSubsong)
+      : undefined;
     return withNativeThenUADE('maniacsOfNoise', monCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => parseManiacsOfNoiseFile(buf as ArrayBuffer, name),
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseManiacsOfNoiseFile(buf as ArrayBuffer, name, monTunes),
       'ManiacsOfNoiseParser', { isFormat: (b: Uint8Array) => isManiacsOfNoiseFormat(b, filename), injectUADE: true });
   }
 

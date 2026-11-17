@@ -8,7 +8,9 @@ import { resolve } from 'path';
 import { parseManiacsOfNoiseFile } from '../ManiacsOfNoiseParser';
 import { exportManiacsOfNoise } from '@/lib/export/ManiacsOfNoiseExporter';
 import { encodeVariableBlock } from '@/engine/uade/UADEPatternEncoder';
-import { buildManiacsOfNoiseGrid, detectManiacsOfNoise, MANIACS_OF_NOISE_ROWS_PER_PATTERN } from '../maniacsOfNoiseGrid';
+import { buildManiacsOfNoiseGrid, detectManiacsOfNoise, maniacsOfNoiseSubsongCount, MANIACS_OF_NOISE_ROWS_PER_PATTERN, MON_SLIDE_LENGTH_EFFECT, MON_SLIDE_NOTE_EFFECT, MON_VOLUME_BASE } from '../maniacsOfNoiseGrid';
+import type { TrackerCell } from '@/types';
+import { sharedCellEdits } from '@/lib/song/sharedCellEdits';
 import { periodToNote } from '@/lib/amiga/periodNotes';
 
 const ROOT = resolve(__dirname, '../../../../../public/data/songs');
@@ -97,5 +99,65 @@ describe.each(FIXTURES)('Maniacs of Noise grid: $name', ({ name, path }) => {
     const out = await exportManiacsOfNoise(song);
     expect(out.warnings.length).toBe(1);
     expect(Array.from(out.data)).toEqual(Array.from(raw));
+  });
+
+  // Every column: change the cell(s) that share one command byte, export, read the module again.
+  describe.each([
+    ['instrument', (g: ReturnType<typeof buildManiacsOfNoiseGrid>) => g!.placements.filter(p => p.instrumentAt >= 0), 'instrumentAt',
+      (c: TrackerCell) => { c.instrument = 7; }, (c: TrackerCell) => c.instrument, 7],
+    ['volume', (g: ReturnType<typeof buildManiacsOfNoiseGrid>) => g!.placements.filter(p => p.volumeAt >= 0 && p.volume < 0x30), 'volumeAt',
+      (c: TrackerCell) => { c.volume = MON_VOLUME_BASE + 0x2a; }, (c: TrackerCell) => c.volume, MON_VOLUME_BASE + 0x2a],
+    ['slide note', (g: ReturnType<typeof buildManiacsOfNoiseGrid>) => g!.placements.filter(p => p.slideNoteAt >= 0), 'slideNoteAt',
+      (c: TrackerCell) => { c.eff = 0x21; }, (c: TrackerCell) => c.eff, 0x21],
+    ['slide length', (g: ReturnType<typeof buildManiacsOfNoiseGrid>) => g!.placements.filter(p => p.slideNoteAt >= 0), 'slideLengthAt',
+      (c: TrackerCell) => { c.eff2 = 0x15; }, (c: TrackerCell) => c.eff2, 0x15],
+  ] as const)('%s column', (column, pick, atKey, edit, read, expected) => {
+    it('writes one command byte and reads back on every note that command reaches', async () => {
+      const { raw, song } = load(path, name);
+      const grid = buildManiacsOfNoiseGrid(raw, name)!;
+      const pls = pick(grid);
+      if (pls.length === 0) return; // this fixture has no such command
+      const at = pls[0][atKey as 'instrumentAt'];
+      const same = pls.filter(p => p[atKey as 'instrumentAt'] === at);
+      const cells = same.map(pl => song.patterns[Math.floor(pl.tick / MANIACS_OF_NOISE_ROWS_PER_PATTERN)].channels[pl.voice].rows[pl.tick % MANIACS_OF_NOISE_ROWS_PER_PATTERN]);
+      cells.forEach(edit);
+      const out = await exportManiacsOfNoise(song);
+      expect(out.warnings, column).toEqual([]);
+      const diff: number[] = [];
+      out.data.forEach((b, i) => { if (b !== raw[i]) diff.push(i); });
+      expect(diff).toEqual([at]);
+      const again = buildManiacsOfNoiseGrid(out.data, name)!;
+      for (const pl of same) {
+        const cell = again.patterns[Math.floor(pl.tick / MANIACS_OF_NOISE_ROWS_PER_PATTERN)].channels[pl.voice].rows[pl.tick % MANIACS_OF_NOISE_ROWS_PER_PATTERN];
+        expect(read(cell)).toBe(expected);
+      }
+      if (column.startsWith('slide')) expect(cells[0].effTyp).toBe(column === 'slide note' ? MON_SLIDE_NOTE_EFFECT : cells[0].effTyp);
+      void MON_SLIDE_LENGTH_EFFECT;
+    });
+  });
+
+  it('a shared command byte edit in one cell is carried to the other cells that show it', () => {
+    const { raw, song } = load(path, name);
+    const layout = song.uadeVariableLayout!;
+    const groups = new Map<number, number>();
+    for (const c of layout.columnBytes ?? []) if (c.fields[0] === 'instrument') groups.set(c.offset, (groups.get(c.offset) ?? 0) + 1);
+    const shared = [...groups].find(([, n]) => n > 1);
+    expect(shared).toBeDefined();
+    const members = layout.columnBytes!.filter(c => c.offset === shared![0] && c.fields[0] === 'instrument');
+    const first = members[0];
+    const before = structuredClone(song.patterns[first.pattern]);
+    song.patterns[first.pattern].channels[first.channel].rows[first.row].instrument = 9;
+    const edits = sharedCellEdits(layout, first.pattern, before, song.patterns[first.pattern], song.patterns);
+    expect(edits.length).toBeGreaterThan(0);
+    expect(edits.every(e => e.values.instrument === 9)).toBe(true);
+    void raw;
+  });
+
+  it('subsongs: the count is the module byte and every subsong builds its own grid', () => {
+    const { raw } = load(path, name);
+    const n = maniacsOfNoiseSubsongCount(raw);
+    expect(n).toBeGreaterThanOrEqual(1);
+    for (let s = 0; s < Math.min(n, 3); s++) expect(buildManiacsOfNoiseGrid(raw, name, s)).not.toBeNull();
+    expect(buildManiacsOfNoiseGrid(raw, name, n)).toBeNull();
   });
 });

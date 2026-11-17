@@ -114,10 +114,42 @@ function sharedNoteEdits(layout: UADEVariablePatternLayout, patternIndex: number
       }
     }
   }));
+  // Other columns: cells sharing a stored argument byte (columnBytes) carry the changed fields to each other.
+  const colGroups = new Map<string, Array<{ pattern: number; channel: number; row: number }>>();
+  const colKey = new Map<string, string>();
+  for (const c of layout.columnBytes ?? []) {
+    const key = `${c.offset}:${c.fields.join()}`;
+    const list = colGroups.get(key) ?? [];
+    list.push(c);
+    colGroups.set(key, list);
+    colKey.set(`${c.pattern}:${c.channel}:${c.row}:${c.fields.join()}`, key);
+  }
+  const changed = new Set<keyof TrackerCell>();
+  after.channels.forEach((ch, channel) => ch.rows.forEach((cell, row) => {
+    const old = before.channels[channel]?.rows[row];
+    if (!old) return;
+    for (const c of layout.columnBytes ?? []) {
+      if (c.pattern !== patternIndex || c.channel !== channel || c.row !== row) continue;
+      if (c.fields.every((f) => cell[f] === old[f])) continue;
+      for (const a of colGroups.get(colKey.get(`${patternIndex}:${channel}:${row}:${c.fields.join()}`) ?? '') ?? []) {
+        if (a.pattern === patternIndex && a.channel === channel && a.row === row) continue;
+        const k = `${a.pattern}:${a.channel}:${a.row}`;
+        let w = work.get(k);
+        if (!w) {
+          const src = patterns[a.pattern]?.channels[a.channel]?.rows[a.row];
+          if (!src) continue;
+          w = { pattern: a.pattern, row: a.row, channel: a.channel, cell: structuredClone(src) };
+          work.set(k, w);
+        }
+        for (const f of c.fields) { (w.cell as unknown as Record<string, unknown>)[f] = cell[f]; changed.add(f); }
+      }
+    }
+  }));
   const out: SharedCellEdit[] = [];
   for (const w of work.values()) {
     const src = patterns[w.pattern].channels[w.channel].rows[w.row];
     const values: Partial<TrackerCell> = {};
+    for (const f of changed) if (w.cell[f] !== src[f]) (values as Record<string, unknown>)[f] = w.cell[f];
     if (w.cell.note !== src.note) values.note = w.cell.note;
     if (JSON.stringify(w.cell.extraNotes) !== JSON.stringify(src.extraNotes)) Object.assign(values, columnPatch(w.cell, 1, {}));
     if (Object.keys(values).length > 0) out.push({ pattern: w.pattern, row: w.row, channel: w.channel, values });

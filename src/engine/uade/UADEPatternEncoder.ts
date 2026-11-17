@@ -322,6 +322,12 @@ export interface UADEVariablePatternLayout {
   propagateSharedCells?: boolean;
 
   /**
+   * With noteBytes + propagateSharedCells: the other columns a stored byte shows. Cells with one `offset` and `fields` share that
+   * byte, so an edit of those fields in one is carried to the others (sharedCellEdits.ts).
+   */
+  columnBytes?: Array<{ pattern: number; channel: number; row: number; offset: number; fields: Array<'instrument' | 'volume' | 'effTyp' | 'eff' | 'effTyp2' | 'eff2'> }>;
+
+  /**
    * SidMon II: rows a command holds (a speed byte after a note, or a standalone rest). A note on a held row splits the hold in
    * two: the speed byte at `at` is cut to the rows before it and a new note command is inserted behind it (the pattern stream
    * grows; `stream` says where the pointer table and the stream live so they can be moved).

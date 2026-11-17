@@ -16,7 +16,7 @@ export interface ManiacsOfNoiseExportResult {
 export async function exportManiacsOfNoise(song: TrackerSong): Promise<ManiacsOfNoiseExportResult> {
   const src = song.uadeEditableFileData;
   if (!src) throw new Error('Maniacs of Noise export needs the module the song was loaded from');
-  const res = applyManiacsOfNoiseGridEdits(new Uint8Array(src), song.patterns);
+  const res = applyManiacsOfNoiseGridEdits(new Uint8Array(src), song.patterns, song.fileSubsongs?.current ?? 0);
   const name = (song.uadeEditableFileName ?? 'module.mon').split('/').pop() ?? 'module.mon';
   return { data: res.data, filename: name, warnings: res.warnings };
 }
