@@ -59,11 +59,11 @@ sLogo:  ; DEViLBOX wordmark for vlist: dy, dx, beam ($FF line, 0 move); at scale
         fcb 32,24,0
         fcb -72,24,$FF
         fcb 72,24,$FF
-        fcb -72,40,0
+        fcb -72,16,0    ; V to i: 16 like the other letter gaps (was 40)
         fcb 48,0,$FF
         fcb 16,0,0
         fcb 8,0,$FF
-        fcb 0,40,0
+        fcb 0,16,0      ; i to L: 16 (was 40)
         fcb -72,0,$FF
         fcb 0,48,$FF
         fcb 0,16,0
@@ -78,7 +78,7 @@ sLogo:  ; DEViLBOX wordmark for vlist: dy, dx, beam ($FF line, 0 move); at scale
         fcb -16,0,$FF
         fcb -16,-16,$FF
         fcb 0,-32,$FF
-        fcb 0,80,0
+        fcb 0,88,0      ; B to O: 8 wider than the 16 gap, round O reads tight against B
         fcb 0,16,$FF
         fcb 16,16,$FF
         fcb 40,0,$FF
