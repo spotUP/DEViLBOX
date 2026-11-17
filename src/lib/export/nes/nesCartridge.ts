@@ -39,7 +39,7 @@ export interface NesPlayer {
   maxStreamBanks: number;
 }
 
-export async function fetchNesPlayer(name: 'player' | 'player24' | 'player26' | 'player69' = 'player'): Promise<NesPlayer> {
+export async function fetchNesPlayer(name: 'player' | 'player24' | 'player26' | 'player69' | 'player19' = 'player'): Promise<NesPlayer> {
   const base = import.meta.env.BASE_URL;
   const [bin, meta] = await Promise.all([
     fetch(`${base}nes/${name}.bin`).then((r) => r.arrayBuffer()),
@@ -103,14 +103,15 @@ export function buildNesCartridge(subsongs: readonly NesSubsongInput[], player: 
 }
 
 /** Original boards that carry 2A03 plus one expansion chip, each with its own player build (player<mapper>.bin, `-D` define in player.s). maxBanks = stream banks the mapper's PRG registers address (one 8 KB bank is the fixed player). */
-export type NesBoard = 'vrc6' | 'fme7';
+export type NesBoard = 'vrc6' | 'fme7' | 'n163';
 const BOARDS: Record<NesBoard, { chip: string; label: string; maxBanks: number }> = {
   vrc6: { chip: 'vrc6', label: 'VRC6', maxBanks: 255 },
   fme7: { chip: 's5b', label: 'Sunsoft 5B', maxBanks: 63 },
+  n163: { chip: 'n163', label: 'Namco 163', maxBanks: 63 },
 };
 
 /**
- * Original cartridge (VRC6 iNES mapper 24/26, Sunsoft 5B mapper 69; player build per board). Stream banks are 8 KB: the player shows the current stream bank at $C000
+ * Original cartridge (VRC6 iNES mapper 24/26, Sunsoft 5B mapper 69, Namco 163 mapper 19; player build per board). Stream banks are 8 KB: the player shows the current stream bank at $C000
  * and the subsong's first bank (dictionary, region table) at $8000 (VRC6: through its 16 KB select); the last 8 KB ($E000, player code)
  * is fixed. Region streams start on an even bank so the table sits at the start of a 16 KB bank. No DPCM bank switching ($C000-$DFFF is the stream
  * window) and no cycle-IRQ tick (the board IRQ is custom): the builder refuses such songs. Only 2A03 and the board's chip writes are allowed.

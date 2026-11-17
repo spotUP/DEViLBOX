@@ -46,3 +46,12 @@ describe.skipIf(!existsSync(join(DIR, 'player69.bin')))('Sunsoft 5B cartridge (m
     expect(() => buildBoardCartridge('fme7', [{ ntsc: song('vrc6', 10) }], p)).toThrow(/2A03 and Sunsoft 5B only/);
   });
 });
+
+describe.skipIf(!existsSync(join(DIR, 'player19.bin')))('Namco 163 cartridge (mapper 19)', () => {
+  it('emits a mapper-19 image and refuses other chips; the Mesen2 bus check is `tools/nes-rom-check.ts --target n163cart`', () => {
+    const p: NesPlayer = { ...JSON.parse(readFileSync(join(DIR, 'player19.json'), 'utf8')), bytes: Uint8Array.from(readFileSync(join(DIR, 'player19.bin'))) };
+    const { rom } = buildBoardCartridge('n163', [{ ntsc: cap(Array.from({ length: 1500 }, (_, t) => [w(t, 'nes', 0x4002, t & 255), w(t, 'n163', 0x78, t & 255)]).flat()) }], p, 'n163 test');
+    expect(((rom[7] & 0xf0) | (rom[6] >> 4))).toBe(19);
+    expect(() => buildBoardCartridge('n163', [{ ntsc: song('vrc6', 10) }], p)).toThrow(/2A03 and Namco 163 only/);
+  });
+});

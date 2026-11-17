@@ -38,6 +38,10 @@ const SONGS: Record<string, () => NesCapture> = {
   'synthetic-5b': () => cap(Array.from({ length: 1500 }, (_, t) => [
     w(t, 'nes', 0x4002, (t * 7) & 0xff), w(t, 'nes', 0x4003, 0x08 | (t & 7)), w(t, 's5b', 0x00, (t * 13) & 0xff), w(t, 's5b', 0x01, (t * 5) & 0x0f), w(t, 's5b', 0x08, (t * 3) & 0x0f), w(t, 's5b', 0x07, (t * 29) & 0x3f),
   ]).flat()),
+  // 2A03 + Namco 163 only: address port writes (autoincrement bit set by the bus mapping) and data writes over 1500 ticks.
+  'synthetic-n163': () => cap(Array.from({ length: 1500 }, (_, t) => [
+    w(t, 'nes', 0x4002, (t * 7) & 0xff), w(t, 'nes', 0x4003, 0x08 | (t & 7)), w(t, 'n163', 0x78 + (t & 7), (t * 3) & 0xff), w(t, 'n163', 0x40, (t * 5) & 0xff), w(t, 'n163', 0x7f, 0x70 | (t & 15)),
+  ]).flat()),
   // The Phase 11 capture: two pulse notes and a volume change.
   'synthetic-2a03': () => cap([w(0, 'nes', 0x4015, 0x0f), w(0, 'nes', 0x4000, 0xbf), w(0, 'nes', 0x4002, 0xa9), w(0, 'nes', 0x4003, 0x01), w(3, 'nes', 0x4000, 0x9f)]),
   // 2A03 + VRC6 + FDS + MMC5 (real bus addresses) over 40 ticks with changing values.
@@ -59,6 +63,7 @@ const CARTS: Record<string, { board: NesBoard; player: string; ranges: Array<[nu
   vrc6cart: { board: 'vrc6', player: 'player24', ranges: VRC6_RANGES, chipName: 'VRC6' },
   vrc6bcart: { board: 'vrc6', player: 'player26', ranges: VRC6_RANGES, chipName: 'VRC6' },
   fme7cart: { board: 'fme7', player: 'player69', ranges: [[0x4000, 0x4013], [0x4015, 0x4015], [0x4017, 0x4017], [0xc000, 0xc000], [0xe000, 0xe000]], chipName: '5B' },
+  n163cart: { board: 'n163', player: 'player19', ranges: [[0x4000, 0x4013], [0x4015, 0x4015], [0x4017, 0x4017], [0x4800, 0x4800], [0xf800, 0xf800]], chipName: 'N163' },
 };
 const playerName = (target: string) => CARTS[target]?.player ?? 'player';
 const hashOf = (song: string, target: string) => createHash('sha1').update(JSON.stringify(SONGS[song]())).update(target).update(readFileSync(path.join(ROOT, `public/nes/${playerName(target)}.bin`))).digest('hex').slice(0, 12);

@@ -5,7 +5,7 @@ import { nesCaptureFromBatches, type NesCapture } from './nesCapture';
 import { fetchNesPlayer, buildBoardCartridge } from './nesCartridge';
 import { buildNsfe } from './nsfe';
 import { NES_REGIONS, type NesRegion, type NesSubsongInput } from './nesStream';
-import { buildNesRom, isSunsoft, nesChipsOf, wantsFme7Cartridge, wantsVrc6Cartridge, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
+import { buildNesRom, isSunsoft, nesChipsOf, wantsFme7Cartridge, wantsN163Cartridge, wantsVrc6Cartridge, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
 import { switchSubsong } from '../../tracker/subsongSwitch';
 import { orderPassLength } from '../vectrex/vectrexCapture';
 
@@ -96,6 +96,14 @@ export async function recordNesRom(choice: NesRegionChoice, title: string, autho
       return { ...v, warnings: ['Built the original Sunsoft 5B cartridge (mapper 69).'], tickRateHz: first.tickRateHz };
     } catch (e) {
       warnings.push(`Built the custom cartridge (mapper 31), not the original Sunsoft 5B board: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  if (wantsN163Cartridge(chips)) {
+    try {
+      const v = buildBoardCartridge('n163', subsongs, await fetchNesPlayer('player19'), title, { author, comments, chipName: 'N163' });
+      return { ...v, warnings: ['Built the original Namco 163 cartridge (mapper 19).'], tickRateHz: first.tickRateHz };
+    } catch (e) {
+      warnings.push(`Built the custom cartridge (mapper 31), not the original Namco 163 board: ${e instanceof Error ? e.message : e}`);
     }
   }
   const rom = buildNesRom(subsongs, await fetchNesPlayer(), info);

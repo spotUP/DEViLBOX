@@ -73,6 +73,11 @@ export function wantsFme7Cartridge(chips: readonly string[]): boolean {
   return chips.includes('s5b') && chips.every((c) => c === 'nes' || c === 's5b');
 }
 
+/** The original Namco 163 board (mapper 19) carries 2A03 + N163 only. */
+export function wantsN163Cartridge(chips: readonly string[]): boolean {
+  return chips.includes('n163') && chips.every((c) => c === 'nes' || c === 'n163');
+}
+
 /** The original VRC6 board carries 2A03 + VRC6 only; any song with a VRC6 and no other expansion chip may try it. */
 export function wantsVrc6Cartridge(chips: readonly string[]): boolean {
   return chips.includes('vrc6') && chips.every((c) => c === 'nes' || c === 'vrc6');
