@@ -496,7 +496,25 @@ export const scaleValuesHelper = (p: Pattern, sel: BlockSelection, c: ValueColum
 export const transposeValuesHelper = (p: Pattern, sel: BlockSelection, c: ValueColumn, amount: number, n: NibbleMode = 'both'): void =>
   mapColumnValues(p, sel, c, n, (v) => v + amount);
 
-/** Deterministic through the injected rng so tests can fix it. */
+/**
+ * Deterministic through the injected rng so tests can fix it.
+ * setEffect (effect columns only): also writes that effect type, filling empty cells (Furnace "set effect").
+ */
 export const randomizeValuesHelper = (
   p: Pattern, sel: BlockSelection, c: ValueColumn, min: number, max: number, n: NibbleMode = 'both', rng: () => number = Math.random,
-): void => mapColumnValues(p, sel, c, n, () => min + Math.floor(rng() * (max - min + 1)));
+  setEffect: number | null = null,
+): void => {
+  const pick = () => min + Math.floor(rng() * (max - min + 1));
+  const typ = VALUE_FIELD[c].typ;
+  if (setEffect === null || !typ) return mapColumnValues(p, sel, c, n, pick);
+  const field = VALUE_FIELD[c].field as 'eff' | 'eff2';
+  for (let ch = Math.min(sel.startChannel, sel.endChannel); ch <= Math.max(sel.startChannel, sel.endChannel); ch++) {
+    for (let r = Math.min(sel.startRow, sel.endRow); r <= Math.max(sel.startRow, sel.endRow); r++) {
+      const cell = p.channels[ch]?.rows[r];
+      if (!cell) continue;
+      const old = cell[field] ?? 0;
+      cell[typ] = setEffect;
+      cell[field] = n === 'both' ? pick() : n === 'high' ? (pick() << 4) | (old & 15) : (old & 0xF0) | pick();
+    }
+  }
+};

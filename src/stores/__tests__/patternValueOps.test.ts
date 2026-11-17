@@ -53,6 +53,25 @@ describe('pattern value operations', () => {
     randomizeValuesHelper(p, sel(), 'volume', 5, 9, 'both', () => 0.999);
     expect(vols(p)).toEqual([9, 9, 0, 9]);
   });
+  it('transposes values down with clamp at zero', () => {
+    const p = pat();
+    transposeValuesHelper(p, sel(), 'volume', -20, 'both');
+    expect(vols(p)).toEqual([0, 12, 0, 44]);
+  });
+  it('set effect writes the type and a random parameter, filling empty cells', () => {
+    const p = pat();
+    randomizeValuesHelper(p, sel(), 'effParam', 3, 3, 'both', () => 0, 0xC);
+    expect(p.channels[0].rows[2].effTyp).toBe(0xC);
+    expect(p.channels[0].rows[2].eff).toBe(3);
+  });
+  it('transposeSelection by free amount moves notes +7', () => {
+    pat();
+    useTrackerStore.getState().setCell(0, 0, { note: 49 });
+    useCursorStore.setState({ selection: sel() });
+    useTrackerStore.getState().transposeSelection(7);
+    const st = useTrackerStore.getState();
+    expect(st.patterns[st.currentPatternIndex].channels[0].rows[0].note).toBe(56);
+  });
   it('effect parameter skips cells with no effect', () => {
     const p = pat();
     p.channels[0].rows[0].effTyp = 0xA; p.channels[0].rows[0].eff = 0x12;

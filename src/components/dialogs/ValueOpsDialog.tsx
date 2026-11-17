@@ -14,7 +14,7 @@ import { Button } from '@components/ui/Button';
 import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 import { CustomSelect } from '@components/common/CustomSelect';
 
-export type ValueOpKind = 'scale' | 'transpose' | 'randomize';
+export type ValueOpKind = 'scale' | 'transpose' | 'transposeNotes' | 'randomize';
 
 interface ValueOpsDialogProps {
   isOpen: boolean;
@@ -38,7 +38,8 @@ const NIBBLE_OPTIONS: { value: NibbleMode; label: string }[] = [
 
 const OP_OPTIONS: { value: ValueOpKind; label: string }[] = [
   { value: 'scale', label: 'Scale by Percent' },
-  { value: 'transpose', label: 'Transpose by Amount' },
+  { value: 'transposeNotes', label: 'Transpose Notes by Semitones' },
+  { value: 'transpose', label: 'Transpose Values by Amount' },
   { value: 'randomize', label: 'Randomize' },
 ];
 
@@ -49,6 +50,7 @@ export const ValueOpsDialog: React.FC<ValueOpsDialogProps> = ({ isOpen, onClose,
   const selection = useCursorStore((s) => s.selection);
   const cursorColumn = useCursorStore((s) => valueColumnOf(s.cursor.columnType));
   const editSelectionValues = useTrackerStore((s) => s.editSelectionValues);
+  const transposeSelection = useTrackerStore((s) => s.transposeSelection);
   const [opChoice, setOpChoice] = useState<{ from: ValueOpKind; op: ValueOpKind }>({ from: initialOp, op: initialOp });
   // Follow the menu entry that opened the dialog without an effect: a new initialOp resets the pick.
   const op = opChoice.from === initialOp ? opChoice.op : initialOp;
@@ -59,12 +61,14 @@ export const ValueOpsDialog: React.FC<ValueOpsDialogProps> = ({ isOpen, onClose,
   const [amount, setAmount] = useState(1);
   const [min, setMin] = useState(0);
   const [max, setMax] = useState(255);
+  const [setEffect, setSetEffect] = useState(-1);
 
   const handleApply = () => {
     if (!selection) return;
-    if (op === 'scale') editSelectionValues({ kind: 'scale', percent }, column, nibble);
+    if (op === 'transposeNotes') transposeSelection(amount);
+    else if (op === 'scale') editSelectionValues({ kind: 'scale', percent }, column, nibble);
     else if (op === 'transpose') editSelectionValues({ kind: 'transpose', amount }, column, nibble);
-    else editSelectionValues({ kind: 'randomize', min: Math.min(min, max), max: Math.max(min, max) }, column, nibble);
+    else editSelectionValues({ kind: 'randomize', min: Math.min(min, max), max: Math.max(min, max), setEffect: setEffect >= 0 ? setEffect : null }, column, nibble);
     onClose();
   };
 
@@ -85,6 +89,7 @@ export const ValueOpsDialog: React.FC<ValueOpsDialogProps> = ({ isOpen, onClose,
           <label className="block text-xs text-text-muted mb-1">Operation</label>
           <CustomSelect value={op} onChange={(v) => setOpChoice({ from: initialOp, op: v as ValueOpKind })} options={OP_OPTIONS} className={SELECT_CLASS} />
         </div>
+        {op !== 'transposeNotes' && <>
         <div>
           <label className="block text-xs text-text-muted mb-1">Column</label>
           <CustomSelect value={column} onChange={(v) => setColumnPick(v as ValueColumn)} options={COLUMN_OPTIONS} className={SELECT_CLASS} />
@@ -93,12 +98,14 @@ export const ValueOpsDialog: React.FC<ValueOpsDialogProps> = ({ isOpen, onClose,
           <label className="block text-xs text-text-muted mb-1">Nibble Mode</label>
           <CustomSelect value={nibble} onChange={(v) => setNibble(v as NibbleMode)} options={NIBBLE_OPTIONS} className={SELECT_CLASS} />
         </div>
+        </>}
         {op === 'scale' && numberField('Percent', percent, setPercent)}
-        {op === 'transpose' && numberField('Amount (negative lowers)', amount, setAmount)}
+        {(op === 'transpose' || op === 'transposeNotes') && numberField(op === 'transposeNotes' ? 'Semitones (negative lowers)' : 'Amount (negative lowers)', amount, setAmount)}
         {op === 'randomize' && (
           <div className="grid grid-cols-2 gap-2">
             {numberField('Minimum', min, setMin)}
             {numberField('Maximum', max, setMax)}
+            {(column === 'effParam' || column === 'effParam2') && numberField('Set Effect Type (-1 keeps existing)', setEffect, setSetEffect)}
           </div>
         )}
         {!selection && <p className="text-xs text-accent-warning">No selection active. Use Alt+Arrow keys to select a region.</p>}

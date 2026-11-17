@@ -615,7 +615,7 @@ interface TrackerStore {
   /** Minimize (true) or maximize (false) every channel of every pattern at once. */
   setAllChannelsCollapsed: (collapsed: boolean) => void;
   /** Value operations on the selection's column; 'invert' = max minus value. */
-  editSelectionValues: (op: { kind: 'invert' } | { kind: 'scale'; percent: number } | { kind: 'transpose'; amount: number } | { kind: 'randomize'; min: number; max: number }, column: ValueColumn, nibble?: NibbleMode) => void;
+  editSelectionValues: (op: { kind: 'invert' } | { kind: 'scale'; percent: number } | { kind: 'transpose'; amount: number } | { kind: 'randomize'; min: number; max: number; setEffect?: number | null }, column: ValueColumn, nibble?: NibbleMode) => void;
   setChannelVolume: (channelIndex: number, volume: number) => void;
   setChannelPan: (channelIndex: number, pan: number) => void;
   setChannelColor: (channelIndex: number, color: string | null) => void;
@@ -1944,7 +1944,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (op.kind === 'invert') invertValuesHelper(pat, selection, column, nibble);
         else if (op.kind === 'scale') scaleValuesHelper(pat, selection, column, op.percent, nibble);
         else if (op.kind === 'transpose') transposeValuesHelper(pat, selection, column, op.amount, nibble);
-        else randomizeValuesHelper(pat, selection, column, op.min, op.max, nibble);
+        else randomizeValuesHelper(pat, selection, column, op.min, op.max, nibble, Math.random, op.setEffect ?? null);
       });
       pushEditAction('AMPLIFY', `${op.kind} ${column}`, currentPatternIndex, beforePattern, get().patterns[currentPatternIndex]);
       syncBulkEdit(currentPatternIndex, get().patterns[currentPatternIndex], beforePattern);
