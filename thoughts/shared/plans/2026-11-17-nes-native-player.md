@@ -170,6 +170,7 @@ Defaults I chose (not owner decisions): raw per-frame register stream like Vectr
 - Flow per song and target: DEViLBOX capture (Phase 1) -> build ROM -> Mesen2 headless with the Lua write-callback log -> normalise both to per-tick (chip, address, value) lists -> diff. PCM events compared in order and count with a stated cycle tolerance. Pass = zero diffs for a 1:1 song.
 - Run subset: only the songs/targets the change touched (rule 6a); a full run only to land.
 - Done-check: harness green on the Phase 9 song for custom cart and NSFe, and each per-chip ROM.
+- RESULT 2026-11-17 (custom cart, synthetic captures only): `tools/nes-rom-check.ts` (resumable, `--only`, `--failed`, results `test-data/nes-rom-check.json`) builds the ROM with `buildNesRom`, logs bus writes through the shared `nesMesenHarness.ts` (now vitest-free and runnable under tsx) and diffs per tick against `nesCaptureToTicks`. `synthetic-multi` (2A03+VRC6+FDS+MMC5, 40 ticks): 240 of 240 writes, 0 diffs. OPEN: no node-side Furnace capture exists (worklet only), so the Phase 9 song, NSFe and per-chip ROMs are NOT covered; no separate `regLog.lua` (the Lua logger is generated inside the shared harness); PCM events not compared.
 
 ## Open risks (unverified in the research docs)
 

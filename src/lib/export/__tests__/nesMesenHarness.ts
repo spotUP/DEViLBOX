@@ -1,12 +1,11 @@
 /** Shared Mesen2 headless runner for the NES player checks (Phase 3 onward). Cycle position is never compared, only (order, address, value) per NMI tick. */
-import { expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export const MESEN = join(homedir(), 'Applications/Mesen.app/Contents/MacOS/Mesen');
-const META = join(__dirname, '../../../../public/nes/player.json');
+const META = join(import.meta.dirname, '../../../../public/nes/player.json');
 
 /** CPU write ranges logged by default: the APU. Chip checks pass the expansion ports as well. */
 export const APU_RANGES: ReadonlyArray<[number, number]> = [[0x4000, 0x4013], [0x4015, 0x4015], [0x4017, 0x4017]]; // $4014 (OAM DMA) and $4016 (joypad strobe) belong to the screen, not the music;
@@ -32,7 +31,7 @@ ${opts.irqBoard ? '' : `emu.addMemoryCallback(function() n=n+1 print(string.form
     mkdirSync(set, { recursive: true });
     if (!existsSync(join(set, 'Settings.json'))) writeFileSync(join(set, 'Settings.json'), '{"FirstRun":false}');
     const out = execFileSync(MESEN, ['--testRunner', `--timeout=${timeout}`, ...(opts.region ? [`--nes.region=${opts.region}`] : []), '--doNotSaveSettings', '--enableStdout', join(dir, 'log.lua'), join(dir, 'p.nes')], { encoding: 'utf8', timeout: timeout * 1000 + 30000, maxBuffer: 1 << 28 });
-    expect(out).toContain('DONE');
+    if (!out.includes('DONE')) throw new Error('Mesen2 run did not reach DONE: ' + out.slice(-300));
     const writes: Array<Array<[number, number]>> = [];
     const window: number[] = [];
     const cycles: number[] = [];

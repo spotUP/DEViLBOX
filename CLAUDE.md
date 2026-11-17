@@ -20,6 +20,7 @@
 | Sync preset banks (clone/pull devilbox-presets into public/data/presets) | `npm run presets:sync` |
 | Format status tracker | `npx tsx tools/format-server.ts &` (serve on :4444) |
 | BossGame .fur opens+plays in Furnace 0.6.8.3 (headless, resumable; `--only <name>`, `--failed`) | `nice -n 19 npx tsx tools/bossgame-furnace-check.ts` -> `test-data/bossgame-furnace-check.json` |
+| NES ROM bus-write check (capture -> buildNesRom -> Mesen2 headless -> per-tick diff; resumable, `--only <name>`, `--failed`) | `nice -n 19 npx tsx tools/nes-rom-check.ts` -> `test-data/nes-rom-check.json` |
 
 **Type-check mandatory after every change.** `npm run type-check` must pass before task done — catch unused vars (TS6133), strict null/undefined, enum syntax `tsc --noEmit` miss. Stricter than global rule; no substitute.
 
