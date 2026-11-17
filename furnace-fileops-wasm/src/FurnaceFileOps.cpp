@@ -10,6 +10,9 @@
 
 #include "engine.h"
 #include <cstring>
+#include <cstdio>
+#include <string>
+#include <vector>
 #include <cstdlib>
 
 // Access private DivEngine members via derived class
@@ -578,4 +581,78 @@ int fur_get_wave_data(int idx, int pos) {
   return w->data[pos];
 }
 
+
+// ============================================================
+// Instrument files (.tfi .vgi .opni .y12 .opli .sbi .wopl .bnk .wopn .s3i .eif .ff .gyb .opm .fti .bti .dmp .fui)
+// Furnace's own DivEngine::instrumentFromFile reads them; results are handed back as .fui bytes.
+// ============================================================
+static std::vector<DivInstrument*> g_insFile;
+
+static void clearInsFile() {
+  for (DivInstrument* i: g_insFile) delete i;
+  g_insFile.clear();
+}
+
+// Returns the number of instruments read (a .bnk/.wopl holds many), or -1 on error.
+int fur_ins_load_file(const uint8_t* data, size_t len, const char* fileName) {
+  ensureInit();
+  clearInsFile();
+  const char* base=strrchr(fileName,'/');
+  base=base?base+1:fileName;
+  std::string path=std::string("/")+base;  // MEMFS root; the extension picks the format
+  FILE* f=fopen(path.c_str(),"wb");
+  if (!f) return -1;
+  fwrite(data,1,len,f);
+  fclose(f);
+  g_insFile=g_engine.instrumentFromFile(path.c_str(),false,true);
+  remove(path.c_str());
+  if (g_insFile.empty()) {
+    snprintf(g_errorBuf,sizeof(g_errorBuf),"%s",g_engine.getError().c_str());
+    return -1;
+  }
+  return (int)g_insFile.size();
+}
+
+const char* fur_ins_get_name(int i) {
+  if (i<0 || i>=(int)g_insFile.size()) return "";
+  return g_insFile[i]->name.c_str();
+}
+
+int fur_ins_get_type(int i) {
+  if (i<0 || i>=(int)g_insFile.size()) return -1;
+  return (int)g_insFile[i]->type;
+}
+
+// .fui bytes of instrument i; NULL buf returns the size.
+int fur_ins_to_fui(int i, uint8_t* buf, size_t bufLen) {
+  if (i<0 || i>=(int)g_insFile.size()) return -1;
+  SafeWriter w;
+  w.init();
+  g_insFile[i]->putInsData2(&w,true,NULL,true);
+  size_t sz=w.size();
+  if (!buf) { w.finish(); return (int)sz; }
+  if (bufLen<sz) { w.finish(); return -1; }
+  memcpy(buf,w.getFinalBuf(),sz);
+  w.finish();
+  return (int)sz;
+}
+
+// .dmp bytes of instrument i via DivInstrument::saveDMP; NULL buf returns the size.
+int fur_ins_to_dmp(int i, uint8_t* buf, size_t bufLen) {
+  if (i<0 || i>=(int)g_insFile.size()) return -1;
+  const char* path="/__ins_out.dmp";
+  if (!g_insFile[i]->saveDMP(path)) return -1;
+  FILE* f=fopen(path,"rb");
+  if (!f) return -1;
+  fseek(f,0,SEEK_END);
+  long sz=ftell(f);
+  fseek(f,0,SEEK_SET);
+  int ret=(int)sz;
+  if (buf) {
+    if ((long)bufLen<sz || fread(buf,1,sz,f)!=(size_t)sz) ret=-1;
+  }
+  fclose(f);
+  remove(path);
+  return ret;
+}
 } // extern "C"

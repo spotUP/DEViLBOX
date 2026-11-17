@@ -89,6 +89,11 @@ interface FurnaceFileOpsAPI {
   fur_get_system_vol(idx: number): number;
   fur_get_system_pan(idx: number): number;
   fur_get_system_pan_fr(idx: number): number;
+  fur_ins_load_file(dataPtr: number, len: number, namePtr: number): number;
+  fur_ins_get_name(i: number): string;
+  fur_ins_get_type(i: number): number;
+  fur_ins_to_fui(i: number, buf: number, bufLen: number): number;
+  fur_ins_to_dmp(i: number, buf: number, bufLen: number): number;
 }
 
 function getAPI(m: WasmModule): FurnaceFileOpsAPI {
@@ -141,6 +146,11 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_get_system_vol: m.cwrap('fur_get_system_vol', 'number', ['number']),
     fur_get_system_pan: m.cwrap('fur_get_system_pan', 'number', ['number']),
     fur_get_system_pan_fr: m.cwrap('fur_get_system_pan_fr', 'number', ['number']),
+    fur_ins_load_file: m.cwrap('fur_ins_load_file', 'number', ['number', 'number', 'number']),
+    fur_ins_get_name: m.cwrap('fur_ins_get_name', 'string', ['number']),
+    fur_ins_get_type: m.cwrap('fur_ins_get_type', 'number', ['number']),
+    fur_ins_to_fui: m.cwrap('fur_ins_to_fui', 'number', ['number', 'number', 'number']),
+    fur_ins_to_dmp: m.cwrap('fur_ins_to_dmp', 'number', ['number', 'number', 'number']),
   };
 }
 
@@ -552,4 +562,54 @@ export async function saveFurFileWasm(): Promise<ArrayBuffer> {
   const result = new Uint8Array(m.HEAPU8.buffer, bufPtr, len).slice(); // Copy out
   api.fur_free_buffer(bufPtr);
   return result.buffer;
+}
+
+/** One instrument read by Furnace's own instrumentFromFile, as the bytes the editor opens or saves. */
+export interface FurnaceInstrumentFile {
+  name: string;
+  /** DivInstrumentType of the instrument. */
+  type: number;
+  /** .fui bytes (DivInstrument::putInsData2), which FurnaceParser.parse reads. */
+  fui: Uint8Array;
+  /** .dmp bytes (DivInstrument::saveDMP); null when the instrument type has no .dmp form. */
+  dmp: Uint8Array | null;
+}
+
+/**
+ * Read an instrument file of any format Furnace's instrument loader knows (.fui .dmp .tfi .vgi .opni .y12
+ * .opli .sbi .wopl .bnk .wopn .s3i .eif .ff .gyb .opm .fti .bti). The extension of fileName picks the format;
+ * a bank file returns several instruments.
+ */
+export async function instrumentsFromFileWasm(buffer: ArrayBuffer, fileName: string): Promise<FurnaceInstrumentFile[]> {
+  const m = await getModule();
+  if (!cachedAPI) cachedAPI = getAPI(m);
+  const api = cachedAPI;
+
+  const data = new Uint8Array(buffer);
+  const dataPtr = m._malloc(data.length);
+  m.HEAPU8.set(data, dataPtr);
+  const nameBytes = new TextEncoder().encode(fileName + '\0');
+  const namePtr = m._malloc(nameBytes.length);
+  m.HEAPU8.set(nameBytes, namePtr);
+  const count = api.fur_ins_load_file(dataPtr, data.length, namePtr);
+  m._free(dataPtr);
+  m._free(namePtr);
+  if (count < 0) throw new Error(`Furnace instrument load failed: ${api.fur_get_error()}`);
+
+  const out = (write: (i: number, ptr: number, len: number) => number, i: number): Uint8Array | null => {
+    const size = write(i, 0, 0);
+    if (size < 0) return null;
+    const ptr = m._malloc(size);
+    const n = write(i, ptr, size);
+    const bytes = n < 0 ? null : new Uint8Array(m.HEAPU8.buffer, ptr, n).slice();
+    m._free(ptr);
+    return bytes;
+  };
+  const result: FurnaceInstrumentFile[] = [];
+  for (let i = 0; i < count; i++) {
+    const fui = out(api.fur_ins_to_fui, i);
+    if (!fui) throw new Error(`Furnace instrument ${i} could not be written as .fui`);
+    result.push({ name: api.fur_ins_get_name(i), type: api.fur_ins_get_type(i), fui, dmp: out(api.fur_ins_to_dmp, i) });
+  }
+  return result;
 }
