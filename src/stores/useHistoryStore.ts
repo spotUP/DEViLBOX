@@ -6,7 +6,13 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type { Pattern, InstrumentConfig, CursorPosition } from '@typedefs';
-import { useCursorStore } from './useCursorStore';
+// Through the storeAccess leaf: importing useCursorStore would pull TrackerReplayer into the store import cycle.
+import { getCursorStoreRef } from './storeAccess';
+
+function currentCursor(): CursorPosition | undefined {
+  try { return { ...(getCursorStoreRef().getState() as { cursor: CursorPosition }).cursor }; }
+  catch { return undefined; } // cursor store not loaded yet (store-only tests)
+}
 
 export type ActionType =
   | 'EDIT_CELL'
@@ -150,7 +156,7 @@ export const useHistoryStore = create<HistoryStore>()(
             before: c.before ? structuredClone(c.before) : null,
             after: structuredClone(c.after),
           })),
-          cursor: { ...useCursorStore.getState().cursor },
+          cursor: currentCursor(),
           ...(order ? { order: { before: [...order.before], after: [...order.after] } } : {}),
           ...(instruments?.length ? { instruments: structuredClone(instruments) } : {}),
         };
