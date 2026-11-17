@@ -19,7 +19,7 @@ func render(_ text: String, size: CGFloat, w: Int, h: Int, baseline: Int) -> [[B
   let attr = NSAttributedString(string: text, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font, NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true])
   ctx.textPosition = CGPoint(x: 0, y: baseline)
   CTLineDraw(CTLineCreateWithAttributedString(attr), ctx)
-  return (0..<h).map { y in (0..<w).map { x in buf[(h - 1 - y) * w + x] >= THRESHOLD } }
+  return (0..<h).map { y in (0..<w).map { x in buf[y * w + x] >= THRESHOLD } }
 }
 func rows(_ px: [[Bool]], x0: Int, w: Int) -> [Int] { px.map { r in (0..<w).reduce(0) { $0 | (r[x0 + $1] ? 0x80 >> $1 : 0) } } }
 // Calibrate on "H": pick the point size whose cap height is 7 rows, then crop every glyph so H's top row lands on row 0 (row 7 stays blank).
