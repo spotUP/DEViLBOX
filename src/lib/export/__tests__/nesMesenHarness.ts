@@ -9,7 +9,7 @@ export const MESEN = join(homedir(), 'Applications/Mesen.app/Contents/MacOS/Mese
 const META = join(__dirname, '../../../../public/nes/player.json');
 
 /** CPU write ranges logged by default: the APU. Chip checks pass the expansion ports as well. */
-export const APU_RANGES: ReadonlyArray<[number, number]> = [[0x4000, 0x4017]];
+export const APU_RANGES: ReadonlyArray<[number, number]> = [[0x4000, 0x4013], [0x4015, 0x4015], [0x4017, 0x4017]]; // $4014 (OAM DMA) and $4016 (joypad strobe) belong to the screen, not the music;
 
 /** Runs rom in Mesen2 headless for `ticks` NMIs. Returns the $4000-$4017 writes per tick and, per tick, the byte at $C000 (DPCM window). */
 export function mesen(rom: Uint8Array, ticks: number, timeout = 30, ranges: ReadonlyArray<[number, number]> = APU_RANGES, opts: { region?: 'Ntsc' | 'Pal' | 'Dendy'; tickAddress?: number; irqBoard?: boolean; stamps?: boolean } = {}): { writes: Array<Array<[number, number]>>; window: number[]; cycles: number[]; writeCycles: number[][] } {

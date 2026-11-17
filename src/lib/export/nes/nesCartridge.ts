@@ -27,6 +27,13 @@ export interface NesPlayer {
   titleLength: number;
   startSubsongOffset: number;
   regbankOffset: number;
+  authorOffset: number;
+  authorLength: number;
+  chipNameOffset: number;
+  chipNameLength: number;
+  scrollOffset: number;
+  scrollLength: number;
+  subsongCountOffset: number;
   nmiAddress: number;
   bankSize: number;
   maxStreamBanks: number;
@@ -43,12 +50,19 @@ export async function fetchNesPlayer(): Promise<NesPlayer> {
 
 export interface NesCartridgeResult { rom: Uint8Array; banks: number; streamBytes: number; seconds: number[] }
 
-/** Title text as the ROM field holds it: printable ASCII, anything else a space, padded to the field. */
+/** Text as a ROM field holds it: printable ASCII, anything else a space, padded to the field. */
 export function nesTitle(title: string, length: number): Uint8Array {
   return Uint8Array.from(title.replace(/[^\x20-\x7E]/g, ' ').slice(0, length).padEnd(length, ' '), (c) => c.charCodeAt(0));
 }
 
-export function buildNesCartridge(subsongs: readonly NesSubsongInput[], player: NesPlayer, title = 'devilbox', region: NesRegion = 'ntsc', startSubsong = 0): NesCartridgeResult {
+/** Player screen text: the font holds ASCII 0x20-0x5F only, so the screen fields are upper-cased and anything else is a space. */
+export function nesScreenText(text: string, length: number): Uint8Array {
+  return nesTitle(text.toUpperCase().replace(/[^\x20-\x5F]/g, ' '), length);
+}
+
+export interface NesScreenInfo { author?: string; chipName?: string; /** Scroller text; PROVISIONAL (owner to confirm): empty falls back to "TITLE - AUTHOR". */ comments?: string }
+
+export function buildNesCartridge(subsongs: readonly NesSubsongInput[], player: NesPlayer, title = 'devilbox', region: NesRegion = 'ntsc', startSubsong = 0, info: NesScreenInfo = {}): NesCartridgeResult {
   if (!subsongs.length) throw new Error('No NES capture to export. Play an NES-family song through while recording.');
   if (!NES_REGIONS.includes(region)) throw new Error(`Unknown region ${region}`);
   if (startSubsong < 0 || startSubsong >= subsongs.length) throw new Error(`Start subsong ${startSubsong} does not exist.`);
@@ -71,8 +85,14 @@ export function buildNesCartridge(subsongs: readonly NesSubsongInput[], player: 
   const last = 16 + (banks - 1) * bank;
   const playerBankAt = player.size - bank;
   rom.set(player.bytes.subarray(playerBankAt), last);
-  rom.set(nesTitle(title, player.titleLength), last + player.titleOffset - playerBankAt);
+  rom.set(nesScreenText(title, player.titleLength), last + player.titleOffset - playerBankAt);
   rom[last + player.startSubsongOffset - playerBankAt] = startSubsong;
+  const author = info.author ?? '';
+  const scroll = info.comments?.trim() || [title, author].filter(Boolean).join(' - ');
+  rom.set(nesScreenText(author, player.authorLength), last + player.authorOffset - playerBankAt);
+  rom.set(nesScreenText(info.chipName ?? 'NES', player.chipNameLength), last + player.chipNameOffset - playerBankAt);
+  rom.set(nesScreenText(scroll.slice(0, player.scrollLength - 32), player.scrollLength), last + player.scrollOffset - playerBankAt);
+  rom[last + player.subsongCountOffset - playerBankAt] = subsongs.length;
   regbank.forEach((b, i) => { rom[last + player.regbankOffset - playerBankAt + i] = b; });
   return { rom, banks, streamBytes: stream.length, seconds: subsongs.map((s) => { const c = s[region] ?? s.ntsc; return c.events.length ? Math.max(...c.events.map((e) => e.sample)) / c.sampleRate : 0; }) };
 }

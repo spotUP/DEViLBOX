@@ -17,7 +17,7 @@ const ROM = join(__dirname, '../../../../public/nes/player.bin');
 const META = join(__dirname, '../../../../public/nes/player.json');
 const ready = existsSync(MESEN) && existsSync(ROM) && existsSync(META);
 const SR = 48000, TR = 60;
-const RANGES: Array<[number, number]> = [[0x4000, 0x4017], [0x4040, 0x408a], [0x4800, 0x4800], [0x5000, 0x5015], [0x8000, 0xffff]];
+const RANGES: Array<[number, number]> = [[0x4000, 0x4013], [0x4015, 0x4015], [0x4017, 0x4017], [0x4040, 0x408a], [0x4800, 0x4800], [0x5000, 0x5015], [0x8000, 0xffff]];
 
 const w = (tick: number, chip: NesChip, addr: number, value: number): NesEvent => ({ kind: 'write', chip, sample: Math.round(tick * SR / TR), addr, value });
 
