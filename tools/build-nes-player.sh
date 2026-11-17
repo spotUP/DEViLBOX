@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds the NES cartridge player public/nes/player.bin (iNES NROM-256 image) + player.json from public/nes/player.s.
+# Builds the NES cartridge player public/nes/player.bin (iNES mapper 31 (32 KB, 8 banks) image) + player.json from public/nes/player.s.
 # Needs cc65 (brew install cc65). Queue it:
 #   ~/.claude/bin/buildq --purpose "..." -- tools/build-nes-player.sh
 # player.json carries the offsets (file offsets into player.bin) the cartridge builder patches stream/title/start subsong at.
@@ -21,7 +21,7 @@ size = os.path.getsize(sys.argv[2])
 assert size == 16 + 0x8000, size
 fo = lambda a: a - 0x8000 + 16
 meta = {'size': size, 'dataOffset': fo(0x8000), 'dataCapacity': 0x7000, 'titleOffset': fo(sym['title']), 'titleLength': 32,
-        'startSubsongOffset': fo(sym['startsong']), 'nmiAddress': sym['nmi']}
+        'startSubsongOffset': fo(sym['startsong']), 'nmiAddress': sym['nmi'], 'bankSize': 4096, 'maxStreamBanks': 255}
 json.dump(meta, open(sys.argv[3], 'w'), indent=1)
 open(sys.argv[3], 'a').write('\n')
 print(meta)

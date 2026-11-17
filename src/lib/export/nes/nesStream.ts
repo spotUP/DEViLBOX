@@ -121,7 +121,7 @@ function buildDictionary(records: ReadonlyArray<number[]>): number[][] {
   return [...count.values()]
     .filter((e) => e.n * (e.rec.length - 2) > e.rec.length + 3)
     .sort((a, b) => b.n * b.rec.length - a.n * a.rec.length)
-    .slice(0, 256).sort((a, b) => b.n - a.n).map((e) => e.rec);
+    .slice(0, 255).sort((a, b) => b.n - a.n).map((e) => e.rec);
 }
 
 export function encodeNesSubsong(cap: NesCapture, opts: NesEncodeOptions = {}): Uint8Array {
