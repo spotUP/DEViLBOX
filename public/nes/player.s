@@ -90,7 +90,7 @@ NBARS    = 28               ; NES_BAR_BUDGET in the plan: 5 (2A03) + 3 (VRC6) + 
   .byte "NES",$1A,2,0,$F0,$18,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 31, PRG size patched by the cartridge builder
 
 .segment "CODE"
-.export title, startsong, regbank, nmi, irq, idle, author, chipname, scrolltext, nsub, nmiend
+.export title, startsong, regbank, nmi, irq, idle, author, chipname, scrolltext, nsub, nmiend, nsfinit, nsfplay
 title:     .res 32,$20      ; patched title text
 startsong: .byte 0          ; patched initial subsong
 regbank:   .byte 0,0,0      ; patched: first ROM bank of the NTSC, PAL, Dendy streams
@@ -1164,6 +1164,32 @@ bartab:
   .word $058A
   .byte $0F,0
 chr:      .incbin "screen.chr"
+
+; NSF / NSFe entry points (Phase 10): no video. The NSF data is this ROM without the iNES header; header bytes $070-$077 bank-init it
+; (windows 0-6 = bank 0, window 7 = the last bank), so $5FF8-$5FFF banking is the NSF banking and the decoder runs unchanged.
+; INIT: A = song, X = region (0 NTSC, 1 PAL; anything else NTSC). PLAY: one stream tick per call (the NSF play rate is the song rate).
+nsfinit:
+  pha
+  lda #0
+  tay
+: sta $00,y                 ; NSF leaves RAM undefined: clear the zero page (not the stack page)
+  iny
+  bne :-
+  pla
+  sta curl
+  cpx #2
+  bcc :+
+  ldx #0
+: stx region
+  lda regbank,x
+  sta rbank
+  lda curl
+  jmp restart
+
+nsfplay:
+  ldy #0
+  jsr dpcm_apply
+  jmp tick
 
 .segment "VECTORS"
   .word nmi, reset, irq

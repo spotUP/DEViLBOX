@@ -21,7 +21,7 @@ size = os.path.getsize(sys.argv[2])
 assert size == 16 + 0x8000, size
 fo = lambda a: a - 0x8000 + 16
 meta = {'size': size, 'dataOffset': fo(0x8000), 'dataCapacity': 0x7000, 'titleOffset': fo(sym['title']), 'titleLength': 32,
-        'startSubsongOffset': fo(sym['startsong']), 'regbankOffset': fo(sym['regbank']), 'nmiAddress': sym['nmi'], 'irqAddress': sym['irq'], 'idleAddress': sym['idle'], 'authorOffset': fo(sym['author']), 'authorLength': 32, 'chipNameOffset': fo(sym['chipname']), 'chipNameLength': 16, 'scrollOffset': fo(sym['scrolltext']), 'scrollLength': 128, 'subsongCountOffset': fo(sym['nsub']), 'nmiEndAddress': sym['nmiend'], 'bankSize': 4096, 'maxStreamBanks': 255}
+        'startSubsongOffset': fo(sym['startsong']), 'regbankOffset': fo(sym['regbank']), 'nmiAddress': sym['nmi'], 'irqAddress': sym['irq'], 'idleAddress': sym['idle'], 'authorOffset': fo(sym['author']), 'authorLength': 32, 'chipNameOffset': fo(sym['chipname']), 'chipNameLength': 16, 'scrollOffset': fo(sym['scrolltext']), 'scrollLength': 128, 'subsongCountOffset': fo(sym['nsub']), 'nmiEndAddress': sym['nmiend'], 'nsfInitAddress': sym['nsfinit'], 'nsfPlayAddress': sym['nsfplay'], 'bankSize': 4096, 'maxStreamBanks': 255}
 json.dump(meta, open(sys.argv[3], 'w'), indent=1)
 open(sys.argv[3], 'a').write('\n')
 print(meta)
