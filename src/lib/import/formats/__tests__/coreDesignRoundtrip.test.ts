@@ -1,5 +1,5 @@
 /**
- * Core Design (.core): the parser shows each pattern stream as a one-voice tick grid; the exporter writes edited note and
+ * Core Design (.core): the parser shows the song as played (3 voices from the order lists, with transpose) as a tick grid; the exporter writes edited note and
  * instrument-slot bytes back. Fixture: public/data/songs/core-design/dynamite dux.core.
  */
 import { describe, it, expect } from 'vitest';
@@ -67,5 +67,42 @@ describe('Core Design parser and exporter', () => {
     for (let i = 0; i < raw.length; i++) if (raw[i] !== out.data[i]) diff.push(i);
     expect(diff.length).toBe(1);
     expect(reparse(out.data).patterns[p].channels[0].rows[r].instrument).toBe(next);
+  });
+
+  it('shows 3 voices and edits a transposed position into the right byte', async () => {
+    const { ab, raw } = load();
+    const song = parseCoreDesignFile(ab, 'dynamite dux.core');
+    const L = song.uadePatternLayout!;
+    expect(song.numChannels).toBe(3);
+    let at: { p: number; r: number; c: number } | null = null;
+    song.patterns.forEach((pat, p) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
+      if (!at && cell.note >= 13 && cell.note < 80 && L.noteOffset!(p, r, c)) at = { p, r, c };
+    })));
+    if (!at) throw new Error('no transposed note');
+    const { p, r, c } = at as { p: number; r: number; c: number };
+    setGridBaseline(baselineOf(song.patterns));
+    const cell = song.patterns[p].channels[c].rows[r];
+    const typed = cell.note + 1;
+    cell.note = typed;
+    const out = await exportCoreDesign(song);
+    setGridBaseline(null);
+    const diff: number[] = [];
+    for (let i = 0; i < raw.length; i++) if (raw[i] !== out.data[i]) diff.push(i);
+    expect(diff).toEqual([getCellFileOffset(L, p, r, c)]);
+    expect(out.warnings).toEqual([]);
+    expect(reparse(out.data).patterns[p].channels[c].rows[r].note).toBe(typed);
+  });
+
+  it('a note typed on a rest is reported, never dropped silently', async () => {
+    const { ab } = load();
+    const song = parseCoreDesignFile(ab, 'dynamite dux.core');
+    const rows = song.patterns[0].channels[0].rows;
+    const r = rows.findIndex((x) => x.note === 0 && x.period === undefined);
+    const rest = rows.findIndex((x) => x.period === 0x7f);
+    setGridBaseline(baselineOf(song.patterns));
+    rows[rest >= 0 ? rest : r].note = 40;
+    const out = await exportCoreDesign(song);
+    setGridBaseline(null);
+    expect(out.warnings.length).toBe(1);
   });
 });
