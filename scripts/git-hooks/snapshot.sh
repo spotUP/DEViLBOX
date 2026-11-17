@@ -176,11 +176,22 @@ SNAPSHOT_SKIPPED_PATHS=(
   /public/monique/MoniqueUI.*
   /public/kissofshame/
 )
+# Single files inside a skipped directory that tests read by name; checked out
+# again after the skips (last matching line wins). The census test allows a
+# test to name a skipped path only when every path it names is listed here.
+# furnaceEffectTable and furnaceSequencerChipIds compare the generated effect
+# tables and chip ids against Furnace's sysDef/dispatch headers (2026-11-17).
+SNAPSHOT_KEPT_PATHS=(
+  /third-party/furnace-master/src/engine/sysDef.cpp
+  /third-party/furnace-master/src/engine/sysDef.h
+  /third-party/furnace-master/src/engine/dispatch.h
+)
 # The sparse-checkout file (non-cone, gitignore syntax: the last matching line wins).
 snapshot_sparse_patterns() {
   local p
   echo "/*"
   for p in "${SNAPSHOT_SKIPPED_PATHS[@]}"; do echo "!$p"; done
+  for p in "${SNAPSHOT_KEPT_PATHS[@]}"; do echo "$p"; done
 }
 # apply_sparse <clone>: write the patterns before the first checkout, so the files
 # are never written. A kept clone whose patterns changed is rebuilt (cheaper than

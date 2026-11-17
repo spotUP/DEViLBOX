@@ -122,6 +122,7 @@ describe('hook snapshot leaves out the paths no test reads', { timeout: 120000 }
     expect(skipped.length).toBeGreaterThan(5);
     const esc = (s: string) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/\'"`]*');
     const sep = '[\'"`, /]+';
+    const kept = new Set(bash(`. "${SNAPSHOT_SH}"; printf '%s\\n' "\${SNAPSHOT_KEPT_PATHS[@]}"`, ROOT).split('\n').filter(Boolean).map((p) => p.replace(/^\//, '')));
     const patterns = skipped.map((p) => ({ p, re: new RegExp(`(^|[\\s'"\`/])${p.split('/').map(esc).join(sep)}(['"\`/\\s,)]|$)`) }));
 
     // Test code = test files, and the helpers/fixtures that live in test directories.
@@ -132,9 +133,15 @@ describe('hook snapshot leaves out the paths no test reads', { timeout: 120000 }
     for (const f of files) {
       let text = '';
       try { text = readFileSync(join(ROOT, f), 'utf8'); } catch { continue; }
-      for (const { p, re } of patterns) if (re.test(text)) hits.push(`${f} names ${p}`);
+      for (const { p, re } of patterns) {
+        if (!re.test(text)) continue;
+        // Allowed when every path the file names under p is a file the snapshot checks out again.
+        const named = text.match(new RegExp(`${esc(p)}[^'"\`\\s,)]*`, 'g')) ?? [];
+        if (named.length > 0 && named.every((n) => kept.has(n))) continue;
+        hits.push(`${f} names ${p}`);
+      }
     }
-    // A hit must be removed from SNAPSHOT_SKIPPED_PATHS (the test needs the file) or the test must stop reading it.
+    // A hit must be removed from SNAPSHOT_SKIPPED_PATHS, have its files listed in SNAPSHOT_KEPT_PATHS, or stop reading it.
     expect(hits).toEqual([]);
   });
 
