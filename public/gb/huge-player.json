@@ -1,0 +1,15 @@
+{
+ "songAddress": 8192,
+ "songOffset": 8192,
+ "songCapacity": 24576,
+ "tickAddress": 368,
+ "sources": [
+  "public/gb/huge-player.asm",
+  "tools/build-gb-player.sh",
+  "third-party/hugedriver/hUGEDriver.asm",
+  "third-party/hugedriver/include/hardware.inc",
+  "third-party/hugedriver/include/hUGE.inc",
+  "third-party/hugedriver/include/hUGE_note_table.inc"
+ ],
+ "sourceHash": "985afa01c649528243b39ba5fbd00866f72de6d5"
+}
