@@ -96,4 +96,19 @@ describe('nesStream tick source table', () => {
     const p = nesIrqPeriod('ntsc', 75);
     expect([r.ntsc[6], r.ntsc[7]]).toEqual([p & 255, p >> 8]);
   });
+
+  it('caps the dictionary to the first bank and still decodes losslessly', () => {
+    // 300 distinct multi-write ticks, each repeated 4x: more worthwhile dictionary records than fit a 1 KiB bank.
+    const events: NesEvent[] = [];
+    for (let t = 0; t < 1200; t++) {
+      const k = Math.floor(t / 4);
+      for (let i = 0; i < 6; i++) events.push({ kind: 'write', chip: 'vrc6', sample: t * SPT, addr: 0x9000 + (i & 3) + (i >> 2) * 0x1000, value: (k * 7 + i * 13) & 255 });
+    }
+    const cap: NesCapture = { ...synth(1), events, sampleRate: SR, tickRateHz: TR };
+    const bank = 1024;
+    const flat = encodeNesStreams([{ ntsc: cap }]).ntsc;
+    const banked = encodeNesStreams([{ ntsc: cap }], bank).ntsc;
+    expect(flat[bank > 0 ? 8 : 0]).toBeGreaterThan(0); // unbanked dictionary is full (255 entries)
+    expect(decodeNesStream(banked, 0, bank).ticks.map((t) => t.writes)).toEqual(decodeNesStream(flat, 0).ticks.map((t) => t.writes));
+  });
 });
