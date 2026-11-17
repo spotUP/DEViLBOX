@@ -18,7 +18,7 @@
  * (CPU cycles per tick), $4102 bit 0 enable, $4103 write acknowledges. These sit outside $5000-$5FFF because Mesen2 aliases all of
  * that range as bank registers. The IRQ board is a spec, not hardware: no emulator models it. The table holds at most 36 subsongs.
  */
-import { encodeNesStreams, NES_REGIONS, type NesRegion, type NesSubsongInput } from './nesStream';
+import { encodeNesStreams, NES_REGION_TIMING, NES_REGIONS, type NesRegion, type NesSubsongInput } from './nesStream';
 
 export interface NesPlayer {
   bytes: Uint8Array;
@@ -39,11 +39,11 @@ export interface NesPlayer {
   maxStreamBanks: number;
 }
 
-export async function fetchNesPlayer(): Promise<NesPlayer> {
+export async function fetchNesPlayer(name: 'player' | 'player24' = 'player'): Promise<NesPlayer> {
   const base = import.meta.env.BASE_URL;
   const [bin, meta] = await Promise.all([
-    fetch(`${base}nes/player.bin`).then((r) => r.arrayBuffer()),
-    fetch(`${base}nes/player.json`).then((r) => r.json()),
+    fetch(`${base}nes/${name}.bin`).then((r) => r.arrayBuffer()),
+    fetch(`${base}nes/${name}.json`).then((r) => r.json()),
   ]);
   return { ...meta, bytes: new Uint8Array(bin) };
 }
@@ -61,6 +61,19 @@ export function nesScreenText(text: string, length: number): Uint8Array {
 }
 
 export interface NesScreenInfo { author?: string; chipName?: string; /** Scroller text; PROVISIONAL (owner to confirm): empty falls back to "TITLE - AUTHOR". */ comments?: string }
+
+/** Patches the player's screen text, start subsong, subsong count and region banks. The player bytes from file offset `from` sit in `rom` at `at`. */
+function patchPlayerScreen(rom: Uint8Array, at: number, from: number, player: NesPlayer, title: string, startSubsong: number, info: NesScreenInfo, subsongCount: number, regbank: readonly number[]): void {
+  rom.set(nesScreenText(title, player.titleLength), at + player.titleOffset - from);
+  rom[at + player.startSubsongOffset - from] = startSubsong;
+  const author = info.author ?? '';
+  const scroll = info.comments?.trim() || [title, author].filter(Boolean).join(' - ');
+  rom.set(nesScreenText(author, player.authorLength), at + player.authorOffset - from);
+  rom.set(nesScreenText(info.chipName ?? 'NES', player.chipNameLength), at + player.chipNameOffset - from);
+  rom.set(nesScreenText(scroll.slice(0, player.scrollLength - 32), player.scrollLength), at + player.scrollOffset - from);
+  rom[at + player.subsongCountOffset - from] = subsongCount;
+  regbank.forEach((b, i) => { rom[at + player.regbankOffset - from + i] = b; });
+}
 
 export function buildNesCartridge(subsongs: readonly NesSubsongInput[], player: NesPlayer, title = 'devilbox', region: NesRegion = 'ntsc', startSubsong = 0, info: NesScreenInfo = {}): NesCartridgeResult {
   if (!subsongs.length) throw new Error('No NES capture to export. Play an NES-family song through while recording.');
@@ -85,14 +98,39 @@ export function buildNesCartridge(subsongs: readonly NesSubsongInput[], player: 
   const last = 16 + (banks - 1) * bank;
   const playerBankAt = player.size - bank;
   rom.set(player.bytes.subarray(playerBankAt), last);
-  rom.set(nesScreenText(title, player.titleLength), last + player.titleOffset - playerBankAt);
-  rom[last + player.startSubsongOffset - playerBankAt] = startSubsong;
-  const author = info.author ?? '';
-  const scroll = info.comments?.trim() || [title, author].filter(Boolean).join(' - ');
-  rom.set(nesScreenText(author, player.authorLength), last + player.authorOffset - playerBankAt);
-  rom.set(nesScreenText(info.chipName ?? 'NES', player.chipNameLength), last + player.chipNameOffset - playerBankAt);
-  rom.set(nesScreenText(scroll.slice(0, player.scrollLength - 32), player.scrollLength), last + player.scrollOffset - playerBankAt);
-  rom[last + player.subsongCountOffset - playerBankAt] = subsongs.length;
-  regbank.forEach((b, i) => { rom[last + player.regbankOffset - playerBankAt + i] = b; });
+  patchPlayerScreen(rom, last, playerBankAt, player, title, startSubsong, info, subsongs.length, regbank);
   return { rom, banks, streamBytes: stream.length, seconds: subsongs.map((s) => { const c = s[region] ?? s.ntsc; return c.events.length ? Math.max(...c.events.map((e) => e.sample)) / c.sampleRate : 0; }) };
+}
+
+/**
+ * VRC6 original cartridge (iNES mapper 24, player build player24.bin). Stream banks are 8 KB: the player shows the current stream bank at $C000
+ * (8 KB select, $C000) and the subsong's first bank (dictionary, region table) through the 16 KB select at $8000; the last 8 KB ($E000, player code)
+ * is fixed. Region streams start on an even bank so the table sits at the start of a 16 KB bank. No DPCM bank switching ($C000-$DFFF is the stream
+ * window) and no cycle-IRQ tick (the board IRQ is custom): the builder refuses such songs. Only 2A03 and VRC6 writes are allowed.
+ */
+export function buildVrc6Cartridge(subsongs: readonly NesSubsongInput[], player: NesPlayer, title = 'devilbox', info: NesScreenInfo = {}): NesCartridgeResult {
+  if (!subsongs.length) throw new Error('No NES capture to export. Play an NES-family song through while recording.');
+  for (const s of subsongs) for (const r of NES_REGIONS) {
+    const c = s[r] ?? s.ntsc;
+    if (r !== 'ntsc' && !s[r]) continue; // a region without its own capture plays the NTSC stream at the console's frame rate
+    const other = c.events.find((e) => e.kind === 'write' && e.chip !== 'nes' && e.chip !== 'vrc6');
+    if (other && other.kind === 'write') throw new Error(`A VRC6 cartridge carries 2A03 and VRC6 only; the song also writes ${other.chip}. Use the custom cartridge or NSFe.`);
+    if (c.events.some((e) => e.kind === 'control' && e.control === 4)) throw new Error('A VRC6 cartridge cannot switch DPCM banks; the song does.');
+    if (Math.abs(c.tickRateHz - NES_REGION_TIMING[r].frameHz) / NES_REGION_TIMING[r].frameHz > 0.005) throw new Error(`The song ticks at ${c.tickRateHz.toFixed(2)} Hz, not the ${r.toUpperCase()} frame rate; a VRC6 cartridge ticks on the frame (the cycle timer exists on the custom board only).`);
+  }
+  const bank = 8192;
+  const regionStreams = encodeNesStreams(subsongs, bank);
+  const regbank = NES_REGIONS.map(() => 0);
+  let streamBanks = 0;
+  for (const [i, r] of NES_REGIONS.entries()) { regbank[i] = streamBanks; streamBanks += Math.ceil(regionStreams[r].length / bank); streamBanks += streamBanks & 1; }
+  if (streamBanks > 255) throw new Error(`The song needs ${streamBanks} banks of 8 KB; the VRC6 player addresses 255 (2 MB).`);
+  const total = Math.ceil((streamBanks + 1) / 2) * 2; // PRG in 16 KB units: stream banks, padding, the fixed player bank last
+  const rom = new Uint8Array(16 + total * bank);
+  rom.set(player.bytes.subarray(0, 16));
+  rom[4] = total / 2;
+  for (const [i, r] of NES_REGIONS.entries()) rom.set(regionStreams[r], 16 + regbank[i] * bank);
+  const fixed = player.size - bank;
+  rom.set(player.bytes.subarray(fixed), rom.length - bank);
+  patchPlayerScreen(rom, rom.length - bank, fixed, player, title, 0, info, subsongs.length, regbank);
+  return { rom, banks: total, streamBytes: streamBanks * bank, seconds: subsongs.map((s) => { const c = s.ntsc; return c.events.length ? Math.max(...c.events.map((e) => e.sample)) / c.sampleRate : 0; }) };
 }

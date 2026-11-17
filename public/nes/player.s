@@ -87,7 +87,11 @@ NBARS    = 28               ; NES_BAR_BUDGET in the plan: 5 (2A03) + 3 (VRC6) + 
 .endmacro
 
 .segment "HEADER"
+.ifdef VRC6
+  .byte "NES",$1A,2,0,$80,$18,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 24 (VRC6), PRG size patched by the cartridge builder
+.else
   .byte "NES",$1A,2,0,$F0,$18,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 31, PRG size patched by the cartridge builder
+.endif
 
 .segment "CODE"
 .export title, startsong, regbank, nmi, irq, idle, author, chipname, scrolltext, nsub, nmiend, nsfinit, nsfplay
@@ -111,10 +115,15 @@ reset:
   stx $2001
   stx $4010
   txa                       ; windows 0-6 = ROM bank 0 (A = 0)
+.ifdef VRC6
+  sta $8000                 ; mapper 24: $8000 16 KB select, $C000 8 KB select (the 8 KB last bank is fixed)
+  sta $C000
+.else
   ldx #6
 : sta $5FF8,x
   dex
   bpl :-
+.endif
   bit $2002
 : bit $2002
   bpl :-
@@ -191,25 +200,56 @@ restart:
   sbc tmp                   ; 7 bytes per table entry (builder limits the song to 36 subsongs)
   tay
   lda rbank
+.ifdef VRC6
+  lsr a                     ; mapper 24 build: stream banks are 8 KB; the region start is even, so the table sits at $8000
+.endif
   sta $5FF8                 ; the subsong table is in the first bank of the region stream
   lda STREAM+6,y
   sta period
   lda STREAM+7,y
   sta period+1
   lda STREAM+2,y            ; offset mid byte: bank = high nibble (offsets are bank aligned; builder keeps them < 1 MB)
+.ifdef VRC6
+  ldx STREAM+3,y            ; offset high byte: 8 KB bank = offset bits 13-20
   lsr a
   lsr a
   lsr a
   lsr a
+  lsr a
+  sta tmp
+  txa
+  asl a
+  asl a
+  asl a
+  ora tmp
+.else
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+.endif
   clc
   adc rbank
   sta sbase
+.ifdef VRC6
+  sta $C000                 ; $C000 8 KB window = the stream bank
+  lsr a
+  sta $8000                 ; $8000 16 KB window = the dictionary (the sbase half of its 16 KB bank)
+  lda #0
+  sta base
+  sta pendf
+  lda #>STREAM
+  bcc :+
+  lda #>STREAM+$20
+: sta base+1
+.else
   sta $5FF8
   lda #0
   sta base
   sta pendf
   lda #>STREAM
   sta base+1
+.endif
   ldy #0
   lda (base),y
   sta cnt
@@ -236,6 +276,12 @@ restart:
   dex
   bne :-
 @done:
+.ifdef VRC6
+  lda ptr+1                 ; the records after the dictionary are read through the stream window
+  and #$1F
+  ora #$C0
+  sta ptr+1
+.endif
   lda #0
   sta rep
   sta ended
@@ -326,7 +372,13 @@ tick:
   cmp #$83
   beq @bank
   cmp #$84
+.ifdef VRC6
+  bne @n84                  ; @raw is out of branch range in the VRC6 build
+  jmp @raw
+@n84:
+.else
   beq @raw
+.endif
   cmp #$FE
   beq @repeat
   cmp #$FF
@@ -353,10 +405,17 @@ tick:
   jsr rd                    ; bank relative to the subsong start, shown in window 1
   clc
   adc sbase
+.ifdef VRC6
+  sta $C000
+  lda #0
+  sta ptr
+  lda #$C0
+.else
   sta $5FF9
   lda #0
   sta ptr
   lda #$90
+.endif
   sta ptr+1
   jmp @decode
 @loop:                      ; target u24 from the subsong start: bank = bits 12-19, offset in bank = bits 0-11
@@ -365,6 +424,29 @@ tick:
   jsr rd
   sta tmp+1
   jsr rd
+.ifdef VRC6
+  asl a                     ; u24 target: 8 KB bank = bits 13-20, offset in bank = bits 0-12
+  asl a
+  asl a
+  sta tmp+2
+  lda tmp
+  sta ptr
+  lda tmp+1
+  and #$1F
+  ora #$C0
+  sta ptr+1
+  lda tmp+1
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  ora tmp+2
+  clc
+  adc sbase
+  sta $C000
+  jmp @decode
+.endif
   lda tmp
   sta ptr
   lda tmp+1

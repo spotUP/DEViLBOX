@@ -8,10 +8,13 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
 cd "$ROOT/public/nes"
-ca65 player.s -o "$W/player.o"
+# Two builds of the same source: player.bin (mapper 31) and player24.bin (mapper 24 / VRC6 original cart, -D VRC6).
+for V in "" 24; do
+if [ -n "$V" ]; then D="-D VRC6"; else D=""; fi
+ca65 $D player.s -o "$W/player.o"
 ld65 -C nes.cfg -Ln "$W/player.lbl" "$W/player.o" -o "$W/player.bin"
-cp "$W/player.bin" player.bin
-python3 - "$W/player.lbl" player.bin player.json <<'PY'
+cp "$W/player.bin" "player$V.bin"
+python3 - "$W/player.lbl" "player$V.bin" "player$V.json" <<'PY'
 import json, os, re, sys
 sym = {}
 for line in open(sys.argv[1]):
@@ -26,3 +29,4 @@ json.dump(meta, open(sys.argv[3], 'w'), indent=1)
 open(sys.argv[3], 'a').write('\n')
 print(meta)
 PY
+done
