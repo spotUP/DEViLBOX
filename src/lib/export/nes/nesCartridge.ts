@@ -62,15 +62,20 @@ export function nesScreenText(text: string, length: number): Uint8Array {
 
 export interface NesScreenInfo { author?: string; chipName?: string; /** Scroller text; PROVISIONAL (owner to confirm): empty falls back to "TITLE - AUTHOR". */ comments?: string }
 
+/** Scroller source text shared by every NES player: the comments, or "TITLE - AUTHOR" when there are none. */
+export function nesScrollText(title: string, info: NesScreenInfo, length: number): Uint8Array {
+  const scroll = info.comments?.trim() || [title, info.author ?? ''].filter(Boolean).join(' - ');
+  return nesScreenText(scroll.slice(0, length - 32), length);
+}
+
 /** Patches the player's screen text, start subsong, subsong count and region banks. The player bytes from file offset `from` sit in `rom` at `at`. */
 function patchPlayerScreen(rom: Uint8Array, at: number, from: number, player: NesPlayer, title: string, startSubsong: number, info: NesScreenInfo, subsongCount: number, regbank: readonly number[]): void {
   rom.set(nesScreenText(title, player.titleLength), at + player.titleOffset - from);
   rom[at + player.startSubsongOffset - from] = startSubsong;
   const author = info.author ?? '';
-  const scroll = info.comments?.trim() || [title, author].filter(Boolean).join(' - ');
   rom.set(nesScreenText(author, player.authorLength), at + player.authorOffset - from);
   rom.set(nesScreenText(info.chipName ?? 'NES', player.chipNameLength), at + player.chipNameOffset - from);
-  rom.set(nesScreenText(scroll.slice(0, player.scrollLength - 32), player.scrollLength), at + player.scrollOffset - from);
+  rom.set(nesScrollText(title, info, player.scrollLength), at + player.scrollOffset - from);
   rom[at + player.subsongCountOffset - from] = subsongCount;
   regbank.forEach((b, i) => { rom[at + player.regbankOffset - from + i] = b; });
 }

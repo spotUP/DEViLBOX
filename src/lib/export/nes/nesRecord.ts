@@ -2,10 +2,13 @@
 import { useTransportStore, useTrackerStore, useFormatStore } from '@stores';
 import { FurnaceDispatchEngine } from '../../../engine/furnace-dispatch/FurnaceDispatchEngine';
 import { nesCaptureFromBatches, type NesCapture } from './nesCapture';
-import { fetchNesPlayer, buildBoardCartridge } from './nesCartridge';
+import { fetchNesPlayer } from './nesCartridge';
 import { buildNsfe } from './nsfe';
 import { NES_REGIONS, type NesRegion, type NesSubsongInput } from './nesStream';
-import { buildNesRom, isSunsoft, nesChipsOf, wantsFme7Cartridge, wantsN163Cartridge, wantsVrc6Cartridge, wantsVrc7Cartridge, wantsMmc5Cartridge, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
+import { isSunsoft, nesChipsOf, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
+import { buildFamistudioRom, furnaceToFamistudio, type FamistudioMeta } from './famistudioSong';
+import { saveFurFileWasm } from '../../import/wasm/FurnaceFileOps';
+import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
 import { switchSubsong } from '../../tracker/subsongSwitch';
 import { orderPassLength } from '../vectrex/vectrexCapture';
 
@@ -49,11 +52,25 @@ export async function recordRegion(region: NesRegion, sunsoft: boolean): Promise
 }
 
 export type NesSubsongChoice = 'current' | 'all';
-export type NesExportFormat = 'nes' | 'nsfe';
-/** Original VRC6 board wiring: VRC6a (mapper 24, Akumajou Densetsu) or VRC6b (mapper 26, Madara / Esper Dream 2; A0 and A1 swapped). */
-export type NesVrc6Board = 'vrc6a' | 'vrc6b';
 
-export async function recordNesRom(choice: NesRegionChoice, title: string, author?: string, comments?: string, format: NesExportFormat = 'nes', subsongChoice: NesSubsongChoice = 'current', vrc6Board: NesVrc6Board = 'vrc6a'): Promise<NesRomResult & { tickRateHz: number }> {
+/** NES cartridge: the live song as FamiStudio song data inside the FamiStudio sound engine ROM (2A03 only; expansion chips are dropped and listed in the warnings). */
+export async function exportNesFamistudioRom(title: string, author?: string): Promise<{ rom: Uint8Array; warnings: string[] }> {
+  const native = useFormatStore.getState().furnaceNative;
+  if (!nesChipsOf(native?.chipIds, native?.chipFlags).includes('nes')) throw new Error('This song has no NES 2A03 channels.');
+  const base = import.meta.env.BASE_URL;
+  const [player, meta, fur] = await Promise.all([
+    fetch(`${base}nes/famistudio/player.nes`).then((r) => r.arrayBuffer()),
+    fetch(`${base}nes/famistudio/player.json`).then((r) => r.json() as Promise<FamistudioMeta>),
+    saveFurFileWasm(), // the module the engine holds, as the .fur export reads it
+  ]);
+  const m = await parseFurnaceSong(fur instanceof ArrayBuffer ? fur : new Uint8Array(fur).buffer);
+  const song = furnaceToFamistudio(m, useFormatStore.getState().furnaceActiveSubsong, meta.dpcmCap);
+  const rom = buildFamistudioRom(new Uint8Array(player), meta, song, { title, author });
+  return { rom, warnings: song.lossy.map((l) => `Not carried to the FamiStudio engine: ${l}`) };
+}
+
+/** NSFe: records the song per region (live worklet) and writes the register streams for the NSF player. */
+export async function recordNsfe(choice: NesRegionChoice, title: string, author?: string, comments?: string, subsongChoice: NesSubsongChoice = 'current'): Promise<NesRomResult & { tickRateHz: number }> {
   const native = useFormatStore.getState().furnaceNative;
   const chips = nesChipsOf(native?.chipIds, native?.chipFlags);
   if (!chips.length) throw new Error('This song has no NES-family sound chip.');
@@ -76,52 +93,6 @@ export async function recordNesRom(choice: NesRegionChoice, title: string, autho
   }
   const first = subsongs[0].ntsc;
   const info: NesRomInfo = { title, author, comments, chips };
-  if (format === 'nsfe') {
-    const n = buildNsfe(subsongs, await fetchNesPlayer(), info);
-    return { rom: n.nsfe, banks: 0, streamBytes: 0, seconds: [], warnings: n.warnings, tickRateHz: first.tickRateHz };
-  }
-  const warnings: string[] = [];
-  if (wantsVrc6Cartridge(chips)) {
-    try {
-      const mapper = vrc6Board === 'vrc6b' ? 26 : 24;
-      const v = buildBoardCartridge('vrc6', subsongs, await fetchNesPlayer(vrc6Board === 'vrc6b' ? 'player26' : 'player24'), title, { author, comments, chipName: 'VRC6' });
-      return { ...v, warnings: [`Built the original VRC6 cartridge (mapper ${mapper}).`], tickRateHz: first.tickRateHz };
-    } catch (e) {
-      warnings.push(`Built the custom cartridge (mapper 31), not the original VRC6 board: ${e instanceof Error ? e.message : e}`);
-    }
-  }
-  if (wantsFme7Cartridge(chips)) {
-    try {
-      const v = buildBoardCartridge('fme7', subsongs, await fetchNesPlayer('player69'), title, { author, comments, chipName: '5B' });
-      return { ...v, warnings: ['Built the original Sunsoft 5B cartridge (mapper 69).'], tickRateHz: first.tickRateHz };
-    } catch (e) {
-      warnings.push(`Built the custom cartridge (mapper 31), not the original Sunsoft 5B board: ${e instanceof Error ? e.message : e}`);
-    }
-  }
-  if (wantsN163Cartridge(chips)) {
-    try {
-      const v = buildBoardCartridge('n163', subsongs, await fetchNesPlayer('player19'), title, { author, comments, chipName: 'N163' });
-      return { ...v, warnings: ['Built the original Namco 163 cartridge (mapper 19).'], tickRateHz: first.tickRateHz };
-    } catch (e) {
-      warnings.push(`Built the custom cartridge (mapper 31), not the original Namco 163 board: ${e instanceof Error ? e.message : e}`);
-    }
-  }
-  if (wantsVrc7Cartridge(chips)) {
-    try {
-      const v = buildBoardCartridge('vrc7', subsongs, await fetchNesPlayer('player85'), title, { author, comments, chipName: 'VRC7' });
-      return { ...v, warnings: ['Built the original VRC7 cartridge (mapper 85).'], tickRateHz: first.tickRateHz };
-    } catch (e) {
-      warnings.push(`Built the custom cartridge (mapper 31), not the original VRC7 board: ${e instanceof Error ? e.message : e}`);
-    }
-  }
-  if (wantsMmc5Cartridge(chips)) {
-    try {
-      const v = buildBoardCartridge('mmc5', subsongs, await fetchNesPlayer('player5'), title, { author, comments, chipName: 'MMC5' });
-      return { ...v, warnings: ['Built the original MMC5 cartridge (mapper 5).'], tickRateHz: first.tickRateHz };
-    } catch (e) {
-      warnings.push(`Built the custom cartridge (mapper 31), not the original MMC5 board: ${e instanceof Error ? e.message : e}`);
-    }
-  }
-  const rom = buildNesRom(subsongs, await fetchNesPlayer(), info);
-  return { ...rom, warnings: [...warnings, ...rom.warnings], tickRateHz: first.tickRateHz };
+  const n = buildNsfe(subsongs, await fetchNesPlayer(), info);
+  return { rom: n.nsfe, banks: 0, streamBytes: 0, seconds: [], warnings: n.warnings, tickRateHz: first.tickRateHz };
 }

@@ -4,6 +4,15 @@
  "dpcmAddr": 49152,
  "dpcmCap": 8192,
  "prgOffset": 16,
- "tickAddr": 59961,
- "sourceHash": "092bfe69bdcf1617b51115677e9382521b3f45fe"
+ "tickAddr": 60003,
+ "titleAddr": 61366,
+ "authorAddr": 61398,
+ "textLen": 32,
+ "chipAddr": 61430,
+ "chipLen": 16,
+ "scrollAddr": 61446,
+ "scrollLen": 128,
+ "nsubAddr": 61574,
+ "nmiAddr": 59983,
+ "sourceHash": "8d46d4dee96265ffbedff8c862fd8e58402fac0d"
 }
