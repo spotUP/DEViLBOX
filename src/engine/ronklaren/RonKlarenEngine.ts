@@ -133,6 +133,15 @@ export class RonKlarenEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'setCell', position, channel, offset, note });
   }
 
+  /**
+   * Write one byte of the module at `offset` when a loaded track holds it: the
+   * argument byte of a track command (SetInstrument, effect arguments), as the
+   * importer's effectPatches name them. The command keeps its length.
+   */
+  setTrackByte(offset: number, value: number): void {
+    this.workletNode?.port.postMessage({ type: 'setTrackByte', offset, value });
+  }
+
   /** Set an instrument parameter by name */
   setInstrumentParam(instrument: number, param: string, value: number): void {
     this.workletNode?.port.postMessage({ type: 'setInstrumentParam', instrument, param, value });

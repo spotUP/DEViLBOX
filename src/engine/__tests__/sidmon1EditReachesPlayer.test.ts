@@ -30,6 +30,7 @@ interface Mod {
   _player_get_voice_consumed(v: number): number;
   _player_get_voice_rows_consumed(v: number): number;
   _player_get_voice_note(v: number): number;
+  _player_get_paula_period(ch: number): number;
 }
 
 async function play(bytes: ArrayBuffer, posted: { type: string; index: number; bytes: Uint8Array }[], row: number) {
@@ -119,5 +120,118 @@ describe('an edited SidMon 1 song still plays, and plays the edit', () => {
     const carried = new Uint8Array(useFormatStore.getState().sidmon1WasmFileData!);
     const reloaded = await play(carried.buffer.slice(0) as ArrayBuffer, [], moduleRow);
     expect(reloaded.soundedNote).toBe(edited);
+  });
+
+  // The effect column. The replayer (sidmon1.c, the row switch) reads effect 2 as the speed, any effect but 0, 2, 3
+  // as a bend whose speed is the parameter byte. The proof the replayer plays the edited effect is its own
+  // behaviour: when voice v consumes each row (a speed change moves every later row) and the Paula period it
+  // writes each tick (a bend moves it). The stored bytes are what the engine posted; the reloaded module is the
+  // song's carried bytes parsed again and played.
+  it('an effect edit (bend parameter, Fxx speed, clear) reaches the replayer rows and the reloaded module', { timeout: 120000 }, async () => {
+    loadSharedWorkletScripts();
+    const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+    const { parseSidMon1File } = await import('@/lib/import/formats/SidMon1Parser');
+    const raw = readFileSync(join(__dirname, '../../../public/data/songs/formats/anarchy.sid1'));
+    const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
+    const song = await parseModuleToSong(new File([ab], 'anarchy.sid1'), 0);
+    const { useFormatStore } = await import('@stores/useFormatStore');
+    const { useTrackerStore } = await import('@stores/useTrackerStore');
+    useTrackerStore.getState().loadPatterns(structuredClone(song.patterns));
+    useFormatStore.getState().applyEditorMode(song as never);
+    const layout = useFormatStore.getState().uadePatternLayout!;
+    const rowOf = (p: number, r: number, ch: number) => (layout.getCellFileOffset!(p, r, ch) - layout.patternDataFileOffset) / 5;
+    const byteAt = (row: number, k: number) => raw[layout.patternDataFileOffset + row * 5 + k];
+
+    const { SidMon1ReplayerEngine } = await import('@/engine/sidmon1/SidMon1ReplayerEngine');
+    const posted: { type: string; index: number; bytes: Uint8Array }[] = [];
+    const fake = Object.create(SidMon1ReplayerEngine.prototype) as { workletNode: unknown };
+    fake.workletNode = { port: { postMessage: (m: { type: string; index: number; bytes: Uint8Array }) => posted.push(m) } };
+    vi.spyOn(SidMon1ReplayerEngine, 'hasInstance').mockReturnValue(true);
+    vi.spyOn(SidMon1ReplayerEngine, 'getInstance').mockReturnValue(fake as never);
+    const ts = await import('@engine/TrackerReplayer');
+    const { liveTrackerSong } = await import('@/lib/song/liveSong');
+    const live = { getSong: () => liveTrackerSong(), syncCellToWasmSequencer() {}, setChannelMuteMask() {}, isPlaying: () => false } as never;
+    vi.spyOn(ts, 'getTrackerReplayer').mockReturnValue(live);
+    vi.spyOn(ts, 'peekTrackerReplayer').mockReturnValue(live);
+
+    // Per voice: the tick each row is first consumed, and the Paula period every tick.
+    const TICKS = 1500;
+    const trace = async (bytes: ArrayBuffer, rows: { type: string; index: number; bytes: Uint8Array }[]) => {
+      const { proc, send } = await startWorklet('sidmon1', 'SidMon1Replayer');
+      await send({ type: 'loadModule', moduleData: bytes.slice(0) });
+      await send({ type: 'resume' });
+      for (const m of rows) await send(m);
+      const m = proc.module as unknown as Mod;
+      const out = m._malloc(960 * 2 * 4);
+      const consumed: string[][] = [[], [], [], []];
+      const seen = [0, 0, 0, 0];
+      const period: number[][] = [[], [], [], []];
+      for (let tick = 0; tick < TICKS; tick++) {
+        m._player_render(out, 960);
+        for (let v = 0; v < 4; v++) {
+          period[v].push(m._player_get_paula_period(v));
+          const n = m._player_get_voice_rows_consumed(v);
+          if (n !== seen[v]) { seen[v] = n; consumed[v].push(`${tick}:${m._player_get_voice_consumed(v)}`); }
+        }
+      }
+      return { consumed, period: period.map((p) => p.join(',')) };
+    };
+    const base = await trace(ab, []);
+    const consumedRows = base.consumed.map((l) => new Set(l.map((e) => Number(e.split(':')[1]))));
+
+    // Candidate rows the unedited replayer reaches, found from the parsed grid (first cell of each module row).
+    type Hit = { p: number; r: number; ch: number; row: number };
+    const hits = { bend: [] as Hit[], plain: [] as Hit[] };
+    const firstSeen = new Set<number>();
+    for (let p = 0; p < song.patterns.length; p++) for (let ch = 0; ch < 4; ch++) {
+      song.patterns[p].channels[ch].rows.forEach((cell, r) => {
+        if (layout.getCellFileOffset!(p, r, ch) < 0) return;
+        const row = rowOf(p, r, ch);
+        if (firstSeen.has(row) || !consumedRows[ch].has(row) || cell.note <= 0) return;
+        firstSeen.add(row);
+        if (cell.effTyp === 0x03 && byteAt(row, 2) > 3 && byteAt(row, 3) >= 8 && Math.abs(byteAt(row, 2) - byteAt(row, 0)) >= 6) hits.bend.push({ p, r, ch, row });
+        else if (cell.effTyp === 0 && byteAt(row, 2) === 0 && byteAt(row, 3) === 0) hits.plain.push({ p, r, ch, row });
+      });
+    }
+    expect(hits.bend.length, 'a bend row the replayer reaches, whose target note is far from its own note (a bend to its own note moves nothing)').toBeGreaterThan(1);
+    expect(hits.plain.length, 'a plain note row the replayer reaches').toBeGreaterThan(0);
+
+    const edit = async (h: Hit, patch: { effTyp: number; eff: number }) => {
+      const n = posted.length;
+      useTrackerStore.setState({ currentPatternIndex: h.p });
+      useTrackerStore.getState().setCell(h.ch, h.r, patch);
+      await vi.waitFor(() => expect(posted.length).toBeGreaterThan(n));
+      return posted.slice(n);
+    };
+    const cases: { name: string; h: Hit; patch: { effTyp: number; eff: number }; stored: [number, number] }[] = [];
+    const bendA = hits.bend[0], bendC = hits.bend[1], plain = hits.plain[0];
+    // the slowest bend (parameter 1) against the song's fast one: the period then moves over many ticks
+    cases.push({ name: 'bend parameter', h: bendA, patch: { effTyp: 0x03, eff: 1 }, stored: [byteAt(bendA.row, 2), 1] });
+    cases.push({ name: 'Fxx speed', h: plain, patch: { effTyp: 0x0f, eff: 1 }, stored: [2, 1] });
+    cases.push({ name: 'clear', h: bendC, patch: { effTyp: 0, eff: 0 }, stored: [0, 0] });
+
+    const all: { type: string; index: number; bytes: Uint8Array }[] = [];
+    for (const c of cases) {
+      const rows = await edit(c.h, c.patch);
+      expect(rows.map((r) => r.index), `${c.name}: the row the cell shows`).toEqual([c.h.row]);
+      expect([rows[0].bytes[2], rows[0].bytes[3]], `${c.name}: the stored effect and parameter bytes`).toEqual(c.stored);
+      all.push(...rows);
+      const t = await trace(ab, rows);
+      expect(`${t.consumed.join('|')}#${t.period.join('|')}`, `${c.name}: the replayer plays something different from the unedited song`)
+        .not.toEqual(`${base.consumed.join('|')}#${base.period.join('|')}`);
+      if (c.name === 'bend parameter' || c.name === 'clear') expect(t.period[c.h.ch], `${c.name}: the voice's Paula period moved`).not.toEqual(base.period[c.h.ch]);
+      if (c.name === 'Fxx speed') expect(t.consumed.map((l) => l.join(',')), 'a speed change moves when rows are consumed').not.toEqual(base.consumed.map((l) => l.join(',')));
+    }
+
+    // The reload: the module the song carries holds all three, re-parses to them, and plays as the posted rows do.
+    const carried = new Uint8Array(useFormatStore.getState().sidmon1WasmFileData!);
+    const back = parseSidMon1File(carried.buffer.slice(0) as ArrayBuffer, 'anarchy.sid1');
+    for (const c of cases) {
+      const cell = back.patterns[c.h.p].channels[c.h.ch].rows[c.h.r];
+      expect([cell.effTyp, cell.eff], `${c.name}: the reloaded module shows the edited cell`).toEqual([c.patch.effTyp, c.patch.eff]);
+    }
+    const viaPosted = await trace(ab, all);
+    const viaReload = await trace(carried.buffer.slice(0) as ArrayBuffer, []);
+    expect(viaReload).toEqual(viaPosted);
   });
 });

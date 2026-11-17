@@ -332,50 +332,12 @@ ub5	djnz ub4
 	call bar
 	ld a,(lvl + 3)
 	ld hl,BARBASE + 8
+	jp bar
 
-bar	ld c,a			; HL = attribute of the bottom cell, A = level 0-8
-	ld de,barcol
-	ld b,8
-bar1	ld a,c
-	or a
-	jr z,bar2
-	dec c
-	ld a,(de)
-	jr bar3
-bar2	xor a
-bar3	ld (hl),a
-	inc de
-	ld a,l
-	sub 32
-	ld l,a
-	jr nc,bar4
-	dec h
-bar4	djnz bar1
-	ret
+scroll				; two scroller pixel rows per frame: one character every 4 frames, no 32 character redraw
+	call scroll_row
+	jp scroll_row
 
-scroll	ld a,(scrtick)
-	inc a
-	ld (scrtick),a
-	and 3
-	ret nz
-	ld a,(scrpos)
-	ld l,a
-	ld h,0
-	ld de,scrtxt
-	add hl,de
-	ld d,22
-	ld e,0
-	ld b,32
-	call puttext
-	ld a,(scrpos)
-	inc a
-	cp SCRLEN
-	jr c,sc1
-	xor a
-sc1	ld (scrpos),a
-	ret
-
-barcol	db #44,#44,#44,#46,#46,#46,#42,#42	; green, yellow, red from the bottom
 chiptxt	db "ZX SPECTRUM AY 128K "
 statustxt	db "SONG 01/01  00:00  PLAYING"
 txt_playing	db "PLAYING"

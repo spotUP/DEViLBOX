@@ -42,6 +42,7 @@ size_t rk_export(const RkModule* module, uint8_t* out, size_t max_size);
 // note command of that entry's track starts there. The importer maps a grid
 // cell to the offset.
 int rk_set_cell(RkModule* module, int position, int channel, uint32_t file_offset, uint8_t note);
+int rk_set_track_byte(RkModule* module, uint32_t file_offset, uint8_t value);
 
 // The note command at file_offset as (note << 8) | wait, or -1.
 int rk_get_cell(const RkModule* module, uint32_t file_offset);

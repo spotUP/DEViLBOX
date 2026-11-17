@@ -1982,6 +1982,27 @@ int rk_set_cell(RkModule* module, int position, int channel, uint32_t file_offse
     return 1;
 }
 
+// Write one stored byte of a track at a file offset: an argument byte of a
+// track command (SetInstrument, ChangeAdsrSpeed, ...). The layout the importer
+// built names only argument bytes, so the command's length is unchanged and
+// the track stays in step. Returns 0 when no track holds the offset.
+int rk_set_track_byte(RkModule* module, uint32_t file_offset, uint8_t value) {
+    if (!module || !module->tracks || !module->track_offsets)
+        return 0;
+
+    int index = 0;
+    int t = find_track_byte(module, file_offset, &index);
+    if (t < 0)
+        return 0;
+
+    module->tracks[t][index] = value;
+
+    // Keep the file image in step so rk_export carries the edit.
+    if (module->original_data && file_offset < module->original_size)
+        module->original_data[file_offset] = value;
+    return 1;
+}
+
 int rk_get_cell(const RkModule* module, uint32_t file_offset) {
     if (!module || !module->tracks || !module->track_offsets)
         return -1;

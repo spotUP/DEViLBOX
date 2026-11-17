@@ -27,6 +27,7 @@ entry
 	di
 	ld sp,#8000		; the screen routine calls; the tone loop uses SP as a scratch register afterwards
 	call screen_static
+	call bar_static
 	xor a
 	jp setbank
 
@@ -113,6 +114,9 @@ record
 	or a
 	jp m,special
 	ld c,a
+	ld a,(mbits)		; voices changed by this record light their bar
+	or c
+	ld (mbits),a
 VOICE	macro fk, dk
 	rr c
 	jr nc,.skip
@@ -181,6 +185,8 @@ dbyte
 
 ; ---- restore the loop state and run the tone loop for the record's length ----------------
 restore
+	ld sp,#8000		; one screen slice between two tone runs: the pin is frozen here, the tone loop timing is untouched
+	call slice
 	exx
 dur	equ $+1
 	ld bc,0
@@ -207,11 +213,17 @@ sv_a	equ $+1
 	ld a,0
 	jp loop
 
-; ---- bank switch: #80 = next bank, #81 = first bank -------------------------------------
+; ---- stream markers: #80 = next bank, #81 = first bank (song restarts: clock to 00:00), #82 = one more second of song
 special
+	ld sp,#8000		; the tone loop leaves SP as a scratch value
+	cp #82
+	jr z,second
 	cp #81
-	ld a,0
-	jr z,setbank
+	jr nz,nextbank
+	call clock_reset
+	xor a
+	jr setbank
+nextbank
 bankix	equ $+1
 	ld a,0
 	inc a
@@ -225,6 +237,10 @@ setbank
 	ld bc,#7ffd
 	out (c),a
 	ld hl,#c000
+	jp record
+second	push hl
+	call clock_inc
+	pop hl
 	jp record
 
 banktab	db #10, #11, #13, #14, #16, #17
@@ -244,11 +260,13 @@ v = v + 1
 
 chiptxt	db "ZX SPECTRUM BEEPER  "
 NBARS	equ 6
+voxon	dw d1,d2,d3,d4,d5,d6	; duty operand per voice, 0 = silent
 statustxt	db "SONG 01/01  00:00  PLAYING"
 bartxt	db "1 2 3 4 5 6"
 scrtxt	db "DEVILBOX NATIVE PLAYER FOR THE ZX SPECTRUM 128K - BEEPER MUSIC ...                                "
 SCRLEN	equ $ - scrtxt
 
+	define LIVE_SCREEN		; screen.inc adds the record gap slice (bars, clock, scroller)
 	include "screen.inc"
 
 drumdata			; the exporter appends the drum bits here

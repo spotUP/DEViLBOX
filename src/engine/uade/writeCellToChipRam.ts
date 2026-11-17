@@ -71,12 +71,16 @@ export async function writeCellToChipRam(
   if (song.ronKlarenFileData && layout) {
     const offset = getCellFileOffset(layout, patternIdx, row, channel);
     const note = ronKlarenNoteIndex(cell.note ?? 0);
-    if (offset >= 0 && note >= 0) {
-      try {
-        const { RonKlarenEngine } = await import('../ronklaren/RonKlarenEngine');
-        if (RonKlarenEngine.hasInstance()) RonKlarenEngine.getInstance().setCell(patternIdx, channel, offset, note);
-      } catch { /* Ron Klaren not active */ }
-    }
+    try {
+      const { RonKlarenEngine } = await import('../ronklaren/RonKlarenEngine');
+      if (RonKlarenEngine.hasInstance()) {
+        const engine = RonKlarenEngine.getInstance();
+        if (offset >= 0 && note >= 0) engine.setCell(patternIdx, channel, offset, note);
+        // The argument bytes the cell shows: the SetInstrument byte the row's instrument comes from (one byte serves every
+        // following note until the next SetInstrument), and effect arguments.
+        for (const [at, value] of layout.effectPatches?.(patternIdx, row, channel, cell).patches ?? []) engine.setTrackByte(at, value);
+      }
+    } catch { /* Ron Klaren not active */ }
   }
 
   // 3. TFMX direct-write into the tfmxFileData buffer (WASM playback path).

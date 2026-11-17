@@ -44,6 +44,7 @@ entry
 	di
 	ld sp,#8000		; the screen routine calls; the tone loop uses SP as a scratch register afterwards
 	call screen_static
+	call bar_static
 	ld c,#fe
 	xor a
 	ld h,a
@@ -118,6 +119,10 @@ rec
 	or a			; 4
 	jp m,special		; 10
 	ld b,a			; 4 = 31
+	ld c,a			; 4 voices changed by this record light their bar
+	ld a,(mbits)		; 13
+	or c			; 4
+	ld (mbits),a		; 13 = 34
 VOICE	macro fk, ok, pk
 	rr b			; 8
 	jr nc,.skip		; 12 / 7
@@ -189,15 +194,28 @@ lval	equ $+1
 	ld a,c			; 4
 	or a			; 4
 	jp z,rec		; 10 (jr cannot reach rec)
+	ld (qsp),hl		; one screen slice between two tone runs: the pin is frozen here, the tone loop timing is untouched
+	ld sp,#8000
+	call slice
+qsp	equ $+1
+	ld hl,0
+	ld a,(lval)
+	ld c,a
 	ex af,af'		; 4
 	exx			; 4
 	jp loop			; 10
 
-; ---- bank switch: #80 = next bank, #81 = first bank ------------------------------------------------
+; ---- stream markers: #80 = next bank, #81 = first bank (song restarts: clock to 00:00), #82 = one more second of song
 special
+	ld sp,#8000		; the tone loop leaves SP as a scratch value
+	cp #82
+	jr z,second
 	cp #81
-	ld a,0
-	jr z,setbank
+	jr nz,nextbank
+	call clock_reset
+	xor a
+	jr setbank
+nextbank
 bankix	equ $+1
 	ld a,0
 	inc a
@@ -212,16 +230,22 @@ setbank
 	out (c),a
 	ld hl,#c000
 	jp rec
+second	push hl
+	call clock_inc
+	pop hl
+	jp rec
 
 banktab	db #10, #11, #13, #14, #16, #17
 
 chiptxt	db "ZX BEEPER QUADTONE  "
 NBARS	equ 4
+voxon	dw o1+1,o2+1,o3+1,o4+1	; duty operand per voice, 0 = silent
 statustxt	db "SONG 01/01  00:00  PLAYING"
 bartxt	db "1 2 3 4"
 scrtxt	db "DEVILBOX NATIVE PLAYER FOR THE ZX SPECTRUM 128K - BEEPER MUSIC ...                                "
 SCRLEN	equ $ - scrtxt
 
+	define LIVE_SCREEN		; screen.inc adds the record gap slice (bars, clock, scroller)
 	include "screen.inc"
 
 drumdata			; the exporter appends the drum bits here
