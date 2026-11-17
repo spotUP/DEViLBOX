@@ -16,6 +16,9 @@
  *   Events prefix: 0x82 u8 count, entries in capture order: byte0 = kind<<3 | chip (kind 0 timed PCM write, 1 control),
  *                  u16 offset (worklet samples from the tick start), then PCM: reg index, value | control: control|channel<<4,
  *                  u16 value. These are the sample-rate ($4011, VRC6 digital) and DAC/DPCM-bank bookkeeping events.
+ *   Raw block:     0x84 chip a b u16 len, then len bytes written back to back to one register ($4011 nes, $9000 vrc6, $5011 mmc5)
+ *                  by a cycle-counted loop of NES_RAW_FIXED + 5a + 7b CPU cycles per sample. Tick prefix (a tick header follows).
+ *                  The player freezes everything else while it runs; blocks never cross a bank.
  *   Register index: nes addr-$4000, vrc6 (bank-$9)*4+(addr&3) over $9000/$A000/$B000, mmc5 addr-$5000, fds addr-$4040;
  *                  vrc7, n163, s5b store the register number itself. The player maps those to ports: VRC7 $9010 (reg) /
  *                  $9030 (data), N163 $F800 (address) / $4800 (data), 5B $C000 (reg) / $E000 (data).
@@ -23,7 +26,7 @@
 import { NES_CONTROL, type NesCapture, type NesChip, type NesEvent } from './nesCapture';
 
 export const CHIP_ORDER: readonly NesChip[] = ['nes', 'vrc6', 'vrc7', 'fds', 'mmc5', 'n163', 's5b'];
-export const NES_OP = { END: 0x80, LOOP: 0x81, EVENTS: 0x82, SET_BANK: 0x83, DICT_BASE: 0xC0, REPEAT: 0xFE, DICT_LONG: 0xFF } as const;
+export const NES_OP = { END: 0x80, LOOP: 0x81, EVENTS: 0x82, SET_BANK: 0x83, RAW: 0x84, DICT_BASE: 0xC0, REPEAT: 0xFE, DICT_LONG: 0xFF } as const;
 export const NES_REGIONS = ['ntsc', 'pal', 'dendy'] as const;
 export type NesRegion = typeof NES_REGIONS[number];
 /** CPU clock (Hz) and frame rate (Hz) per console region. */
@@ -46,8 +49,20 @@ export function nesIrqPeriod(region: NesRegion, rateHz: number): number {
 export type NesTickEvent =
   | { kind: 'pcm'; chip: NesChip; offset: number; addr: number; value: number }
   | { kind: 'control'; chip: NesChip; offset: number; control: number; channel: number; value: number };
-export interface NesTick { writes: Partial<Record<NesChip, Array<[number, number]>>>; events: NesTickEvent[] }
-export interface NesEncodeOptions { loopTick?: number; bankSize?: number }
+/** One cycle-counted sample block: `period` CPU cycles per sample, bytes written to the chip's sample register. */
+export interface NesRawBlock { chip: NesChip; period: number; data: number[] }
+export interface NesTick { writes: Partial<Record<NesChip, Array<[number, number]>>>; events: NesTickEvent[]; raws?: NesRawBlock[] }
+/** CPU cycles per sample of the player's raw loop besides its two delay loops (5a + 7b). Measured in Mesen2 (see plan Phase 7). */
+export const NES_RAW_FIXED = 30;
+/** Raw loop sample register per chip (address, event register index). */
+export const NES_RAW_REG: Partial<Record<NesChip, number>> = { nes: 0x4011, vrc6: 0x9000, mmc5: 0x5011 };
+const RAW_MIN = 16;
+function rawDelay(period: number): { a: number; b: number } {
+  const n = period - NES_RAW_FIXED;
+  for (let b = 1; b <= 255; b++) { const r = n - 7 * b; if (r >= 5 && r % 5 === 0 && r / 5 <= 255) return { a: r / 5, b }; }
+  throw new Error(`nesStream: sample period ${period} cycles is outside the raw loop range`);
+}
+export interface NesEncodeOptions { loopTick?: number; bankSize?: number; region?: NesRegion }
 export interface NesDecoded { tickRateCentiHz: number; irqPeriod: number; ticks: NesTick[]; loopTick?: number }
 
 function regIndex(chip: NesChip, a: number): number {
@@ -72,11 +87,35 @@ function regAddr(chip: NesChip, i: number): number {
   }
 }
 
+/** Pull runs of evenly spaced pcm writes out of the capture as raw blocks (placed at the run's first tick). */
+function extractRaw(cap: NesCapture, cpuHz: number): { events: NesEvent[]; raws: Array<{ tick: number; block: NesRawBlock }> } {
+  const taken = new Set<NesEvent>();
+  const raws: Array<{ tick: number; block: NesRawBlock }> = [];
+  for (const chip of Object.keys(NES_RAW_REG) as NesChip[]) {
+    const pcm = cap.events.filter((e) => e.kind === 'pcm' && e.chip === chip && e.addr === NES_RAW_REG[chip]);
+    for (let i = 0; i < pcm.length;) {
+      let j = i + 1;
+      const g0 = j < pcm.length ? pcm[j].sample - pcm[i].sample : 0;
+      while (j < pcm.length && g0 > 0 && Math.abs(pcm[j].sample - pcm[j - 1].sample - g0) <= 1) j++;
+      if (j - i >= RAW_MIN) {
+        const period = Math.round(cpuHz * (pcm[j - 1].sample - pcm[i].sample) / ((j - i - 1) * cap.sampleRate));
+        const tick = Math.max(0, Math.floor(pcm[i].sample * cap.tickRateHz / cap.sampleRate));
+        raws.push({ tick, block: { chip, period, data: pcm.slice(i, j).map((e) => (e as { value: number }).value & 255) } });
+        for (let k = i; k < j; k++) taken.add(pcm[k]);
+        i = j;
+      } else i++;
+    }
+  }
+  return { events: cap.events.filter((e) => !taken.has(e)), raws };
+}
+
 /** Bucket the capture into driver ticks (tick = floor(sample * tickRate / sampleRate)). Shared by encoder and tests. */
-export function nesCaptureToTicks(cap: NesCapture): NesTick[] {
+export function nesCaptureToTicks(cap: NesCapture, region?: NesRegion): NesTick[] {
   const ticks: NesTick[] = [];
   const at = (t: number) => { while (ticks.length <= t) ticks.push({ writes: {}, events: [] }); return ticks[t]; };
-  for (const e of cap.events) {
+  const { events, raws } = region ? extractRaw(cap, NES_REGION_TIMING[region].cpuHz) : { events: cap.events, raws: [] };
+  for (const r of raws) (at(r.tick).raws ??= []).push(r.block);
+  for (const e of events) {
     const t = Math.max(0, Math.floor(e.sample * cap.tickRateHz / cap.sampleRate));
     const offset = Math.max(0, e.sample - Math.ceil(t * cap.sampleRate / cap.tickRateHz));
     if (offset > 0xffff) throw new Error('nesStream: event offset exceeds 16 bits');
@@ -116,6 +155,19 @@ function tickRecord(t: NesTick): number[] {
   return mask ? [mask, ...body] : [];
 }
 
+/** Raw blocks of one tick as separate prefixes, each cut to `room` data bytes (a bank minus its header). */
+function rawChunks(t: NesTick, room: number): number[][] {
+  const out: number[][] = [];
+  for (const r of t.raws ?? []) {
+    const { a, b } = rawDelay(r.period);
+    for (let o = 0; o < r.data.length; o += room) {
+      const d = r.data.slice(o, o + room);
+      out.push([NES_OP.RAW, CHIP_ORDER.indexOf(r.chip), a, b, d.length & 255, d.length >> 8, ...d]);
+    }
+  }
+  return out;
+}
+
 function eventBytes(evs: readonly NesTickEvent[]): number[] {
   if (!evs.length) return [];
   if (evs.length > 255) throw new Error('nesStream: more than 255 events in one tick');
@@ -142,7 +194,7 @@ function buildDictionary(records: ReadonlyArray<number[]>): number[][] {
 }
 
 export function encodeNesSubsong(cap: NesCapture, opts: NesEncodeOptions = {}): Uint8Array {
-  const ticks = nesCaptureToTicks(cap);
+  const ticks = nesCaptureToTicks(cap, opts.region);
   const records = ticks.map(tickRecord);
   const dict = buildDictionary(records);
   const dictIndex = new Map(dict.map((r, i) => [r.join(','), i]));
@@ -168,8 +220,10 @@ export function encodeNesSubsong(cap: NesCapture, opts: NesEncodeOptions = {}): 
   ticks.forEach((t, i) => {
     if (i === opts.loopTick) { flush(); pendingLoop = true; }
     const ev = eventBytes(t.events), rec = records[i];
-    if (!ev.length && !rec.length) { run++; return; }
+    const chunks = rawChunks(t, (bank || 65536) - 8 - 16);
+    if (!ev.length && !rec.length && !chunks.length) { run++; return; }
     flush();
+    for (const c of chunks) emit(c);
     const d = dictIndex.get(rec.join(','));
     const body = d === undefined ? (rec.length ? rec : [0]) : d < 62 ? [NES_OP.DICT_BASE + d] : [NES_OP.DICT_LONG, d];
     emit([...ev, ...body]);
@@ -186,7 +240,7 @@ export interface NesSubsongInput { ntsc: NesCapture; pal?: NesCapture; dendy?: N
 export function encodeNesStreams(subsongs: readonly NesSubsongInput[], bankSize = 0): Record<NesRegion, Uint8Array> {
   const res = {} as Record<NesRegion, Uint8Array>;
   for (const r of NES_REGIONS) {
-    const streams = subsongs.map((s) => ({ cap: s[r] ?? s.ntsc, data: encodeNesSubsong(s[r] ?? s.ntsc, { loopTick: s.loopTick, bankSize }) }));
+    const streams = subsongs.map((s) => ({ cap: s[r] ?? s.ntsc, data: encodeNesSubsong(s[r] ?? s.ntsc, { loopTick: s.loopTick, bankSize, region: r }) }));
     const out: number[] = [streams.length];
     if (streams.length > 36) throw new Error('nesStream: the player table holds at most 36 subsongs');
     let off = 1 + streams.length * 7;
@@ -248,6 +302,12 @@ export function decodeNesStream(region: Uint8Array, subsong: number, bankSize = 
         else { t.events.push({ kind: 'control', chip, offset, control: s[p] & 15, channel: s[p] >> 4, value: s[p + 1] | s[p + 2] << 8 }); p += 3; }
       }
       fresh = false;
+      continue;
+    }
+    if (h === NES_OP.RAW) {
+      const chip = CHIP_ORDER[s[p]], a = s[p + 1], b = s[p + 2], len = s[p + 3] | s[p + 4] << 8;
+      (t.raws ??= []).push({ chip, period: NES_RAW_FIXED + 5 * a + 7 * b, data: Array.from(s.subarray(p + 5, p + 5 + len)) });
+      p += 5 + len;
       continue;
     }
     if (h === NES_OP.REPEAT) { const n = s[p++]; for (let i = 0; i < n; i++) ticks.push({ writes: {}, events: [] }); continue; }

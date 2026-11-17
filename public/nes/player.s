@@ -5,7 +5,9 @@
 ; The region header (subsong table) lives in ROM bank 0. Streams are always encoded with bankSize 4096.
 ; Stream format: header comment of src/lib/export/nes/nesStream.ts. The region stream sits at $8000 (patched in).
 ; Decoded: tick masks, chip blocks (items, ascending and constant runs), dictionary refs, repeat, loop, end.
-; Chip writers for 2A03, VRC6, VRC7, FDS, MMC5, N163, 5B (Phase 5). Events prefix: only DPCM_BANK is acted on (PCM events: Phase 7).
+; Chip writers for 2A03, VRC6, VRC7, FDS, MMC5, N163, 5B (Phase 5). Events prefix: only DPCM_BANK is acted on.
+; Phase 7: RAW prefix ($84, chip, a, b, u16 len, bytes) runs a cycle-counted loop that writes the bytes to $4011 / $9000 / $5011.
+; Cycles per sample = 30 + 5a + 7b (NES_RAW_FIXED in nesStream.ts). NMI is off and nothing else runs while it plays.
 ; Phase 6: region (NTSC/PAL/Dendy) is detected at boot by counting loop iterations between two vblanks; the region's stream starts
 ; at ROM bank regbank[region] (patched). A subsong whose table entry has period 0 ticks on NMI (song rate = console frame rate);
 ; otherwise the custom board's cycle IRQ ticks it every `period` CPU cycles ($4100/$4101 reload lo/hi, $4102 bit 0 enable, $4103 ack;
@@ -33,6 +35,32 @@ wp       = $14              ; computed write port (VRC6)
 rbank    = $16              ; first ROM bank of the detected region's stream
 period   = $17              ; IRQ period of the current subsong (0 = NMI driven), 2 bytes
 region   = $19              ; 0 NTSC, 1 PAL, 2 Dendy
+ra       = $1A              ; raw loop delay loop counts (5 and 7 cycle loops)
+rb       = $1B
+endp     = $1C              ; raw block end address, 2 bytes
+
+; One raw sample loop. Per sample: fetch, write, advance (+4 cycles on a page carry), two delay loops, end test.
+.macro RAWLOOP port
+:
+  lda (ptr),y
+  sta port
+  inc ptr
+  bne :+
+  inc ptr+1
+: ldx ra
+: dex
+  bne :-
+  ldx rb
+: dex
+  nop
+  bne :-
+  lda ptr
+  cmp endp
+  bne :----
+  lda ptr+1
+  cmp endp+1
+  bne :----
+.endmacro
 
 .segment "HEADER"
   .byte "NES",$1A,2,0,$F0,$18,0,0,0,0,0,0,0,0 ; NES 2.0, mapper 31, PRG size patched by the cartridge builder
@@ -236,9 +264,13 @@ tick:
   cmp #$81
   beq @loop
   cmp #$82
-  beq @events
+  bne @n82
+  jmp @events
+@n82:
   cmp #$83
   beq @bank
+  cmp #$84
+  beq @raw
   cmp #$FE
   beq @repeat
   cmp #$FF
@@ -300,6 +332,54 @@ tick:
   ora #$80
   sta ptr+1
   jmp @decode               ; loop target is a tick start; decode it in this tick
+@raw:                       ; chip index (CHIP_ORDER), a, b, u16 length, data
+  jsr rd
+  sta tmp
+  jsr rd
+  sta ra
+  jsr rd
+  sta rb
+  jsr rd
+  sta endp
+  jsr rd
+  sta endp+1
+  clc
+  lda endp
+  adc ptr
+  sta endp
+  lda endp+1
+  adc ptr+1
+  sta endp+1
+  lda #0
+  sta $2000                 ; no NMI tick while the sample plays
+  lda tmp
+  bne @r1
+  RAWLOOP $4011
+  jmp @rawdone
+@r1:
+  cmp #1
+  bne @r4
+  RAWLOOP $9000
+  jmp @rawdone
+@r4:
+  cmp #4
+  bne @rskip
+  RAWLOOP $5011
+  jmp @rawdone
+@rskip:
+  lda endp                  ; unknown chip: skip the data
+  sta ptr
+  lda endp+1
+  sta ptr+1
+@rawdone:
+  bit $2002                 ; drop the vblank edge that passed during the block
+  lda period
+  ora period+1
+  bne @rawnoirq
+  lda #$80
+  sta $2000
+@rawnoirq:
+  jmp @decode
 @events:                    ; entries: byte0 = kind<<3|chip, u16 offset, then 2 (PCM) or 3 (control) value bytes
   jsr rd
   sta cnt
