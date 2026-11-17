@@ -158,6 +158,24 @@ function parseMusicMakerFile(
 
   // Chunks are only present in IFF files; prefix-based legacy files have no IFF container.
   const isIFF = buf.length >= MIN_IFF_SIZE && readTag4(buf, 0) === 'FORM';
+
+  // FORM/MMV8 with a decodable SDAT: same grid compiler as the split .sdata form; the file itself stays the engine's data.
+  if (isIFF && readTag4(buf, 8) === 'MMV8') {
+    try {
+      const ch = readChunks(buf);
+      const sdat = ch.get('SDAT'), pins = ch.get('PINS'), inst = ch.get('INST');
+      const ic = pins ?? inst;
+      if (sdat && ic) {
+        const stem = 'iff';
+        const sdata = buf.slice(sdat.offset + 4, sdat.offset + sdat.size);
+        const names = ch.get('INAM');
+        const comp = new Map<string, ArrayBuffer>([[`${stem}.${pins ? 'ip' : 'i'}`, buf.slice(ic.offset, ic.offset + ic.size).buffer as ArrayBuffer]]);
+        if (names) comp.set(`${stem}.${pins ? 'ip' : 'i'}.n`, buf.slice(names.offset, names.offset + names.size).buffer as ArrayBuffer);
+        const song = parseMusicMakerSongFile(sdata, `${stem}.sdata`, comp);
+        return { ...song, name: moduleName, musicMakerFileData: buf.slice().buffer as ArrayBuffer };
+      }
+    } catch { /* not a decodable song: fall through to the skeleton */ }
+  }
   const chunks = isIFF ? readChunks(buf) : new Map<string, IFFChunk>();
 
   // ── Song name from SDAT ──────────────────────────────────────────────────────

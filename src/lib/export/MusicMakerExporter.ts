@@ -5,7 +5,7 @@
  * is played. Edits the triple cannot hold (empty cell, legato instrument, note off, other bank) come back as warnings.
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import { buildMusicMakerGrid, MM_NOTE_PERIODS, MM_VOLUMES, readChunks, readMusicMakerIff } from '@lib/import/formats/MusicMakerParser';
+import { buildMusicMakerGrid, buildMusicMakerIff, MM_NOTE_PERIODS, MM_VOLUMES, readChunks, readMusicMakerIff } from '@lib/import/formats/MusicMakerParser';
 import { noteToPeriod } from '@lib/amiga/periodNotes';
 
 export interface MusicMakerExportResult { data: Uint8Array; filename: string; warnings: string[] }
@@ -64,5 +64,14 @@ export function editedMusicMakerIff(song: TrackerSong): ArrayBuffer {
 export async function exportMusicMaker(song: TrackerSong): Promise<MusicMakerExportResult> {
   const { out, warnings } = patchedSdata(song);
   const stem = (song.name || 'song').replace(/[^\w.-]+/g, '_');
+  // A file loaded as a single FORM/MMV8 (.mm4/.mm8) leaves as that file; a split .sdata song (whose IFF the parser built) as .sdata.
+  const orig = new Uint8Array(song.musicMakerFileData!);
+  const { song: dec, instruments } = readMusicMakerIff(orig);
+  const ic = readChunks(orig);
+  const c = ic.get('PINS') ?? ic.get('INST')!;
+  const built = new Uint8Array(buildMusicMakerIff(dec.sdata, orig.subarray(c.offset, c.offset + c.size), instruments.packed));
+  if (built.length !== orig.length || built.some((x, i) => x !== orig[i])) {
+    return { data: new Uint8Array(editedMusicMakerIff(song)), filename: `${stem}.mm${dec.voices === 8 ? 8 : 4}`, warnings };
+  }
   return { data: out, filename: `${stem}.sdata`, warnings };
 }
