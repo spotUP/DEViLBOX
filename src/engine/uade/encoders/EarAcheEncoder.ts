@@ -1,33 +1,27 @@
 /**
- * EarAcheEncoder — Encodes TrackerCell back to EarAche (.ea) score bytes.
+ * EarAcheEncoder - EarAche (.ea) grid cell codec (third-party/nuade/players/earache/ea_module.c).
  *
- * An EarAche module is an "EASO" container: a 4-byte magic + a 6-entry u32 section
- * offset table (relative to byte 4), then a score command-stream at section[0]
- * followed by instrument / envelope / sample tables. The score is an opcode-driven
- * event byte-stream (0x19/0x1b/0x1c note+control ops, 0x31/0x36/0x38 args), not a
- * clean note/effect grid, so the faithful byte-exact inverse is a per-byte carrier.
- *
- * decodeCell (in EarAcheParser) stashes the exact source byte in the invisible
- * `period` carrier; this encoder reproduces it verbatim. Edited grid cells lack the
- * carrier and fall back to a rest byte. True note-level editing of the opcode stream
- * is future work; this codec's job is a byte-exact export round-trip over the real
- * located score region.
+ * The row table (header word 0, offset 0x18 after the "EASO" mark) holds 8-byte rows, one 2-byte cell [note, instrument]
+ * per voice. note = index into the player's period table (1..70, ascending pitch, 0 = none): grid note = index, in table
+ * order only, the octave is not measured against Paula output. instrument = instrument table index, grid instrument =
+ * index + 1. A cell the grid cannot show (an instrument byte with no note, or a note above the table) is carried raw:
+ * effTyp = first byte, eff = second byte.
  */
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 
-// A zero byte reads as a no-op / stream padding in the opcode dispatch.
-const EA_REST = 0x00;
+export const EA_MAX_NOTE = 70;
 
-export function encodeEarAcheCell(cell: TrackerCell): Uint8Array {
-  // Byte-exact carrier restore: reproduce the exact source byte when present.
-  if (cell.period !== undefined) {
-    return new Uint8Array([cell.period & 0xFF]);
-  }
-  return new Uint8Array([EA_REST]);
+export function decodeEarAcheCell(b: ArrayLike<number>): TrackerCell {
+  const shown = b[0] >= 1 && b[0] <= EA_MAX_NOTE;
+  return { note: shown ? b[0] : 0, instrument: shown ? b[1] + 1 : 0, volume: 0, effTyp: shown ? 0 : b[0], eff: shown ? 0 : b[1], effTyp2: 0, eff2: 0 };
+}
+
+export function encodeEarAcheCell(c: TrackerCell): Uint8Array {
+  const note = c.note ?? 0;
+  if (note >= 1 && note <= EA_MAX_NOTE) return Uint8Array.of(note, Math.max(0, (c.instrument ?? 0) - 1) & 0xff);
+  return Uint8Array.of((c.effTyp ?? 0) & 0xff, (c.eff ?? 0) & 0xff);
 }
 
 registerPatternEncoder('earAche', () => encodeEarAcheCell);
-
-export { EA_REST };

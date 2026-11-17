@@ -178,8 +178,8 @@
     },
     "earAche": {
       "exporter": "EarAcheExporter.exportEarAche",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
       "cells": 1024,
       "bytes": 1288
