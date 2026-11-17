@@ -18,7 +18,7 @@ import type { FurnacePatternCell } from '../../import/formats/furnace/FurnacePat
 import { convertFurnaceNoteValue } from '../../import/formats/furnace/FurnacePatternParser';
 
 export interface FamistudioMeta { musicAddr: number; musicCap: number; dpcmAddr: number; dpcmCap: number; prgOffset: number; tickAddr: number; sourceHash: string }
-export interface FamistudioSong { music: Uint8Array; dpcm: Uint8Array; lossy: string[]; channelsWithNotes: boolean[]; firstNotes: number[] }
+export interface FamistudioSong { music: Uint8Array; dpcm: Uint8Array; lossy: string[]; channelsWithNotes: boolean[]; firstNotes: number[]; firstNoteFrames: number[] }
 
 class Lossy {
   private counts = new Map<string, number>();
@@ -34,6 +34,9 @@ const MAX_INSTRUMENTS = 64;
 const MAX_EMPTY = 64; // 0x81|(n<<1) waits n+1 rows, n <= 63
 /** FamiStudio note N plays NoteTables index N; index 46 = A-4 440 Hz. Furnace flat A-4 = 57. */
 const NOTE_OFFSET = 11;
+/** FamiStudio note 10 (A-1, period 2033) is the lowest whose 2A03 period fits 11 bits; lower notes wrap in $4003/$400B,
+ *  while Furnace saturates the period at 2047 (nes.cpp: if (freq>2047) freq=2047). */
+const LOWEST_11BIT_NOTE = 10;
 /** FamiTracker tempo 150 = one Furnace tick per 60 Hz frame (FamitoneMusicFile.cs OutputHeader). */
 const FT_TEMPO = 150;
 
@@ -152,6 +155,21 @@ export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2
     orderLen.push(len);
   }
 
+  // Frame at which each row starts (speed effects in any channel apply to all; tick rate scales frames per tick).
+  const rowFrame: number[][] = [];
+  {
+    let f = 0, spd = s.speed1;
+    const perTick = 60 / (s.hz > 0 ? s.hz : 60);
+    for (let o = 0; o < endOrder; o++) {
+      rowFrame.push([]);
+      for (let r = 0; r < orderLen[o]; r++) {
+        for (let ch = 0; ch < CHANNELS; ch++) for (const e of cellAt(ch, o, r)?.effects ?? []) if ((e.type === 0x09 || e.type === 0x0f) && e.value > 0) spd = e.value;
+        rowFrame[o].push(Math.round(f));
+        f += spd * perTick;
+      }
+    }
+  }
+
   // Instruments by first use; envelopes deduplicated by content.
   const insMap = new Map<number, number>();
   const insNo = (i: number): number => {
@@ -184,11 +202,12 @@ export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2
   const fixups: Array<Array<[number, number]>> = [];
   const channelsWithNotes: boolean[] = [];
   const firstNotes: number[] = [];
+  const firstNoteFrames: number[] = [];
   const speedFx = new Set([0x09, 0x0f]);
   for (let ch = 0; ch < CHANNELS; ch++) {
     const out: number[] = [];
     const fx: Array<[number, number]> = [];
-    let lastIns = -1, lastVol = -1, empty = 0, hasNotes = false, loopAt = 0, first = -1;
+    let lastIns = -1, lastVol = -1, empty = 0, hasNotes = false, loopAt = 0, first = -1, firstFrame = -1;
     let curIns: FurnaceInstrument | undefined;
     const flush = (): void => { if (empty > 0) { out.push(0x81 | ((empty - 1) << 1)); empty = 0; } };
     if (ch === 0) out.push(0x46, s.speed1);
@@ -215,7 +234,7 @@ export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2
           else if (nv === 254 || nv === 255) rowByte = ch === DPCM_CH ? [0x00] : [0x45];
           else if (nv >= 0) {
             hasNotes = true;
-            if (first < 0) first = nv;
+            if (first < 0) { first = nv; firstFrame = rowFrame[o][r]; }
             if (ch === DPCM_CH) {
               const b = dpcmNote(curIns, nv);
               rowByte = b > 0 ? [b] : null;
@@ -224,6 +243,7 @@ export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2
               else if (lastIns < 0) { ops.push(0x80 | (insNo(0) << 1)); lastIns = 0; }
               // Noise: FamiStudio and Furnace both use the low nibble as the period index.
               let n = ch === NOISE_CH ? 32 + (nv & 15) : nv - NOTE_OFFSET;
+              if (ch !== NOISE_CH && n < LOWEST_11BIT_NOTE) { lossy.add('note below A-1 (2A03 period past 11 bits; raised to A-1 as Furnace saturates it)'); n = LOWEST_11BIT_NOTE; }
               if (n < 1 || n > 96) { lossy.add('note outside FamiStudio range C-1..B-8 (clamped)'); n = Math.max(1, Math.min(96, n)); }
               rowByte = n >= 13 && n <= 75 ? [n - 12] : [0x40, n];
             }
@@ -237,7 +257,7 @@ export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2
     flush();
     out.push(0x42, 0, 0);
     fx.push([out.length - 2, loopAt]);
-    streams.push(out); fixups.push(fx); channelsWithNotes.push(hasNotes); firstNotes.push(first);
+    streams.push(out); fixups.push(fx); channelsWithNotes.push(hasNotes); firstNotes.push(first); firstNoteFrames.push(firstFrame);
   }
 
   // Instrument envelopes.
@@ -316,7 +336,7 @@ export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2
     music.set(st, at);
     for (const [off, target] of fixups[c]) w16(at + off, streamAddr[c] + target);
   });
-  return { music, dpcm: Uint8Array.from(dpcm), lossy: lossy.list(), channelsWithNotes, firstNotes };
+  return { music, dpcm: Uint8Array.from(dpcm), lossy: lossy.list(), channelsWithNotes, firstNotes, firstNoteFrames };
 }
 
 /** Patch the converted song into the NROM player image (public/nes/famistudio/player.nes). */
