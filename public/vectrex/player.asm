@@ -25,6 +25,8 @@ bi            equ $C8A4
 dy            equ $C8A5
 xs            equ $C8A6
 ph            equ $C8A7
+lp            equ $C8A8       ; logo list pointer
+lf            equ $C8AA       ; logo segment flag
         org $0000
         fcc "g GCE 2026"
         fcb $80
@@ -33,15 +35,65 @@ ph            equ $C8A7
 title:  fcc "DEVILBOX        "
         fcb $80
         fcb 0
+        jmp start       ; the BIOS enters the cart right after the header terminator; data there ran as code by luck
 author: fcc "DEVILBOX        "
         fcb $80
 scroll: fcc "    DEVILBOX VECTREX AY-3-8910 PLAYER - MUSIC CAPTURED FROM FURNACE                                                             "
 scrollEnd:
-sLogo:  fcc "DEVILBOX"
+sLogo:
+; DEViLBOX wordmark as vectors, 6x9 units a letter (generated): flag 0=move 1=line, dy, dx; relative from the screen centre. $80 ends.
+        fcb 0,112,-120
+        fcb 1,9,0
+        fcb 1,0,4
+        fcb 1,-2,2
+        fcb 1,-4,0
+        fcb 1,-3,-2
+        fcb 1,0,-4
+        fcb 0,9,14
+        fcb 1,0,-6
+        fcb 1,-9,0
+        fcb 1,0,6
+        fcb 0,5,-6
+        fcb 1,0,5
+        fcb 0,4,3
+        fcb 1,-9,3
+        fcb 1,9,3
+        fcb 0,-9,5
+        fcb 1,6,0
+        fcb 0,2,0
+        fcb 1,1,0
+        fcb 0,0,5
+        fcb 1,-9,0
+        fcb 1,0,6
+        fcb 0,0,2
+        fcb 1,9,0
+        fcb 1,0,4
+        fcb 1,-1,2
+        fcb 1,-2,0
+        fcb 1,-1,-2
+        fcb 1,0,-4
+        fcb 0,0,4
+        fcb 1,-1,2
+        fcb 1,-2,0
+        fcb 1,-2,-2
+        fcb 1,0,-4
+        fcb 0,0,10
+        fcb 1,0,2
+        fcb 1,2,2
+        fcb 1,5,0
+        fcb 1,2,-2
+        fcb 1,0,-2
+        fcb 1,-2,-2
+        fcb 1,-5,0
+        fcb 1,-2,2
+        fcb 0,0,6
+        fcb 1,9,6
+        fcb 0,0,-6
+        fcb 1,-9,6
         fcb $80
 sPlat:  fcc "VECTREX AY-3-8910"
         fcb $80
-sSong:  fcc "SONG 1/1"
+sSong:  fcc "SONG 01/01"
         fcb $80
 sPlay:  fcc "PLAYING"
         fcb $80
@@ -178,39 +230,62 @@ pstr:   pshs d,u
         tfr a,dp
         rts
 
-screen: lda ph
-        eora #1
-        sta ph
-        bne scr2
-        ldu #sLogo
-        lda #110
-        ldb #-120
-        jsr pstr
+screen: lda ph          ; three frames a cycle: logo+chip+title / author+status / bars+scroller (the 48-segment logo made two overrun 50 Hz)
+        inca
+        cmpa #3
+        blo scp
+        clra
+scp:    sta ph
+        beq scr0
+        deca
+        lbne scr2
+        bra scr1
+scr0:
+        jsr Reset0Ref
+        jsr Intensity_5F
+        ldx #sLogo
+        stx lp
+lg:     ldx lp
+        ldb ,x+
+        bmi lgd
+        stb lf
+        lda ,x+
+        ldb ,x+
+        stx lp
+        tst lf
+        beq lgm
+        jsr Draw_Line_d
+        bra lg
+lgm:    jsr Moveto_d
+        bra lg
+lgd:    lda #$D0
+        tfr a,dp
         ldu #sPlat
-        lda #88
-        ldb #-76
+        lda #112
+        ldb #-48
         jsr pstr
         ldu #title
-        lda #60
-        ldb #-72
-        jsr pstr
-        ldu #author
-        lda #38
-        ldb #-72
-        jsr pstr
-        ldu #sSong
-        lda #12
-        ldb #-72
+        lda #84
+        ldb #-120
         jsr pstr
         rts
-scr2:   ldu #clk
-        lda #12
-        ldb #20
+scr1:   ldu #author
+        lda #66
+        ldb #-120
+        jsr pstr
+        ldu #sSong
+        lda #40
+        ldb #-120
+        jsr pstr
+        ldu #clk
+        lda #40
+        ldb #-30
         jsr pstr
         ldu #sPlay
-        lda #-10
-        ldb #-72
+        lda #40
+        ldb #30
         jsr pstr
+scr2:
         clr bi
 bl:     ldb bi
         ldx #vol

@@ -1,11 +1,11 @@
 {
- "size": 740,
+ "size": 930,
  "titleOffset": 17,
  "titleLength": 16,
- "dataOffset": 740,
- "authorOffset": 35,
+ "dataOffset": 930,
+ "authorOffset": 38,
  "authorLength": 16,
- "scrollOffset": 52,
+ "scrollOffset": 55,
  "scrollLength": 128,
  "maxCartridge": 32768
 }
