@@ -2,9 +2,10 @@
 import { useTransportStore, useTrackerStore, useFormatStore } from '@stores';
 import { FurnaceDispatchEngine } from '../../../engine/furnace-dispatch/FurnaceDispatchEngine';
 import { nesCaptureFromBatches, type NesCapture } from './nesCapture';
-import { fetchNesPlayer } from './nesCartridge';
+import { fetchNesPlayer, buildVrc6Cartridge } from './nesCartridge';
+import { buildNsfe } from './nsfe';
 import { NES_REGIONS, type NesRegion } from './nesStream';
-import { buildNesRom, isSunsoft, nesChipsOf, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
+import { buildNesRom, isSunsoft, nesChipsOf, wantsVrc6Cartridge, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
 import { orderPassLength } from '../vectrex/vectrexCapture';
 
 const MAX_RECORD_MS = 10 * 60 * 1000;
@@ -46,7 +47,9 @@ async function recordRegion(region: NesRegion, sunsoft: boolean): Promise<NesCap
   return nesCaptureFromBatches(batches.map((b) => ({ ...b, sample: b.sample - origin })), d.regCaptureSampleRate, tickRateHz, { sunsoft });
 }
 
-export async function recordNesRom(choice: NesRegionChoice, title: string, author?: string, comments?: string): Promise<NesRomResult & { tickRateHz: number }> {
+export type NesExportFormat = 'nes' | 'nsfe';
+
+export async function recordNesRom(choice: NesRegionChoice, title: string, author?: string, comments?: string, format: NesExportFormat = 'nes'): Promise<NesRomResult & { tickRateHz: number }> {
   const native = useFormatStore.getState().furnaceNative;
   const chips = nesChipsOf(native?.chipIds, native?.chipFlags);
   if (!chips.length) throw new Error('This song has no NES-family sound chip.');
@@ -57,6 +60,20 @@ export async function recordNesRom(choice: NesRegionChoice, title: string, autho
   const first = caps[regions[0]]!;
   // The ntsc slot is the fallback of the other regions: a single recorded region fills it.
   const info: NesRomInfo = { title, author, comments, chips };
-  const rom = buildNesRom([{ ntsc: first, pal: caps.pal, dendy: caps.dendy }], await fetchNesPlayer(), info);
-  return { ...rom, tickRateHz: first.tickRateHz };
+  const subsongs = [{ ntsc: first, pal: caps.pal, dendy: caps.dendy }];
+  if (format === 'nsfe') {
+    const n = buildNsfe(subsongs, await fetchNesPlayer(), info);
+    return { rom: n.nsfe, banks: 0, streamBytes: 0, seconds: [], warnings: n.warnings, tickRateHz: first.tickRateHz };
+  }
+  const warnings: string[] = [];
+  if (wantsVrc6Cartridge(chips)) {
+    try {
+      const v = buildVrc6Cartridge(subsongs, await fetchNesPlayer('player24'), title, { author, comments, chipName: 'VRC6' });
+      return { ...v, warnings: ['Built the original VRC6 cartridge (mapper 24).'], tickRateHz: first.tickRateHz };
+    } catch (e) {
+      warnings.push(`Built the custom cartridge (mapper 31), not the original VRC6 board: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  const rom = buildNesRom(subsongs, await fetchNesPlayer(), info);
+  return { ...rom, warnings: [...warnings, ...rom.warnings], tickRateHz: first.tickRateHz };
 }

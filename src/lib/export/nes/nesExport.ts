@@ -1,7 +1,6 @@
 /**
  * NES ROM export, pure part: availability, warnings and the ROM build from finished captures. The live recording
- * (needs the audio worklet) is in nesRecord.ts. Export targets: custom cart only. NSFe and per-chip original-mapper
- * ROMs are Phase 10 (not built); add their targets here and in the dialog when that phase lands.
+ * (needs the audio worklet) is in nesRecord.ts. Export targets: custom mapper-31 cart, VRC6 mapper-24 cart, NSFe.
  */
 import { FurnaceDispatchPlatform } from '../../../engine/furnace-dispatch/platforms';
 import { chipKeyPlatform } from '../../../engine/furnace-dispatch/chipKey';
@@ -67,4 +66,9 @@ export function buildNesRom(subsongs: readonly NesSubsongInput[], player: NesPla
   if (info.chips.length > 1) warnings.push('Several sound chips in one cartridge need a custom board; no stock console or emulator decodes them together.');
   if (subsongs.some((s) => s.ntsc.events.some((e) => e.kind === 'control' && e.control === 4))) warnings.push('The song switches DPCM banks mid-sample. Mesen2 applies this correctly; real hardware is untested.');
   return { ...cart, warnings };
+}
+
+/** The original VRC6 board carries 2A03 + VRC6 only; any song with a VRC6 and no other expansion chip may try it. */
+export function wantsVrc6Cartridge(chips: readonly string[]): boolean {
+  return chips.includes('vrc6') && chips.every((c) => c === 'nes' || c === 'vrc6');
 }

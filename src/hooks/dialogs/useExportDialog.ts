@@ -39,7 +39,7 @@ import { saveFurFileWasm, saveFurTextWasm, loadFurFileWasm } from '@lib/import/w
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'vectrexCart' | 'nesRom' | 'tad';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'vectrexCart' | 'nesRom' | 'nsfe' | 'tad';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -80,11 +80,13 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   nano: '.dbn',
   native: '',
   fur: '.fur',
-  furText: '.txt',  furAy: '.fur',
+  furText: '.txt',
+  furAy: '.fur',
   zxTap: '.tap',
   zxBeeperTap: '.tap',
   vectrexCart: '.bin',
   nesRom: '.nes',
+  nsfe: '.nsfe',
   tad: '.zip',
 };
 
@@ -343,13 +345,14 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     }
   }, [metadata]);
 
-  // Phase 10 (NSFe, per-chip ROMs) is not built: the custom mapper-31 cartridge is the only NES target.
+  // NES targets: custom mapper-31 cartridge or the original VRC6 board ('nesRom', chosen in nesRecord), and NSFe.
   const nesRomAvailable = nesRomExportAvailable(furnaceNative?.chipIds, furnaceNative?.chipFlags);
   const [nesRegion, setNesRegion] = useState<NesRegionChoice>('ntsc');
   const nesRomTempoWarning = nesTempoWarning(bpm, nesRegion === 'all' ? undefined : [nesRegion]);
   const [nesRomBusy, setNesRomBusy] = useState(false);
 
-  const handleExportNesRom = useCallback(async (
+  const exportNes = useCallback(async (
+    format: 'nes' | 'nsfe',
     downloadFn: (blob: Blob, filename: string) => void,
     onClose: () => void,
   ) => {
@@ -357,17 +360,20 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     try {
       const { recordNesRom } = await import('@lib/export/nes/nesRecord');
       const author = metadata.author && metadata.author !== 'Unknown' ? metadata.author : undefined;
-      const r = await recordNesRom(nesRegion, metadata.name || 'song', author, metadata.description || undefined);
-      downloadFn(new Blob([r.rom as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.nes`);
-      notify.success(`NES ROM exported (${r.rom.byteLength} bytes).`);
+      const r = await recordNesRom(nesRegion, metadata.name || 'song', author, metadata.description || undefined, format);
+      const label = format === 'nsfe' ? 'NSFe' : 'NES ROM';
+      downloadFn(new Blob([r.rom as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.${format === 'nsfe' ? 'nsfe' : 'nes'}`);
+      notify.success(`${label} exported (${r.rom.byteLength} bytes).`);
       r.warnings.forEach((w) => notify.warning(w));
       onClose();
     } catch (e) {
-      notify.error(e instanceof Error ? e.message : 'NES ROM export failed.');
+      notify.error(e instanceof Error ? e.message : 'NES export failed.');
     } finally {
       setNesRomBusy(false);
     }
   }, [metadata, nesRegion]);
+  const handleExportNesRom = useCallback((d: (blob: Blob, filename: string) => void, c: () => void) => exportNes('nes', d, c), [exportNes]);
+  const handleExportNsfe = useCallback((d: (blob: Blob, filename: string) => void, c: () => void) => exportNes('nsfe', d, c), [exportNes]);
 
   const [zxBeeperReport, setZxBeeperReport] = useState<{ warnings: string[]; seconds: number } | null>(null);
 
@@ -591,6 +597,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     vectrexCartTempoWarning,
     vectrexCartBusy,
     handleExportNesRom,
+    handleExportNsfe,
     nesRomAvailable,
     nesRegion,
     setNesRegion,

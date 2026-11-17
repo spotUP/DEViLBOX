@@ -98,6 +98,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
           return await ex.handleExportVectrexCart((b, n) => saveAs(b, n), onClose);
         case 'nesRom':
           return await ex.handleExportNesRom((b, n) => saveAs(b, n), onClose);
+        case 'nsfe':
+          return await ex.handleExportNsfe((b, n) => saveAs(b, n), onClose);
         case 'zxBeeperTap':
           return await ex.handleExportZxBeeperTap((b, n) => saveAs(b, n), onClose);
         case 'furAy':
@@ -425,6 +427,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">NES Cartridge (.nes)</div>
                     </button>
                   )}
+                  {ex.nesRomAvailable && (
+                    <button
+                      onClick={() => ex.setExportMode('nsfe')}
+                      className={`
+                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        ${ex.exportMode === 'nsfe'
+                          ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                          : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                        }
+                      `}
+                    >
+                      <FileMusic size={24} className="mx-auto mb-2" />
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">NES NSF Extended (.nsfe)</div>
+                    </button>
+                  )}
                   {ex.furnaceAyAvailable.zxbeeper && (
                     <button
                       onClick={() => ex.setExportMode('zxBeeperTap')}
@@ -680,13 +697,14 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
-              {ex.exportMode === 'nesRom' && (
+              {(ex.exportMode === 'nesRom' || ex.exportMode === 'nsfe') && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-                    NES cartridge (.nes)
+                    {ex.exportMode === 'nsfe' ? 'NES NSF Extended (.nsfe)' : 'NES cartridge (.nes)'}
                   </h3>
                   <div className="space-y-3 text-sm font-mono text-text-secondary">
-                    <div>Plays the song once per region in real time and records the sound chip register writes. The cartridge (mapper 31) runs on an emulator or a custom board and shows the title on screen. Only the current subsong is recorded.</div>
+                    {ex.exportMode === 'nsfe' && <div>An NSFe music file for NSF players and emulators. It plays at the console frame rate, and FDS songs are not supported.</div>}
+                    <div>Plays the song once per region in real time and records the sound chip register writes.{ex.exportMode === 'nesRom' && ' The cartridge (mapper 31, or the original VRC6 board for 2A03 and VRC6 songs at the frame rate) runs on an emulator or a custom board and shows the title on screen.'} Only the current subsong is recorded.</div>
                     <CustomSelect
                       value={ex.nesRegion}
                       onChange={(v) => ex.setNesRegion(v as NesRegionChoice)}
@@ -920,6 +938,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : ex.exportMode === 'zxTap' || ex.exportMode === 'zxBeeperTap' ? '.tap'
                   : ex.exportMode === 'vectrexCart' ? '.bin'
                   : ex.exportMode === 'nesRom' ? '.nes'
+                  : ex.exportMode === 'nsfe' ? '.nsfe'
                   : ex.exportMode === 'tad' ? '.zip'
                   : `.${ex.exportMode}.json`
                 }`
