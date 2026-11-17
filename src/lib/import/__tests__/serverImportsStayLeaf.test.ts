@@ -98,20 +98,18 @@ describe('server imports of the frontend tree stay leaf modules', () => {
 /** Root src/ files that import from server/src (the frontend type-check and vitest pull these in). */
 function rootFilesImportingServer(): string[] {
   // A node fs walk of src/ (5900 files) took 12-15 s under load; git grep prefilters in ~1.5 s.
-  // Every relative specifier into server/src contains "server/"; --untracked keeps new files visible.
+  // Every relative specifier into server/src contains "server/". `git grep --untracked` took 34 s under load
+  // (it scans every untracked path in the repo), so grep tracked files and add src/'s few untracked files.
+  const git = (args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 1 << 24 }).split('\n').filter(Boolean);
   let hits: string[];
   try {
-    hits = execFileSync('git', ['grep', '--untracked', '-l', '-e', 'server/', '--', 'src/*.ts', 'src/*.tsx'], {
-      cwd: repo,
-      encoding: 'utf8',
-      maxBuffer: 1 << 24,
-    })
-      .split('\n')
-      .filter(Boolean);
+    hits = git(['grep', '-l', '-e', 'server/', '--', 'src/*.ts', 'src/*.tsx']);
   } catch (e) {
     if ((e as { status?: number }).status !== 1) throw e; // status 1 = no match
     hits = [];
   }
+  const untracked = git(['ls-files', '-o', '--exclude-standard', '--', 'src/*.ts', 'src/*.tsx']);
+  hits.push(...untracked.filter((f) => readFileSync(join(repo, f), 'utf8').includes('server/')));
   return hits.map((h) => join(repo, h)).filter((p) =>
     specifiers(p).some((s) => {
       if (!s.startsWith('.')) return false;
