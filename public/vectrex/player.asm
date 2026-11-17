@@ -43,7 +43,7 @@ author: fcc "DEVILBOX        "
         fcb $80
 scroll: fcc "    DEVILBOX VECTREX AY-3-8910 PLAYER - MUSIC CAPTURED FROM FURNACE                                                             "
 scrollEnd:
-sLogo:  ; DEViLBOX wordmark for vlist: dy, dx, beam ($FF line, 0 move); x8 at scale $20 (= the scale $FF original), after the scale $FF move to 112,-120
+sLogo:  ; DEViLBOX wordmark for vlist: dy, dx, beam ($FF line, 0 move); at scale $20, after the scale $7F move to 112,-120
         fcb 72,0,$FF
         fcb 0,32,$FF
         fcb -16,16,$FF
@@ -268,7 +268,9 @@ tkd:    rts
 ; BIOS Print_Str does a beam return after every one of the 7 font rows. Here even rows run left to right
 ; (BIOS font, ,U+) and odd rows right to left (fontR, ,-U) with the same 18 cycle character loop,
 ; so the beam never goes back. Rows 0-6 end on a left-to-right row.
-TAIL    equ 23          ; cycles from the last character's loop exit to ramp off, equal on both row kinds (alignment)
+; Alignment: both row kinds turn the ramp off right at loop exit. The integrators lag the beam switch (MAME ANALOG_DELAY,
+; about 11 cycles, as real hardware does), so any ramp time after the last dot shifts the reversed rows by twice the lag
+; plus that time; with no tail the right-to-left dots land on the left-to-right columns (measured in MAME).
 ; The beam must be at the origin (ptxt itself ends with Reset0Ref).
 ptxt:   jsr Moveto_d_7F
         jsr Delay_1
@@ -287,15 +289,12 @@ tf0:    lda a,x
         sta <$0A
 tf1:    lda ,u+
         bpl tf0
-        cmpx #$FBB4     ; 4  tail: TAIL cycles
-        beq tlast       ; 3
-        leax $50,x      ; 5
-        leay $50,y      ; 5
-        nop             ; 2
-        nop             ; 2
-        nop             ; 2
         lda #$81
-        sta <$00        ; ramp off
+        sta <$00        ; ramp off at once (same 15 cycles after the last write on both row kinds)
+        cmpx #$FBB4
+        beq tlast
+        leax $50,x
+        leay $50,y
         leau -1,u       ; back onto the $80 end mark
         bsr tstep
         lda $C82B
@@ -308,20 +307,14 @@ tb0:    lda a,y
         sta <$0A
 tb1:    lda ,-u
         bpl tb0
-        leax $50,x      ; 5  tail: TAIL cycles
-        leay $50,y      ; 5
-        leau 1,u        ; 5  back onto the first character
-        nop             ; 2
-        nop             ; 2
-        nop             ; 2
-        nop             ; 2
         lda #$81
-        sta <$00
+        sta <$00        ; ramp off
+        leax $50,x
+        leay $50,y
+        leau 1,u        ; back onto the first character
         bsr tstep
         bra tfw
-tlast:  lda #$81
-        sta <$00
-        lda #$98
+tlast:  lda #$98
         sta <$0B
         jmp Reset0Ref
 ; one row down (BIOS Print_Str step: Y S/H = text height, short ramp, X rate 0), then into thead
@@ -366,12 +359,12 @@ vw:     bitb <$0D
         rts
 screen: jsr Intensity_5F
         jsr Reset0Ref
-        lda #$FF
+        lda #$7F        ; at scale $FF 112,-120 is off the screen (the logo was never seen)
         sta <$04
         lda #112
         ldb #-120
         jsr Moveto_d
-        lda #$20        ; logo list is x8 at scale $20
+        lda #$20        ; logo list at scale $20, above the chip row
         sta <$04
         ldx #sLogo
         lda #(sLogoEnd-sLogo)/3
@@ -411,7 +404,7 @@ screen: jsr Intensity_5F
         jsr Reset0Ref
 ;MK 3
         ldu #sPlat
-        lda #112
+        lda #100        ; below the logo (logo bottom edge sits at y 112)
         ldb #-48
         jsr ptxt
         ldu #title
