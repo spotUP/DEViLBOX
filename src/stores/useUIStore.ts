@@ -27,7 +27,7 @@ export type PerformanceQuality = 'high' | 'medium' | 'low';
 export type ModalId =
   | 'auth' | 'collab' | 'dj-playlist' | 'drumpads' | 'export' | 'help'
   | 'instrumentFx' | 'instruments' | 'masterFx' | 'midi-mapper' | 'midi-wizard'
-  | 'moduleInfo' | 'nks-library' | 'nks-wizard' | 'register-view' | 'revisions' | 'settings'
+  | 'moduleInfo' | 'nks-library' | 'nks-wizard' | 'log-viewer' | 'register-view' | 'revisions' | 'settings'
   | 'tips' | 'usb-sid-wizard';
 
 export type StartupJingleStage = 'off' | 'awaiting-gesture' | 'playing' | 'done';

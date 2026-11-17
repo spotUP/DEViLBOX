@@ -587,6 +587,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     { id: 'preview-uprough-song', label: 'Preview Up Rough Song', icon: <Headphones size={14} />, onClick: handlePreviewUpRoughSong },
     { id: 'new', label: 'New Song', icon: <FilePlus size={14} />, onClick: () => useUIStore.getState().openNewSongWizard() },
     { id: 'revisions', label: 'Revisions', icon: <HistoryIcon size={14} />, onClick: () => useUIStore.getState().openModal('revisions') },
+    { id: 'register-view', label: 'Register View', onClick: () => useUIStore.getState().openModal('register-view') },
+    { id: 'log-viewer', label: 'Log Viewer', onClick: () => useUIStore.getState().openModal('log-viewer') },
     { id: 'clear', label: 'Clear All Patterns', icon: <ClearIcon size={14} />, danger: true, onClick: () => setShowClearModal(true) },
     { type: 'divider' as const },
     { id: 'ai', label: 'AI Composition', icon: <Wand2 size={14} />, checked: aiOpen, onClick: toggleAI },
