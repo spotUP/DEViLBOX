@@ -158,6 +158,7 @@ registerEditableFormat({ formatId: "soundProgrammingLanguage", label: "Sound Pro
 registerEditableFormat({ formatId: "uade_vss", label: "Voodoo Supreme", patternCodec: { kind: "variable" }, exporter: { module: "VoodooSupremeExporter", fn: "exportVoodooSupreme", byLayout: true } });
 registerEditableFormat({ formatId: "timFollin", label: "Tim Follin", patternCodec: { kind: "variable" }, exporter: { module: "TimFollinExporter", fn: "exportTimFollin", byLayout: true } });
 registerEditableFormat({ formatId: "beathoven", label: "Beathoven Synthesizer", patternCodec: { kind: "variable" }, exporter: { module: "BeathovenExporter", fn: "exportBeathoven", byLayout: true } });
+registerEditableFormat({ formatId: "musicMaker", label: "Music Maker", patternCodec: { kind: "variable" }, exporter: { module: "MusicMakerExporter", fn: "exportMusicMaker" } });
 registerEditableFormat({ formatId: "howieDavies", label: "Howie Davies", patternCodec: { kind: "variable" }, exporter: { module: "HowieDaviesExporter", fn: "exportHowieDavies", byLayout: true } });
 registerEditableFormat({ formatId: "riffRaff", label: "Riff Raff", patternCodec: { kind: "variable" }, exporter: { module: "RiffRaffExporter", fn: "exportRiffRaff", byLayout: true } });
 registerEditableFormat({ formatId: "dynamicSynthesizer", label: "Dynamic Synthesizer", patternCodec: { kind: "variable" }, exporter: { module: "DynamicSynthesizerExporter", fn: "exportDynamicSynthesizer", byLayout: true } });
