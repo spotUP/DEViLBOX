@@ -12,9 +12,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import fixture from './fixtures/bank_analysis.json';
 import { analyze, bankEntry, cuePoints, fluxOnsets, loadWavCues, splitWords, bankAnalysisStats } from '../scratchBankAnalysis';
 import { demoRecordPcm } from '../scratchGrit';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/bank_analysis.json');
 
 const PACK = join(process.cwd(), 'public', 'data', 'samples', 'packs', 'scratch-originals');
 const bytesOf = (file: string): ArrayBuffer => { const b = readFileSync(join(PACK, file)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.length); };

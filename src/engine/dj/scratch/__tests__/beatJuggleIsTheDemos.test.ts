@@ -7,14 +7,29 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import fixture from './fixtures/beat_juggle.json';
 import {
   makeBreak, classifyBreak, JUGGLE_PATTERNS, patHalfBar, planResets, validateJuggle, repairJuggle, rewindTime, renderJuggle, renderHit,
   renderJuggleRoutine, routineEvents16, renderJuggleMacro, fitBreak, loadBreak, buildJuggleEvents, validateBudget, validateThreeDeck,
   buildJuggleBus, hiphopRecord, readFloatWav, DECK_B, beatJuggleStats, type JuggleEvent, type JuggleSource, type JugglePatternName, type JuggleRoutineName,
 } from '../beatJuggle';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
 
 interface Sub { n: number; keep: number; x: number[]; ss: number }
+interface Fixture {
+  breaks: Record<string, { sig: Sub; cues: unknown; step: number; classify: unknown }>;
+  patterns: Record<string, unknown>;
+  resets: Array<{ variant: string; name: string; events: Array<readonly unknown[]>; bad: unknown; validate: unknown; repair: unknown }>;
+  rewind: Array<[string, string, number]>;
+  renders: Record<string, Sub>;
+  hits: Array<{ cue: string; steps: number; sig: Sub }>;
+  routines: Record<string, { events: unknown; sig: Sub }>;
+  events16: unknown;
+  macro: { text: string; events: unknown; sig: Sub };
+  amen: { fit: { sig: Sub; cues: unknown }; load: { n: number; bars: number; cues: unknown } };
+  threeDeck: { events: unknown; budget: unknown; budgetTight: unknown; validate: Record<string, unknown>; bus92: Sub; bus130: Sub; recordCues: unknown[]; busRecords: Sub };
+  records: Array<{ file: string; style: string; srcBpm: number }>;
+}
+const fixture = loadFixture<Fixture>(import.meta.url, './fixtures/beat_juggle.json');
 const RATE = 22050;
 const RECS = join(process.cwd(), 'public/data/samples/packs/juggle-records');
 const bytesOf = (f: string): ArrayBuffer => { const b = readFileSync(join(RECS, f)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };

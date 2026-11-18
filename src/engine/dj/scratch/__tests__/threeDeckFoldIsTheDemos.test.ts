@@ -5,10 +5,11 @@
  * events (fixture gen_three_deck_fold.py): fold 2 (a 116-230 BPM set) and fold 0.5 (under 57.5), both routines.
  */
 import { describe, it, expect } from 'vitest';
-import fixture from './fixtures/three_deck_fold.json';
 import { buildThreeDeckRoutine, THREE_DECK_ARC, THREE_DECK_BUDGET } from '../scratchDemoRoutines';
 import { REFERENCE_GESTURE_IDS } from '../scratchGestureCatalog';
 import type { ScratchGestureId } from '../scratchTypes';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/three_deck_fold.json');
 
 const gid = (ref: string): ScratchGestureId => (ref === 'needle_drop' ? 'needleDrop' : ref === 'needle_lift' ? 'needleLift' : REFERENCE_GESTURE_IDS[ref]!);
 type Row = { seed: number; fold: number; emphasis: boolean; events: Array<[number, number, string, string, number]> };

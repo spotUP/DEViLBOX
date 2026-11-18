@@ -17,7 +17,8 @@ import { render, cleanup, act, waitFor } from '@testing-library/react';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } from '@/test/audio/realWebAudio';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { setDJEngineHolder } from '@/engine/dj/DJPhase';
-import fixture from '@/engine/dj/scratch/__tests__/fixtures/three_deck_showcase.json';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, '../scratch/__tests__/fixtures/three_deck_showcase.json');
 
 const holder = vi.hoisted(() => ({
   ctx: null as unknown, off: null as unknown, now: 0, samplerInput: null as unknown,

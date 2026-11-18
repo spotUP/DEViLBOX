@@ -15,7 +15,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render, cleanup, act } from '@testing-library/react';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } from '@/test/audio/realWebAudio';
-import fixture from '@/engine/dj/scratch/__tests__/fixtures/deck_c_motion.json';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, '../scratch/__tests__/fixtures/deck_c_motion.json');
 
 const holder = vi.hoisted(() => ({ ctx: null as unknown, samplerInput: null as unknown }));
 vi.mock('tone', async (orig) => {

@@ -11,7 +11,8 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { installRealWebAudio } from '@/test/audio/realWebAudio';
-import roomFixture from './fixtures/scratch_room_ir.json';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const roomFixture = loadFixture<{ rate: number; every: number; samples: number[] }>(import.meta.url, './fixtures/scratch_room_ir.json');
 
 const SR = 48000;
 const REF = { tailToBurstDb: -17.66, roomRt60Sec: 0.3128 };

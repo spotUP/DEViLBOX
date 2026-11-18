@@ -12,7 +12,6 @@
  */
 import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import fixture from '../scratch/__tests__/fixtures/three_deck_two_hands.json';
 
 const holder = vi.hoisted(() => ({
   engine: null as unknown,
@@ -55,6 +54,8 @@ import type { AutoDJInternals } from './juggleTransitionHarness';
 import { setupStandalone, teardownStandalone, runStandalone, type StandaloneRig } from './standaloneJuggleHarness';
 import type { DJPerformanceContext, DJTrackAnalysis } from '../autodj/types';
 import type { ScratchEvent } from '../scratch/scratchTypes';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture<{ juggle_jl_min: number; juggles: number[]; hand: number[]; deck_c: number[] }>(import.meta.url, '../scratch/__tests__/fixtures/three_deck_two_hands.json');
 
 const perfAt = (track: DJTrackAnalysis, t: number): DJPerformanceContext => ({
   currentDeck: 'A', currentTrack: track, incomingTrack: null, currentPosition: t, currentBeat: 0, currentBar: 0,

@@ -4,9 +4,10 @@
  * from `tools/scratch-fixtures/gen_record_sets.py` (the demo's own bank metadata).
  */
 import { describe, it, expect } from 'vitest';
-import fixture from './fixtures/record_sets.json';
 import { ALL_SOURCE_NAMES, recordSet, recordSetChoices, scratchRecordsFor, sourcePool, CLEAN_CRATE_POOL } from '../scratchCatalogue';
 import { overlayRecord } from '../scratchDemoRoutines';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/record_sets.json');
 
 const F = fixture as unknown as { allNames: string[]; choices: string[]; sets: Record<string, string[] | null>; picks: Array<{ sel: string; section: string; seed: number; pick: string }> };
 

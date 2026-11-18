@@ -61,7 +61,6 @@ import { resetScratchVoicePool } from '../scratch/scratchVoicePool';
 import { ScratchExecutor } from '../scratch/ScratchExecutor';
 import { scratchDJStats } from '../scratch/DJScratchDJ';
 import { demoRoutineStats } from '../scratch/scratchDemoRoutines';
-import fixture from '../scratch/__tests__/fixtures/phrasing_parity.json';
 import type { ScratchEvent } from '../scratch/scratchTypes';
 import { overlaySectionAt } from '../scratch/DJScratchDJ';
 import { planScratch } from '../scratch/scratchPlanner';
@@ -71,6 +70,8 @@ import { buildScratchContext } from '../scratch/scratchContext';
 import { scratchStyleFor } from '../scratch/scratchStyles';
 import type { DJPerformanceContext } from '../autodj/types';
 import type { ScratchMode } from '../scratch/scratchStyles';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture<{ overlay: unknown }>(import.meta.url, '../scratch/__tests__/fixtures/phrasing_parity.json');
 
 const TRACK = 'drops';
 const BPM = 130;

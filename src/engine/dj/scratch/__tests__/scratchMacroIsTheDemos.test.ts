@@ -8,10 +8,11 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import fixture from './fixtures/scratch_macro.json';
 import { parseMacro, renderMacro, scratchMacroStats } from '../scratchRender';
 import { demoRecordPcm } from '../scratchGrit';
 import { getScratchRecord } from '../scratchCatalogue';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/scratch_macro.json');
 
 interface MacroCase { text: string; tempo: number; velocity: number; segs: Array<[number, number, boolean]>; cut: [number, number] | null; anchor: number; errors: string[]; stepS: number; n: number; out: number[] }
 const F = fixture as unknown as { rate: number; keep: number; record: string; cases: MacroCase[] };

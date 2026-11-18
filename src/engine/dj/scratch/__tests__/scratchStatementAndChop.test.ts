@@ -7,12 +7,13 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import fixture from './fixtures/statement_and_chop.json';
 import { buildThreeDeckRoutine, demoRoutineRenderSpecs } from '../scratchDemoRoutines';
 import { getScratchRecord, lastWordSlice, wordEmphasisRecord, type CueRole } from '../scratchCatalogue';
 import { REFERENCE_GESTURE_IDS, getGesture } from '../scratchGestureCatalog';
 import { ScratchVoicePool } from '../scratchVoicePool';
 import type { ScratchGestureId } from '../scratchTypes';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/statement_and_chop.json');
 
 const F = fixture as unknown as {
   record: string; bpm: number; rate: number; keep: number; events: Record<string, Array<[number, number, CueRole, string, number]>>;

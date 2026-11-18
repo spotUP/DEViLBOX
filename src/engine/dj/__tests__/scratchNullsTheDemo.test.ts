@@ -17,8 +17,9 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } from '@/test/audio/realWebAudio';
-import fixture from '@/engine/dj/scratch/__tests__/fixtures/scratch_null.json';
-import overlayFixture from '@/engine/dj/scratch/__tests__/fixtures/scratch_overlay_null.json';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, '../scratch/__tests__/fixtures/scratch_null.json');
+const overlayFixture = loadFixture(import.meta.url, '../scratch/__tests__/fixtures/scratch_overlay_null.json');
 
 const holder = vi.hoisted(() => ({ ctx: null as unknown, samplerInput: null as unknown }));
 // the registry's entry points (pads, MCP, a transition's preset, a tracker sample, the loop) on an offline context;

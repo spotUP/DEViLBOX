@@ -1,7 +1,8 @@
 /** The placement brain's random is the reference LFSR (section 36, SCR-P4.3). */
 import { describe, it, expect } from 'vitest';
-import fixture from './fixtures/lfsr.json';
 import { lfsr, crc32, barSeed } from '../scratchRandom';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture<{ lfsr: unknown; crc: Record<string, number> }>(import.meta.url, './fixtures/lfsr.json');
 
 describe('deterministic scratch random (SCR-P4.3)', () => {
   for (const seed of [1, 7, 12345]) {

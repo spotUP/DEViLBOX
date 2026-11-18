@@ -9,7 +9,8 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } from '@/test/audio/realWebAudio';
-import fixture from './fixtures/three_deck_showcase.json';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/three_deck_showcase.json');
 
 vi.mock('@/engine/dj/DJEngine', () => ({ getDJEngine: () => { throw new Error('no DJ engine in the showcase render'); }, getDJEngineIfActive: () => null }));
 

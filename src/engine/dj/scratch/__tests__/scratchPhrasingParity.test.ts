@@ -9,8 +9,6 @@
  * the second step-15 stroke and the overlapping ones included, is in the DEViLBOX plan, in every mode.
  */
 import { describe, it, expect } from 'vitest';
-import spec from './fixtures/phrasing_parity_spec.json';
-import fixture from './fixtures/phrasing_parity.json';
 import { planScratch, routineSlotRecord, type OverlaySection } from '../scratchPlanner';
 import type { PlacedScratch } from '../scratchPlacement';
 import { REFERENCE_GESTURE_IDS, getGesture } from '../scratchGestureCatalog';
@@ -20,11 +18,16 @@ import { buildScratchDjRoutine, buildThreeDeckRoutine, validateScratchDjRoutine 
 import { SECTION_OF_KIND, type ScratchPerformanceContext } from '../scratchContext';
 import type { ScratchDJStyle, ScratchGestureId } from '../scratchTypes';
 import type { SectionKind } from '../../autodj/types';
+import { loadFixture } from '@/engine/uprough/__tests__/loadFixture';
 
 const gid = (ref: string): ScratchGestureId => (ref === 'needle_drop' ? 'needleDrop' : ref === 'needle_lift' ? 'needleLift' : REFERENCE_GESTURE_IDS[ref]!);
 const profileOf = (reference: string): ScratchProfileId => (Object.values(SCRATCH_PROFILES).find((p) => p.reference === reference)!.id);
 
 interface SpecTrack { name: string; style: string; profile: string; seed: number; sections: Array<{ kind: string; name: string; startBar: number; bars: number }> }
+interface Spec { tracks: SpecTrack[] }
+interface Parity { bankOrder: string[]; cleanPool: string[]; activity: Record<string, number>; overlay: unknown; scratchDj: unknown; threeDeck: unknown; pools: unknown; profiles: unknown }
+const spec = loadFixture<Spec>(import.meta.url, './fixtures/phrasing_parity_spec.json');
+const fixture = loadFixture<Parity>(import.meta.url, './fixtures/phrasing_parity.json');
 interface OverlayRow { track: string; routine: string | null; events: Array<{ bar: number; step: number; gesture: string; velocity: number; kind: string }>; records: Array<{ startBar: number; record: string }> }
 
 function ctxFor(track: SpecTrack, vocal = 0, beatConfidence = 1): ScratchPerformanceContext {
