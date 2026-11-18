@@ -128,7 +128,7 @@ export function expandProcMacro(mac: FurnaceMacro, version = 245): FurnaceMacro 
     }
   }
   const [low, high, ar, ht, dr, sl, st, sr] = v, lfoSpeed = v[11], wave = v[12] & 3, phase = v[13];
-  const inv = low > high, bottom = (low << 8) | (inv ? 0xff : 0), top = inv ? high << 8 : (high << 8) | 0xff;
+  const inv = low > high, bottom = (low << 8) | (inv ? 0xff : 0), top = high << 8; // measured against Furnace 0.6 (The East tambourine 0,15 ADSR): the peak is high<<8, reached on the first tick STRICTLY past it
   const sus = inv ? sl << 8 : (sl << 8) | 0xff;
   let pos = bottom, state = 0, delay = 0, dir = false, val = low;
   if (kind === 2) {
@@ -142,7 +142,7 @@ export function expandProcMacro(mac: FurnaceMacro, version = 245): FurnaceMacro 
     if (delay > 0) { delay--; out.push(val); continue; }
     const d = inv ? -1 : 1; // the inverted case mirrors every comparison
     if (kind === 1) {
-      if (state === 0) { pos += d * ar; if (d * (pos - (inv ? high << 8 : top)) >= 0) { pos = inv ? high << 8 : top; state = 1; delay = ht; } }
+      if (state === 0) { pos += d * ar; if (d * (pos - top) > 0) { pos = top; state = 1; delay = ht; } }
       else if (state === 1) { pos -= d * dr; if (d * (pos - sus) <= 0) { pos = sus; state = 2; delay = st; } }
       else if (state === 2) { pos -= d * sr; if (d * (pos - (inv ? bottom : low << 8)) <= 0) { pos = bottom; state = 4; } }
       else { out.push(val); break; }

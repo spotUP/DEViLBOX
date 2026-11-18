@@ -285,6 +285,11 @@ end, emu.eventType.inputPolled)
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }, 120000);
 
+  it('expandProcMacro: pre-245 volume ADSR 0..15 attack 255 decay 16 holds 15 for three ticks then falls one per tick (The East tambourine)', () => {
+    const adsr = { code: 0, type: 3, mode: 0, speed: 1, delay: 0, length: 16, loop: 255, release: 255, data: [0, 15, 255, 0, 16, 0, 0, 0, ...Array(8).fill(0)] };
+    expect(expandProcMacro(adsr as never, 223).data.slice(0, 8)).toEqual([15, 15, 14, 13, 12, 11, 10, 9]);
+  });
+
   it('expandProcMacro runs a pre-245 ADSR pitch macro (smashtv "slide down") as a 16 semitone slide in about 19 ticks', () => {
     const adsr = { code: 4, type: 131, mode: 0, speed: 1, delay: 0, length: 16, loop: 255, release: 255, data: [0, -2048, 13, ...Array(13).fill(0)] };
     const old = expandProcMacro(adsr as never, 218).data, cur = expandProcMacro(adsr as never, 245).data;
