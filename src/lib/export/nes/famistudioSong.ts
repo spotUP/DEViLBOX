@@ -586,7 +586,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               vib = Array.from({ length: len }, (_, i) => {
                 const phase = x * (Math.floor(i / perTick + 1e-9) + 1);
                 if (!linear) return Math.round(-amp * Math.sin(2 * Math.PI * phase / 64));
-                const u = (Math.round(127 * Math.sin(2 * Math.PI * (phase & 63) / 64)) * y) >> 4;
+                // Furnace: vibTable = (short)(127 sin) truncates; pitch = ((depth * vibTable * vibratoFine(15)) >> 4) / 15, C division truncates.
+                const u = Math.trunc(((y * Math.trunc(127 * Math.sin(2 * Math.PI * (phase & 63) / 64)) * 15) >> 4) / 15);
                 return Math.round(X * 2 ** (-u / 1536)) - 1 - P;
               });
               pid = envId(encodeEnvelope(vib, 0, -1, 'pitch'));
