@@ -673,11 +673,36 @@ void osl_set_sample_preamp(int32_t preamp) {
 
 #ifndef MODPLUG_NO_FILESAVE
 
+// libc++'s stringbuf refuses to seek past what was written, so SaveS3M (which
+// seeks forward to the first pattern, then writes sample headers back) silently
+// dropped everything after the header. Zero-fill up to a forward seek target.
+struct GrowingStringBuf : std::stringbuf {
+    GrowingStringBuf() : std::stringbuf(std::ios::out | std::ios::binary) {}
+protected:
+    pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) override {
+        if (dir != std::ios_base::end && (which & std::ios_base::out)) {
+            pos_type here = std::stringbuf::seekoff(0, std::ios_base::cur, std::ios_base::out);
+            off_type target = (dir == std::ios_base::beg) ? off : off_type(here) + off;
+            pos_type endPos = std::stringbuf::seekoff(0, std::ios_base::end, std::ios_base::out);
+            if (target > off_type(endPos)) {
+                std::string pad(size_t(target - off_type(endPos)), '\0');
+                sputn(pad.data(), std::streamsize(pad.size()));
+            }
+            return std::stringbuf::seekoff(target, std::ios_base::beg, std::ios_base::out);
+        }
+        return std::stringbuf::seekoff(off, dir, which);
+    }
+    pos_type seekpos(pos_type pos, std::ios_base::openmode which) override {
+        return seekoff(off_type(pos), std::ios_base::beg, which);
+    }
+};
+
 static int do_save(int format) {
     if (!g_sf) return 0;
     g_save_buf.clear();
 
-    std::ostringstream oss(std::ios::binary);
+    GrowingStringBuf sbuf;
+    std::ostream oss(&sbuf);
     bool ok = false;
     switch (format) {
         case 0: ok = g_sf->SaveMod(oss); break;
@@ -688,7 +713,7 @@ static int do_save(int format) {
     }
 
     if (ok) {
-        std::string data = oss.str();
+        std::string data = sbuf.str();
         g_save_buf.assign(data.begin(), data.end());
         return 1;
     }
