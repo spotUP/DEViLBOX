@@ -1,0 +1,19 @@
+# Players whose format needs more than a 68000. One line per player.
+#
+# UADE emulates an 020, so a player can depend on 020 behaviour -- chiefly
+# misaligned longword access, which is legal there and an ADDRESS ERROR on a
+# 68000 -- and nobody upstream would notice. On a real A500 that is a guru, so
+# a build that targets 68000 with such a format must be REFUSED rather than
+# shipped to crash.
+#
+# `source` says who decided, because these are not all measurable: a device
+# failure tells you THIS player faults on a 68000, not whether the format was
+# ever meant to run there. The owner's scene knowledge settles that, and it is
+# the authority for the rows marked `owner`.
+#
+# player	min_cpu	source	why
+DIGI-Booster	68020	owner	owner: not an A500-compatible format. Matches the measurement -- ADRE (address error, misaligned longword) at 0x000161A0 in call_check_module on a 68000, plays under uade123, which emulates an 020.
+# --- formats the REFERENCE implementation cannot play with the modules we have.
+# Not a port limitation: uade123 itself refuses these, so there is nothing on
+# the Amiga side to fix. Listed for the record, not enforced.
+# TFMX_ST	-	measured	all four Modland TFMX ST modules: uade123 says "module check failed". Atari ST TFMX; the mdat. half alone is not enough.

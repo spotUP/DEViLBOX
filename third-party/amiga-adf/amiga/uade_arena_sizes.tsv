@@ -1,0 +1,41 @@
+player	pool_hw	any_hw	chip_hw	cpu	module
+AM-Composer	0	0	64412	68000	krymini jingle 2.amc
+AbyssHighestExperience	2576	412152	48044	68000	amanda.ahx
+ArtOfNoise-4V	0	0	41884	68000	sunray.aon
+BenDaglish	0	0	92572	68000	motorhead-titleandingame.bd
+BenDaglish-SID	16208	0	53996	68000	terramex.bds
+CustomMade	0	0	42652	68000	the plague game end.cm
+DeltaMusic1.3	0	0	35996	68000	crusaders1.dm
+DeltaMusic2.0	0	0	50332	68000	anthrox_intro.dm2
+EarAche	0	0	53916	68000	bladerunner.ea
+Fred	0	0	39068	68000	bomb jack.fred
+FutureComposer-BSI	0	0	225436	68000	newtek.bsi
+FutureComposer1.3	0	0	38556	68000	commando.smod
+FutureComposer1.4	0	0	52636	68000	starglide1.fc
+FuturePlayer	42324	0	97776	68000	imploder drums.fp
+GlueMon	0	0	31132	68000	gnu-song.glue
+InStereo	0	0	79260	68000	fantasi8.is
+InStereo2.0	0	0	45724	68000	spaceflight.is20
+JamCracker	0	0	68764	68000	freehand-spreadtro.jam
+JochenHippel	0	0	41372	68000	dragonflight unicorn.hip
+JochenHippel-CoSo	0	0	34460	68000	demo shorty.soc
+Jochen_Hippel_ST	0	0	41116	68000	HST.APrehistoricTale jingle
+MMDC	0	0	58268	68000	knightmare - ingame 3.mmdc
+Medley	0	0	48796	68000	combat.mso
+Mugician	0	0	48028	68000	flight.dmu
+MugicianII	0	264	136860	68000	snickle.mug2
+MusicAssembler	0	0	32412	68000	thanatos.ma
+MusiclineEditor	35632	71256	183500	68000	drax.ml
+PreTracker	0	0	329116	68000	the little things.prt
+PumaTracker	0	0	65180	68000	liquid kids - lv1a.puma
+QuadraComposer	0	0	1773468	68000	poison.emod
+SIDMon1.0	0	0	60060	68000	anarchy.sid1
+SIDMon2.0	0	0	42908	68000	ice7-intro.sid2
+SUN-Tronic	0	0	32156	68000	msx-cracktro.sun
+SonicArranger	0	0	225436	68000	mega end.sa
+SonixMusicDriver	19776	56	65756	68000	bridge.snx
+SoundMon2.0	0	0	43420	68000	nicktune1.bp
+SoundMon2.2	0	0	40860	68000	testmod.bp3
+SynTracker	0	0	40860	68000	under the stars.synmod
+Synth	0	0	40092	68000	space_sound.syn
+TFMX-Pro	79792	264	122188	68000	mdat.karamalz-fitwie

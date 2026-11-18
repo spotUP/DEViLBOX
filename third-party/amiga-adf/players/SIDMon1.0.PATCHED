@@ -1,0 +1,42 @@
+SIDMon1.0 -- ONE WORD PATCHED, not the binary UADE ships.
+
+  file offset 0x19C:  5288 -> 5488   (addq.l #1,a0 -> addq.l #2,a0)
+  file offset 0x228:  5288 -> 5488   (ditto)
+
+There are TWO byte-stepping scans, not one: InitPlayer hunts for the playroutine
+entry, and patchjmps then walks the same region rewriting jmp -> rts. Patching
+only the first just moves the address error to the second. Both were found by
+searching the binary for the pattern `addq.l #1,a0` immediately followed by a
+dbra, which is what a byte-stepping scan looks like; there are no other
+occurrences of addq.l #1,a0 in this player.
+
+WHY. UADE's SidMon eagleplayer locates the embedded playroutine by scanning the
+module for an RTS followed by movem.l d0-d7/a0-a6,-(sp):
+
+    initloop:   cmp.w  #$4e75,(a0)
+                bne    nextinitloop
+                cmp.l  #$48e7fffe,2(a0)
+                beq    SID1_Init_ok
+    nextinitloop:
+                addq.l #1,a0            <-- steps ONE byte
+                dbra   d1,initloop
+
+Stepping one byte puts a0 on odd addresses, where both the cmp.w and the cmp.l
+are misaligned. That is legal on a 68020 and an ADDRESS ERROR on a 68000. UADE
+never trips over it because its uaerc sets cpu_type=68020; on a real A500 the
+format dies in InitPlayer. SidMon 1.0 is an A500 tracker, so this is a limitation
+of UADE's WRAPPER, not of the format.
+
+WHY THE PATCH IS EQUIVALENT. The signature being searched for is 68k code, so it
+can only ever begin at an even address. Stepping 2 finds the same first match and
+never lands on an odd address. The loop count is unchanged, so the scan simply
+covers twice the span; a genuine match is found at the same place.
+
+WHY PATCHED AND NOT REBUILT. amigasrc/players/sidmon1/SIDMon1.0.s is INCOMPLETE:
+checkloop1, songendfunc1 and songendfunc2 are referenced but never defined, and
+it assembles to 830 bytes against the shipped 952. A rebuild cannot be verified
+against upstream, so a source-level fix could not be trusted. A one-word patch to
+the shipped binary can be stated exactly, which is what this file does.
+
+Restore the original with:
+    cp /opt/homebrew/share/uade/players/SIDMon1.0 .

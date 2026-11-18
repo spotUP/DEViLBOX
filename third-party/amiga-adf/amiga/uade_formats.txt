@@ -1,0 +1,207 @@
+# UADE FORMATS -- which ones the demo system should support.
+#
+# HOW TO EDIT: change the first column to `drop` for every format you do not
+# want. Leave `keep` on the ones you do. Nothing else needs changing; I read
+# only the first column and the player name.
+#
+# What `keep` commits us to: that player's binary gets vendored into the repo
+# and the format is expected to play on the Amiga. Players are small -- median
+# ~4 KB -- so keeping a lot is cheap in repo terms. The real cost is that every
+# kept format is one more thing that has to actually work on the device.
+#
+# Columns:  keep|drop   PlayerName   prefixes   size   notes
+#
+# Notes:
+#   CANNOT WORK NATIVELY (speed_hack) -- only plays when an emulator may run the
+#       CPU unbounded. No hardware equivalent, so these are pre-marked `drop`
+#       and the build refuses them regardless of what this file says.
+#   NO PLAYER BINARY -- eagleplayer.conf names it but the installed UADE has no
+#       binary, so we cannot ship it even if you keep it.
+#   already vendored -- committed and usable right now.
+#   sample: <file> -- a module of this format exists in your DEViLBOX corpus,
+#       so it can be tested immediately. No sample just means nothing to test
+#       with yet; it is not a reason to drop it.
+#
+# eagleplayer.conf names 171 DISTINCT players on 179 lines (PTK-Prowiz owns
+# nine of them, one per epopt type). ALL 171 ARE TRIAGED HERE as of
+# 2026-09-23: 164 keep, 7 drop, none left unlisted.
+#
+# 164 keep | 143 have a module on this machine | 132 PROVEN on an emulated
+# 68000 -- one real boot each, recorded in amiga/uade_sweep_results.68000.tsv.
+# Of the 21 with nothing to boot, 2 have NO PLAYER BINARY at all and 19 have
+# NO MODULE: not among the 17,358 corpus files (every one content-probed with
+# `uade123 -g` on 2026-09-22; 2,875 resolved to a player) and not in Modland's
+# 516,118-file index either, which was searched by prefix and by format
+# directory on 2026-09-23. Each says so on its own row.
+
+keep  AbyssHighestExperience      ahx,thx                                     12484B  already vendored; sample: amanda.ahx
+keep  ActionAmics                 ast                                          4976B  PLAYS on a 68000 (2026-09-22), one real boot; sample: dynablaster.ast
+drop  ADPCM_mono                  adpcm                                        4356B  owner 2026-09-22: skip -- the demo system has its own ADPCM player (amiga/adpcm.mk)
+keep  Alcatraz_Packer             alp                                          4268B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- its 516,118-file index has no alp.* / *.alp and no format directory for it. Listed and searched for, but never booted, so it carries no device verdict.
+keep  AM-Composer                 amc                                          3416B  
+drop  AMOS                        abk                                          7504B  owner 2026-09-23: skip -- AMOS bank, taken to be repackaged mods; UNVERIFIED (no .abk exists anywhere in the corpus or in Modland's 516,118-file index, so nothing was available to measure)
+keep  Anders_0land                hot                                          3568B  PLAYS on a 68000 (2026-09-22), one real boot; sample: primemover_09.hot
+keep  Andrew_Parton               bye                                          3272B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- its 516,118-file index has no bye.* / *.bye and no format directory for it. Listed and searched for, but never booted, so it carries no device verdict.
+keep  AProSys                     aps                                         10024B  PLAYS on a 68000 (2026-09-23), one real boot; sample: mercenary.aps
+keep  ArtAndMagic                 aam                                           784B  PLAYS on a 68000 (2026-09-23), one real boot; sample: agony-level1.aam
+keep  ArtOfNoise-4V               aon,aon4                                     8668B  sample: action_section.aon
+keep  ArtOfNoise-8V               aon8                                        26968B  A1200/020 ONLY: ILLG on 68000, PLAYS on 68020 -- the player binary is an 020 build (2026-09-22)
+keep  Ashley_Hogg                 ash                                          3096B  PLAYS on a 68000 (2026-09-22), one real boot; sample: ash.nobby_the_aardvark
+keep  AudioSculpture              adsc,mod_adsc4                               6108B  sample: audiosculpture_smallest.adsc
+keep  BeathovenSynthesizer       bss                                           2688B  added 2026-09-22 (owner): untriaged until now
+keep  BenDaglish                  bd                                           2832B  sample: mickey_mouse.bd
+keep  BenDaglish-SID              BDS                                          1640B  sample: terramex.bds
+keep  BladePacker                 uds                                          9244B  PLAYS on a 68000 (2026-09-23), one real boot; sample: uds.obsession menu -- two-file format, needs its smp.<tune> half in the same directory
+keep  ChipTracker                kris                                          4812B  added 2026-09-22 (owner): untriaged until now
+keep  Cinemaware                  cin                                          6028B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- its 516,118-file index has no cin.* / *.cin and no format directory for it. Listed and searched for, but never booted, so it carries no device verdict.
+keep  CoreDesign                  core                                         2160B  PLAYS on a 68000 (2026-09-22), one real boot; sample: dynamite dux.core
+keep  custom                      cus,cust,custom                                  -  NO PLAYER BINARY; sample: skyfox.cus
+keep  CustomMade                  cm,rk,rkb                                    3956B  sample: viking_child.cm
+keep  DariusZendeh                dz,mkiio                                     1820B  PLAYS on a 68000 (2026-09-22), one real boot; sample: crash and burn.dz
+keep  DaveLowe                    dl                                           2832B  PLAYS on a 68000 (2026-09-22), one real boot; sample: incredibleshrinkingsphere.dl
+keep  DaveLowe_Deli               dl_deli                                      2200B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- no dl_deli.* anywhere in its 516,118-file index. Modland's Dave Lowe modules are dl.* (the DaveLowe player) and its Delitracker Custom/Dave Lowe/*.cus resolve to `custom`, not to this player. Listed and searched for, but never booted, so it carries no device verdict.
+keep  DaveLoweNew                 dln                                         10108B  PLAYS on a 68000 (2026-09-22), one real boot; sample: m-bison.dln
+keep  DavidHanney                 dh                                           9280B  PLAYS on a 68000 (2026-09-22), one real boot; sample: tearaway thomas unused.dh
+keep  DavidWhittaker              dw,dwold                                     4328B  PLAYS on a 68000 (2026-09-22), one real boot; sample: garfield2+.dw
+keep  DeltaMusic1.3               dlm1,dm,dm1                                  2972B  sample: crusaders1.dm
+keep  DeltaMusic2.0               dlm2,dm2                                     1096B  sample: anthrox_intro.dm2
+keep  Desire                      dsr                                          1992B  NO AUDIO on 68000 and 68020 (2026-09-22), but NOT a verdict on the format: the corpus's only module, batmanreturns.dsr, is silent on its DEFAULT subsong 1 -- subsongs 2-10 all sound in uade123 (peaks 4840..24036). The sweep rig has no subsong control.
+keep  DIGI-Booster                db,digi                                     11820B  sample: the_day_after.digi  A1200/020 ONLY: ADRE at $161A0 on 68000, PLAYS on 68020 -- 020-only player build, same class as MED (2026-09-22)
+keep  DigitalSonixChrome          dsc                                          3860B  NO AUDIO on 68000 and 68020 (2026-09-22), UNEXPLAINED: it relocates and publishes "Digital Sonix & Chrome", then never raises Paula DMA. Re-tested with dragon'sbreath title.dsc, which uade123 renders 39/39 quarter-second slices non-silent and which has a single subsong, so neither sparseness nor subsong choice explains it.
+keep  DigitalSoundStudio          dss                                          6508B  PLAYS on a 68000 (2026-09-22), one real boot; sample: zrimay.dss
+keep  DirkBialluch                tpu                                          4908B  PLAYS on a 68000 (2026-09-23), one real boot; sample: tpu.timelock loader -- two-file format, needs its smp.<tune> half in the same directory
+keep  DynamicSynthesizer         dns                                           3160B  added 2026-09-22 (owner): untriaged until now
+keep  EarAche                     ea,mg                                        2744B  sample: skythebest.ea
+keep  EMS                         ems                                          3260B  PLAYS on a 68000 (2026-09-23), one real boot; sample: megad-d2-04mid4.ems
+keep  EMS-6                       emsv6                                       18668B  A1200/020 ONLY: ILLG at $00018568 on 68000, PLAYS on 68020 (2026-09-23) -- an 020 player build, same class as DIGI-Booster and ArtOfNoise-8V. NOT the speed_hack: on an 020 it plays at the rig's ordinary speed, so the flag is again a timing warning and not a refusal. sample: softsynthtest.ems. Its modules are named *.ems, never emsv6.*, so the prefix table sends them to the EMS player while uade123 answers EMS v6 -- stage with --player EMS-6.
+keep  FashionTracker              ex                                           3252B  PLAYS on a 68000 (2026-09-22), one real boot; sample: ivory tover ii.ex
+keep  ForgottenWorlds_Game        fw                                           1484B  PLAYS on a 68000 (2026-09-22), one real boot; sample: forgotten worlds intro.fw
+keep  Fred                        fred                                         1008B  sample: rebels.fred
+keep  FredGray                   gray                                          2112B  added 2026-09-22 (owner): untriaged until now
+keep  FutureComposer-BSI          bfc,bsi,fc-bsi                               2244B  sample: newtek.bsi
+keep  FutureComposer1.3           fc13,fc3,smod                                5616B  sample: adept.smod
+keep  FutureComposer1.4           fc,fc14,fc4                                  4976B  sample: anthrox.fc
+keep  FuturePlayer                fp                                           4740B  sample: imploder_drums.fp
+keep  GlueMon                     glue,gm                                      2040B  sample: memphis.glue
+keep  GMC                         gmc                                          2924B  PLAYS on a 68000 (2026-09-22), one real boot; sample: knights_of_sky.gmc
+keep  HowieDavies                 hd                                           2208B  PLAYS on a 68000 (2026-09-22), one real boot; sample: blazing thunder.hd
+keep  ImagesMusicSystem          ims                                           4756B  added 2026-09-22 (owner): untriaged until now
+keep  Infogrames                  dum                                          4508B  PLAYS on a 68000 (2026-09-22), one real boot; sample: advantage tennis-intro.dum
+keep  InStereo                    is                                           6292B  sample: fantasi8.is
+keep  InStereo2.0                 is20                                         5756B  sample: stereo_feeling.is20
+keep  JamCracker                  jam,jc                                       4224B  sample: freehand-spreadtro.jam
+keep  JankoMrsicFlogel            jmf                                          2152B  PLAYS on a 68000 (2026-09-22), one real boot; sample: spacestation.jmf
+keep  Janne_Salmijarvi_Optimizer  js                                           7540B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- its 516,118-file index has no js.* / *.js and no format directory for it. Listed and searched for, but never booted, so it carries no device verdict.
+keep  JasonBrooke                 jcb,jcbo,jb                                  3476B  PLAYS on a 68000 (2026-09-22), one real boot; sample: ikari warriors.jb
+keep  JasonPage                   jpn,jpnd,jp                                 13424B  PLAYS on a 68000 (2026-09-22), one real boot; sample: jpn.fire and ice-1
+keep  JeroenTel                   jt,mon_old                                   3492B  PLAYS on a 68000 (2026-09-22), one real boot; sample: stormlord title.jt
+keep  JesperOlsen                 jo                                           4056B  NO MODULE (2026-09-22): nothing in the corpus is this format. All 17,358 files under Data/Music/uade-songs and uade-mods were content-probed with uade123; 2,875 resolved and none to this player.
+keep  Jochen_Hippel_ST            hst                                          6992B  
+keep  JochenHippel                hip,mcmd,sog                                 3312B  sample: astaroth.sog
+keep  JochenHippel-7V             hip7,s7g                                     8496B  sample: lethalxcess-intro.hip7
+keep  JochenHippel-CoSo           hipc,soc                                     4500B  sample: wings of death (level 3).hipc
+keep  Kim_Christensen             kim                                          3352B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- no kim.* there but one Protracker module; Modland's Delitracker Custom/K. Christensen/*.cus resolve to `custom`, not to this player. Listed and searched for, but never booted, so it carries no device verdict.
+keep  KrisHatlelid                kh                                           3216B  ILLG at $00000004 on 68000 and 68020 (2026-09-22), but the SAMPLE is bad, not necessarily the format: hatlelid_smallest.kh is the only KrisHatlelid file in the corpus and uade123 fails on it too -- "bad song end: score crashed". Needs a module that plays.
+keep  Laxity                      powt,pt                                      4312B  PLAYS on a 68000 (2026-09-23), one real boot; sample: graphics are none.pt -- the Powertracker format, a tracker and not the Laxity PACKER, which PTK-Prowiz handles under its `lax` prefix
+keep  LegglessMusicEditor        lme                                           4024B  added 2026-09-22 (owner): untriaged until now
+keep  MagneticFieldsPacker        mfp                                          7072B  PLAYS on a 68000 (2026-09-23), one real boot; sample: mfp.crystaldragon ingame -- two-file format, needs its smp.<tune> half in the same directory
+keep  MajorTom                    hn,mtp2,thn,arp                              6724B  PLAYS on a 68000 (2026-09-23), one real boot; sample: b-manipulation.arp (Modland files it under Arpeggiator)
+keep  ManiacsOfNoise              mon                                          1292B  PLAYS on a 68000 (2026-09-22), one real boot; sample: unreal flying.mon
+keep  Mark_Cooksey                mc,mcr                                       4392B  PLAYS on a 68000 (2026-09-22), one real boot; sample: grand_national-title.mc
+keep  Mark_Cooksey_Old            mco                                          1884B  PLAYS on a 68000 (2026-09-22), one real boot; sample: mco.overlander
+keep  MarkII                      mk2,mkii                                     1488B  PLAYS on a 68000 (2026-09-22), one real boot; sample: astarrsonix.mk2
+keep  MartinWalker                avp,mw                                       2868B  PLAYS on a 68000 (2026-09-22), one real boot; sample: gettysburg.avp
+keep  Maximum_Effect              max                                          3388B  PLAYS on a 68000 (2026-09-23), one real boot; sample: MAX.DinosaurDetective level4 -- two-file format (MAX./SMP.), though four jingles play with no sample half at all. Roughly half the known tunes, among them MAX.DinosaurDetective intro, fail inside uade123 itself with "module check failed" WITH their SMP half present, so those are broken tunes and not a device question.
+keep  MCMD                        mcmd_org                                     3248B  PLAYS on a 68000 (2026-09-23), one real boot; sample: ep-trmonsterbusiness.mcmd. Its files are named *.mcmd, which the prefix table gives to JochenHippel (conf line 69) while this player's prefix `mcmd_org` matches nothing that exists -- stage with --player MCMD.
+drop  MED                         med,mmd0,mmd1,mmd2                          14836B  sample: funky nightmare.mmd1
+keep  Medley                      mso                                          7596B  sample: combat.mso
+keep  MIDI-Loriciel               midi                                         3796B  PLAYS on a 68000 (2026-09-22), one real boot; sample: MIDI.Cartoons 2
+keep  MikeDavies                  md                                           2600B  PLAYS on a 68000 (2026-09-22), one real boot; sample: strider.md
+keep  MMDC                        mmdc                                         4236B  sample: captain planet and the 
+keep  Mosh_Packer                 mosh                                         3792B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- its 516,118-file index has no mosh.* / *.mosh and no format directory for it. Listed and searched for, but never booted, so it carries no device verdict.
+keep  Mugician                    dmu,mug                                      8000B  sample: snickle.mug
+keep  MugicianII                  dmu2,mug2                                   10924B  sample: snickle.mug2
+keep  MultiMedia_Sound            mms,sfx20                                    4372B  PLAYS on a 68000 (2026-09-22), one real boot; sample: bottle popper.mms
+keep  MusicAssembler              ma                                            928B  sample: baseheads.ma
+keep  MusiclineEditor             ml                                          90948B  CANNOT WORK NATIVELY (speed_hack); sample: harmonic disorder.ml
+keep  MusicMaker-4V               mm4,sdata                                    9172B  DIED(8) = AMIGAMSG_SCOREDEAD on 68000 and 68020 (2026-09-22), UNEXPLAINED: staged with moveback.sdata + moveback.ip, which is exactly the pair uade123 plays (proven by isolating the directory -- the module alone gives "module check failed", the pair renders 352 KB of audio, and moveback.ip.n is not needed).
+keep  MusicMaker-8V               mm8                                         26156B  UNIN at $083400FC on 68000 and 68020 (2026-09-22), UNEXPLAINED: both corpus modules render 39/39 non-silent slices in uade123. Tested with roetzmegoem.mm8, which is alone in its directory and so cannot pick up a stray companion.
+keep  Nick_Pelling_Packer         npp                                          9988B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- its 516,118-file index has no npp.* / *.npp and no format directory for it. Listed and searched for, but never booted, so it carries no device verdict.
+keep  NovoTradePacker             ntp                                          3320B  PLAYS on a 68000 (2026-09-23), one real boot; sample: 3rdblock.ntp
+keep  NTSP-system                 two                                          1272B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- its 516,118-file index has no two.* / *.two on the Amiga side and no format directory for it. Listed and searched for, but never booted, so it carries no device verdict.
+keep  Octa-MED                    octamed                                     12852B  PLAYS on a 68000 (2026-09-22): wants an MMD2 -- MMD0/MMD1 go to the MED player, MMDC to MMDC, and uade123 resolves MMD3 to nothing
+keep  Oktalyzer                   okt,okta                                     7604B  PLAYS on a 68000 (2026-09-22), one real boot; sample: les granges brulees.okta
+keep  onEscapee                   one                                          1140B  NO MODULE (2026-09-22): nothing in the corpus is this format. All 17,358 files under Data/Music/uade-songs and uade-mods were content-probed with uade123; 2,875 resolved and none to this player.
+keep  Paul_Tonge                  pat                                          2296B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- it has Paul Tonge's C64 SIDs only, no Amiga pat.* and no format directory. Listed and searched for, but never booted, so it carries no device verdict.
+keep  PaulRobotham                dat                                          6212B  NO MODULE (2026-09-22): nothing in the corpus is this format. All 17,358 files under Data/Music/uade-songs and uade-mods were content-probed with uade123; 2,875 resolved and none to this player.
+keep  PaulShields                 ps                                           7216B  PLAYS on a 68000 (2026-09-22), one real boot; sample: jug-hiscore.ps
+keep  PaulSummers                 snk                                          3252B  PLAYS on a 68000 (2026-09-22), one real boot; sample: everton fc - jingles.snk
+keep  PeterVerswyvelen            pvp                                          3196B  PLAYS on a 68000 (2026-09-23), one real boot; sample: ziriax loader.pvp. Four of the twelve known modules fail inside uade123 itself with "module check failed" -- broken tunes, not a device question. Content calls it "Peter Verswyvelen Packer"; the conf name has no Packer in it.
+keep  PierreAdane                 pap                                          3376B  PLAYS on a 68000 (2026-09-23), one real boot; sample: pang - ingame 14.pap
+keep  Pokeynoise                  pn                                          61004B  UNIN at $083400FC on 68000 and 68020 (2026-09-23), UNEXPLAINED: two modules by different composers (pn.bjl, pn.warhawk) fault identically, so it is the player and not the tune. uade123 renders pn.warhawk for 6 s at peak 10468. Its companion IS staged -- see below. The fault PC is the same value MusicMaker-8V reports, so it is a sentinel, not a code address. COMPANION SHAPE: PokeyNoise needs the Amiga ICON file, pn.<tune>.info, beside the module; without it uade123 says "module check failed", and a same-sized decoy under another name does not substitute (measured on two tunes, 2026-09-23).
+keep  PreTracker                  prt                                         19972B  CANNOT WORK NATIVELY (speed_hack); sample: the little things.prt
+keep  ProfessionalSoundArtists    psa                                          4864B  PLAYS on a 68000 (2026-09-22), one real boot; sample: test module.psa
+keep  Protracker4                 ptm,mod3                                    10112B  PLAYS on a 68000 (2026-09-22), one real boot; sample: the drainer.ptm
+keep  PTK-Prowiz                  mod_doc,mod15,mod15_mst,mod_ntk,mod_ntk1,mod_ntk2,mod_ntkamp,mod_flt4,mod,mod_comp,!pm!,40a,40b,41a,50a,60a,61a,ac1,ac1d,aval,chan,cp,cplx,crb,di,eu,fc-m,fcm,ft,fuz,fuzz,gv,hmc,hrt,hrt!,ice,it1,kef,kef7,krs,ksm,lax,mexxmp,mpro,np,np1,np2,noisepacker2,np3,noisepacker3,nr,nru,ntpk,p10,p21,p30,p40a,p40b,p41a,p4x,p50a,p5a,p5x,p60,p60a,p61,p61a,p6x,pha,pin,pm,pm0,pm01,pm1,pm10c,pm18a,pm2,pm20,pm4,pm40,pmz,polk,pp10,pp20,pp21,pp30,ppk,pr1,pr2,prom,pru,pru1,pru2,prun,prun1,prun2,pwr,pyg,pygm,pygmy,skt,skyt,snt,snt!,st2,st26,st30,star,stpk,tp,tp1,tp2,tp3,un2,unic,unic2,wn,xan,xann,zen  54512B  ADRE at $00016430 on 68000, PUBL on 68020 (2026-09-22) -- NOT the format and not the CPU. PTK-Prowiz is the ONLY player in eagleplayer.conf that requires an eagleplayer OPTION: all nine of its rows carry epopt=type:<fourcc> (pt30, st20, st24, nt10, nt20, m&k., flt4, comp, and the packer list), and nothing in this tree passes epopt to a player. uade123 plays the same module cleanly (39/39 non-silent). Needs epopt plumbing before it can work.
+keep  PumaTracker                 puma                                         6548B  sample: liquid kids - lv1a.puma
+keep  QuadraComposer              emod,qc                                     10568B  sample: synth_corn.emod
+keep  Quartet                     qpa                                          4688B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- it carries Quartet PSG (.sqt) and Quartet ST (.qts) but nothing for qpa. Listed and searched for, but never booted, so it carries no device verdict.
+keep  Quartet_PSG                 sqt                                          2348B  PLAYS on a 68000 (2026-09-22), one real boot; sample: horror zombies from crypt.sqt
+keep  Quartet_ST                  qts                                          3472B  PLAYS on a 68000 (2026-09-23), one real boot; sample: qts.Turtle 3 with the directory's shared SMP.set bank. UADE CANNOT detect this format by content -- uade123 answers "Unknown format" for a Modland-named <name>.4v -- so it resolves by PREFIX only: rename to qts.<tune> + smp.<tune> and it is found.
+keep  RichardJoseph               rj                                           2676B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- the only rj.* in its 516,118-file index is a C64 SID, and Modland's Richard Joseph directory is .sng/.ins, which is RichardJoseph_Player. Listed and searched for, but never booted, so it carries no device verdict.
+keep  RichardJoseph_Player        rjp                                          5616B  PLAYS on a 68000 (2026-09-22), one real boot; sample: cannon fodder (intro).sng -- a .sng, found BY CONTENT, not by its prefix; it was the one remaining untriaged player with a module in the corpus
+keep  RiffRaff                    riff                                         2268B  PLAYS on a 68000 (2026-09-22), one real boot; sample: bombfusion.riff
+keep  RobHubbard                  rh                                           2488B  PLAYS on a 68000 (2026-09-22), one real boot; sample: skateordie.rh
+keep  RobHubbard_ST               rho                                          1964B  PLAYS on a 68000 (2026-09-22), one real boot; sample: battleships.rho
+keep  SCUMM                       scumm                                         448B  PLAYS on a 68000 (2026-09-22), one real boot; sample: zaktitle.scumm
+keep  SeanConnolly                s-c,scn                                      4204B  PLAYS on a 68000 (2026-09-22), one real boot; sample: surf ninjas.scn
+keep  SeanConran                  scr                                          3340B  PLAYS on a 68000 (2026-09-22), one real boot; sample: count duckula.scr
+keep  SIDMon1.0                   sid,sid1,smn                                  952B  already vendored; sample: anarchy.sid1
+keep  SIDMon2.0                   sid2                                         3816B  sample: bruno_time.sid2
+keep  Sierra-AGI                  agi                                          4884B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- its Sierra material is PC Ad Lib (.sci), not Amiga agi.*. Listed and searched for, but never booted, so it carries no device verdict.
+keep  Silmarils                   mok                                          6240B  PLAYS on a 68000 (2026-09-22), one real boot; sample: bostonbombclub.mok
+keep  SonicArranger               lion,sa,sa-p,sonic                           7976B  sample: almighty.sa
+drop  SonicArranger-pc-all        sa_old                                        820B  
+keep  SonixMusicDriver            smus,snx,tiny                               16464B  sample: radiokomppi.smus
+keep  Sound-FX                    sfx,sfx13                                    4176B  PLAYS on a 68000 (2026-09-22), one real boot; sample: distancia al ano.sfx
+keep  SoundControl                sc,sct                                      12228B  PLAYS on a 68000 (2026-09-22), one real boot; sample: north sea inferno ongame1.sc
+keep  SoundFactory               psf                                           5692B  added 2026-09-22 (owner): untriaged until now
+keep  SoundImages                 tw                                           3444B  PLAYS on a 68000 (2026-09-23), one real boot; sample: super monaco gp-1.tw
+keep  SoundMaster                 sm,sm1,sm2,sm3,smpro                         2376B  PLAYS on a 68000 (2026-09-22), one real boot; sample: rackney'sisland 4.sm
+keep  SoundMon2.0                 bp,sndmon                                    2860B  sample: aquarivs.bp
+keep  SoundMon2.2                 bp3                                          3652B  sample: antidust.bp3
+keep  SoundPlayer                 sjs                                          4844B  PLAYS on a 68000 (2026-09-22), one real boot; sample: sjs.tune6
+keep  SoundProgrammingLanguage   spl                                           2384B  added 2026-09-22 (owner): untriaged until now
+drop  Soundtracker-IV            mod15_st-iv                                   2892B  owner 2026-09-22: skip
+keep  Special-FX                  jd                                           2756B  PLAYS on a 68000 (2026-09-22), one real boot; sample: striker ingame.jd
+keep  Special-FX_ST               doda                                         6840B  PLAYS on a 68000 (2026-09-23), one real boot; sample: wildwheels jingles.doda. It reached PLAY in 2 ticks because that module is a jingle; NOT the Special-FX player (prefix jd), which is a different player and already listed.
+keep  SpeedyA1System              sas                                          4632B  PLAYS on a 68000 (2026-09-22), one real boot; sample: digital voyage.sas
+keep  SpeedySystem                ss                                           5192B  PLAYS on a 68000 (2026-09-22), one real boot; sample: pauker rap 2.ss
+keep  SteveBarrett                sb                                           2240B  PLAYS on a 68000 (2026-09-22), one real boot; sample: street fighter.sb
+keep  SteveTurner                 jpo,jpold                                    4332B  PLAYS on a 68000 (2026-09-22), one real boot; sample: offroad.jpo
+keep  SUN-Tronic                  sun                                          1624B  sample: pseudo oops.sun
+keep  Synth                       syn                                         10536B  sample: space_sound.syn
+keep  SynthDream                  sdr                                          7100B  PLAYS on a 68000 (2026-09-22): it needs its companion -- smp.<tune>, or the directory's shared smp.set
+keep  SynthPack                   osp                                         10000B  PLAYS on a 68000 (2026-09-22): needs the shared smp.set bank
+keep  SynTracker                  st,synmod                                    4448B  sample: okolaNUKE.st
+keep  TCB_Tracker                 tcb                                          3248B  PLAYS on a 68000 (2026-09-22), one real boot; sample: m-demo3 3.tcb
+keep  TFMX                        tfmx1.5                                      8008B  
+keep  TFMX-1.5-TFHD               tfhd1.5                                          -  NO PLAYER BINARY
+keep  TFMX-7V                     tfmx7V                                      14604B  
+keep  TFMX-7V-TFHD                tfhd7V                                      45864B  
+keep  TFMX-Pro                    mdat,tfmxpro                                12296B  sample: mdat.turrican_bonus
+keep  TFMX-Pro-TFHD               tfhdpro,tfmx                                14592B  
+drop  TFMX_ST                     mdst                                         9212B  
+keep  TheMusicalEnlightenment    tme                                           6020B  added 2026-09-22 (owner): untriaged until now
+keep  ThomasHermann               thm                                          5472B  PLAYS on a 68000 (2026-09-23), one real boot; sample: thm.blueangel69 -- two-file format, needs its smp.<tune> half in the same directory
+keep  TimeTracker                 tmk                                          6760B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- its 516,118-file index has no tmk.* / *.tmk and no format directory for it. Listed and searched for, but never booted, so it carries no device verdict.
+keep  TimFollin                   tf                                           3144B  PLAYS on a 68000 (2026-09-22), one real boot; sample: follin_smallest.tf
+keep  Titanics_Packer             tits                                         3112B  NO MODULE (2026-09-23): not in the corpus (all 17,358 files content-probed with uade123) and none on Modland -- its 516,118-file index has no tits.* / *.tits and no format directory for it. Listed and searched for, but never booted, so it carries no device verdict.
+keep  TomyTracker                 sg                                           4100B  PLAYS on a 68000 (2026-09-22), one real boot; sample: inconvenient intro.sg
+keep  Tronic                      dp,trc,tro,tronic                            2840B  PLAYS on a 68000 (2026-09-23), one real boot; sample: crystal.dp (Modland files it under Delta Packer)
+keep  UFO                         mus,ufo                                      3820B  NO MODULE (2026-09-22): nothing in the corpus is this format. All 17,358 files under Data/Music/uade-songs and uade-mods were content-probed with uade123; 2,875 resolved and none to this player.
+keep  UltimateSoundtracker        mod15_ust                                    2268B  PLAYS on a 68000 (2026-09-23), one real boot; sample: drum01.mod -- a plain .mod found BY CONTENT, not by its prefix (mod15_ust matches no file that exists); most of Modland's Soundtracker directory resolves to PTK-Prowiz and only the Karsten Obarski tunes to this player.
+keep  VoodooSupremeSynthesizer   vss                                           6016B  added 2026-09-22 (owner): untriaged until now
+keep  WallyBeben                  wb                                           2956B  PLAYS on a 68000 (2026-09-22), one real boot; sample: wicked.wb
+drop  YM-2149                     ym,ymst                                     43624B  owner 2026-09-22: skip -- .sndh is not a UADE format and the .ym/.ymst samples fail inside uade123 itself
+keep  ZoundMonitor                sng                                          2952B  sample: $3jammar-akhbar.sng
