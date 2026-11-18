@@ -53,7 +53,7 @@ export async function recordRegion(region: NesRegion, sunsoft: boolean): Promise
 
 export type NesSubsongChoice = 'current' | 'all';
 
-/** NES cartridge: the live song as FamiStudio song data inside the FamiStudio sound engine ROM (2A03, plus the three VRC6 channels on a mapper-24 board; other expansion chips are dropped and listed in the warnings). */
+/** NES cartridge: the live song as FamiStudio song data inside the FamiStudio sound engine ROM (2A03 on NROM, or on an FME-7 board when the music is past 16 KB; plus the three VRC6 channels on a mapper-24 board; other expansion chips are dropped and listed in the warnings). */
 export async function exportNesFamistudioRom(title: string, author?: string): Promise<{ rom: Uint8Array; warnings: string[] }> {
   const native = useFormatStore.getState().furnaceNative;
   if (!nesChipsOf(native?.chipIds, native?.chipFlags).includes('nes')) throw new Error('This song has no NES 2A03 channels.');
@@ -68,7 +68,8 @@ export async function exportNesFamistudioRom(title: string, author?: string): Pr
   const [plain, fur] = await Promise.all([load('player'), saveFurFileWasm()]); // fur: the module the engine holds, as the .fur export reads it
   const m = await parseFurnaceSong(fur instanceof ArrayBuffer ? fur : new Uint8Array(fur).buffer);
   const song = furnaceToFamistudio(m, useFormatStore.getState().furnaceActiveSubsong, plain.meta.dpcmCap);
-  const { player, meta } = song.vrc6 ? await load('player-vrc6') : plain; // 2A03 + VRC6: the mapper-24 build of the same engine
+  // 2A03 + VRC6: the mapper-24 build of the same engine; 2A03 music past 16 KB: the FME-7 build (24 KB at $6000)
+  const { player, meta } = song.vrc6 ? await load('player-vrc6') : song.fme7 ? await load('player-fme7') : plain;
   const rom = buildFamistudioRom(new Uint8Array(player), meta, song, { title, author });
   return { rom, warnings: song.lossy.map((l) => `Not carried to the FamiStudio engine: ${l}`) };
 }

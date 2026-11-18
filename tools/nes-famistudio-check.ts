@@ -22,10 +22,12 @@ const PLAYER = readFileSync(path.join(ROOT, 'public/nes/famistudio/player.nes'))
 const META: FamistudioMeta = JSON.parse(readFileSync(path.join(ROOT, 'public/nes/famistudio/player.json'), 'utf8'));
 const PLAYER_VRC6 = readFileSync(path.join(ROOT, 'public/nes/famistudio/player-vrc6.nes'));
 const META_VRC6: FamistudioMeta = JSON.parse(readFileSync(path.join(ROOT, 'public/nes/famistudio/player-vrc6.json'), 'utf8'));
+const PLAYER_FME7 = readFileSync(path.join(ROOT, 'public/nes/famistudio/player-fme7.nes'));
+const META_FME7: FamistudioMeta = JSON.parse(readFileSync(path.join(ROOT, 'public/nes/famistudio/player-fme7.json'), 'utf8'));
 const CPU_NTSC = 1789773;
 // Tick marker at NMI entry (vector at $FFFA), not META.tickAddr (after famistudio_update): the harness drops writes before
 // the first marker, which would lose the first update (note attacks, the $4003 period-high write).
-const nmiOf = (rom: Uint8Array): number => rom[16 + 0x7ffa] | (rom[16 + 0x7ffb] << 8);
+const nmiOf = (rom: Uint8Array, meta: FamistudioMeta): number => rom[meta.prgOffset + 0x7ffa] | (rom[meta.prgOffset + 0x7ffb] << 8);
 // Frames run past the last channel's first note, so a channel that enters late is still heard.
 const FIRST_NOTE_MARGIN = 60;
 
@@ -217,8 +219,9 @@ for (const name of names) {
   try {
     const m = await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
     const song = furnaceToFamistudio(m, 0, META.dpcmCap);
-    if (song.music.length > META.musicCap) console.log(`  [SIZE] ${song.music.length} B > cap ${META.musicCap}: header+instruments=${song.sizes.header} sampleTable=${song.sizes.samples} envelopes=${song.sizes.envelopes} streams(pulse1/pulse2/tri/noise/dpcm...)=${song.sizes.streams.join('/')}`);
-    const rom = buildFamistudioRom(song.vrc6 ? PLAYER_VRC6 : PLAYER, song.vrc6 ? META_VRC6 : META, song, { title: m.name || name, author: m.author });
+    const [player, meta]: [Buffer, FamistudioMeta] = song.vrc6 ? [PLAYER_VRC6, META_VRC6] : song.fme7 ? [PLAYER_FME7, META_FME7] : [PLAYER, META];
+    if (song.music.length > meta.musicCap) console.log(`  [SIZE] ${song.music.length} B > cap ${meta.musicCap}: header+instruments=${song.sizes.header} sampleTable=${song.sizes.samples} envelopes=${song.sizes.envelopes} streams(pulse1/pulse2/tri/noise/dpcm...)=${song.sizes.streams.join('/')}`);
+    const rom = buildFamistudioRom(player, meta, song, { title: m.name || name, author: m.author });
     if (OUT) writeFileSync(path.join(OUT, `${name}.nes`), rom);
     const refWrites = furnaceTicks(path.join(SONGS, `${name}.fur`), 60, MAX_FRAMES);
     // Reference first: Furnace stops writing at song end (-loops 0); compare the whole song up to and including its last register write.
@@ -233,7 +236,7 @@ for (const name of names) {
     const refD = dpcmFrames(refWrites).slice(0, refEnd);
     const lagGuess = Math.max(0, ...song.firstNoteFrames) + FIRST_NOTE_MARGIN;
     const ticks = refEnd + lagGuess + 60;
-    const run = mesen(rom, ticks, Math.ceil(ticks / 20) + 60, song.vrc6 ? [...APU_RANGES, [0x9000, 0x9002], [0xa000, 0xa002], [0xb000, 0xb002]] : undefined, { tickAddress: nmiOf(rom), region: 'Ntsc' });
+    const run = mesen(rom, ticks, Math.ceil(ticks / 20) + 60, song.vrc6 ? [...APU_RANGES, [0x9000, 0x9002], [0xa000, 0xa002], [0xb000, 0xb002]] : undefined, { tickAddress: nmiOf(rom, meta), region: 'Ntsc' });
     const s = sounding(run.writes);
     // famistudio_init runs before the first NMI marker, so the harness drops its writes; replay the ones that set APU
     // state the frames depend on ($4015 = $0F, triangle $4008 = $80, noise length load $400F = 0; famistudio_ca65.s famistudio_init).

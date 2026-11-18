@@ -24,6 +24,7 @@ export interface PitchLossySpan { ch: number; from: number; to: number }
 export interface FamistudioSong { music: Uint8Array; dpcm: Uint8Array; lossy: string[]; pitchLossy: PitchLossySpan[]; channelsWithNotes: boolean[]; firstNotes: number[]; firstNoteFrames: number[];
   /** Bytes of each music-area part: song header + instrument table, DPCM sample table, envelopes, and one entry per channel stream. */ sizes: { header: number; samples: number; envelopes: number; streams: number[] }
   /** The song carries the three VRC6 channels: it needs the mapper-24 player (player-vrc6.nes / .json). */ vrc6?: boolean
+  /** Music past 16 KB, assembled for $6000: it needs the FME-7 player (player-fme7.nes / .json). */ fme7?: boolean
   /** Furnace A-4 tuning (Hz); buildFamistudioRom retunes the player's note table to it. */ tuning?: number }
 
 class Lossy {
@@ -279,19 +280,31 @@ const scaleVol = (vol: number, env: number, flags: { newVolumeScaling?: unknown;
   return flags?.ceilVolumeScaling ? Math.floor((vol * e + 14) / 15) : Math.floor((vol * e) / 15);
 };
 
-/** Music bytes the player ROM holds (musicCap in player.json). */
+/** Music bytes the NROM player holds at $8000 (musicCap in player.json). */
 const MUSIC_CAP = 16384;
+/** 2A03 songs past MUSIC_CAP go to the FME-7 player: 24 KB of music at $6000 (player-fme7.json musicAddr / musicCap). */
+const FME7_MUSIC_ADDR = 0x6000;
+const FME7_MUSIC_CAP = 0x6000;
 
 export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2000): FamistudioSong {
   // Note cuts cost 2 bytes per row, a held 01/02 slide 3 extra bytes per note; when the song is over the cap, drop cuts
   // first, then held slides (the notes then play unslid), then both.
-  let song = convert(m, subsong, dpcmCap, true, true);
-  for (const [cuts, held] of [[false, true], [true, false], [false, false]]) {
-    if (song.music.length <= MUSIC_CAP) break;
-    song = convert(m, subsong, dpcmCap, cuts, held);
-    if (!cuts) song.lossy.push('note cut EC dropped to fit the 16 KiB music area');
-    if (!held) song.lossy.push('01/02 slide held over later notes dropped to fit the 16 KiB music area');
+  let base = 0x8000;
+  let cap = MUSIC_CAP;
+  let song = convert(m, subsong, dpcmCap, true, true, base);
+  // shortcut: VRC6 songs stay on the 16 KB mapper-24 player; give player-vrc6 a second music bank when one needs it.
+  if (song.music.length > cap && !song.vrc6) {
+    base = FME7_MUSIC_ADDR;
+    cap = FME7_MUSIC_CAP;
+    song = convert(m, subsong, dpcmCap, true, true, base);
   }
+  for (const [cuts, held] of [[false, true], [true, false], [false, false]]) {
+    if (song.music.length <= cap) break;
+    song = convert(m, subsong, dpcmCap, cuts, held, base);
+    if (!cuts) song.lossy.push(`note cut EC dropped to fit the ${cap / 1024} KiB music area`);
+    if (!held) song.lossy.push(`01/02 slide held over later notes dropped to fit the ${cap / 1024} KiB music area`);
+  }
+  if (base === FME7_MUSIC_ADDR) song.fme7 = true;
   return song;
 }
 
@@ -387,7 +400,7 @@ export function expandRefs(p: PackedStream): number[] {
   return out;
 }
 
-function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean): FamistudioSong {
+function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean, base: number): FamistudioSong {
   const lossy = new Lossy();
   const pitchLossy: PitchLossySpan[] = [];
   const s = m.subsongs[subsong];
@@ -841,7 +854,6 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   }
 
   // Assemble: header, song header, instruments, sample table, envelopes, streams.
-  const base = 0x8000;
   const headerLen = 1 + 2 + 2 + NCH * 2 + 4;
   const insOff = headerLen;
   const smpOff = insOff + insEnvs.length * 8;
@@ -889,8 +901,9 @@ export function famistudioText(s: string, len: number): Uint8Array {
   return out;
 }
 
-/** Patch the converted song (and optional on-screen title/author) into the NROM player image (public/nes/famistudio/player.nes). */
+/** Patch the converted song (and optional on-screen title/author) into the player image (public/nes/famistudio/player*.nes). */
 export function buildFamistudioRom(player: Uint8Array, meta: FamistudioMeta, song: FamistudioSong, text: { title?: string } & NesScreenInfo = {}, subsongCount = 1): Uint8Array {
+  if ((song.fme7 ? FME7_MUSIC_ADDR : 0x8000) !== meta.musicAddr) throw new Error(`song assembled for another player than musicAddr ${meta.musicAddr}`);
   if (song.music.length > meta.musicCap) throw new Error(`song data ${song.music.length} bytes > ${meta.musicCap}`);
   if (song.dpcm.length > meta.dpcmCap) throw new Error(`DPCM ${song.dpcm.length} bytes > ${meta.dpcmCap}`);
   const rom = new Uint8Array(player); // copy: Buffer.slice() is a view, retuneNoteTable would write into the caller's player

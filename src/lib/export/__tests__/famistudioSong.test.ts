@@ -48,10 +48,27 @@ describe('famistudio ROM', () => {
     expect(String.fromCharCode(...at(META.authorAddr))).toBe('X'.repeat(32));
     expect(rom[META.prgOffset + META.titleAddr - 0x8000 + 13]).toBe(0x20);
   });
-  it('player.nes is built from the current sources (run tools/build-nes-famistudio-player.sh)', () => {
+  it.each([['', 'fs.cfg'], ['vrc6', 'fs.cfg'], ['fme7', 'fs-fme7.cfg']])('player%s.nes is built from the current sources (run tools/build-nes-famistudio-player.sh)', (v, cfg) => {
     const h = createHash('sha1');
-    for (const f of [path.join(DIR, 'player.s'), path.join(DIR, 'fs.cfg'), path.join(ROOT, 'third-party/famistudio/famistudio_ca65.s'), path.join(ROOT, 'public/nes/screen.chr')]) h.update(readFileSync(f));
-    expect(h.digest('hex')).toBe(META.sourceHash);
+    for (const f of [path.join(DIR, 'player.s'), path.join(DIR, cfg), path.join(ROOT, 'third-party/famistudio/famistudio_ca65.s'), path.join(ROOT, 'public/nes/screen.chr')]) h.update(readFileSync(f));
+    const hex = h.digest('hex');
+    const meta: FamistudioMeta = JSON.parse(readFileSync(path.join(DIR, v ? `player-${v}.json` : 'player.json'), 'utf8'));
+    expect(v ? createHash('sha1').update(hex + v).digest('hex') : hex).toBe(meta.sourceHash);
+  });
+  it('moves 2A03 music past 16 KiB to the FME-7 player: 24 KiB at $6000, file offset 16 + address (Future_Re-ference.fur)', async () => {
+    const buf = readFileSync(path.join(ROOT, 'public/data/songs/furnace/nes/Future_Re-ference.fur'));
+    const song = furnaceToFamistudio(await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer));
+    const meta: FamistudioMeta = JSON.parse(readFileSync(path.join(DIR, 'player-fme7.json'), 'utf8'));
+    expect(song.fme7).toBe(true);
+    expect(song.music.length).toBeGreaterThan(META.musicCap);
+    expect(song.lossy.some((l) => l.includes('dropped to fit'))).toBe(false);
+    expect(song.music[1] | (song.music[2] << 8)).toBeGreaterThanOrEqual(0x6000); // song header pointers assembled for $6000
+    expect(() => buildFamistudioRom(readFileSync(path.join(DIR, 'player.nes')), META, song)).toThrow();
+    const player = readFileSync(path.join(DIR, 'player-fme7.nes'));
+    const rom = buildFamistudioRom(player, meta, song);
+    expect([rom[6] >> 4 | (rom[7] & 0xf0), rom[4]]).toEqual([69, 4]);
+    expect([...rom.subarray(16 + 0x6000, 16 + 0x6000 + song.music.length)]).toEqual([...song.music]);
+    expect(rom[meta.prgOffset + 0x7ffc] | (rom[meta.prgOffset + 0x7ffd] << 8)).toBeGreaterThanOrEqual(0xe000); // reset vector in the fixed bank
   });
 });
 

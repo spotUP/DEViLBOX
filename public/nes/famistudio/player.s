@@ -28,6 +28,8 @@ FAMISTUDIO_EXP_VRC6              = 1     ; -D VRC6=1: mapper-24 board, 2A03 + 3 
 .segment "HEADER"
 .ifdef VRC6
     .byte "NES", $1a, 2, 1, $80, $10, 0, 0, 0, 0, 0, 0, 0, 0   ; mapper 24
+.elseif .defined(FME7)
+    .byte "NES", $1a, 4, 1, $50, $40, 0, 0, 0, 0, 0, 0, 0, 0   ; mapper 69, 64 KB PRG
 .else
     .byte "NES", $1a, 2, 1, $00, $00, 0, 0, 0, 0, 0, 0, 0, 0
 .endif
@@ -108,6 +110,14 @@ fs_reset:
     clc
     adc #4
     sta $e000,x
+    dex
+    bpl :-
+.endif
+.ifdef FME7
+    ldx #13
+:   stx $8000                   ; FME-7 command, then its value at $A000 (fs_fme7tab)
+    lda fs_fme7tab,x
+    sta $a000
     dex
     bpl :-
 .endif
@@ -852,6 +862,14 @@ fs_chip:   .byte "2A03"
 fs_scroll: .byte "UNTITLED - DEVILBOX"
            .res 109, $20
 fs_nsub:   .byte 1              ; subsong count (the exporter writes one subsong)
+
+.ifdef FME7
+; FME-7 commands 0-13: CHR 1 KB banks 0-7; PRG bank 3 (ROM, bit 6 clear) at $6000, 4 at $8000, 5 at $A000 = 24 KB of music
+; at $6000-$BFFF; bank 6 at $C000 = DPCM; $E000 is fixed to bank 7. Mirroring 1 = horizontal like the NROM header; IRQ off.
+; With that order a CPU address in $6000-$FFFF sits at file offset 16 + address (fs-fme7.cfg, banks 0-2 are filler).
+.segment "CODE"
+fs_fme7tab: .byte 0, 1, 2, 3, 4, 5, 6, 7, 3, 4, 5, 6, 1, 0
+.endif
 
 .segment "CHARS"
     .incbin "screen.chr"
