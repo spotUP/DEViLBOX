@@ -57,6 +57,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   format669: 'public/data/songs/composer-669/speed fighter.669',
   mtm: 'public/data/songs/multi-tracker/anonymous in 4ce.mtm',
   far: 'public/data/songs/formats/m31.far',
+  plm: 'public/data/songs/disorder-tracker-2/hyper geckoo.plm',
   stm: 'public/data/songs/scream-tracker-2/slideshow i.stm',
   stoneTracker: 'public/data/songs/stonetracker/hypnosphere.spm',
   daveLowe: 'public/data/songs/dave-lowe/incredibleshrinkingsphere.dl',

@@ -640,6 +640,14 @@
       "cells": 5144,
       "bytes": 5144
     },
+    "plm": {
+      "exporter": "PLMExporter.exportPLM",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 226184,
+      "bytes": 226184
+    },
     "preTracker": {
       "exporter": "PreTracker (PreTrackerExporter, store-dependent)",
       "tier": "pattern-data",

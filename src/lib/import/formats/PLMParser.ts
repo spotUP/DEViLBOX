@@ -212,6 +212,47 @@ function transformEffect(cmd: number, param: number): [number, number] {
   return [effTyp, effParam];
 }
 
+
+/** The grid cell a stored 5-byte PLM cell decodes to: the parser's pattern-loop mapping, with the source bytes as carriers. */
+function decodePLMBytes(raw: Uint8Array): TrackerCell {
+  const noteByte = raw[0];
+  const note = noteByte > 0 && noteByte < 0x90 ? ((noteByte >> 4) * 12) + (noteByte & 0x0F) + 13 : 0;
+  const volume = raw[2] !== 0xFF ? 0x10 + Math.min(raw[2], 64) : 0x00;
+  const [effTyp, eff] = transformEffect(raw[3], raw[4]);
+  // Volume (0xFF/clamp), note nibbles and effects (many-to-one) are lossy: the source bytes ride in invisible carriers.
+  return {
+    note, instrument: raw[1], volume, effTyp, eff, effTyp2: 0, eff2: 0,
+    period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3], resonance: raw[4],
+  };
+}
+
+/** Write an edited grid cell over its stored bytes: only the changed fields are re-encoded (inverting the parser's own mapping). */
+function encodePLMEdit(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
+  if (!stored) return encodePLMCell(cell);
+  const out = stored.slice(0, 5);
+  const was = decodePLMBytes(stored);
+  const note = cell.note ?? 0;
+  if (note !== was.note) {
+    const raw = note - 13;
+    out[0] = note >= 13 ? Math.min(8, Math.floor(raw / 12)) << 4 | (raw % 12) : 0;
+  }
+  if ((cell.instrument ?? 0) !== was.instrument) out[1] = (cell.instrument ?? 0) & 0xFF;
+  const vol = cell.volume ?? 0;
+  if (vol !== was.volume) out[2] = vol >= 0x10 && vol <= 0x50 ? vol - 0x10 : 0xFF;
+  const effTyp = cell.effTyp ?? 0;
+  const eff = cell.eff ?? 0;
+  if (effTyp !== was.effTyp || eff !== was.eff) {
+    out[3] = 0; out[4] = 0;
+    search: for (let cmd = 0; cmd < EFF_TRANS.length; cmd++) {
+      for (let p = 0; p < 256; p++) {
+        const [t, e] = transformEffect(cmd, p);
+        if (t === effTyp && e === eff) { out[3] = cmd; out[4] = p; break search; }
+      }
+    }
+  }
+  return out;
+}
+
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
 interface PLMOrderItem {
@@ -583,40 +624,14 @@ export async function parsePLMFile(
     numChannels,
     numPatterns,
     moduleSize: buffer.byteLength,
-    encodeCell: encodePLMCell,
-    decodeCell: (bytes: Uint8Array): TrackerCell => {
-      // Inverse of parser's 5-byte PLM cell decode
-      const noteByte = bytes[0];
-      const instr    = bytes[1];
-      const volByte  = bytes[2];
-      const cmd      = bytes[3];
-      const param    = bytes[4];
-
-      // Note: 0=empty, >=0x90=ignore, else (hi*12)+lo+12+1
-      let note = 0;
-      if (noteByte > 0 && noteByte < 0x90) {
-        note = ((noteByte >> 4) * 12) + (noteByte & 0x0F) + 12 + 1;
-      }
-
-      // Volume: 0xFF = empty (0x00), else 0x10 + min(volByte, 64)
-      const volume = volByte !== 0xFF ? 0x10 + Math.min(volByte, 64) : 0x00;
-
-      const [effTyp, eff] = transformEffect(cmd, param);
-
-      // Byte-exact carrier. The 5-byte PLM cell is lossy in the XM view: the volume
-      // maps 0xFF->0 and clamps >64, and transformEffect is a many-to-one command map.
-      // Stash the raw 5 source bytes in the invisible period/pan/cutoff/resonance
-      // carriers (fields the grid loop never sets, so edited cells fall back to the
-      // canonical derivation).
-      return {
-        note, instrument: instr, volume, effTyp, eff, effTyp2: 0, eff2: 0,
-        period: (noteByte << 8) | instr, pan: volByte, cutoff: cmd, resonance: param,
-      };
-    },
+    encodeCell: encodePLMEdit,
+    decodeCell: decodePLMBytes,
+    encodeOverStored: true,
+    propagateSharedCells: true,
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // PLM uses a 2D canvas; resolve through the pre-built offset map
       const key = `${pattern}:${row}:${channel}`;
-      return cellFileOffsets.get(key) ?? 0;
+      return cellFileOffsets.get(key) ?? -1;
     },
   };
 
@@ -633,6 +648,8 @@ export async function parsePLMFile(
     initialBPM:      tempo || 125,
     linearPeriods:   false,
     uadePatternLayout,
+    uadeEditableFileData: buffer.slice(0),
+    uadeEditableFileName: filename,
   };
 }
 

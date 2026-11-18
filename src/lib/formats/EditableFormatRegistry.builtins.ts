@@ -124,7 +124,7 @@ registerEditableFormat({ formatId: "paulShields", label: "Paul Shields", pattern
 registerEditableFormat({ formatId: "maniacsOfNoise", label: "Maniacs of Noise", patternCodec: { kind: "variable" }, exporter: { module: "ManiacsOfNoiseExporter", fn: "exportManiacsOfNoise", byLayout: true } });
 registerEditableFormat({ formatId: "paulSummers", label: "Paul Summers", patternCodec: { kind: "variable" }, exporter: { module: "PaulSummersExporter", fn: "exportPaulSummers", byLayout: true } });
 registerEditableFormat({ formatId: "quartet", label: "Quartet PSG", patternCodec: { kind: "variable" }, exporter: { module: "QuartetExporter", fn: "exportQuartet", byLayout: true } });
-registerEditableFormat({ formatId: "plm", label: "", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "plm", label: "Disorder Tracker 2", patternCodec: { kind: "fixed" }, exporter: { module: "PLMExporter", fn: "exportPLM", byLayout: true } });
 registerEditableFormat({ formatId: "preTracker", label: "PreTracker", exporter: { module: "PreTrackerExporter", fn: "exportAsPreTracker" } });
 registerEditableFormat({ formatId: "psm", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "pt36", label: "ProTracker 3.6", patternCodec: { kind: "fixed" } });
