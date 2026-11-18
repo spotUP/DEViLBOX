@@ -129,6 +129,11 @@ describe('furnaceToFamistudio', () => {
     expect(song.music.includes(0x4a)).toBe(true);
     expect(song.lossy.some((l) => l.startsWith('effect 04'))).toBe(false);
   });
+  it('plays an effect with no value byte (-1) as xx = 00: a bare 04 does not advance the vibrato phase of the later 0488 (The East triangle)', () => {
+    const bare = music({ 0: { 0: { ...A4, ...fx(0x04, -1) }, 12: fx(0x04, 0x88) } });
+    const zero = music({ 0: { 0: { ...A4, ...fx(0x04, 0) }, 12: fx(0x04, 0x88) } });
+    expect(Array.from(bare.music)).toEqual(Array.from(zero.music));
+  });
   it('adds 04 vibrato to the instrument pitch macro in one relative envelope (Furnace sums pitch and pitch2)', () => {
     const notes: string[] = [];
     const vib = [0, 5, 0, -5];
@@ -186,6 +191,15 @@ describe('furnaceToFamistudio', () => {
     expect(at).toBeGreaterThan(-1);
     expect(song.music[at + 1]).toBeGreaterThan(0);
     expect(song.music[at + 2]).toBe(240);
+  });
+  it('re-sends a running 0Axy after a volume set only until Furnace stops it past the maximum (playback.cpp; going_up pulse 2)', () => {
+    // 0A10 from v0 climbs 1/4 per tick (1 frame per tick here) and passes 15 after 64 ticks: row 10 of speed 6.
+    const slides = (row: number): number => {
+      const b = [...music({ 0: { 0: { ...A4, volume: 0, ...fx(0x0a, 0x10) }, [row]: { ...A4, volume: 4 } } }).music];
+      return b.filter((x, i) => x === 0x51 && b[i + 1] === 4 && b[i + 2] === 240).length;
+    };
+    expect(slides(2)).toBe(2);
+    expect(slides(12)).toBe(1);
   });
   it('maps ED note delay to 0x47 with ticks*frames-1', () => {
     const song = music({ 0: { 0: { ...A4, ...fx(0xed, 0x03) } } });

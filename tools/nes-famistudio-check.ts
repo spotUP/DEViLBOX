@@ -220,9 +220,10 @@ for (const name of names) {
     if (song.music.length > META.musicCap) console.log(`  [SIZE] ${song.music.length} B > cap ${META.musicCap}: header+instruments=${song.sizes.header} sampleTable=${song.sizes.samples} envelopes=${song.sizes.envelopes} streams(pulse1/pulse2/tri/noise/dpcm...)=${song.sizes.streams.join('/')}`);
     const rom = buildFamistudioRom(song.vrc6 ? PLAYER_VRC6 : PLAYER, song.vrc6 ? META_VRC6 : META, song, { title: m.name || name, author: m.author });
     if (OUT) writeFileSync(path.join(OUT, `${name}.nes`), rom);
-    // Reference first: Furnace stops writing at song end (-loops 0); compare the whole song up to its last register write (+2 for the final row).
     const refWrites = furnaceTicks(path.join(SONGS, `${name}.fur`), 60, MAX_FRAMES);
-    const refEnd = refWrites.map((w) => w.length > 0).lastIndexOf(true) + 3;
+    // Reference first: Furnace stops writing at song end (-loops 0); compare the whole song up to and including its last register write.
+    // Frames after it are not held state: Furnace has stopped ticking (its volume macros write no more), while the ROM plays on.
+    const refEnd = refWrites.map((w) => w.length > 0).lastIndexOf(true) + 1;
     const sub = m.subsongs[0];
     const hz = sub.hz > 0 ? sub.hz : 60;
     const spd = (sub.speedPattern?.length ? sub.speedPattern : [sub.speed1, sub.speed2 || sub.speed1]).reduce((x: number, y: number) => x + y, 0) / (sub.speedPattern?.length || 2);

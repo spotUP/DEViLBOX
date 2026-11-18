@@ -520,6 +520,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     const fx: Array<[number, number]> = [];
     // 2A03 hardware volume state (nes.cpp): 15xx envMode, 16xx length index, volume column = envelope period in envelope modes.
     let envMode = 3, lenIdx = 0x1f, furVol = 15, hwVol = false, baked = false, lastSpd = -1;
+    let slideOps: number[] = [];
+    let slVol = ch === 7 ? 63 : 15, slStep = 0, slFrame = 0; // Furnace channel volume under a running 0Axy (volume units), its step per tick
     let lastIns = -1, lastVol = -1, empty = 0, hasNotes = false, loopAt = 0, first = -1, firstFrame = -1;
     let curIns: FurnaceInstrument | undefined;
     let vibPos = 0, vibFrame = 0; // Furnace's vibratoPos (64-step sine) at the row start
@@ -552,6 +554,12 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         let delay = 0, noAttack = false, slide: number[] | null = null, rowByte: number[] | null = null;
         if (ch === 7 && o === 0 && r === 0) ops.push(0x55, 1); // saw volume shift: full (x4), so 0-15 spans the saw's 0-60
         if (ch === 0 && (rowSpeed[o][r] !== lastSpd || (o === loopOrder && r === 0))) { ops.push(0x46, Math.min(255, rowSpeed[o][r] * spdMul)); lastSpd = rowSpeed[o][r]; }
+        // Furnace stops a running 0Axy once the volume passes its maximum or drops below 0 (playback.cpp, unless noVolSlideReset).
+        if (slideOps.length && slVol >= 0) {
+          slVol += slStep * (rowFrame[o][r] - slFrame) / perTick;
+          if ((slVol >= (ch === 7 ? 64 : 16) || slVol < 0) && !m.compatFlags?.noVolSlideReset) slideOps = [];
+        }
+        slFrame = rowFrame[o][r];
         if (cell) {
           if (cell.instrument >= 0) { curIns = m.instruments[cell.instrument]; curInsIdx = cell.instrument; }
           // Furnace steps vibratoPos by the rate each tick (a new note zeroes it unless continuousVibrato) while the depth is above 0; the elapsed ticks run with the previous 04xy.
@@ -560,7 +568,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           let fxChanged = false, fineHere = false, slideFx = 0, slideVal = 0, volSlide = -1, cutTicks = 0;
           for (const e of cell.effects) {
             if (e.type < 0) continue;
-            const t = e.type, v = e.value;
+            const t = e.type, v = Math.max(0, e.value); // an effect with no value byte plays as xx = 00 (Furnace playback.cpp)
             if (speedFx.has(t)) continue; // speed rows are written per row on channel 0 from rowSpeed
             else if ((t === 0x15 || t === 0x16) && ch < DPCM_CH && ch !== 2) { if (t === 0x15) envMode = v & 3; else lenIdx = v & 0x1f; }
             else if (t === 0x12 && ch < DPCM_CH && ch !== 2) ops.push(0x4f, v & 3);
@@ -684,13 +692,14 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           if (withCuts && cutTicks > 0 && seq[ri + 1] && cutTicks * perTick < seq[ri + 1].frame - seq[ri].frame) ops.push(0x48, Math.min(255, Math.round(cutTicks * perTick)));
           if (cell.volume >= 0) {
             if (ch === DPCM_CH) lossy.add('volume column on DPCM');
-            else { furVol = Math.min(15, ch === 7 ? Math.round(cell.volume / 4) : cell.volume); /* VRC6 saw volume is 0-63 */ if (!hwVol && !(baked && n === 0) && cell.volume !== lastVol) { ops.push(0x70 | furVol); lastVol = cell.volume; } }
+            else { slVol = cell.volume; furVol = Math.min(15, ch === 7 ? Math.round(cell.volume / 4) : cell.volume); /* VRC6 saw volume is 0-63 */ if (!hwVol && !(baked && n === 0) && cell.volume !== lastVol) { ops.push(0x70 | furVol); lastVol = cell.volume; } }
           }
           if (volSlide >= 0) {
             const x = volSlide >> 4, y = volSlide & 15;
-            if (x > 0) ops.push(0x51, clamp8(x * 16 * perFrame) & 0xff, 240);
-            else if (y > 0) ops.push(0x51, -clamp8(y * 16 * perFrame) & 0xff, 0);
-            else ops.push(0x51, 0, 0);
+            // Furnace keeps the 0Axy slide running across rows until 0A00; FamiStudio's slide stops on a volume set, so it is re-sent after each one.
+            slideOps = x > 0 ? [0x51, clamp8(x * 4 * perFrame) & 0xff, 240] : y > 0 ? [0x51, -clamp8(y * 4 * perFrame) & 0xff, 0] : [];
+            ops.push(...(slideOps.length ? slideOps : [0x51, 0, 0]));
+            slStep = x > 0 ? x / 4 : -y / 4;
             lastVol = -1;
           }
           if (n > 0) {
@@ -705,6 +714,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             const fsVol = hwVol || baked ? 15 : furVol;
             if (hwVol || baked ? lastVol !== 15 : lastVol >= 0 && lastVol !== furVol) { ops.push(0x70 | fsVol); lastVol = fsVol; }
           }
+          if (volSlide < 0 && slideOps.length && (cell.volume >= 0 || n > 0)) { ops.push(...slideOps); lastVol = -1; }
           // Slides: 0x50 step,from,to replaces the note byte (it attacks the note); 0x43 first keeps a held note from retriggering.
           if (tonal && src > 0 && slideFx) {
             const pFrom = pulsePeriod;
