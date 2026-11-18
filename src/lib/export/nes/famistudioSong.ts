@@ -244,7 +244,8 @@ function pcmToDpcm(levels: number[]): number[] {
 /** NES DPCM rates (Hz, NTSC) for pitch index 0..15. */
 const DPCM_RATES = [4181.71, 4709.93, 5264.04, 5593.04, 6257.95, 7046.35, 7919.35, 8363.42, 9419.86, 11186.1, 12604, 13982, 16884.6, 21306.8, 24858, 33143.9];
 /** 2A03 pulse period of FamiStudio note n (index 46 = A-4); the triangle period is half. */
-const pulsePeriod = (n: number): number => Math.max(1, Math.round(1789773 / (16 * 440 * 2 ** ((n - 46) / 12))) - 1);
+const pulsePeriodRaw = (n: number): number => 1789773 / (16 * 440 * 2 ** ((n - 46) / 12));
+const pulsePeriod = (n: number): number => Math.max(1, Math.round(pulsePeriodRaw(n)) - 1);
 const SLIDE_FX = new Set([0x01, 0x02, 0x03, 0xe1, 0xe2]);
 const clamp8 = (v: number): number => Math.max(-127, Math.min(127, Math.round(v)));
 /** Furnace VOL_SCALE_LINEAR_BROKEN (dispatch.h): channel volume x macro volume. Default floors; FamiStudio's volume table
@@ -578,7 +579,16 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
               const len = Math.max(2, Math.min(240, Math.round(64 / gcd(x, 64) * perTick)));
               const amp = linear ? pulsePeriod(src || 46) * (2 ** ((vibXY & 15) / 192) - 1) : y;
-              vib = Array.from({ length: len }, (_, i) => Math.round(-amp * Math.sin(2 * Math.PI * x * (i / perTick + 1) / 64)));
+              // Linear pitch: Furnace offsets the pitch by (round(127 sin) * depth) >> 4 in 1/128 semitone and rounds the
+              // unrounded period (measured on Sky Sanctuary: a depth-1 vibrato dips a period only above ~2 units), so offsets
+              // are taken against the fractional base period, not the table's rounded one.
+              const P = pulsePeriod(src || 46), X = pulsePeriodRaw(src || 46);
+              vib = Array.from({ length: len }, (_, i) => {
+                const phase = x * (Math.floor(i / perTick + 1e-9) + 1);
+                if (!linear) return Math.round(-amp * Math.sin(2 * Math.PI * phase / 64));
+                const u = (Math.round(127 * Math.sin(2 * Math.PI * (phase & 63) / 64)) * y) >> 4;
+                return Math.round(X * 2 ** (-u / 1536)) - 1 - P;
+              });
               pid = envId(encodeEnvelope(vib, 0, -1, 'pitch'));
             }
             if (linear) {
