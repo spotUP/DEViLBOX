@@ -816,6 +816,14 @@
       "cells": 264198,
       "bytes": 264198
     },
+    "stm": {
+      "exporter": "STMExporter.exportSTM",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 220494,
+      "bytes": 220494
+    },
     "stoneTracker": {
       "exporter": "StoneTrackerExporter.exportStoneTracker",
       "tier": "byte-exact",

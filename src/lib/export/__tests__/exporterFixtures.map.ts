@@ -56,6 +56,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   anders0land: 'public/data/songs/anders-oland/primemover 07.hot',
   format669: 'public/data/songs/composer-669/speed fighter.669',
   mtm: 'public/data/songs/multi-tracker/anonymous in 4ce.mtm',
+  stm: 'public/data/songs/scream-tracker-2/slideshow i.stm',
   stoneTracker: 'public/data/songs/stonetracker/hypnosphere.spm',
   daveLowe: 'public/data/songs/dave-lowe/incredibleshrinkingsphere.dl',
   jeroenTel: 'public/data/songs/jeroen-tel/stormlord title.jt',

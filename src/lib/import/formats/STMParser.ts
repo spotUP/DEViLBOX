@@ -266,6 +266,79 @@ function convertSTMEffect(
   }
 }
 
+/** The grid cell a stored 4-byte STM cell decodes to (the parser's own decode), source bytes as carriers. */
+function decodeSTMBytes(bytes: Uint8Array): TrackerCell {
+  // Inverse of parser's 4-byte STM cell decode
+  const noteByte = bytes[0];
+  const insVol   = bytes[1];
+  const volCmd   = bytes[2];
+  const cmdInf   = bytes[3];
+
+  // Note
+  let note = 0;
+  if (noteByte === 0xFD || noteByte === 0xFE) {
+    note = XM_NOTE_CUT;
+  } else if (noteByte < 0x60) {
+    const octave   = (noteByte >> 4) & 0x0F;
+    const semitone = noteByte & 0x0F;
+    note = octave * 12 + semitone + 36 + NOTE_MIN;
+  }
+
+  // Instrument (upper 5 bits of insVol)
+  let instrument = insVol >> 3;
+  if (instrument > 31) instrument = 0;
+
+  // Volume: low 3 bits of insVol | ((high 4 bits of volCmd) >> 1)
+  const volLo  = insVol & 0x07;
+  const volHi  = (volCmd & 0xF0) >> 1;
+  const rawVol = volLo | volHi;
+  const volume = rawVol <= 64 ? rawVol : 0;
+
+  // Effect (simplified — ignores deferred Bxx/tempo injection)
+  const effIdx = volCmd & 0x0F;
+  let effTyp = 0;
+  let eff = 0;
+  if (effIdx > 0 && effIdx <= 0x0F && cmdInf !== 0) {
+    const xmEff = STM_EFFECTS[effIdx] ?? 0;
+    if (xmEff !== 0) {
+      effTyp = xmEff;
+      eff = cmdInf;
+    }
+  }
+
+  // Byte-exact carrier. The 4-byte STM cell collapses several distinct source
+  // bytes onto one XM view: the note sentinels 0xFB/0xFC (empty/continue) and
+  // 0xFD/0xFE (both note-cut) fold together, instruments >31 clamp to 0, volumes
+  // >64 clamp to 0, and convertSTMEffect is a many-to-one map (encode packs the
+  // set-speed param into the high nibble, dropping the low). None of that inverts
+  // exactly, so stash the raw 4 source bytes in the invisible period/pan/cutoff
+  // carriers (fields the parser's own channelRows grid loop never sets, so edited
+  // cells lack them and fall back to the canonical derivation).
+  return {
+    note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0,
+    period: (noteByte << 8) | insVol, pan: volCmd, cutoff: cmdInf,
+  };
+}
+
+/** Write an edited grid cell over its stored bytes: only the fields the edit changed are re-encoded. */
+function encodeSTMEdit(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
+  if (!stored) return encodeSTMCell(cell);
+  const out = stored.slice(0, 4);
+  const was = decodeSTMBytes(stored);
+  const full = encodeSTMCell({ ...cell, period: undefined, pan: undefined, cutoff: undefined });
+  if ((cell.note ?? 0) !== was.note) out[0] = full[0];
+  if ((cell.instrument ?? 0) !== was.instrument) out[1] = (out[1] & 0x07) | (full[1] & 0xF8);
+  if ((cell.volume ?? 0) !== was.volume) {
+    out[1] = (out[1] & 0xF8) | (full[1] & 0x07);
+    out[2] = (out[2] & 0x0F) | (full[2] & 0xF0);
+  }
+  if ((cell.effTyp ?? 0) !== was.effTyp || (cell.eff ?? 0) !== was.eff) {
+    out[2] = (out[2] & 0xF0) | (full[2] & 0x0F);
+    out[3] = full[3];
+  }
+  return out;
+}
+
 // Parser
 
 export async function parseSTMFile(
@@ -577,58 +650,15 @@ export async function parseSTMFile(
     numChannels: NUM_CHANNELS,
     numPatterns,
     moduleSize: buffer.byteLength,
-    encodeCell: encodeSTMCell,
-    decodeCell: (bytes: Uint8Array): TrackerCell => {
-      // Inverse of parser's 4-byte STM cell decode
-      const noteByte = bytes[0];
-      const insVol   = bytes[1];
-      const volCmd   = bytes[2];
-      const cmdInf   = bytes[3];
-
-      // Note
-      let note = 0;
-      if (noteByte === 0xFD || noteByte === 0xFE) {
-        note = XM_NOTE_CUT;
-      } else if (noteByte < 0x60) {
-        const octave   = (noteByte >> 4) & 0x0F;
-        const semitone = noteByte & 0x0F;
-        note = octave * 12 + semitone + 36 + NOTE_MIN;
-      }
-
-      // Instrument (upper 5 bits of insVol)
-      let instrument = insVol >> 3;
-      if (instrument > 31) instrument = 0;
-
-      // Volume: low 3 bits of insVol | ((high 4 bits of volCmd) >> 1)
-      const volLo  = insVol & 0x07;
-      const volHi  = (volCmd & 0xF0) >> 1;
-      const rawVol = volLo | volHi;
-      const volume = rawVol <= 64 ? rawVol : 0;
-
-      // Effect (simplified — ignores deferred Bxx/tempo injection)
-      const effIdx = volCmd & 0x0F;
-      let effTyp = 0;
-      let eff = 0;
-      if (effIdx > 0 && effIdx <= 0x0F && cmdInf !== 0) {
-        const xmEff = STM_EFFECTS[effIdx] ?? 0;
-        if (xmEff !== 0) {
-          effTyp = xmEff;
-          eff = cmdInf;
-        }
-      }
-
-      // Byte-exact carrier. The 4-byte STM cell collapses several distinct source
-      // bytes onto one XM view: the note sentinels 0xFB/0xFC (empty/continue) and
-      // 0xFD/0xFE (both note-cut) fold together, instruments >31 clamp to 0, volumes
-      // >64 clamp to 0, and convertSTMEffect is a many-to-one map (encode packs the
-      // set-speed param into the high nibble, dropping the low). None of that inverts
-      // exactly, so stash the raw 4 source bytes in the invisible period/pan/cutoff
-      // carriers (fields the parser's own channelRows grid loop never sets, so edited
-      // cells lack them and fall back to the canonical derivation).
-      return {
-        note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0,
-        period: (noteByte << 8) | insVol, pan: volCmd, cutoff: cmdInf,
-      };
+    encodeCell: encodeSTMEdit,
+    decodeCell: decodeSTMBytes,
+    encodeOverStored: true,
+    propagateSharedCells: true,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const patIdx = allPatIdxs[pattern];
+      if (patIdx === undefined || row >= ROWS_PER_PATTERN || channel >= NUM_CHANNELS) return -1;
+      const off = patternDataStart + patIdx * PATTERN_SIZE + (row * NUM_CHANNELS + channel) * 4;
+      return off + 4 <= buffer.byteLength ? off : -1;
     },
   };
 
@@ -645,5 +675,7 @@ export async function parseSTMFile(
     initialBPM,
     linearPeriods:   false,
     uadePatternLayout,
+    uadeEditableFileData: buffer.slice(0),
+    uadeEditableFileName: filename,
   };
 }

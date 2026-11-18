@@ -154,7 +154,7 @@ registerEditableFormat({ formatId: "soundMon", label: "SoundMon", patternCodec: 
 registerEditableFormat({ formatId: "startrekkerAM", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "steveTurner", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "stk", label: "", patternCodec: { kind: "fixed" } });
-registerEditableFormat({ formatId: "stm", label: "", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "stm", label: "Scream Tracker 2", patternCodec: { kind: "fixed" }, exporter: { module: "STMExporter", fn: "exportSTM", byLayout: true } });
 registerEditableFormat({ formatId: "stp", label: "", newSong: { template: "templates/stp.stp", name: "SoundTracker Pro II" }, patternCodec: { kind: "fixed" }, exporter: { module: "STPExporter", fn: "exportSTP", byLayout: true } });
 registerEditableFormat({ formatId: "stx", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "sunTronic", label: "SunTronic", newSong: { template: "templates/sunTronic.src" }, patternCodec: { kind: "variable" }, exporter: { module: "SunTronicExporter", fn: "exportAsSunTronic", byLayout: true, ext: "src" } });
