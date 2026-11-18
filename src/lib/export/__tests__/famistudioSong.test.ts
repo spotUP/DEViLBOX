@@ -233,6 +233,16 @@ describe('furnaceToFamistudio', () => {
     expect(song.music.includes(0x4e)).toBe(true);
     expect(song.lossy.some((l) => l.startsWith('effect E5'))).toBe(false);
   });
+  it('sends E5 fine pitch as the period Furnace calcFreq rounds (linear: 1/128 semitone, round(raw period) - 1)', () => {
+    // A4 cell = FamiStudio note 58: raw period 127.12, table 126; E5A0 = +32/128 semitone -> round(127.12 * 2^(-32/1536)) - 1 = 124 -> offset -2.
+    expect(has(music({ 0: { 0: { ...A4, ...fx(0xe5, 0xa0) } } }).music, [0x4e, 0xfe])).toBe(true);
+  });
+
+  it('sends the loop target row effects even when they match the first-pass state (the loop enters with the end-of-song state)', () => {
+    // Order 0 is the loop target: 0400 at its row 0 must stop a vibrato left running at the song end (Sky Sanctuary pulse1).
+    const out = music({ 0: { 0: { ...A4, ...fx(0x04, 0x00) }, 4: { ...A4, ...fx(0x04, 0x31) } } }).music;
+    expect(has(out, [0x4a])).toBe(true);
+  });
   it('reports a dpcmMode=false song sample note as PCM played as DPCM until an NES-type note switches Furnace to DPCM', () => {
     const pcmLossy = (insType: number): boolean => {
       const m = nesModule({ 4: { 0: { note: 1, octave: 4, instrument: 0 } } });

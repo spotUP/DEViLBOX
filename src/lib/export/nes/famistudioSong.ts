@@ -578,6 +578,9 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           // Furnace steps vibratoPos by the rate each tick (a new note zeroes it unless continuousVibrato) while the depth is above 0; the elapsed ticks run with the previous 04xy.
           if ((vibXY & 15) > 0) vibPos = (vibPos + (vibXY >> 4) * Math.round((rowFrame[o][r] - vibFrame) / perTick)) & 63;
           vibFrame = rowFrame[o][r];
+          // The loop target is entered again with the end-of-song state: its effects are sent there even when they match the first pass.
+          const atLoop = o === loopOrder && r === 0;
+          if (atLoop) { fineSent = NaN; vibOn = -2; arpOn = -2; } // -2: override state unknown, sent either way
           let fxChanged = false, fineHere = false, slideFx = 0, slideVal = 0, volSlide = -1, cutTicks = 0;
           for (const e of cell.effects) {
             if (e.type < 0) continue;
@@ -586,8 +589,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             else if ((t === 0x15 || t === 0x16) && ch < DPCM_CH && ch !== 2) { if (t === 0x15) envMode = v & 3; else lenIdx = v & 0x1f; }
             else if (t === 0x12 && ch < DPCM_CH && ch !== 2) ops.push(0x4f, v & 3);
             else if (t === 0x0b || t === 0x0d) continue;
-            else if (t === 0x00 && ch !== DPCM_CH) { if (v !== arpXY) fxChanged = true; arpXY = v; }
-            else if (t === 0x04 && tonal) { if (v !== vibXY) fxChanged = true; vibXY = v; }
+            else if (t === 0x00 && ch !== DPCM_CH) { if (v !== arpXY || atLoop) fxChanged = true; arpXY = v; }
+            else if (t === 0x04 && tonal) { if (v !== vibXY || atLoop) fxChanged = true; vibXY = v; }
             else if (SLIDE_FX.has(t) && tonal) { slideFx = t; slideVal = v; }
             else if (t === 0xe5 && tonal) { fineRaw = v; fineHere = true; }
             else if (t === 0x0a && ch !== DPCM_CH && ch !== 2) volSlide = v;
@@ -615,9 +618,11 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           if (slideFx) heldSlide = (slideFx === 0x01 || slideFx === 0x02) && slideVal > 0 ? [slideFx, slideVal] : null;
           else if (n > 0 && heldSlide && withHeld) [slideFx, slideVal] = heldSlide;
           const src = n > 0 ? n : curNote;
-          // Fine pitch (E5xx, 80 = centre): +-1 semitone, as a signed period offset scaled to the playing note.
+          // Fine pitch (E5xx, 80 = centre): Furnace chan.pitch = xx - 0x80, in 1/128 semitone with linear pitch (calcFreq:
+          // round(period at base + pitch) - 1), else raw period units subtracted; sent as the period offset from the note's table entry.
           if (tonal && (fineHere || (n > 0 && fineRaw !== 128))) {
-            const fine = clamp8(-((fineRaw - 128) / 128) * 0.0595 * pulsePeriod(src || 46));
+            const fp = fineRaw - 128, sn = src || 46;
+            const fine = clamp8(linear ? Math.round(pulsePeriodRaw(sn) * 2 ** (-fp / 1536)) - 1 - pulsePeriod(sn) : -fp);
             if (fine !== fineSent) { ops.push(0x4e, fine & 0xff); fineSent = fine; }
           }
           // Vibrato (04xy): looping absolute pitch envelope, a sine over 64/x ticks. Depth y is y/16 semitone in linear
@@ -670,7 +675,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             }
             // An override persists across notes and instrument changes in the engine: send it only when it changes.
             if (pid >= 0) { if (vibOn !== pid) ops.push(0x49, { env: pid }); vibOn = pid; }
-            else if (vibOn >= 0) { ops.push(0x4a); vibOn = -1; lastIns = -1; }
+            else if (vibOn !== -1) { ops.push(0x4a); vibOn = -1; lastIns = -1; }
           }
           // Arpeggio: effect 00xy wins; else a per-note override of the instrument arp macro when FamiStudio's relative
           // steps would not land on Furnace's note: fixed-note steps (pinned to the flat note value), and every noise arp
@@ -699,7 +704,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               env = encodeEnvelope(Array.from({ length: len }, (_, f) => steps[Math.floor(f * macroRate + 1e-9) % 3]), 0, -1, 'arp');
             } else env = noteArp;
             if (env) { const id = envId(env); if (arpOn !== id) ops.push(0x4b, { env: id }); arpOn = id; }
-            else if (arpOn >= 0) { ops.push(0x4c); arpOn = -1; lastIns = -1; }
+            else if (arpOn !== -1) { ops.push(0x4c); arpOn = -1; lastIns = -1; }
           }
           // A cut at or after the end of its row never fires; skip it (saves 2 bytes per row against the 16 KiB cap).
           if (withCuts && cutTicks > 0 && seq[ri + 1] && cutTicks * perTick < seq[ri + 1].frame - seq[ri].frame) ops.push(0x48, Math.min(255, Math.round(cutTicks * perTick)));
