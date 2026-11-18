@@ -247,6 +247,14 @@ const DPCM_RATES = [4181.71, 4709.93, 5264.04, 5593.04, 6257.95, 7046.35, 7919.3
 const pulsePeriod = (n: number): number => Math.max(1, Math.round(1789773 / (16 * 440 * 2 ** ((n - 46) / 12))) - 1);
 const SLIDE_FX = new Set([0x01, 0x02, 0x03, 0xe1, 0xe2]);
 const clamp8 = (v: number): number => Math.max(-127, Math.min(127, Math.round(v)));
+/** Furnace VOL_SCALE_LINEAR_BROKEN (dispatch.h): channel volume x macro volume. Default floors; FamiStudio's volume table
+ *  rounds up, so a channel volume under 15 is baked into the volume envelope and the channel volume sent as 15. */
+const KEY_BAKE = 2 ** 28; // instrument key = macro index + 65536 * (1 + hardware envelope) + KEY_BAKE * (1 + baked channel volume)
+const scaleVol = (vol: number, env: number, flags: { newVolumeScaling?: unknown; ceilVolumeScaling?: unknown } | undefined): number => {
+  const e = Math.min(15, env);
+  if (flags?.newVolumeScaling === false) return Math.max(0, Math.min(15, vol + e - 15));
+  return flags?.ceilVolumeScaling ? Math.floor((vol * e + 14) / 15) : Math.floor((vol * e) / 15);
+};
 
 /** Music bytes the player ROM holds (musicCap in player.json). */
 const MUSIC_CAP = 16384;
@@ -482,7 +490,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     const out: number[] = [];
     const fx: Array<[number, number]> = [];
     // 2A03 hardware volume state (nes.cpp): 15xx envMode, 16xx length index, volume column = envelope period in envelope modes.
-    let envMode = 3, lenIdx = 0x1f, furVol = 15, hwVol = false, lastSpd = -1;
+    let envMode = 3, lenIdx = 0x1f, furVol = 15, hwVol = false, baked = false, lastSpd = -1;
     let lastIns = -1, lastVol = -1, empty = 0, hasNotes = false, loopAt = 0, first = -1, firstFrame = -1;
     let curIns: FurnaceInstrument | undefined;
     let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, arpXY = 0, arpOn = -1, noteArp: number[] | null = null, fineRaw = 128, fineSent = 0;
@@ -629,7 +637,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           if (withCuts && cutTicks > 0 && seq[ri + 1] && cutTicks * perTick < seq[ri + 1].frame - seq[ri].frame) ops.push(0x48, Math.min(255, Math.round(cutTicks * perTick)));
           if (cell.volume >= 0) {
             if (ch === DPCM_CH) lossy.add('volume column on DPCM');
-            else { furVol = Math.min(15, cell.volume); if (!hwVol && cell.volume !== lastVol) { ops.push(0x70 | furVol); lastVol = cell.volume; } }
+            else { furVol = Math.min(15, cell.volume); if (!hwVol && !(baked && n === 0) && cell.volume !== lastVol) { ops.push(0x70 | furVol); lastVol = cell.volume; } }
           }
           if (volSlide >= 0) {
             const x = volSlide >> 4, y = volSlide & 15;
@@ -643,10 +651,12 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             // volume envelope is the APU output frame by frame (hwVolumeEnvelope), with the channel volume at 15.
             hwVol = ch !== 2 && ch < DPCM_CH && envMode !== 3;
             const idx = curInsIdx >= 0 ? curInsIdx : 0;
-            const key = hwVol ? idx + 65536 * (1 + (envMode | (furVol << 2) | (lenIdx << 6))) : idx;
+            const volMac = curIns?.macros.some((x) => x.code === MACRO_VOL && x.length > 0);
+            baked = !hwVol && ch < DPCM_CH && ch !== 2 && !!volMac && furVol < 15;
+            const key = (hwVol ? idx + 65536 * (1 + (envMode | (furVol << 2) | (lenIdx << 6))) : idx) + (baked ? KEY_BAKE * (1 + furVol) : 0);
             if (key !== lastIns) { insOps.push(0x80 | (insNo(key) << 1)); lastIns = key; }
-            const fsVol = hwVol ? 15 : furVol;
-            if (hwVol ? lastVol !== 15 : lastVol >= 0 && lastVol !== furVol) { ops.push(0x70 | fsVol); lastVol = fsVol; }
+            const fsVol = hwVol || baked ? 15 : furVol;
+            if (hwVol || baked ? lastVol !== 15 : lastVol >= 0 && lastVol !== furVol) { ops.push(0x70 | fsVol); lastVol = fsVol; }
           }
           // Slides: 0x50 step,from,to replaces the note byte (it attacks the note); 0x43 first keeps a held note from retriggering.
           if (tonal && src > 0 && slideFx) {
@@ -731,7 +741,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   // Instrument envelopes.
   const insEnvs: number[][] = [];
   for (const [key] of [...insMap].sort((a, b) => a[1] - b[1])) {
-    const fi = key % 65536, hw = Math.floor(key / 65536) - 1;
+    const bake = Math.floor(key / KEY_BAKE) - 1, rest = key % KEY_BAKE;
+    const fi = rest % 65536, hw = Math.floor(rest / 65536) - 1;
     const ins = m.instruments[fi];
     const pick = (code: number): FurnaceMacro | undefined => ins?.macros.find((x) => x.code === code && x.length > 0);
     const slot = (code: number, kind: 'vol' | 'arp' | 'duty' | 'pitch'): number => {
@@ -739,7 +750,11 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
       return envId(mac ? macroEnvelope(mac, kind, lossy, undefined, macroRate, m.version) : DEFAULT_ENV[kind]);
     };
     if (hw >= 0 && pick(MACRO_VOL)) lossy.add('volume macro under 15xx hardware envelope (APU envelope played, macro ignored)');
-    insEnvs.push([hw >= 0 ? envId(hwVolumeEnvelope(hw)) : slot(MACRO_VOL, 'vol'), slot(MACRO_ARP, 'arp'), slot(MACRO_DUTY, 'duty'), slot(MACRO_PITCH, 'pitch')]);
+    const bakedVol = (): number => {
+      const f = macroFrames(pick(MACRO_VOL)!, 'vol', lossy, undefined, macroRate, m.version);
+      return envId(encodeEnvelope(f.vals.map((v) => scaleVol(bake, v, m.compatFlags)), f.loop, f.release, 'vol'));
+    };
+    insEnvs.push([hw >= 0 ? envId(hwVolumeEnvelope(hw)) : bake >= 0 ? bakedVol() : slot(MACRO_VOL, 'vol'), slot(MACRO_ARP, 'arp'), slot(MACRO_DUTY, 'duty'), slot(MACRO_PITCH, 'pitch')]);
     for (const mac of ins?.macros ?? []) if (mac.length > 0 && ![MACRO_VOL, MACRO_ARP, MACRO_DUTY, MACRO_PITCH].includes(mac.code)) lossy.add(`macro code ${mac.code}`);
   }
   if (insEnvs.length === 0) insEnvs.push([envId(DEFAULT_ENV.vol), envId(DEFAULT_ENV.arp), envId(DEFAULT_ENV.duty), envId(DEFAULT_ENV.pitch)]);
