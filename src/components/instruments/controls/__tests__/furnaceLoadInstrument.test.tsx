@@ -9,7 +9,9 @@ import React from 'react';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import manifest from '../../../../generated/file-manifest.json';
+import { loadFixture } from '../../../../engine/uprough/__tests__/loadFixture';
+
+const manifest = loadFixture<string[]>(import.meta.url, '../../../../generated/file-manifest.json');
 
 const fakeEngine = {
   instruments: new Map<number, unknown>(),
@@ -63,7 +65,7 @@ describe('Furnace Load Instrument opens the chip folder and loads into the curre
     render(<Editor id={id} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Load Instrument' }));
 
-    const gbFiles = (manifest as string[]).filter((p) => p.startsWith('/public/data/instruments/furnace/GB/') && /\.(fui|dmp)$/.test(p));
+    const gbFiles = manifest.filter((p) => p.startsWith('/public/data/instruments/furnace/GB/') && /\.(fui|dmp)$/.test(p));
     expect(gbFiles.length).toBeGreaterThan(0);
     expect(await screen.findByText(PICKED)).toBeTruthy();
     fireEvent.doubleClick(screen.getByText(PICKED));

@@ -8,7 +8,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import manifest from '../../../../generated/file-manifest.json';
+import { loadFixture } from '../../../../engine/uprough/__tests__/loadFixture';
+
+const manifest = loadFixture<string[]>(import.meta.url, '../../../../generated/file-manifest.json');
 
 const fakeSynth = { loadSysex: vi.fn(), _loadVcedData: vi.fn() };
 const fakeEngine = {
@@ -50,11 +52,11 @@ describe('DX7 Load SysEx File opens the bundled DX7 folder', () => {
 
     // Opened at the mapped folder: the entries are the manifest's dx7 files (a sample of them, by name).
     const onDisk = readdirSync(LIB).filter((f) => f.endsWith('.syx'));
-    const inManifest = (manifest as string[]).filter((p) => p.startsWith('/public/data/sysex/dx7/') && p.endsWith('.syx'));
+    const inManifest = manifest.filter((p) => p.startsWith('/public/data/sysex/dx7/') && p.endsWith('.syx'));
     expect(inManifest.length).toBe(onDisk.length);
     expect(await screen.findByText(PICKED)).toBeTruthy();
     // Nothing from the folder tree above (a sibling sysex folder's file is not listed).
-    const other = (manifest as string[]).find((p) => p.startsWith('/public/data/sysex/') && !p.startsWith('/public/data/sysex/dx7/') && p.endsWith('.syx'));
+    const other = manifest.find((p) => p.startsWith('/public/data/sysex/') && !p.startsWith('/public/data/sysex/dx7/') && p.endsWith('.syx'));
     if (other) expect(screen.queryByText(other.split('/').pop()!)).toBeNull();
 
     fireEvent.doubleClick(screen.getByText(PICKED));
