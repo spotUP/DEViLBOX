@@ -202,6 +202,15 @@ describe('furnaceToFamistudio', () => {
     expect(song.music.includes(0x4e)).toBe(true);
     expect(song.lossy.some((l) => l.startsWith('effect E5'))).toBe(false);
   });
+  it('reports a dpcmMode=false song sample note as PCM played as DPCM until an NES-type note switches Furnace to DPCM', () => {
+    const pcmLossy = (insType: number): boolean => {
+      const m = nesModule({ 4: { 0: { note: 1, octave: 4, instrument: 0 } } });
+      Object.assign(m, { chipFlags: ['clockSel=0\ndpcmMode=false\n'], instruments: [{ type: insType, macros: [], amiga: { initSample: 0 } }], samples: [{ depth: 8, data: new Int8Array(64), length: 64, c4Rate: 8000, loop: false }] });
+      return furnaceToFamistudio(m).lossy.some((l) => l.startsWith('DPCM channel in Furnace PCM mode'));
+    };
+    expect(pcmLossy(4)).toBe(true); // Amiga sample instrument: nes.cpp streams it through $4011
+    expect(pcmLossy(34)).toBe(false); // NES instrument: nes.cpp:518 sets dpcmMode
+  });
   it('keeps unsupported effects lossy with the channel kind', () => {
     const song = music({ 0: { 0: { ...A4, ...fx(0x11, 0x01) } } });
     expect(song.lossy.some((l) => l.startsWith('effect 11'))).toBe(true);

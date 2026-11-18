@@ -479,7 +479,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     }
     if (sample < 0 || !m.samples[sample]) { lossy.add('DPCM note without a sample'); return -1; }
     if (!ins || ins.type === 34) pcmMode = false;
-    else if (pcmMode) lossy.add('PCM-mode sample ($4011 stream in Furnace) played as 1-bit DPCM');
+    else if (pcmMode) lossy.add('DPCM channel in Furnace PCM mode ($4011 stream) played as 1-bit DPCM');
     // nes.cpp:425-456: a non-NES-type (Amiga/sample) instrument writes calcDPCMRate(min(sample rate at the note, 48000)) to $4010.
     if (ins && ins.type !== 34) {
       const hz = Math.min(48000, (m.samples[sample].c4Rate || 0) * 2 ** ((flat - 48) / 12));

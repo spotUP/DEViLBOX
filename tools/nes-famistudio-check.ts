@@ -75,7 +75,12 @@ function furnaceTicks(furPath: string, _hz: number, ticks: number): Array<Array<
       else if (c >= 0x70 && c <= 0x7f) { sample += (c & 15) + 1; i++; }
       else if (c === 0x67) i += 7 + b.readUInt32LE(i + 3);
       else if (c === 0x68) i += 12;
-      else if (c >= 0x90 && c <= 0x95) i += [5, 5, 6, 11, 2, 5][c - 0x90]; // DAC stream control (DPCM): not compared
+      else if (c >= 0x90 && c <= 0x95) {
+        // DAC stream = Furnace PCM mode ($4011 sample stream, dpcmMode=false): start (93/95) and stop (94) binned as pseudo writes $4018/$4019.
+        const t = Math.floor(sample / perTick + 0.5);
+        if (t < ticks && (c === 0x93 || c === 0x95)) out[t].push([0x4018, 1]); else if (t < ticks && c === 0x94) out[t].push([0x4019, 0]);
+        i += [5, 5, 6, 11, 2, 5][c - 0x90];
+      }
       else if (c >= 0x30 && c <= 0x3f) i += 2;
       else if ((c >= 0x40 && c <= 0x5f) || (c >= 0xa0 && c <= 0xbf)) i += 3;
       else if (c >= 0xc0 && c <= 0xdf) i += 4;
@@ -135,14 +140,15 @@ const FIELDS: Array<keyof NonNullable<ChState>> = ['period', 'vol', 'duty', 'swe
 const fmt = (x: ChState | undefined): string => (x ? FIELDS.map((f) => `${f}=${x[f]}`).join(' ') : 'silent');
 
 /** DPCM per frame: start (a $4015 write with bit 4), the rate/length latched at it, and the last $4015 bit 4 ("play"). */
-type DpcmFrame = { start: boolean; rate: number; len: number; play: boolean };
+/** `pcm`: the start is a Furnace PCM-mode stream ($4018 pseudo write), so only its timing compares (no DPCM rate/length/play). */
+type DpcmFrame = { start: boolean; rate: number; len: number; play: boolean; pcm?: boolean };
 function dpcmFrames(writes: Array<Array<[number, number]>>): DpcmFrame[] {
-  let rate = 0, len = 0, play = false, loaded = false;
+  let rate = 0, len = 0, play = false, loaded = false, pcm = false;
   return writes.map((tick) => {
     let start = false;
     // $4015 bit 4 with no sample length ever written is the init enable, not a sample start.
-    for (const [a, v] of tick) { if (a === 0x4010) rate = v & 15; else if (a === 0x4013) { len = v; loaded = true; } else if (a === 0x4015) { play = (v & 16) !== 0 && loaded; if (play) start = true; } }
-    return { start, rate, len, play };
+    for (const [a, v] of tick) { if (a === 0x4010) rate = v & 15; else if (a === 0x4013) { len = v; loaded = true; pcm = false; } else if (a === 0x4015) { play = (v & 16) !== 0 && loaded; if (play) start = true; } else if (a === 0x4018) { start = true; pcm = true; } }
+    return { start, rate, len, play, pcm };
   });
 }
 
@@ -159,6 +165,7 @@ function lockstep(ref: ChState[][], got: ChState[][], rd: DpcmFrame[], gd: DpcmF
       if (ch === 4) {
         const a = rd[t], b = gd[t + lag] ?? { start: false, rate: 0, len: 0, play: false };
         if (a.start !== b.start) note(t, 'start', String(a.start), String(b.start));
+        else if (a.pcm) continue;
         else if (a.start && a.rate !== b.rate) note(t, 'rate', String(a.rate), String(b.rate));
         else if (a.start && a.len !== b.len) note(t, 'length', String(a.len), String(b.len));
         else if (a.play !== b.play) note(t, 'play', String(a.play), String(b.play));
