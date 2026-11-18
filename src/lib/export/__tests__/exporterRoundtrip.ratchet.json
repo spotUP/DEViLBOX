@@ -984,6 +984,14 @@
       "cells": 10560,
       "bytes": 10560
     },
+    "ult": {
+      "exporter": "ULTExporter.exportULT",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 879855,
+      "bytes": 879855
+    },
     "unic": {
       "exporter": "UNICExporter.exportUNIC",
       "tier": "pattern-data",

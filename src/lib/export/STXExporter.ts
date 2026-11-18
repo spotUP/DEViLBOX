@@ -65,7 +65,7 @@ export function packSTXPattern(pattern: Pattern): Uint8Array {
 }
 
 /** 16-bit mono frames of a 8/16-bit PCM WAV (the instrument's audioBuffer), or null. */
-function wavFrames(wav: ArrayBuffer | undefined): Int16Array | null {
+export function wavFrames(wav: ArrayBuffer | undefined): Int16Array | null {
   if (!wav || wav.byteLength < 44) return null;
   const v = new DataView(wav);
   if (v.getUint32(0) !== 0x52494646) return null;

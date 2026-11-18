@@ -171,7 +171,7 @@ registerEditableFormat({ formatId: "dynamicSynthesizer", label: "Dynamic Synthes
 registerEditableFormat({ formatId: "synthesis", label: "Synthesis", newSong: { template: "templates/synthesis.syn" }, patternCodec: { kind: "fixed" }, exporter: { module: "SynthesisExporter", fn: "exportSynthesis", byLayout: true } });
 registerEditableFormat({ formatId: "tcbTracker", label: "TCB Tracker", newSong: { template: "templates/tcbTracker.tcb" }, patternCodec: { kind: "fixed" }, exporter: { module: "TCBTrackerExporter", fn: "exportTCBTracker", byLayout: true } });
 registerEditableFormat({ formatId: "tfmx", label: "TFMX", newSong: { template: "templates/tfmx.rocknroll" }, patternCodec: { kind: "fixed" }, exporter: { module: "TFMXExporter", fn: "exportTFMX", byLayout: true } });
-registerEditableFormat({ formatId: "ult", label: "", patternCodec: { kind: "variable" } });
+registerEditableFormat({ formatId: "ult", label: "", patternCodec: { kind: "variable" }, exporter: { module: "ULTExporter", fn: "exportULT", byLayout: true } });
 registerEditableFormat({ formatId: "unic", label: "", newSong: { template: "templates/unic.unic", name: "UNIC Tracker" }, patternCodec: { kind: "fixed" }, exporter: { module: "UNICExporter", fn: "exportUNIC", byLayout: true } });
 registerEditableFormat({ formatId: "wantedTeamDaveLowe", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "xm", label: "XM", patternCodec: { kind: "variable" } });

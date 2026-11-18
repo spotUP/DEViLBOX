@@ -61,6 +61,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   plm: 'public/data/songs/disorder-tracker-2/hyper geckoo.plm',
   stm: 'public/data/songs/scream-tracker-2/slideshow i.stm',
   stx: 'public/data/songs/formats/futurebrain.stx',
+  ult: 'public/data/songs/formats/seasons.ult',
   stoneTracker: 'public/data/songs/stonetracker/hypnosphere.spm',
   daveLowe: 'public/data/songs/dave-lowe/incredibleshrinkingsphere.dl',
   jeroenTel: 'public/data/songs/jeroen-tel/stormlord title.jt',

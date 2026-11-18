@@ -843,5 +843,7 @@ export async function parseULTFile(
     initialBPM:      125,  // UltraTracker default BPM
     linearPeriods:   false,
     uadeVariableLayout,
+    uadeEditableFileData: buffer,
+    uadeEditableFileName: filename,
   };
 }
