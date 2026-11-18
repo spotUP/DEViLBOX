@@ -4,9 +4,10 @@
  * capture route (zxAyStream) once tools/zx-pt3-check.ts passes. Layout follows the player's INIT/PTDECOD:
  * header (201 bytes), position list, pattern table, samples, ornaments, then the three channel streams per pattern.
  *
- * Mapping: Furnace instrument -> PT3 sample (volume, waveform and noise macros, one tick per macro step) plus a PT3
- * ornament (arpeggio macro); order -> position; pattern rows -> one skip-counted row per PT3 line. Hardware envelope,
- * pitch macros and slide effects are not converted and are reported lossy.
+ * Mapping: Furnace instrument -> PT3 sample (volume, waveform and noise macros) plus a PT3 ornament (arpeggio macro),
+ * both resampled from the Furnace tick rate to the player's fixed 50 Hz frame; order -> position; pattern rows -> one
+ * skip-counted PT3 line each, with per-row delays from the accumulated Furnace tick time (groove included).
+ * Hardware envelope, pitch macros and slide effects are not converted and are reported lossy.
  */
 
 import type { FurnaceModule } from '../../import/formats/FurnaceSongParser';
@@ -26,12 +27,52 @@ class Lossy {
 const AY8910 = 0x80, AY8930 = 0x9a; // Furnace file system ids (FurnaceSongParser.ts)
 const CHANNELS = 3;
 const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_NOISE = 2, MACRO_WAVE = 3;
+/** Furnace AY envelope macros (ay.cpp): ex2 = shape (R13), ex3/alg = auto-envelope numerator/denominator, ex5 = period. */
+const MACRO_ENV_SHAPE = 6, MACRO_AUTO_NUM = 7, MACRO_AUTO_DEN = 8, MACRO_ENV_PERIOD = 16;
+const ENV_MACROS = [MACRO_ENV_SHAPE, MACRO_AUTO_NUM, MACRO_AUTO_DEN, MACRO_ENV_PERIOD];
 const MAX_SAMPLES = 31, MAX_ORNAMENTS = 15, MAX_TICKS = 64;
-/** Furnace flat note C-0 = 0; PT3 note 0 = C-1. */
-const NOTE_OFFSET = 12;
-const PT3_TONE_TABLE = 2; // ASM table, tuned for the Spectrum AY clock (1.7734 MHz)
 const FRAME_HZ = 50;
-const MODULE_BASE = 0xC000, MODULE_CAP = 0x4000;
+const ZX_CLOCK = 1773400;
+/** Furnace's default AY clock (clockSel 0). Notes below its 12-bit period floor play at period 4095 in Furnace too.
+ * shortcut: clockSel flags are not read, upgrade when a song sets another AY clock. */
+const FURNACE_AY_CLOCK = 1789773;
+
+/** Octave-1 tone periods (PT3 notes 0..11) the player depacks, by header table number; table 2 differs between
+ * versions 3.0..3.4r (old, header version 3) and 3.4x+ (new, version 6). From MM-PTxPlay.asm T_PACK/NT_DATA; the
+ * player's +-1 corrections are left out. Each further octave halves the period. */
+const TONE_TABLES: Array<{ version: number; table: number; periods: number[] }> = [
+  { version: 6, table: 0, periods: [0xC22, 0xB73, 0xACF, 0xA33, 0x9A1, 0x917, 0x894, 0x819, 0x7A4, 0x737, 0x6CF, 0x66D] },
+  { version: 6, table: 1, periods: [0xEF8, 0xE10, 0xD60, 0xC80, 0xBD8, 0xB28, 0xA88, 0x9F0, 0x960, 0x8E0, 0x858, 0x7E0] },
+  { version: 3, table: 2, periods: [0xD3E, 0xC80, 0xBCC, 0xB22, 0xA82, 0x9EC, 0x95C, 0x8D6, 0x858, 0x7E0, 0x76E, 0x704] },
+  { version: 6, table: 2, periods: [0xD10, 0xC55, 0xBA4, 0xAFC, 0xA5F, 0x9CA, 0x93D, 0x8B8, 0x83B, 0x7C5, 0x755, 0x6EC] },
+  { version: 6, table: 3, periods: [0xCDA, 0xC22, 0xB73, 0xACF, 0xA33, 0x9A1, 0x917, 0x894, 0x819, 0x7A4, 0x737, 0x6CF] },
+];
+interface Tuning { version: number; table: number; periods: number[]; noteOffset: number; cents: number }
+const pt3Period = (t: Tuning, n: number): number => t.periods[n % 12] / 2 ** Math.floor(n / 12);
+/** Hz Furnace plays for note nv (C-0 = 0, A-4 = 57), period floor of the 12-bit AY counter included. */
+const furnaceHz = (tuningHz: number, nv: number): number => Math.max(FURNACE_AY_CLOCK / (16 * 4095), tuningHz * 2 ** ((nv - 57) / 12));
+/** Table, version and note offset with the smallest worst-case pitch error over the notes the song uses. The residual
+ * is a PT3 limit: the player has four fixed tone tables and no fine tune. */
+function pickTuning(tuningHz: number, notes: number[]): Tuning {
+  const hz = tuningHz > 0 ? tuningHz : 440;
+  const used = notes.length ? notes : [48, 57, 60];
+  let best: Tuning | undefined;
+  for (const t of TONE_TABLES) for (let k = 0; k <= 30; k++) {
+    const cand = { ...t, noteOffset: k, cents: 0 };
+    let worst = 0;
+    for (const nv of used) {
+      const n = nv - k;
+      if (n < 0 || n > 95) continue;
+      worst = Math.max(worst, Math.abs(1200 * Math.log2(ZX_CLOCK / (16 * pt3Period(cand, n)) / furnaceHz(hz, nv))));
+    }
+    cand.cents = worst;
+    if (!best || worst < best.cents - 1e-9) best = cand;
+  }
+  return best!;
+}
+/** BASIC PRINT lines: the S.V. Bulba player is shipped with credit. */
+const PT3_CREDIT = ['PT3 player (c) 2004-2007', 'S.V.Bulba, Vortex Tracker II'];
+const MODULE_BASE = 0xC000,MODULE_CAP = 0x4000;
 
 /** Macro value per tick; the last value holds, or the loop restarts. */
 function expand(mac: FurnaceMacro | undefined, ticks: number, fallback: number): number[] {
@@ -43,35 +84,80 @@ function expand(mac: FurnaceMacro | undefined, ticks: number, fallback: number):
   const loop = mac.loop >= 0 && mac.loop < mac.length ? (mac.delay || 0) + mac.loop * speed : -1;
   return Array.from({ length: ticks }, (_, t) => (t < raw.length ? raw[t] : loop >= 0 ? raw[loop + ((t - raw.length) % (raw.length - loop))] : raw[raw.length - 1]));
 }
+const macroSpan = (m: FurnaceMacro | undefined): number => (m ? (m.delay || 0) + m.length * Math.max(1, m.speed || 1) : 1);
+const macroLoop = (m: FurnaceMacro | undefined): number => (m && m.loop >= 0 && m.loop < m.length ? (m.delay || 0) + m.loop * Math.max(1, m.speed || 1) : -1);
 
-function sampleBytes(macros: FurnaceMacro[], lossy: Lossy): number[] {
+/** Furnace tick index played at each 50 Hz player frame, for a macro of
+ * lenTicks ticks looping at loopTick (-1: hold the last tick). A loop is unrolled to whole tick cycles that end on a
+ * frame boundary, so the PT3 loop repeats the same ticks as Furnace. Residual: up to one frame of jitter per tick,
+ * the player's 50 Hz interrupt. */
+function frameTicks(lenTicks: number, loopTick: number, tickHz: number, lossy: Lossy, what: string): { idx: number[]; loop: number } {
+  const r = tickHz / FRAME_HZ;
+  // Frame f sounds for ticks [f*r, (f+1)*r); play the tick at the window midpoint, the one that sounds longest in it.
+  // Taking the tick at the frame start lagged by one frame in 2 of every 5 frames of a 60 Hz song. 50 Hz: unchanged.
+  const at = (f: number): number => Math.floor(f * r + r / 2 + 1e-9);
+  const wrap = (t: number): number => (t < lenTicks ? t : loopTick < 0 ? lenTicks - 1 : loopTick + ((t - loopTick) % (lenTicks - loopTick)));
+  const range = (n: number): number[] => Array.from({ length: n }, (_, f) => wrap(at(f)));
+  if (loopTick < 0) {
+    const n = Math.max(1, Math.ceil(lenTicks / r - 1e-9));
+    if (n > MAX_TICKS) { lossy.add(`${what} longer than ${MAX_TICKS} frames (cut)`); return { idx: range(MAX_TICKS), loop: MAX_TICKS - 1 }; }
+    return { idx: range(n), loop: n - 1 };
+  }
+  const cyc = lenTicks - loopTick;
+  const f0 = Math.ceil(loopTick / r - 1e-9);
+  for (let p = 1; f0 + p <= MAX_TICKS; p++) {
+    const k = (p * r) / cyc;
+    if (Math.abs(k - Math.round(k)) < 1e-6 && Math.round(k) >= 1) return { idx: range(f0 + p), loop: f0 };
+  }
+  lossy.add(`${what} loop does not fit ${MAX_TICKS} frames at ${tickHz} Hz (loop phase drifts)`);
+  const n = Math.min(MAX_TICKS, f0 + Math.max(1, Math.round(cyc / r)));
+  return { idx: range(n), loop: Math.min(f0, n - 1) };
+}
+
+/** PT3 sample: per frame b0 (noise), b1 (volume, tone/noise masks) and a 16-bit tone offset added to the note period. */
+/** PT3 sample from Furnace AY macros. The wave macro is a bitmask (ay.cpp psgMode = wave & 7): bit 0 tone, bit 1 noise,
+ * bit 2 hardware envelope. Furnace writes R6 = 31 - duty, so the noise offset is inverted. forceEnv: effect 22xy state for
+ * instruments without a wave macro. */
+function sampleBytes(macros: FurnaceMacro[], lossy: Lossy, tickHz: number, toneShift: number, forceEnv = false): number[] {
   const pick = (code: number): FurnaceMacro | undefined => macros.find((x) => x.code === code && x.length > 0);
-  for (const mac of macros) if (mac.length > 0 && ![MACRO_VOL, MACRO_ARP, MACRO_NOISE, MACRO_WAVE].includes(mac.code)) lossy.add(`macro code ${mac.code} (hardware envelope, pitch)`);
+  for (const mac of macros) if (mac.length > 0 && ![MACRO_VOL, MACRO_ARP, MACRO_NOISE, MACRO_WAVE, ...ENV_MACROS].includes(mac.code)) lossy.add(`macro code ${mac.code} (pitch or other)`);
+  for (const c of ENV_MACROS) {
+    const mac = pick(c);
+    if (mac && new Set(mac.data.slice(0, mac.length)).size > 1) lossy.add(`envelope macro ${c} changing within a note (first value used)`);
+  }
   const vol = pick(MACRO_VOL), wave = pick(MACRO_WAVE), noise = pick(MACRO_NOISE);
-  const span = (m: FurnaceMacro | undefined): number => (m ? (m.delay || 0) + m.length * Math.max(1, m.speed || 1) : 1);
-  const longest = [vol, wave, noise].reduce((a, m) => (span(m) > span(a) ? m : a), undefined as FurnaceMacro | undefined);
-  let ticks = span(longest);
-  if (ticks > MAX_TICKS) { lossy.add(`macro longer than ${MAX_TICKS} ticks (cut)`); ticks = MAX_TICKS; }
-  const loop = longest && longest.loop >= 0 && longest.loop < longest.length ? Math.min(ticks - 1, (longest.delay || 0) + longest.loop * Math.max(1, longest.speed || 1)) : ticks - 1;
-  const v = expand(vol, ticks, 15), w = expand(wave, ticks, 1), n = expand(noise, ticks, 0);
-  const out: number[] = [loop, ticks];
-  for (let t = 0; t < ticks; t++) {
-    const toneOn = (w[t] & 1) !== 0 || (w[t] & 3) === 0 ? ((w[t] & 3) !== 0 ? (w[t] & 1) !== 0 : true) : false;
-    const noiseOn = (w[t] & 2) !== 0;
-    const b0 = noiseOn ? 0x01 | ((n[t] & 31) << 1) : 0x01;
+  const longest = [vol, wave, noise].reduce((a, m) => (macroSpan(m) > macroSpan(a) ? m : a), undefined as FurnaceMacro | undefined);
+  const ticks = macroSpan(longest);
+  const { idx, loop } = frameTicks(ticks, macroLoop(longest), tickHz, lossy, 'instrument macro');
+  const v = expand(vol, ticks, 15), w = expand(wave, ticks, forceEnv ? 5 : 1), n = expand(noise, ticks, 0);
+  const out: number[] = [loop, idx.length];
+  const tone = toneShift & 0xffff;
+  for (const t of idx) {
+    const toneOn = (w[t] & 1) !== 0, noiseOn = (w[t] & 2) !== 0, envOn = (w[t] & 4) !== 0;
+    const b0 = (envOn ? 0 : 0x01) | (noiseOn ? ((31 - n[t]) & 31) << 1 : 0);
     const b1 = (Math.max(0, Math.min(15, v[t])) & 15) | (toneOn ? 0 : 0x10) | (noiseOn ? 0 : 0x80);
-    out.push(b0, b1, 0, 0);
+    out.push(b0, b1, tone & 0xff, tone >> 8);
   }
   return out;
 }
 
-function ornamentBytes(mac: FurnaceMacro, lossy: Lossy): number[] {
-  if (mac.data.some((x) => (x & 0x40000000) !== 0)) lossy.add('arp macro fixed-note steps (played relative)');
-  let ticks = Math.min(MAX_TICKS, Math.max(1, (mac.delay || 0) + mac.length * Math.max(1, mac.speed || 1)));
-  if (ticks >= MAX_TICKS) lossy.add(`arp macro longer than ${MAX_TICKS} ticks (cut)`);
-  const loop = mac.loop >= 0 && mac.loop < mac.length ? Math.min(ticks - 1, (mac.delay || 0) + mac.loop * Math.max(1, mac.speed || 1)) : ticks - 1;
-  ticks = Math.max(1, ticks);
-  return [loop, ticks, ...expand(mac, ticks, 0).map((x) => Math.max(-128, Math.min(127, (x << 1) >> 1)) & 0xff)];
+/** True when any sample step plays the hardware envelope (b0 bit 0 clear). */
+const sampleUsesEnv = (b: number[]): boolean => b.slice(2).some((x, i) => i % 4 === 0 && (x & 1) === 0);
+
+/** Furnace arp macro step: fixed note (bit 30 or 31 set, note = v ^ 0x40000000) or a signed relative offset. */
+const arpFixed = (v: number): boolean => ((v & 0xc0000000) >>> 0) === 0x40000000 || ((v & 0xc0000000) >>> 0) === 0x80000000;
+
+/** PT3 ornament from an arp macro. An all-fixed macro becomes offsets from its first fixed note, which the caller plays
+ * as the cell note (Furnace ignores the cell note then). */
+function ornamentBytes(mac: FurnaceMacro, lossy: Lossy, tickHz: number): { bytes: number[]; fixed: number | null } {
+  const data = mac.data.slice(0, mac.length);
+  const fixedSteps = data.filter(arpFixed).length;
+  const base = fixedSteps === data.length && data.length > 0 ? (data[0] ^ 0x40000000) | 0 : null;
+  if (fixedSteps > 0 && base === null) lossy.add('arp macro mixing fixed and relative steps (fixed steps played as 0)');
+  const ticks = macroSpan(mac);
+  const steps = expand(mac, ticks, 0).map((x) => (arpFixed(x) ? (base === null ? 0 : ((x ^ 0x40000000) | 0) - base) : x | 0));
+  const { idx, loop } = frameTicks(ticks, macroLoop(mac), tickHz, lossy, 'arp macro');
+  return { bytes: [loop, idx.length, ...idx.map((t) => Math.max(-96, Math.min(96, steps[t])) & 0xff)], fixed: base };
 }
 
 export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author = ''): Pt3Song {
@@ -82,9 +168,8 @@ export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author =
   if (m.systems[0] === AY8930) lossy.add('AY8930 enhanced mode (played as AY-3-8910)');
   for (const sys of m.systems.slice(1)) lossy.add(`second chip system ${sys} (channels dropped; one AY only)`);
   if (m.subsongs.length > 1) lossy.add('other subsongs (only one exported)');
-  if (s.speed2 !== s.speed1) lossy.add(`speed 2 (${s.speed2}) and groove: played at speed 1 (${s.speed1})`);
-  if (s.hz !== FRAME_HZ) lossy.add(`tick rate ${s.hz} Hz (PT3 player runs at ${FRAME_HZ} Hz; speeds rescaled)`);
-  const toDelay = (spd: number): number => Math.max(1, Math.min(255, Math.round((spd * FRAME_HZ) / (s.hz > 0 ? s.hz : FRAME_HZ))));
+  const baseHz = s.hz > 0 ? s.hz : FRAME_HZ;
+  const tickHz = s.virtualTempo > 0 && s.virtualTempoD > 0 ? (baseHz * s.virtualTempo) / s.virtualTempoD : baseHz;
   const cellAt = (ch: number, o: number, r: number): FurnacePatternCell | undefined => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o]}`)?.rows[r];
 
   const orderLen: number[] = [];
@@ -102,60 +187,170 @@ export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author =
     orderLen.push(len);
   }
 
-  // Samples and ornaments by first use.
+  // Samples and ornaments, deduplicated by content. Instruments keep their macros; samples are made per tone shift.
   const samples: number[][] = [], ornaments: number[][] = [[0, 1, 0]];
-  const insSample = new Map<number, { sample: number; orn: number }>();
-  const instrument = (i: number): { sample: number; orn: number } => {
-    const hit = insSample.get(i);
+  const sampleKey = new Map<string, number>(), ornKey = new Map<string, number>([['0,1,0', 0]]);
+  const addOrnament = (b: number[]): number => {
+    const k = b.join(',');
+    const hit = ornKey.get(k);
+    if (hit !== undefined) return hit;
+    if (ornaments.length > MAX_ORNAMENTS) { lossy.add(`ornaments past ${MAX_ORNAMENTS} (dropped)`); return 0; }
+    ornaments.push(b); ornKey.set(k, ornaments.length - 1);
+    return ornaments.length - 1;
+  };
+  interface Ins { macros: FurnaceMacro[]; orn: number; fixed: number | null }
+  const insCache = new Map<number, Ins>();
+  const instrument = (i: number): Ins => {
+    const hit = insCache.get(i);
     if (hit) return hit;
     const macros = m.instruments[i]?.macros ?? [];
-    let sample = 1, orn = 0;
-    if (samples.length >= MAX_SAMPLES) lossy.add(`instruments past ${MAX_SAMPLES} (sample ${MAX_SAMPLES} reused)`);
-    else { samples.push(sampleBytes(macros, lossy)); sample = samples.length; }
     const arp = macros.find((x) => x.code === MACRO_ARP && x.length > 0);
-    if (arp) {
-      if (ornaments.length > MAX_ORNAMENTS) lossy.add(`arpeggio macros past ${MAX_ORNAMENTS} (ornament dropped)`);
-      else { ornaments.push(ornamentBytes(arp, lossy)); orn = ornaments.length - 1; }
-    }
-    const e = { sample, orn };
-    insSample.set(i, e);
+    const o = arp ? ornamentBytes(arp, lossy, tickHz) : null;
+    const e = { macros, orn: o ? addOrnament(o.bytes) : 0, fixed: o?.fixed ?? null };
+    insCache.set(i, e);
     return e;
   };
+  const sampleFor = (ins: Ins, shift: number, forceEnv: boolean): number => {
+    const b = sampleBytes(ins.macros, lossy, tickHz, shift, forceEnv && !ins.macros.some((x) => x.code === MACRO_WAVE && x.length > 0));
+    const k = b.join(',');
+    const hit = sampleKey.get(k);
+    if (hit !== undefined) return hit;
+    if (samples.length >= MAX_SAMPLES) { lossy.add(`samples past ${MAX_SAMPLES} (sample ${MAX_SAMPLES} reused)`); return MAX_SAMPLES; }
+    samples.push(b); sampleKey.set(k, samples.length);
+    return samples.length;
+  };
 
-  // Channel streams per order: one entry per PT3 line; skip counts pack empty rows after an event.
+  // Effect 0xy (arpeggio, sticky until 000): steps 0,x,y of arpLen ticks each, resampled to 50 Hz frames.
+  const arpLen = Math.max(1, s.arpLen || 1);
+  const arpOrn = new Map<number, number>();
+  const arpOrnament = (v: number): number => {
+    const hit = arpOrn.get(v);
+    if (hit !== undefined) return hit;
+    const steps = [0, v >> 4, v & 15];
+    const { idx, loop } = frameTicks(3 * arpLen, 0, tickHz, lossy, 'effect 00 arpeggio');
+    const o = addOrnament([loop, idx.length, ...idx.map((t) => steps[Math.floor(t / arpLen)])]);
+    arpOrn.set(v, o);
+    return o;
+  };
+
+  // Tuning from the notes the song plays (fixed arp notes included).
+  const used = new Set<number>();
+  for (let o = 0; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) for (let ch = 0; ch < CHANNELS; ch++) {
+    const cell = cellAt(ch, o, r);
+    const nv = cell ? convertFurnaceNoteValue(cell) : -1;
+    if (nv >= 0 && nv < 253) used.add(nv);
+  }
+  const tune = pickTuning(m.tuning, [...used]);
+  if (tune.cents > 35) lossy.add(`tone table off by up to ${Math.round(tune.cents)} cents (PT3 has four fixed tables, no fine tune)`);
+  /** PT3 note and sample tone offset for Furnace note nv: past C-1..B-8 the edge note plays with the period difference. */
+  const placeNote = (nv: number): { n: number; shift: number } => {
+    const n = nv - tune.noteOffset;
+    if (n >= 0 && n <= 95) return { n, shift: 0 };
+    const edge = n < 0 ? 0 : 95;
+    const want = Math.max(1, Math.min(4095, Math.round(ZX_CLOCK / (16 * furnaceHz(m.tuning > 0 ? m.tuning : 440, nv)))));
+    return { n: edge, shift: want - Math.round(pt3Period(tune, edge)) };
+  };
+
+  // Rows: Furnace speeds cycle per row (groove); 09 sets speed 1, 0F speed 2. Each row's PT3 delay is the frame
+  // difference of the accumulated tick time, so 60 Hz songs and odd speeds keep their timing within one frame.
+  const speeds = s.speedPattern?.length ? [...s.speedPattern] : s.speed2 !== s.speed1 ? [s.speed1, s.speed2] : [s.speed1];
+  let speedIdx = 0, ticksAt = 0, frames = 0, curDelay = -1, firstDelay = -1;
+  const chan = [0, 1, 2].map(() => ({ ins: -1, arp: -1, shift: 0, outSample: -1, outOrn: -1, n: 0, env22: false, autoNum: 0, autoDen: 0, envOut: false }));
+  // Hardware envelope: one generator per chip, shape (R13) and period are chip state in Furnace and in PT3.
+  let envShape = 0, envPeriod = 0;
+  const firstVal = (macros: FurnaceMacro[], code: number): number | null => {
+    const mac = macros.find((x) => x.code === code && x.length > 0);
+    return mac ? mac.data[0] : null;
+  };
+  /** PT3 envelope command bytes for a channel note: Furnace auto-envelope (ay.cpp: (freq * den / num) >> 4 on the played
+   * tone period) or the fixed period, converted from the Furnace AY clock. */
+  const envBytes = (st: (typeof chan)[number], macros: FurnaceMacro[], onNote = true): number[] => {
+    const shapeM = onNote ? firstVal(macros, MACRO_ENV_SHAPE) : null;
+    if (shapeM !== null) envShape = shapeM & 15;
+    const numM = firstVal(macros, MACRO_AUTO_NUM), denM = firstVal(macros, MACRO_AUTO_DEN);
+    const num = numM !== null || denM !== null ? (numM ?? 1) : st.autoNum, den = numM !== null || denM !== null ? (denM ?? 1) : st.autoDen;
+    const fixedM = firstVal(macros, MACRO_ENV_PERIOD);
+    let period: number;
+    if (num > 0 && den > 0) {
+      const tone = Math.max(0, Math.min(4095, Math.round(pt3Period(tune, st.n)) + st.shift));
+      period = Math.floor(Math.floor((tone * den) / num) / 16);
+    } else period = Math.round(((fixedM ?? envPeriod) * ZX_CLOCK) / FURNACE_AY_CLOCK);
+    period = Math.max(0, Math.min(0xffff, period));
+    // Shapes 0-3 play as 9 and 4-7 as 15 on the AY; PT3 has no 0x10 + 0 envelope byte.
+    const shape = envShape < 4 ? 9 : envShape < 8 ? 15 : envShape;
+    return [0x10 + shape, period >> 8, period & 0xff];
+  };
   const channelsWithNotes = [false, false, false];
-  let speed = s.speed1, curDelay = toDelay(s.speed1), frames = 0;
   const patternBytes: number[][][] = []; // [order][channel]
   for (let o = 0; o < endOrder; o++) {
     const rows: Array<{ ops: number[]; note: number; args: number[] }[]> = [[], [], []];
-    let lastRowSpeed = speed;
     for (let r = 0; r < orderLen[o]; r++) {
-      let newSpeed = speed;
-      for (let ch = 0; ch < CHANNELS; ch++) for (const e of cellAt(ch, o, r)?.effects ?? []) if ((e.type === 0x09 || e.type === 0x0f) && e.value > 0) newSpeed = e.value;
-      if (newSpeed !== lastRowSpeed || (o === 0 && r === 0 && false)) { speed = newSpeed; lastRowSpeed = newSpeed; }
-      frames += toDelay(speed);
+      for (let ch = 0; ch < CHANNELS; ch++) for (const e of cellAt(ch, o, r)?.effects ?? []) {
+        if (e.type === 0x09 && e.value > 0) speeds[0] = e.value;
+        if (e.type === 0x0f && e.value > 0) { if (speeds.length < 2) speeds.push(speeds[0]); speeds[1] = e.value; }
+      }
+      const spd = speeds[speedIdx % speeds.length];
+      speedIdx++;
+      ticksAt += spd;
+      // Round half down: a tick at exactly the half-frame belongs to the frame whose midpoint it reaches (same convention as frameTicks).
+      let delay = Math.ceil((ticksAt * FRAME_HZ) / tickHz - 0.5 - 1e-9) - frames;
+      if (delay < 1) { lossy.add('row shorter than one 50 Hz frame (lengthened)'); delay = 1; }
+      if (delay > 255) { lossy.add('row longer than 255 frames (cut)'); delay = 255; }
+      frames += delay;
+      if (firstDelay < 0) firstDelay = curDelay = delay;
       for (let ch = 0; ch < CHANNELS; ch++) {
         const cell = cellAt(ch, o, r);
         const ops: number[] = [], args: number[] = [];
         let note = 0xd0;
         if (cell) {
-          if (cell.instrument >= 0) { const ins = instrument(cell.instrument); ops.push(0xf0 | ins.orn, ins.sample * 2); }
+          const st = chan[ch];
+          if (cell.instrument >= 0) st.ins = cell.instrument;
+          for (const e of cell.effects) {
+            if (e.type === 0x00) st.arp = e.value > 0 ? arpOrnament(e.value) : -1;
+            if (e.type === 0x22) { envShape = e.value >> 4; st.env22 = (e.value & 15) !== 0; }
+            if (e.type === 0x29) { st.autoNum = e.value >> 4; st.autoDen = e.value & 15; }
+            if (e.type === 0x23) envPeriod = (envPeriod & 0xff00) | e.value;
+            if (e.type === 0x24) envPeriod = (envPeriod & 0xff) | (e.value << 8);
+          }
           if (cell.volume >= 0) ops.push(cell.volume === 0 ? 0xc0 : 0xc0 | Math.min(15, cell.volume));
-          const nv = convertFurnaceNoteValue(cell);
+          let nv = convertFurnaceNoteValue(cell);
           if (nv === 253 || nv === 254 || nv === 255) note = 0xc0;
           else if (nv >= 0) {
             channelsWithNotes[ch] = true;
-            let n = nv - NOTE_OFFSET;
-            if (n < 0 || n > 95) { lossy.add('note outside PT3 range C-1..B-8 (clamped)'); n = Math.max(0, Math.min(95, n)); }
-            note = 0x50 + n;
-            if (cell.instrument < 0 && !rows[ch].some((x) => x.ops.some((p) => p >= 0xf0))) ops.push(0xf0, instrument(0).sample * 2);
+            if (st.ins < 0) st.ins = 0;
+            const fixed = instrument(st.ins).fixed;
+            if (fixed !== null) nv = fixed;
+            const p = placeNote(nv);
+            if (p.shift !== 0) lossy.add('note outside PT3 C-1..B-8 (edge note with sample tone offset)');
+            st.shift = p.shift;
+            st.n = p.n;
+            note = 0x50 + p.n;
+          }
+          if (st.ins >= 0 && (note !== 0xd0 || cell.instrument >= 0)) {
+            const ins = instrument(st.ins);
+            const sample = sampleFor(ins, st.shift, st.env22);
+            const orn = st.arp >= 0 ? st.arp : ins.orn;
+            if (sampleUsesEnv(samples[sample - 1] ?? [])) {
+              // shortcut: PT3 retriggers R13 on every envelope command; Furnace only when the shape value changes.
+              // Repeating shapes (8, 10, 12, 14) can differ in phase per note; exact only with a player that sets the period alone.
+              if (orn !== 0 && ins.macros.some((x) => (x.code === MACRO_AUTO_NUM || x.code === MACRO_AUTO_DEN) && x.length > 0) || (st.autoNum > 0 && orn !== 0)) lossy.add('auto-envelope with arpeggio (period follows the row note only)');
+              ops.unshift(...envBytes(st, ins.macros), sample * 2, ...(orn !== st.outOrn ? [0x40 | orn] : []));
+              st.outSample = sample; st.outOrn = orn; st.envOut = true;
+            } else if (note === 0xd0 && st.envOut && cell.effects.some((e) => [0x22, 0x23, 0x24, 0x29].includes(e.type))) {
+              // Envelope effect without a note: 0xB2..0xBF sets shape 1..14 and the period, keeping the sample.
+              const eb = envBytes(st, ins.macros, false);
+              if (eb[0] - 0x10 <= 14) ops.push(0xb1 + eb[0] - 0x10, eb[1], eb[2]);
+              else lossy.add('envelope shape 15 set without a note (PT3 0xB2..0xBF reaches 1..14)');
+            } else if (sample !== st.outSample || orn !== st.outOrn || st.envOut) {
+              ops.unshift(0xf0 | orn, sample * 2); st.outSample = sample; st.outOrn = orn; st.envOut = false;
+            }
           }
           for (const e of cell.effects) {
-            if (e.type < 0 || e.type === 0x09 || e.type === 0x0f || e.type === 0x0b || e.type === 0x0d) continue;
+            if (e.type < 0 || [0x00, 0x09, 0x0f, 0x0b, 0x0d, 0x22, 0x23, 0x24, 0x29].includes(e.type)) continue;
             lossy.add(`effect ${e.type.toString(16).toUpperCase().padStart(2, '0')}`);
           }
         }
-        if (ch === 0 && newSpeed !== curDelay && toDelay(newSpeed) !== curDelay) { curDelay = toDelay(newSpeed); ops.push(0x09); args.push(curDelay); }
+        if (ch === 0 && delay !== curDelay) { curDelay = delay; ops.push(0x09); args.push(delay); }
         rows[ch].push({ ops, note, args });
       }
     }
@@ -193,11 +388,11 @@ export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author =
   const patPtr: number[][] = patList.map((p) => p.map((c) => { const a = at; body.push(...c); at += c.length; return a; }));
   const mod = new Uint8Array(at);
   const put = (o: number, text: string, len: number): void => { for (let i = 0; i < len; i++) mod[o + i] = text.charCodeAt(i) || 0x20; };
-  put(0, 'ProTracker 3.6 compilation of ', 30);
+  put(0, `ProTracker 3.${tune.version} compilation of`, 30);
   put(30, title.replace(/[^\x20-\x7E]/g, '?'), 32);
   put(62, ' by ', 4);
   put(66, author.replace(/[^\x20-\x7E]/g, '?'), 32);
-  mod[99] = PT3_TONE_TABLE; mod[100] = toDelay(s.speed1); mod[101] = positions.length + 1;
+  mod[99] = tune.table; mod[100] = Math.max(1, firstDelay); mod[101] = positions.length + 1;
   mod[102] = Math.min(loopOrder, positions.length - 1);
   const w = (o: number, v: number): void => { mod[o] = v & 0xff; mod[o + 1] = v >> 8; };
   w(103, patTab);
@@ -220,7 +415,7 @@ export function buildZxPt3Tap(module: Uint8Array, player: Pt3Player, title = 'de
   const code = Uint8Array.from(player.bytes);
   code[player.bankOffset] = 0x10;
   const name = title.replace(/[^\x20-\x7E]/g, '?').slice(0, 10);
-  const loader = basicLoader([0], player);
+  const loader = basicLoader([0], player, [...PT3_CREDIT, ...(title ? [title.slice(0, 32)] : [])]);
   const parts = [
     tapBlock(0x00, header(0, name, loader.length, 10, loader.length)), tapBlock(0xFF, loader),
     ...codeBlocks('player', player.loadAddress, code),

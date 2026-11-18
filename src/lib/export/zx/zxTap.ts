@@ -75,7 +75,7 @@ export const codeBlocks = (name: string, address: number, data: Uint8Array) =>
   [tapBlock(0x00, header(3, name, data.length, address, 32768)), tapBlock(0xFF, data)];
 
 type BasicItem = number | string; // number = token byte, string = literal text
-const TOK = { CLEAR: 0xFD, POKE: 0xF4, OUT: 0xDF, LOAD: 0xEF, CODE: 0xAF, RANDOMIZE: 0xF9, USR: 0xC0 };
+const TOK = { CLEAR: 0xFD, POKE: 0xF4, OUT: 0xDF, LOAD: 0xEF, CODE: 0xAF, RANDOMIZE: 0xF9, USR: 0xC0, PRINT: 0xF5 };
 
 /** A number in a BASIC line: digits, then 0x0E and the 5-byte integer form. */
 function num(n: number): number[] {
@@ -93,11 +93,12 @@ function basicLine(lineNo: number, items: BasicItem[]): number[] {
  * Tape block order must match. The POKE keeps BANK_M (23388) in step: 128 BASIC (the Tape Loader) re-pages port 32765
  * from BANK_M around LOAD, so a bare OUT is undone and every bank lands in bank 0.
  */
-export function basicLoader(banks: number[], p: Pick<ZxPlayer, 'loadAddress' | 'entry' | 'dataAddress'>): Uint8Array {
+export function basicLoader(banks: number[], p: Pick<ZxPlayer, 'loadAddress' | 'entry' | 'dataAddress'>, print: string[] = []): Uint8Array {
   const colon = ':';
   const load = (addr: number) => [TOK.LOAD, '""', TOK.CODE, ...num(addr)];
   const lines: number[] = [];
   const flat = (xs: Array<BasicItem | number[]>): BasicItem[] => xs.flatMap((x) => (Array.isArray(x) ? x : [x]));
+  print.forEach((t, i) => lines.push(...basicLine(1 + i, [TOK.PRINT, `"${t.replace(/[^\x20-\x7E]|"/g, '?')}"`])));
   lines.push(...basicLine(10, flat([TOK.CLEAR, ...num(p.loadAddress - 1)])));
   lines.push(...basicLine(20, flat(load(p.loadAddress))));
   banks.forEach((b, i) => {
