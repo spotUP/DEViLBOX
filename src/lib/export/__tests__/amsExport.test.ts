@@ -38,6 +38,15 @@ describe('AMSExporter', () => {
     expect(grid(re, 0)).toEqual(before);
   });
 
+  it('song name and instrument edits warn instead of vanishing', async () => {
+    const { song } = load();
+    song.name = 'renamed';
+    song.instruments[0] = { ...song.instruments[0], name: 'edited' };
+    const w = (await exportAMS(song)).warnings.join('\n');
+    expect(w).toContain('song name edits');
+    expect(w).toContain('instrument and sample edits');
+  });
+
   it('an effect AMS cannot hold is dropped with a warning', async () => {
     const { song } = load();
     song.patterns[0].channels[0].rows[3] = { ...song.patterns[0].channels[0].rows[3], effTyp: 0x1F, eff: 5 };

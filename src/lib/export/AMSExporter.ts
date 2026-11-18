@@ -12,7 +12,8 @@
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { TrackerCell } from '@/types';
-import { decodeExtEffect, decodeModEffect, parseAMSPattern } from '@/lib/import/formats/AMSParser';
+import { decodeExtEffect, decodeModEffect, parseAMSFile, parseAMSPattern } from '@/lib/import/formats/AMSParser';
+import { sameInstr } from './MDLExporter';
 
 export interface AMSExportResult {
   data: Uint8Array;
@@ -116,6 +117,15 @@ export async function exportAMS(song: TrackerSong): Promise<AMSExportResult> {
   }
   const warned = new Map<string, number>();
   const warn = (m: string): void => { warned.set(m, (warned.get(m) ?? 0) + 1); };
+
+  const loaded = parseAMSFile(src, name);
+  if (loaded) {
+    const ins = song.instruments ?? [];
+    if (song.name !== loaded.name) warn('song name edits are not written to AMS; the module keeps its loaded name');
+    if (ins.length !== loaded.instruments.length || ins.some((x, i) => !sameInstr(x, loaded.instruments[i]))) {
+      warn('instrument and sample edits are not written to AMS; the module keeps its loaded instruments and samples');
+    }
+  }
 
   const nameLen = src[7];
   const hdr = 8 + nameLen;
