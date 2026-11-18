@@ -156,7 +156,7 @@ registerEditableFormat({ formatId: "steveTurner", label: "", patternCodec: { kin
 registerEditableFormat({ formatId: "stk", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "stm", label: "Scream Tracker 2", patternCodec: { kind: "fixed" }, exporter: { module: "STMExporter", fn: "exportSTM", byLayout: true } });
 registerEditableFormat({ formatId: "stp", label: "", newSong: { template: "templates/stp.stp", name: "SoundTracker Pro II" }, patternCodec: { kind: "fixed" }, exporter: { module: "STPExporter", fn: "exportSTP", byLayout: true } });
-registerEditableFormat({ formatId: "stx", label: "", patternCodec: { kind: "variable" } });
+registerEditableFormat({ formatId: "stx", label: "Scream Tracker Music Interface Kit", patternCodec: { kind: "variable" }, exporter: { module: "STXExporter", fn: "exportSTX", byLayout: true } });
 registerEditableFormat({ formatId: "sunTronic", label: "SunTronic", newSong: { template: "templates/sunTronic.src" }, patternCodec: { kind: "variable" }, exporter: { module: "SunTronicExporter", fn: "exportAsSunTronic", byLayout: true, ext: "src" } });
 registerEditableFormat({ formatId: "symphoniePro", label: "Symphonie Pro", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "synthDream", label: "SynthDream", patternCodec: { kind: "variable" }, exporter: { module: "SynthDreamExporter", fn: "exportSynthDream", byLayout: true } });

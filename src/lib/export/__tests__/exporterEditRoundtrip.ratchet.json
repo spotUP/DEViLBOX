@@ -516,6 +516,12 @@
       "slotClean": true,
       "detail": ""
     },
+    "stx": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
     "stoneTracker": {
       "verdict": "pass",
       "edited": "note",

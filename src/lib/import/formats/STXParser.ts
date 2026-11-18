@@ -740,5 +740,7 @@ export function parseSTXFile(buffer: ArrayBuffer, filename: string): TrackerSong
     initialBPM,
     linearPeriods:   false,
     uadeVariableLayout,
+    uadeEditableFileData: buffer,
+    uadeEditableFileName: filename,
   };
 }
