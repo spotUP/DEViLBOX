@@ -6,6 +6,7 @@ import { parsePLMFile } from '@/lib/import/formats/PLMParser';
 import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 import { getCellFileOffset } from '@/engine/uade/UADEPatternEncoder';
 import { exportPLM } from '../PLMExporter';
+import { encodePLMCell } from '@/engine/uade/encoders/PLMEncoder';
 
 const FIXTURE = join(process.cwd(), 'public/data/songs/disorder-tracker-2/hyper geckoo.plm');
 const load = async () => {
@@ -21,6 +22,23 @@ describe('PLMExporter', () => {
     const { b, song } = await load();
     const r = await exportPLM(song);
     expect(Buffer.from(r.data).equals(b)).toBe(true);
+  });
+
+  it('encodePLMCell note byte (no carriers) equals the stored note byte', async () => {
+    const { b, song } = await load();
+    const layout = song.uadePatternLayout!;
+    let checked = 0;
+    for (let p = 0; p < song.patterns.length; p++)
+      for (let c = 0; c < song.patterns[p].channels.length; c++)
+        for (let r = 0; r < 64; r++) {
+          const off = getCellFileOffset(layout, p, r, c);
+          const cell = song.patterns[p].channels[c].rows[r];
+          if (off < 0 || !cell.note || (b[off] & 0x0F) > 11) continue;
+          const { period: _a, pan: _b, cutoff: _c, resonance: _d, ...bare } = cell;
+          expect(encodePLMCell(bare)[0]).toBe(b[off]);
+          checked++;
+        }
+    expect(checked).toBeGreaterThan(0);
   });
 
   it('a note edit reaches the exported bytes and reparses', async () => {

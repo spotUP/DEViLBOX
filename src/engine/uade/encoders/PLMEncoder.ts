@@ -10,7 +10,7 @@
  *
  * Note mapping: XM note → PLM note
  *   Parser: (noteByte >> 4) * 12 + (noteByte & 0x0F) + 12 + 1
- *   Reverse: raw = xmNote - 37, octave = floor(raw/12), semi = raw%12
+ *   Reverse: raw = xmNote - 13, octave = floor(raw/12), semi = raw%12
  *            plmNote = (octave << 4) | semi
  */
 
@@ -44,19 +44,19 @@ function reversePLMEffect(effTyp: number, eff: number): { cmd: number; param: nu
   }
 }
 
+/** Inverse of the parser's note mapping (octave*12 + semi + 13); 0 = empty. */
+export function encodePLMNote(note: number): number {
+  if (note < 13) return 0;
+  const raw = note - 13;
+  return (Math.min(8, Math.floor(raw / 12)) << 4) | (raw % 12);
+}
+
 function encodePLMCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(5);
   const note = cell.note ?? 0;
 
   // Byte 0: note as BCD
-  if (note > 0 && note >= 37) {
-    const raw = note - 37;
-    const octave = Math.floor(raw / 12);
-    const semi = raw % 12;
-    out[0] = (octave << 4) | semi;
-  } else {
-    out[0] = 0; // empty
-  }
+  out[0] = encodePLMNote(note);
 
   out[1] = (cell.instrument ?? 0) & 0xFF;
   out[2] = (cell.volume ?? 0) & 0xFF;

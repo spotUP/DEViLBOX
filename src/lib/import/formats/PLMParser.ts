@@ -56,7 +56,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
-import { encodePLMCell } from '@/engine/uade/encoders/PLMEncoder';
+import { encodePLMCell, encodePLMNote } from '@/engine/uade/encoders/PLMEncoder';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -233,8 +233,7 @@ function encodePLMEdit(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
   const was = decodePLMBytes(stored);
   const note = cell.note ?? 0;
   if (note !== was.note) {
-    const raw = note - 13;
-    out[0] = note >= 13 ? Math.min(8, Math.floor(raw / 12)) << 4 | (raw % 12) : 0;
+    out[0] = encodePLMNote(note);
   }
   if ((cell.instrument ?? 0) !== was.instrument) out[1] = (cell.instrument ?? 0) & 0xFF;
   const vol = cell.volume ?? 0;
