@@ -85,10 +85,10 @@
       "detail": ""
     },
     "digitalSonixChrome": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "dynamicSynthesizer": {
       "verdict": "pass",
@@ -109,10 +109,10 @@
       "detail": ""
     },
     "emsv6": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": null,
-      "detail": "instrument read back 1 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "faceTheMusic": {
       "verdict": "pass",
@@ -133,16 +133,16 @@
       "detail": ""
     },
     "fc": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "forgottenWorlds": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "format669": {
       "verdict": "pass",
@@ -205,10 +205,10 @@
       "detail": ""
     },
     "infogrames": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "jamCracker": {
       "verdict": "pass",
@@ -268,7 +268,7 @@
       "verdict": "fail",
       "edited": "instrument",
       "slotClean": null,
-      "detail": "instrument read back 3 want 4 (bytes unchanged)"
+      "detail": "instrument read back 2 want 3 (bytes unchanged)"
     },
     "markCooksey": {
       "verdict": "pass",
@@ -355,10 +355,10 @@
       "detail": ""
     },
     "paulSummers": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": null,
-      "detail": "instrument read back 1 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "peterVerswyvelenPacker": {
       "verdict": "pass",

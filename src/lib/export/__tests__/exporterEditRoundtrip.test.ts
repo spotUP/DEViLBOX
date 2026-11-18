@@ -35,6 +35,9 @@ const ids = Object.entries(base.results).filter(([, v]) => v.status === 'byte-ex
 const fixtureOf = (id: string): string | undefined =>
   id in LAYOUT_EXPORTERS ? LAYOUT_FIXTURES[id] : NAMED_EXPORTERS.find((n) => n.id === id)?.fixture;
 
+/** Grid notes 1..96 are pitches; 97 is note-off. */
+const isPitch = (n: number): boolean => n >= 1 && n <= 96;
+
 function pickCell(song: TrackerSong): [number, number, number] | undefined {
   const layout = song.uadePatternLayout;
   let fallback: [number, number, number] | undefined;
@@ -61,18 +64,26 @@ async function measure(id: string): Promise<Row> {
   const pos = pickCell(song);
   if (!pos) return none('no-edit-path', 'no cell with a file offset');
   let last: Row = none('fail', '');
-  // Without a layout the first cell is often an empty row of a voice that holds no instrument yet, which cannot take a note;
+  // The first cell is often an empty row of a voice that holds no instrument yet, which cannot take a note;
   // the first row that already has a note is tried too.
-  const noted = song.uadePatternLayout ? undefined : ((): [number, number, number] | undefined => {
+  // Cells that already hold a note are tried too (up to 40, spread over the song): a stream byte shared by several cells or an
+  // instrument with a narrow note range rejects a single probe, and one storable cell is enough to show the edit path works.
+  const noted = ((): [number, number, number][] => {
+    const all: [number, number, number][] = [];
     for (let p = 0; p < song.patterns.length; p++) for (let c = 0; c < song.patterns[p].channels.length; c++)
-      for (let r = 0; r < song.patterns[p].channels[c].rows.length; r++) if (song.patterns[p].channels[c].rows[r].note) return [p, r, c];
+      for (let r = 0; r < song.patterns[p].channels[c].rows.length; r++)
+        if (isPitch(song.patterns[p].channels[c].rows[r].note) && (!song.uadePatternLayout || getCellFileOffset(song.uadePatternLayout, p, r, c) >= 0)) all.push([p, r, c]);
+    const step = Math.max(1, Math.floor(all.length / 40));
+    return all.filter((_, i) => i % step === 0).slice(0, 40);
   })();
-  for (const [p, r, c] of noted ? [pos, noted] : [pos]) {
+  for (const [p, r, c] of [pos, ...noted]) {
     const layout = song.uadePatternLayout;
     const off = layout ? getCellFileOffset(layout, p, r, c) : -1;
     const slot = layout?.bytesPerCell ?? 0;
     // Each format's note table covers a different range (ProTracker 13..48, TCB 52..87), so several probe notes follow.
-    const tries = [['note', 49], ['note', 25], ['note', 61], ['instrument', 3]] as const;
+    // A note one step off the stored one is the likeliest to stay inside a format's table, so the neighbours follow.
+    const here = isPitch(song.patterns[p].channels[c].rows[r].note) ? song.patterns[p].channels[c].rows[r].note : 0;
+    const tries: (readonly ['note' | 'instrument', number])[] = [['note', 49], ['note', 25], ['note', 61], ...(here ? [['note', here + 1], ['note', here - 1]] as const : []), ['instrument', 3]];
     for (const [field, probe] of tries) {
       const fresh = await parseAs(fx, raw);
       setGridBaseline(baselineOf(fresh.patterns));
