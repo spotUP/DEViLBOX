@@ -183,7 +183,7 @@ export function isGraoumfTracker2Format(bytes: Uint8Array): boolean {
  * @param isGTK       - true = GTK file (negative fileVersion in OpenMPT)
  * @param speed       - current tempo speed (for CMD_SPEED tracking)
  */
-function translateEffect(
+export function translateEffect(
   effect: number,
   param: number,
   isGTK: boolean,
@@ -572,7 +572,7 @@ function parseGTKFile(buf: Uint8Array, filename: string): TrackerSong | null {
 
 // ── GT2 chunk reader ──────────────────────────────────────────────────────────
 
-interface GT2Chunk {
+export interface GT2Chunk {
   id:     number;   // 4-byte big-endian chunk ID
   length: number;   // chunk payload length (after subtracting 8-byte header)
   offset: number;   // byte offset in buf where payload starts
@@ -590,7 +590,7 @@ const CHUNK_SAMP = 0x53414D50; // "SAMP"
 const CHUNK_SAM2 = 0x53414D32; // "SAM2"
 const CHUNK_ENDC = 0x454E4443; // "ENDC"
 
-function readGT2Chunks(buf: Uint8Array, startOff: number): GT2Chunk[] {
+export function readGT2Chunks(buf: Uint8Array, startOff: number): GT2Chunk[] {
   const chunks: GT2Chunk[] = [];
   let pos = startOff;
   while (pos + 8 <= buf.length) {
@@ -1179,6 +1179,8 @@ function parseGT2File(buf: Uint8Array, filename: string): TrackerSong | null {
     initialBPM,
     linearPeriods:   false,
     uadePatternLayout: gt2PatternLayout,
+    uadeEditableFileData: buf.slice().buffer,
+    uadeEditableFileName: filename,
   };
 }
 

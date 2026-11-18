@@ -312,6 +312,14 @@
       "cells": 686,
       "bytes": 686
     },
+    "graoumfTracker2_gt2": {
+      "exporter": "GraoumfTracker2Exporter.exportGraoumfTracker2",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 464131,
+      "bytes": 464131
+    },
     "hippelCoSo": {
       "exporter": "HippelCoSoExporter.exportAsHippelCoSo",
       "tier": "byte-exact",

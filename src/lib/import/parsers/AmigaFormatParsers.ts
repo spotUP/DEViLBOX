@@ -761,6 +761,17 @@ export async function tryRouteFormat(
   // ── Graoumf Tracker 1/2 ───────────────────────────────────────────────────
   // .gt2 — OpenMPT; .gtk — UADE only (not in OpenMPT)
   if (matchesExt(filename, ['gt2'])) {
+    // Native grid (carries the source bytes for the re-packer); libopenmpt keeps playback.
+    try {
+      const { isGraoumfTracker2Format, parseGraoumfTracker2File } = await import('@lib/import/formats/GraoumfTracker2Parser');
+      const u8 = new Uint8Array(buffer);
+      if (isGraoumfTracker2Format(u8)) {
+        const song = parseGraoumfTracker2File(u8, originalFileName);
+        if (song) { song.libopenmptFileData = buffer.slice(0); return song; }
+      }
+    } catch (err) {
+      console.warn(`[GraoumfTracker2Parser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+    }
     const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
     const song = await parseWithOpenMPT(buffer, originalFileName);
     song.libopenmptFileData = buffer.slice(0);

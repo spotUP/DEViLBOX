@@ -62,6 +62,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   stm: 'public/data/songs/scream-tracker-2/slideshow i.stm',
   stx: 'public/data/songs/formats/futurebrain.stx',
   ams: 'public/data/songs/formats/kernel.ams',
+  graoumfTracker2_gt2: 'public/data/songs/formats/gimmekuh.gt2',
   mdl: 'public/data/songs/digi-trakker/rohadtjo.mdl',
   ult: 'public/data/songs/formats/seasons.ult',
   stoneTracker: 'public/data/songs/stonetracker/hypnosphere.spm',

@@ -77,7 +77,7 @@ registerEditableFormat({ formatId: "futurePlayer", label: "Future Player", newSo
 registerEditableFormat({ formatId: "gameMusicCreator", label: "Game Music Creator", newSong: { template: "templates/gameMusicCreator.gmc" }, patternCodec: { kind: "fixed" }, exporter: { module: "GameMusicCreatorExporter", fn: "exportGameMusicCreator", byLayout: true } });
 registerEditableFormat({ formatId: "gdm", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "gmc", label: "Game Music Creator", patternCodec: { kind: "fixed" } });
-registerEditableFormat({ formatId: "graoumfTracker2_gt2", label: "Graoumf Tracker 2", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "graoumfTracker2_gt2", label: "Graoumf Tracker 2", patternCodec: { kind: "fixed" }, exporter: { module: "GraoumfTracker2Exporter", fn: "exportGraoumfTracker2", ext: "gt2", byLayout: true } });
 registerEditableFormat({ formatId: "graoumfTracker2_gtk4", label: "Graoumf Tracker 2", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "graoumfTracker2_gtk5", label: "Graoumf Tracker 2", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "hippelCoSo", label: "Hippel-CoSo", patternCodec: { kind: "variable" }, exporter: { module: "HippelCoSoExporter", fn: "exportAsHippelCoSo", byLayout: true }, newSong: { template: "templates/hippelCoSo.hipc", name: "Jochen Hippel CoSo" } });
