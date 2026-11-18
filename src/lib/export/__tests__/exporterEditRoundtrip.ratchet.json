@@ -390,6 +390,12 @@
       "slotClean": true,
       "detail": ""
     },
+    "ptm": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
     "pumaTracker": {
       "verdict": "pass",
       "edited": "note",

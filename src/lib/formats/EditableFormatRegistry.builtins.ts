@@ -128,7 +128,7 @@ registerEditableFormat({ formatId: "plm", label: "Disorder Tracker 2", patternCo
 registerEditableFormat({ formatId: "preTracker", label: "PreTracker", exporter: { module: "PreTrackerExporter", fn: "exportAsPreTracker" } });
 registerEditableFormat({ formatId: "psm", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "pt36", label: "ProTracker 3.6", patternCodec: { kind: "fixed" } });
-registerEditableFormat({ formatId: "ptm", label: "", patternCodec: { kind: "variable" } });
+registerEditableFormat({ formatId: "ptm", label: "PolyTracker", patternCodec: { kind: "variable" }, exporter: { module: "PTMExporter", fn: "exportPTM", byLayout: true } });
 registerEditableFormat({ formatId: "pumaTracker", label: "Puma Tracker", patternCodec: { kind: "variable" }, newSong: { template: "templates/pumatracker.puma" }, exporter: { module: "PumaTrackerExporter", fn: "exportPumaTrackerFile" } });
 registerEditableFormat({ formatId: "quadraComposer", label: "Quadra Composer", newSong: { template: "templates/quadraComposer.emod" }, patternCodec: { kind: "fixed" }, exporter: { module: "QuadraComposerExporter", fn: "exportQuadraComposer", byLayout: true } });
 registerEditableFormat({ formatId: "robHubbard", label: "Rob Hubbard", newSong: { template: "templates/robHubbard.rh" }, patternCodec: { kind: "fixed" }, exporter: { module: "RobHubbardExporter", fn: "exportRobHubbard", byLayout: true } });

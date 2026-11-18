@@ -598,5 +598,7 @@ export async function parsePTMFile(
     initialBPM:      125, // PTM has no BPM field in header; 125 is the DOS tracker default
     linearPeriods:   false,
     uadeVariableLayout,
+    uadeEditableFileData: buffer,
+    uadeEditableFileName: filename,
   };
 }

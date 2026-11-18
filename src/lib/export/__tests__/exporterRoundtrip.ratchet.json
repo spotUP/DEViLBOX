@@ -664,6 +664,14 @@
       "cells": 2962,
       "bytes": 2962
     },
+    "ptm": {
+      "exporter": "PTMExporter.exportPTM",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 224884,
+      "bytes": 224884
+    },
     "pumaTracker": {
       "exporter": "PumaTracker (PumaTrackerExporter)",
       "tier": "byte-exact",
