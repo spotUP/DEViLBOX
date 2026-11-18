@@ -20,15 +20,15 @@
     },
     "artOfNoise": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": true,
       "detail": ""
     },
     "beathoven": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": null,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "benDaglish": {
       "verdict": "fail",
@@ -37,14 +37,14 @@
       "detail": "instrument read back 0 want 3 (bytes unchanged)"
     },
     "coreDesign": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "daveLowe": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": null,
       "detail": ""
     },
@@ -92,7 +92,7 @@
     },
     "dynamicSynthesizer": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": null,
       "detail": ""
     },
@@ -128,7 +128,7 @@
     },
     "fashionTracker": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": true,
       "detail": ""
     },
@@ -175,20 +175,20 @@
       "detail": ""
     },
     "hivelyAHX": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "hivelyHVL": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": null,
-      "detail": "instrument read back 1 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "howieDavies": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": null,
       "detail": ""
     },
@@ -212,7 +212,7 @@
     },
     "jamCracker": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": true,
       "detail": ""
     },
@@ -224,8 +224,8 @@
     },
     "jesperOlsen": {
       "verdict": "pass",
-      "edited": "instrument",
-      "slotClean": false,
+      "edited": "note",
+      "slotClean": true,
       "detail": ""
     },
     "jochenHippelST": {
@@ -259,10 +259,10 @@
       "detail": ""
     },
     "majortom": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "maniacsOfNoise": {
       "verdict": "fail",
@@ -278,7 +278,7 @@
     },
     "maximumEffect": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": true,
       "detail": ""
     },
@@ -320,7 +320,7 @@
     },
     "musicAssembler": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": null,
       "detail": ""
     },
@@ -343,10 +343,10 @@
       "detail": ""
     },
     "paulRobotham": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": null,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "paulShields": {
       "verdict": "pass",
@@ -358,11 +358,11 @@
       "verdict": "fail",
       "edited": "instrument",
       "slotClean": null,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": "instrument read back 1 want 3 (bytes unchanged)"
     },
     "peterVerswyvelenPacker": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": true,
       "detail": ""
     },
@@ -398,15 +398,15 @@
     },
     "quadraComposer": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": true,
       "detail": ""
     },
     "quartet": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": null,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "richardJoseph": {
       "verdict": "pass",
@@ -416,7 +416,7 @@
     },
     "riffRaff": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": null,
       "detail": ""
     },
@@ -428,8 +428,8 @@
     },
     "ronKlaren": {
       "verdict": "pass",
-      "edited": "instrument",
-      "slotClean": false,
+      "edited": "note",
+      "slotClean": true,
       "detail": ""
     },
     "sawteeth": {
@@ -457,10 +457,10 @@
       "detail": ""
     },
     "silmarils": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "soundControl": {
       "verdict": "pass",
@@ -488,7 +488,7 @@
     },
     "soundPlayer": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": true,
       "detail": ""
     },
@@ -500,7 +500,7 @@
     },
     "speedySystem": {
       "verdict": "pass",
-      "edited": "instrument",
+      "edited": "note",
       "slotClean": null,
       "detail": ""
     },
@@ -512,8 +512,8 @@
     },
     "stoneTracker": {
       "verdict": "pass",
-      "edited": "instrument",
-      "slotClean": false,
+      "edited": "note",
+      "slotClean": true,
       "detail": ""
     },
     "sunTronic": {
@@ -577,16 +577,16 @@
       "detail": ""
     },
     "uade_vss": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": null,
-      "detail": "instrument read back 1 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "wallyBeben": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     }
   }
 }

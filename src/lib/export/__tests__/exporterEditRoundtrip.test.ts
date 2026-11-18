@@ -15,6 +15,9 @@ import { join } from 'path';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import { getCellFileOffset } from '@/engine/uade/UADEPatternEncoder';
 import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
+import { useFormatStore } from '@/stores/useFormatStore';
+import { useTrackerStore } from '@/stores/useTrackerStore';
+import { editHivelyCell } from '@/components/hively/hivelyEdit';
 import { LAYOUT_EXPORTERS } from '../nativeExportRouter';
 import { readFixture, parseAs, invokeLayoutExport, invokeNamedExport } from './exporterHarness.shared';
 import { LAYOUT_FIXTURES, NAMED_EXPORTERS } from './exporterFixtures.map';
@@ -75,7 +78,13 @@ async function measure(id: string): Promise<Row> {
       setGridBaseline(baselineOf(fresh.patterns));
       const orig = fresh.patterns[p].channels[c].rows[r];
       const nv = orig[field] === probe ? probe + 1 : probe;
-      fresh.patterns[p].channels[c].rows[r] = { ...orig, [field]: nv };
+      if (fresh.hivelyNative) {
+        // Hively keeps a native store the exporter reads; the app edits it through editHivelyCell, so the probe does too.
+        useFormatStore.setState({ hivelyNative: structuredClone(fresh.hivelyNative) });
+        useTrackerStore.setState({ patterns: structuredClone(fresh.patterns), currentPatternIndex: 0 });
+        editHivelyCell(p, c, r, field, nv);
+        fresh.hivelyNative = useFormatStore.getState().hivelyNative!;
+      } else fresh.patterns[p].channels[c].rows[r] = { ...orig, [field]: nv };
       let out: Uint8Array;
       try { out = id in LAYOUT_EXPORTERS ? await invokeLayoutExport(id, fresh) : await invokeNamedExport(id, fresh); }
       catch (e) { last = { verdict: 'fail', edited: field, slotClean: null, detail: `export: ${(e as Error).message}` }; continue; }
