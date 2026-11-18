@@ -104,7 +104,60 @@ const DEFAULT_ENV: Record<'vol' | 'arp' | 'duty' | 'pitch', number[]> = {
 };
 
 /** Furnace macro -> envelope values + loop/release, expanding speed and delay into frames. */
-function macroEnvelope(mac: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch', lossy: Lossy, step?: (v: number) => number, rate = 1): number[] {
+/**
+ * Furnace macros are sequences, ADSR (open bits 1-2 = 1) or LFO (= 2). The latter two store parameters in data[]
+ * (macroInt.cpp 19-47, 141-300), not values: run the same per-tick state machine here and return a plain sequence.
+ * shortcut: note release is ignored (no release phase / LFO keeps running), LFO cut at 240 ticks, delay ticks ignore macro speed.
+ */
+export function expandProcMacro(mac: FurnaceMacro, version = 245): FurnaceMacro {
+  const kind = ((mac.type & 15) >> 1) & 3;
+  if (kind !== 1 && kind !== 2) return mac;
+  const v = mac.data.slice();
+  if (version < 245) { // instrument.cpp convertOldADSRLFO: files before 245 store rates as 0..255 fractions of the range
+    if (v[0] >= v[1]) v[0] = v[1] + ((255 + (v[0] - v[1]) * 255) >> 8);
+    const bottom = v[0], top = v[1], range = Math.abs(top - bottom) << 8;
+    if (kind === 1) {
+      for (const i of [2, 4, 7, 8]) v[i] = Math.trunc((v[i] * range) / 255);
+      v[5] = bottom + Math.trunc(((top - bottom) * v[5]) / 255);
+    } else {
+      const w = v[12] & 3, r = Math.abs(top - bottom);
+      v[11] = w === 0 ? (r * v[11]) >> 1 : w === 1 ? (r * v[11]) >> 2 : w === 2 ? v[11] << 6 : v[11];
+    }
+  }
+  const [low, high, ar, ht, dr, sl, st, sr] = v, lfoSpeed = v[11], wave = v[12] & 3, phase = v[13];
+  const inv = low > high, bottom = (low << 8) | (inv ? 0xff : 0), top = inv ? high << 8 : (high << 8) | 0xff;
+  const sus = inv ? sl << 8 : (sl << 8) | 0xff;
+  let pos = bottom, state = 0, delay = 0, dir = false, val = low;
+  if (kind === 2) {
+    const b = low << 8, tp = (high << 8) | 0xff;
+    if (wave === 0) { dir = (phase & 512) !== 0; pos = dir ? tp + (((b - tp) * (phase & 511)) >> 9) : b + (((tp - b) * phase) >> 9); }
+    else if (wave === 1) pos = b + (((tp - b) * phase) >> 10);
+    else pos = phase << 6;
+  }
+  const out: number[] = [];
+  for (let n = 0; n < 240; n++) {
+    if (delay > 0) { delay--; out.push(val); continue; }
+    const d = inv ? -1 : 1; // the inverted case mirrors every comparison
+    if (kind === 1) {
+      if (state === 0) { pos += d * ar; if (d * (pos - (inv ? high << 8 : top)) >= 0) { pos = inv ? high << 8 : top; state = 1; delay = ht; } }
+      else if (state === 1) { pos -= d * dr; if (d * (pos - sus) <= 0) { pos = sus; state = 2; delay = st; } }
+      else if (state === 2) { pos -= d * sr; if (d * (pos - (inv ? bottom : low << 8)) <= 0) { pos = bottom; state = 4; } }
+      else { out.push(val); break; }
+      val = pos >> 8;
+    } else if (wave === 2) { pos = (pos + lfoSpeed) & 65535; val = pos & 32768 ? high : low; }
+    else {
+      const lo = inv ? high << 8 : low << 8, hi = inv ? (low << 8) | 0xff : (high << 8) | 0xff;
+      if (wave === 0) { pos += dir === inv ? lfoSpeed : -lfoSpeed; if (pos > hi) { dir = !inv; pos -= lfoSpeed * 2; } else if (pos < lo) { dir = inv; pos += lfoSpeed * 2; } }
+      else { pos += inv ? -lfoSpeed : lfoSpeed; if (pos > hi || pos < lo) pos += inv ? hi - lo : lo - hi; }
+      val = pos >> 8;
+    }
+    out.push(val);
+  }
+  return { ...mac, type: mac.type & ~6, data: out, length: out.length, loop: 255, release: 255 };
+}
+
+function macroEnvelope(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch', lossy: Lossy, step?: (v: number) => number, rate = 1, version = 245): number[] {
+  const mac = expandProcMacro(macIn, version);
   const speed = Math.max(1, mac.speed || 1);
   const delay = Math.max(0, mac.delay || 0);
   const vals: number[] = [];
@@ -408,7 +461,14 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 const P = pulsePeriod(src || 46);
                 // shortcut: relative macros scale each increment at the note's period (exact for small sums), rounding per step.
                 const toPeriod = (v: number): number => { const d = Math.round(P * (2 ** (-v / 1536) - 1)); if (Math.abs(d) > 63) lossy.add('pitch macro step past 63 period units (clamped)'); return d; };
-                pid = envId(macroEnvelope(pm, 'pitch', lossy, toPeriod, macroRate));
+                // An ADSR/LFO pitch macro in absolute mode is a position curve: FamiStudio's +-63 range only holds per-frame
+                // steps, so send the differences of the period offsets as a relative envelope.
+                const ex = expandProcMacro(pm, m.version);
+                if (ex !== pm && (pm.mode & 1) === 0) {
+                  const abs = ex.data.map((v) => Math.round(P * (2 ** (-v / 1536) - 1)));
+                  const deltas = abs.map((a, i) => { const d = a - (i ? abs[i - 1] : 0); if (Math.abs(d) > 63) lossy.add('pitch macro step past 63 period units (clamped)'); return d; });
+                  pid = envId(macroEnvelope({ ...ex, mode: 1, data: deltas }, 'pitch', lossy, undefined, 1, m.version));
+                } else pid = envId(macroEnvelope(pm, 'pitch', lossy, toPeriod, macroRate, m.version));
               }
             }
             // An override persists across notes and instrument changes in the engine: send it only when it changes.
@@ -429,7 +489,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             const outside = !!arpMac && ch !== NOISE_CH && arpMac.data.slice(0, arpMac.length).some((v) => inTable(v) !== target(v) - nv);
             if (outside && arpMac.data.slice(0, arpMac.length).some((v) => n + target(v) - nv > 96)) lossy.add('arp step above B-8 (clamped)');
             noteArp = !arpMac || (!fixed && !outside && ch !== NOISE_CH) ? null
-              : macroEnvelope(arpMac, 'arp', lossy, ch === NOISE_CH ? (v) => noiseNote(target(v), properNoise) - n : inTable, macroRate);
+              : macroEnvelope(arpMac, 'arp', lossy, ch === NOISE_CH ? (v) => noiseNote(target(v), properNoise) - n : inTable, macroRate, m.version);
           }
           if (ch < DPCM_CH && (fxChanged || n > 0)) {
             let env: number[] | null = null;
@@ -549,7 +609,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     const pick = (code: number): FurnaceMacro | undefined => ins?.macros.find((x) => x.code === code && x.length > 0);
     const slot = (code: number, kind: 'vol' | 'arp' | 'duty' | 'pitch'): number => {
       const mac = pick(code);
-      return envId(mac ? macroEnvelope(mac, kind, lossy, undefined, macroRate) : DEFAULT_ENV[kind]);
+      return envId(mac ? macroEnvelope(mac, kind, lossy, undefined, macroRate, m.version) : DEFAULT_ENV[kind]);
     };
     if (hw >= 0 && pick(MACRO_VOL)) lossy.add('volume macro under 15xx hardware envelope (APU envelope played, macro ignored)');
     insEnvs.push([hw >= 0 ? envId(hwVolumeEnvelope(hw)) : slot(MACRO_VOL, 'vol'), slot(MACRO_ARP, 'arp'), slot(MACRO_DUTY, 'duty'), slot(MACRO_PITCH, 'pitch')]);

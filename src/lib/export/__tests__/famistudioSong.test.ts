@@ -7,7 +7,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { FurnaceModule } from '../../import/formats/FurnaceSongParser';
 import { MESEN } from './nesMesenHarness';
-import { buildFamistudioRom, famistudioText, encodeEnvelope, furnaceToFamistudio, noiseNote, type FamistudioMeta } from '../nes/famistudioSong';
+import { buildFamistudioRom, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, noiseNote, type FamistudioMeta } from '../nes/famistudioSong';
 
 const ROOT = path.resolve(__dirname, '../../../..');
 const DIR = path.join(ROOT, 'public/nes/famistudio');
@@ -241,4 +241,15 @@ end, emu.eventType.inputPolled)
       expect(Number(out.match(/PPUEND (\d+)/)![1])).toBeLessThan(2273 - 7); // last VRAM write ($2006/$2007) of any NMI; the scroller split's $2001/$2005/$2006 writes at scanline 212 are meant to be mid-frame and not counted, counted from the NMI vector (7 cycles)
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }, 120000);
+
+  it('expandProcMacro runs a pre-245 ADSR pitch macro (smashtv "slide down") as a 16 semitone slide in about 19 ticks', () => {
+    const adsr = { code: 4, type: 131, mode: 0, speed: 1, delay: 0, length: 16, loop: 255, release: 255, data: [0, -2048, 13, ...Array(13).fill(0)] };
+    const old = expandProcMacro(adsr as never, 218).data, cur = expandProcMacro(adsr as never, 245).data;
+    expect(old[0]).toBeLessThan(-100); // about 104 units (0.8 semitone) per tick
+    expect(old[19]).toBeLessThan(-1900);
+    expect(old[old.length - 1]).toBeLessThanOrEqual(-2040);
+    expect(cur[cur.length - 1]).toBeGreaterThan(-20); // 245+ files keep the raw rate: 13/256 per tick
+    const seq = { ...adsr, type: 1 };
+    expect(expandProcMacro(seq as never, 218)).toBe(seq); // sequence macros pass through
+  });
 });
