@@ -118,6 +118,52 @@ export function isFARFormat(buffer: ArrayBuffer): boolean {
 
 // ── Effect conversion ─────────────────────────────────────────────────────────
 
+/** The grid cell a stored 4-byte FAR cell decodes to: the same mapping the parser's pattern loop applies, source bytes as carriers. */
+function decodeFARBytes(raw: Uint8Array): TrackerCell {
+  const valid = raw[0] >= 1 && raw[0] <= 72;
+  let volume = raw[2] >= 1 && raw[2] <= 16 ? 0x10 + Math.round((raw[2] - 1) * 64 / 15) : 0;
+  const fx = convertFAREffect(raw[3]);
+  if (fx.skipEffect && fx.volColOverride !== undefined) volume = 0x10 + Math.min(64, fx.volColOverride);
+  // The volume, instrument offset and effect are lossy (/15 scale, +1, many-to-one effects): the source bytes ride in invisible carriers.
+  return {
+    note: valid ? raw[0] + 36 : 0, instrument: valid ? raw[1] + 1 : 0, volume, effTyp: fx.effTyp, eff: fx.eff, effTyp2: 0, eff2: 0,
+    period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3],
+  };
+}
+
+/** Write an edited grid cell over its stored bytes: only the changed fields are re-encoded (each by inverting the parser's own mapping). */
+function encodeFAREdit(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
+  if (!stored) return encodeFARCell(cell);
+  const out = stored.slice(0, 4);
+  const was = decodeFARBytes(stored);
+  const note = cell.note ?? 0;
+  const instr = cell.instrument ?? 0;
+  if (note !== was.note || instr !== was.instrument) {
+    out[0] = note > 36 ? Math.min(72, note - 36) : 0;
+    out[1] = instr > 0 ? (instr - 1) & 0xFF : 0;
+  }
+  const vol = cell.volume ?? 0;
+  if (vol !== was.volume) {
+    const col = (r: number) => 0x10 + Math.round((r - 1) * 64 / 15);
+    let best = 0;
+    if (vol > 0) for (let r = 1; r <= 16; r++) if (best === 0 || Math.abs(col(r) - vol) < Math.abs(col(best) - vol)) best = r;
+    out[2] = best;
+    if (out[3] >> 4 === 0x0A) out[3] = 0; // volume+portamento stored the volume in the effect; the column now owns it
+  }
+  const effTyp = cell.effTyp ?? 0;
+  const eff = cell.eff ?? 0;
+  // A pattern break the parser injected from the pattern header (0x0D/0) is not a cell effect.
+  const injected = effTyp === 0x0D && eff === 0 && was.effTyp !== 0x0D;
+  if (!injected && (effTyp !== was.effTyp || eff !== was.eff)) {
+    out[3] = 0;
+    for (let b = 0; b < 256; b++) {
+      const fx = convertFAREffect(b);
+      if (!fx.skipEffect && fx.effTyp === effTyp && fx.eff === eff) { out[3] = b; break; }
+    }
+  }
+  return out;
+}
+
 /**
  * Convert a FAR raw effect byte into { effTyp, eff, volume } fields for a TrackerCell.
  *
@@ -483,48 +529,15 @@ export async function parseFARFile(
     numChannels: NUM_CHANNELS,
     numPatterns: MAX_PATTERNS,
     moduleSize: buffer.byteLength,
-    encodeCell: encodeFARCell,
-    decodeCell: (raw: Uint8Array): TrackerCell => {
-      const noteRaw = raw[0];
-      const instrRaw = raw[1];
-      const volRaw = raw[2];
-      const effByte = raw[3];
-
-      const note = (noteRaw >= 1 && noteRaw <= 72) ? noteRaw + 36 : 0;
-      const instrument = instrRaw > 0 ? instrRaw + 1 : 0; // parser adds 1
-
-      // Volume: 1-16 → (rawVol - 1) * 64 / 15
-      let volume = 0;
-      if (volRaw >= 1 && volRaw <= 16) {
-        volume = 0x10 + Math.round((volRaw - 1) * 64 / 15); // XM vol column
-      }
-
-      // Effect byte: hi nibble = type, lo nibble = param
-      const fx = convertFAREffect(effByte);
-      let effTyp = fx.effTyp;
-      let eff = fx.eff;
-      if (fx.skipEffect) {
-        // Volume+portamento: effect goes into volume column
-        if (fx.volColOverride !== undefined && volume === 0) {
-          volume = 0x10 + Math.min(64, fx.volColOverride);
-        }
-        effTyp = 0;
-        eff = 0;
-      }
-
-      // Byte-exact carrier. The 4-byte FAR cell is lossy in the XM view: the volume
-      // double-rounds through a /15 scale (1-16 <-> 0-64), the instrument is offset by 1,
-      // and convertFAREffect is a many-to-one map (skipEffect drops the effect entirely).
-      // Stash the raw 4 source bytes in the invisible period/pan/cutoff carriers (fields
-      // the grid loop never sets, so edited cells fall back to the canonical derivation).
-      return {
-        note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0,
-        period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3],
-      };
-    },
+    encodeCell: encodeFAREdit,
+    decodeCell: decodeFARBytes,
+    encodeOverStored: true,
+    propagateSharedCells: true,
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
-      const cellDataStart = patternCellOffsets[pattern];
-      if (cellDataStart === 0) return 0; // pattern doesn't exist
+      // The song's patterns are the non-empty slots, compacted.
+      const slot = patterns.reduce<number[]>((a, p, i) => (p ? [...a, i] : a), [])[pattern];
+      const cellDataStart = patternCellOffsets[slot];
+      if (!cellDataStart || row >= patternRowCounts[slot]) return -1; // pattern or row not in the file
       return cellDataStart + (row * NUM_CHANNELS + channel) * 4;
     },
   };
@@ -536,7 +549,7 @@ export async function parseFARFile(
     // No samples — build empty instruments
     return assembleSong(
       songName, orderList, restartPos, patterns, [],
-      initialSpeed, NUM_CHANNELS, uadePatternLayout,
+      initialSpeed, NUM_CHANNELS, uadePatternLayout, { data: buffer, name: filename },
     );
   }
 
@@ -647,7 +660,7 @@ export async function parseFARFile(
 
   return assembleSong(
     songName, orderList, restartPos, patterns, instruments,
-    initialSpeed, NUM_CHANNELS, uadePatternLayout,
+    initialSpeed, NUM_CHANNELS, uadePatternLayout, { data: buffer, name: filename },
   );
 }
 
@@ -662,6 +675,7 @@ function assembleSong(
   initialSpeed: number,
   numChannels:  number,
   uadeLayout?:  UADEPatternLayout,
+  source?:      { data: ArrayBuffer; name: string },
 ): TrackerSong {
   // Compact the pattern array: only include non-null patterns
   // Use orderList entries to determine which patterns exist; keep all non-null slots.
@@ -679,6 +693,6 @@ function assembleSong(
     initialSpeed,
     initialBPM:      INITIAL_BPM,
     linearPeriods:   false,   // FAR uses Amiga-style periods
-    ...(uadeLayout ? { uadePatternLayout: uadeLayout } : {}),
+    ...(uadeLayout ? { uadePatternLayout: uadeLayout, uadeEditableFileData: source?.data.slice(0), uadeEditableFileName: source?.name } : {}),
   };
 }

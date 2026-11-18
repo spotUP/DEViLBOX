@@ -232,6 +232,14 @@
       "cells": 187692,
       "bytes": 187692
     },
+    "far": {
+      "exporter": "FARExporter.exportFAR",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 202668,
+      "bytes": 202668
+    },
     "fashionTracker": {
       "exporter": "FashionTrackerExporter.exportFashionTracker",
       "tier": "byte-exact",
