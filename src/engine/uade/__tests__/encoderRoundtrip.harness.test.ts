@@ -268,8 +268,9 @@ function readRatchet(): Ratchet {
 }
 
 describe('UADE encoder round-trip harness (real fixtures)', () => {
-  // 30s timeout: this harness scans every real fixture — the default 5s trips under
-  // full-suite CPU contention even though it runs in <2s isolated.
+  // 120s timeout: this harness scans every real fixture in one test, so its run time
+  // grows with the fixture list. It took 20.6s isolated at nice 19 on 2026-11-18 and
+  // passed 30s under pre-push CPU load.
   it('runs every fixture and prints the result table', async () => {
     await runAll;
     const rows = [...results].sort((a, b) => a.formatId.localeCompare(b.formatId));
@@ -308,7 +309,7 @@ describe('UADE encoder round-trip harness (real fixtures)', () => {
 
     expect(rows.length).toBeGreaterThan(0);
     expect(existsSync(RATCHET_PATH), 'ratchet file must be committed').toBe(true);
-  }, 30000);
+  }, 120000);
 
   it('every fixtures.map entry has a ratchet baseline (no undocumented format)', async () => {
     await runAll;
