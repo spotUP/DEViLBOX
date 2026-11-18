@@ -22,6 +22,7 @@ export interface FamistudioMeta { musicAddr: number; musicCap: number; dpcmAddr:
 /** Frames (song start = 0) where the converter knows the pitch cannot match Furnace (a lossy slide), per channel. */
 export interface PitchLossySpan { ch: number; from: number; to: number }
 export interface FamistudioSong { music: Uint8Array; dpcm: Uint8Array; lossy: string[]; pitchLossy: PitchLossySpan[]; channelsWithNotes: boolean[]; firstNotes: number[]; firstNoteFrames: number[];
+  /** Bytes of each music-area part: song header + instrument table, DPCM sample table, envelopes, and one entry per channel stream. */ sizes: { header: number; samples: number; envelopes: number; streams: number[] }
   /** The song carries the three VRC6 channels: it needs the mapper-24 player (player-vrc6.nes / .json). */ vrc6?: boolean
   /** Furnace A-4 tuning (Hz); buildFamistudioRom retunes the player's note table to it. */ tuning?: number }
 
@@ -867,7 +868,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     for (const [off, target] of fixups[c]) w16(at + off, streamAddr[c] + target);
     for (const [off, id] of envFixups[c]) w16(at + off, envAddr[id]);
   });
-  return { music, dpcm: Uint8Array.from(dpcm), lossy: lossy.list(), pitchLossy, channelsWithNotes, firstNotes, firstNoteFrames, tuning: m.tuning, vrc6 };
+  return { music, dpcm: Uint8Array.from(dpcm), sizes: { header: smpOff, samples: envOff - smpOff, envelopes: streamAddr[0] - base - envOff, streams: streams.map((st) => st.length) }, lossy: lossy.list(), pitchLossy, channelsWithNotes, firstNotes, firstNoteFrames, tuning: m.tuning, vrc6 };
 }
 
 /** On-screen text slot: uppercase ASCII 0x20-0x5F (the player font), space padded to `len`. */

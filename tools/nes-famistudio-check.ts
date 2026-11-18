@@ -217,6 +217,7 @@ for (const name of names) {
   try {
     const m = await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
     const song = furnaceToFamistudio(m, 0, META.dpcmCap);
+    if (song.music.length > META.musicCap) console.log(`  [SIZE] ${song.music.length} B > cap ${META.musicCap}: header+instruments=${song.sizes.header} sampleTable=${song.sizes.samples} envelopes=${song.sizes.envelopes} streams(pulse1/pulse2/tri/noise/dpcm...)=${song.sizes.streams.join('/')}`);
     const rom = buildFamistudioRom(song.vrc6 ? PLAYER_VRC6 : PLAYER, song.vrc6 ? META_VRC6 : META, song, { title: m.name || name, author: m.author });
     if (OUT) writeFileSync(path.join(OUT, `${name}.nes`), rom);
     // Reference first: Furnace stops writing at song end (-loops 0); compare the whole song up to its last register write (+2 for the final row).
