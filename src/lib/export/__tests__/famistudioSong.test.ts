@@ -7,7 +7,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { FurnaceModule } from '../../import/formats/FurnaceSongParser';
 import { MESEN } from './nesMesenHarness';
-import { buildFamistudioRom, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, mergeVibratoPitch, noiseNote, type FamistudioMeta } from '../nes/famistudioSong';
+import { buildFamistudioRom, compressRefs, expandRefs, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, mergeVibratoPitch, noiseNote, type FamistudioMeta } from '../nes/famistudioSong';
 
 const ROOT = path.resolve(__dirname, '../../../..');
 const DIR = path.join(ROOT, 'public/nes/famistudio');
@@ -268,5 +268,34 @@ end, emu.eventType.inputPolled)
     expect(cur[cur.length - 1]).toBeGreaterThan(-20); // 245+ files keep the raw rate: 13/256 per tick
     const seq = { ...adsr, type: 1 };
     expect(expandProcMacro(seq as never, 218)).toBe(seq); // sequence macros pass through
+  });
+});
+
+describe('famistudio pattern references', () => {
+  const chunk = (...b: number[]): number[] => b;
+  const build = (chunks: number[][]): { out: number[]; ev: number[] } => {
+    const out: number[] = [], ev: number[] = [];
+    for (const c of chunks) { out.push(...c); ev.push(out.length); }
+    return { out, ev };
+  };
+  it('replaces repeated chunk runs by 0x41 len addr and expands back to the same bytes', () => {
+    const a = chunk(0x46, 6, 0x0d), b = chunk(0x81), c = chunk(0x4a, 0x20, 0x13), d = chunk(0x05);
+    const { out, ev } = build([a, b, c, d, a, b, c, d, a, b, c, d, d]);
+    const p = compressRefs(out, ev, [], 0);
+    expect(p.out.length).toBeLessThan(out.length);
+    expect(p.refs.length).toBeGreaterThan(0);
+    expect(p.out.filter((_, i) => p.refs.some((r) => r.at === i))).toEqual(p.refs.map(() => 0x41));
+    expect(expandRefs(p)).toEqual(out);
+    // references never point at references
+    for (const r of p.refs) expect(p.refs.some((q) => q.at === r.target)).toBe(false);
+  });
+  it('keeps the loop target on a real position and treats different envelope ids as different chunks', () => {
+    const a = chunk(0x4a, 0, 0, 0x13), b = chunk(0x81, 0x05);
+    const { out, ev } = build([a, b, a, b, a, b, a, b]);
+    const same = compressRefs(out, ev, [[1, 7], [9, 7], [17, 7], [25, 7]], ev[3]);
+    expect(expandRefs(same)).toEqual(out);
+    expect(same.refs.some((r) => r.at < same.loopAt && same.loopAt < r.at + 4)).toBe(false);
+    const diff = compressRefs(out, ev, [[1, 1], [9, 2], [17, 3], [25, 4]], 0);
+    expect(diff.refs.length).toBe(0);
   });
 });

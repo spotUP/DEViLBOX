@@ -287,6 +287,75 @@ export function hwVolumeEnvelope(hw: number): number[] {
   return encodeEnvelope(out, halt ? 0 : out.length - 1, -1, 'vol');
 }
 
+export interface StreamRef { at: number; events: number; target: number }
+export interface PackedStream { out: number[]; efx: Array<[number, number]>; loopAt: number; refs: StreamRef[]; chunkEnds: number[] }
+const REF_OP = 0x41; // engine opcode_set_reference: len (events), 16-bit address; counts events (note, wait or slide byte), then returns
+const REF_SIZE = 4;
+
+/**
+ * FamiStudio-style pattern references. A chunk = the ops before an event plus the event (`ev` = stream length after each
+ * event). A run of chunks equal to earlier literal chunks becomes `0x41 len addr` when that is shorter. References never
+ * nest (the engine keeps one return pointer) and never hide the loop target. Chunks match on bytes and envelope ids
+ * (`efx`: [offset, envelope id]). Returns the stream without the loop op; `target` is a stream offset (caller adds the base).
+ */
+export function compressRefs(out: number[], ev: number[], efx: Array<[number, number]>, loopAt: number): PackedStream {
+  const n = ev.length;
+  const starts = ev.map((_, i) => (i ? ev[i - 1] : 0));
+  const envAt = new Map(efx);
+  const ids = new Map<string, number>();
+  const key = starts.map((a, i) => {
+    let k = '';
+    for (let o = a; o < ev[i]; o++) { if (envAt.has(o)) { k += `e${envAt.get(o)},`; o++; } else k += `${out[o]},`; }
+    // Release (0x45) jumps to the engine's ref-row check with X clobbered by the envelope index (famistudio_ca65.s @opcode_release_note),
+    // so a reference cannot count it: give it a key nothing else shares.
+    if (out[ev[i] - 1] === 0x45 && ev[i] - a === 1) k = `release${i}`;
+    return ids.get(k) ?? (ids.set(k, ids.size), ids.size - 1);
+  });
+  const literal = new Array<boolean>(n).fill(true);
+  const plan = new Map<number, { len: number; j: number }>();
+  for (let i = 0; i < n;) {
+    let cap = Math.min(255, n - i);
+    for (let k = i + 1; k < i + cap; k++) if (starts[k] === loopAt) { cap = k - i; break; }
+    let best = 0, bestJ = -1, bestSave = 0;
+    for (let j = 0; j < i; j++) {
+      let l = 0, bytes = 0;
+      while (l < cap && j + l < i && literal[j + l] && key[j + l] === key[i + l]) { bytes += ev[i + l] - starts[i + l]; l++; }
+      if (bytes - REF_SIZE > bestSave) { best = l; bestJ = j; bestSave = bytes - REF_SIZE; }
+    }
+    if (best > 0) { plan.set(i, { len: best, j: bestJ }); for (let k = 0; k < best; k++) literal[i + k] = false; i += best; } else i++;
+  }
+  const res: number[] = [], newEfx: Array<[number, number]> = [], refs: StreamRef[] = [], chunkEnds: number[] = [];
+  const newStart = new Array<number>(n).fill(-1);
+  let loop = loopAt >= (ev[n - 1] ?? 0) ? -1 : loopAt;
+  for (let i = 0; i < n;) {
+    if (starts[i] === loopAt) loop = res.length;
+    const r = plan.get(i);
+    if (r) {
+      refs.push({ at: res.length, events: r.len, target: newStart[r.j] });
+      res.push(REF_OP, r.len, 0, 0); i += r.len;
+      continue;
+    }
+    newStart[i] = res.length;
+    for (let o = starts[i]; o < ev[i]; o++) { if (envAt.has(o)) newEfx.push([res.length, envAt.get(o)!]); res.push(out[o]); }
+    chunkEnds.push(res.length); i++;
+  }
+  return { out: res, efx: newEfx, loopAt: loop < 0 ? res.length : loop, refs, chunkEnds };
+}
+
+/** Inverse of compressRefs (references replaced by the chunks they replay), for tests. Envelope placeholders stay zero. */
+export function expandRefs(p: PackedStream): number[] {
+  const lit: Array<[number, number]> = []; // literal chunks [start, end)
+  const refAt = new Map(p.refs.map((r) => [r.at, r]));
+  const out: number[] = [];
+  for (let o = 0; o < p.out.length;) {
+    const r = refAt.get(o);
+    if (r) { const k = lit.findIndex(([s]) => s === r.target); for (const [s, e] of lit.slice(k, k + r.events)) out.push(...p.out.slice(s, e)); o += REF_SIZE; continue; }
+    const e = p.chunkEnds.find((x) => x > o)!;
+    lit.push([o, e]); out.push(...p.out.slice(o, e)); o = e;
+  }
+  return out;
+}
+
 function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean): FamistudioSong {
   const lossy = new Lossy();
   const pitchLossy: PitchLossySpan[] = [];
@@ -432,7 +501,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
       }
       return 240;
     };
-    const flush = (): void => { if (empty > 0) { out.push(0x81 | ((empty - 1) << 1)); empty = 0; } };
+    const ev: number[] = []; // stream length after each event (note byte, wait byte, slide): the reference boundaries
+    const flush = (): void => { if (empty > 0) { out.push(0x81 | ((empty - 1) << 1)); empty = 0; ev.push(out.length); } };
     let ri = 0;
     for (let o = 0; o < endOrder; o++) {
       if (o === loopOrder) { flush(); loopAt = out.length; }
@@ -643,14 +713,18 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           flush();
           for (const b of row) { if (typeof b === 'number') out.push(b); else { efx.push([out.length, b.env]); out.push(0, 0); } }
           // The 0x50 slide opcode plays its target note and ends the row like a note byte (engine @slide_done_pos).
-          if (rowByte) out.push(...rowByte); else if (!slide) empty = 1;
+          if (rowByte) { out.push(...rowByte); ev.push(out.length); } else if (!slide) empty = 1; else ev.push(out.length);
         } else { empty++; }
         if (empty === MAX_EMPTY) flush();
       }
     }
     flush();
+    const packed = compressRefs(out, ev, efx, loopAt);
+    out.length = 0; out.push(...packed.out);
+    efx.length = 0; efx.push(...packed.efx);
+    fx.push(...packed.refs.map((r): [number, number] => [r.at + 2, r.target]));
     out.push(0x42, 0, 0);
-    fx.push([out.length - 2, loopAt]);
+    fx.push([out.length - 2, packed.loopAt]);
     streams.push(out); fixups.push(fx); envFixups.push(efx); channelsWithNotes.push(hasNotes); firstNotes.push(first); firstNoteFrames.push(firstFrame);
   }
 
