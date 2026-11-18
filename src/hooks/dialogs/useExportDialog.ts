@@ -8,8 +8,7 @@
 
 import { furnaceModuleExportAvailable } from '@/lib/export/FurnaceModuleExporter';
 import { furnaceAyScrambleExportAvailable, ayScrambleTempoWarning, type AyScrambleTarget } from '@/lib/export/FurnaceExporter';
-import { nesChipsOf, nesRomExportAvailable, nesTempoWarning, wantsVrc6Cartridge, type NesRegionChoice } from '@/lib/export/nes/nesExport';
-import type { NesVrc6Board } from '@/lib/export/nes/nesRecord';
+import { nesRomExportAvailable, nesTempoWarning, type NesRegionChoice } from '@/lib/export/nes/nesExport';
 import { QUADTONE_PLATFORM } from '@lib/export/zx/zxQuadToneData';
 import { FURNACE_SNES_CHIP_ID } from '@/lib/export/tad/tadSongWriter';
 import { useState, useEffect, useCallback } from 'react';
@@ -354,8 +353,6 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   const [nesRegion, setNesRegion] = useState<NesRegionChoice>('ntsc');
   const nesRomTempoWarning = nesTempoWarning(bpm, nesRegion === 'all' ? undefined : [nesRegion]);
   const [nesSubsongs, setNesSubsongs] = useState<'current' | 'all'>('current');
-  const nesVrc6Song = wantsVrc6Cartridge(nesChipsOf(furnaceNative?.chipIds, furnaceNative?.chipFlags));
-  const [nesVrc6Board, setNesVrc6Board] = useState<NesVrc6Board>('vrc6a');
   const [nesRomBusy, setNesRomBusy] = useState(false);
 
   const exportNes = useCallback(async (
@@ -365,9 +362,10 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   ) => {
     setNesRomBusy(true);
     try {
-      const { recordNesRom } = await import('@lib/export/nes/nesRecord');
       const author = metadata.author && metadata.author !== 'Unknown' ? metadata.author : undefined;
-      const r = await recordNesRom(nesRegion, metadata.name || 'song', author, metadata.description || undefined, format, nesSubsongs, nesVrc6Board);
+      const r = format === 'nsfe'
+        ? await (await import('@lib/export/nes/nesRecord')).recordNsfe(nesRegion, metadata.name || 'song', author, metadata.description || undefined, nesSubsongs)
+        : await (await import('@lib/export/nes/nesRecord')).exportNesFamistudioRom(metadata.name || 'song', author);
       const label = format === 'nsfe' ? 'NSFe' : 'NES ROM';
       downloadFn(new Blob([r.rom as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.${format === 'nsfe' ? 'nsfe' : 'nes'}`);
       notify.success(`${label} exported (${r.rom.byteLength} bytes).`);
@@ -378,7 +376,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     } finally {
       setNesRomBusy(false);
     }
-  }, [metadata, nesRegion, nesSubsongs, nesVrc6Board]);
+  }, [metadata, nesRegion, nesSubsongs]);
   const handleExportNesRom = useCallback((d: (blob: Blob, filename: string) => void, c: () => void) => exportNes('nes', d, c), [exportNes]);
   const handleExportNsfe = useCallback((d: (blob: Blob, filename: string) => void, c: () => void) => exportNes('nsfe', d, c), [exportNes]);
 
@@ -634,9 +632,6 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     nesSubsongs,
     setNesSubsongs,
     nesSubsongCount: furnaceSubsongs?.length ?? 1,
-    nesVrc6Song,
-    nesVrc6Board,
-    setNesVrc6Board,
     nesRomTempoWarning,
     nesRomBusy,
     handleExportZxBeeperTap,

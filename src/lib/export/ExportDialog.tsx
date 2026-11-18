@@ -16,7 +16,6 @@ import { ChipExportPanel } from './ChipExportPanel';
 import { notify } from '@stores/useNotificationStore';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { NES_REGION_LABELS, type NesRegionChoice } from './nes/nesExport';
-import type { NesVrc6Board } from './nes/nesRecord';
 import { AY_SCRAMBLE_TARGETS, type AyScrambleTarget } from './FurnaceExporter';
 
 interface ExportDialogProps {
@@ -722,30 +721,29 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   </h3>
                   <div className="space-y-3 text-sm font-mono text-text-secondary">
                     {ex.exportMode === 'nsfe' && <div>An NSFe music file for NSF players and emulators. It plays at the console frame rate, and FDS songs are not supported.</div>}
-                    <div>Plays the song once per region in real time and records the sound chip register writes.{ex.exportMode === 'nesRom' && ' The cartridge (mapper 31, or the original VRC6 board for 2A03 and VRC6 songs at the frame rate) runs on an emulator or a custom board and shows the title on screen.'}</div>
-                    <CustomSelect
-                      value={ex.nesRegion}
-                      onChange={(v) => ex.setNesRegion(v as NesRegionChoice)}
-                      options={(Object.keys(NES_REGION_LABELS) as NesRegionChoice[]).map((r) => ({ value: r, label: NES_REGION_LABELS[r] }))}
-                    />
-                    {ex.nesSubsongCount > 1 && (
-                      <CustomSelect
-                        value={ex.nesSubsongs}
-                        onChange={(v) => ex.setNesSubsongs(v as 'current' | 'all')}
-                        options={[{ value: 'current', label: 'Current subsong' }, { value: 'all', label: `All ${ex.nesSubsongCount} subsongs (choose on the title screen)` }]}
-                      />
+                    {ex.exportMode === 'nesRom' ? (
+                      <div>The song as FamiStudio music data inside the FamiStudio sound engine, with the title and author on screen. Only the 2A03 channels are carried; the sound plays at the console frame rate on an emulator or a flash cart.</div>
+                    ) : (
+                      <>
+                        <div>Plays the song once per region in real time and records the sound chip register writes.</div>
+                        <CustomSelect
+                          value={ex.nesRegion}
+                          onChange={(v) => ex.setNesRegion(v as NesRegionChoice)}
+                          options={(Object.keys(NES_REGION_LABELS) as NesRegionChoice[]).map((r) => ({ value: r, label: NES_REGION_LABELS[r] }))}
+                        />
+                        {ex.nesSubsongCount > 1 && (
+                          <CustomSelect
+                            value={ex.nesSubsongs}
+                            onChange={(v) => ex.setNesSubsongs(v as 'current' | 'all')}
+                            options={[{ value: 'current', label: 'Current subsong' }, { value: 'all', label: `All ${ex.nesSubsongCount} subsongs (choose on the title screen)` }]}
+                          />
+                        )}
+                      </>
                     )}
-                    {ex.exportMode === 'nesRom' && ex.nesVrc6Song && (
-                      <CustomSelect
-                        value={ex.nesVrc6Board}
-                        onChange={(v) => ex.setNesVrc6Board(v as NesVrc6Board)}
-                        options={[{ value: 'vrc6a', label: 'VRC6a board (mapper 24, Akumajou Densetsu)' }, { value: 'vrc6b', label: 'VRC6b board (mapper 26, Madara, Esper Dream 2)' }]}
-                      />
-                    )}
-                    {ex.nesRomTempoWarning && (
+                    {ex.exportMode === 'nsfe' && ex.nesRomTempoWarning && (
                       <div className="text-xs font-mono text-accent-warning">{ex.nesRomTempoWarning}</div>
                     )}
-                    {ex.nesRomBusy && <div className="text-xs font-mono text-accent-primary">Recording the song. Wait for it to finish.</div>}
+                    {ex.nesRomBusy && <div className="text-xs font-mono text-accent-primary">{ex.exportMode === 'nsfe' ? 'Recording the song. Wait for it to finish.' : 'Building the cartridge.'}</div>}
                   </div>
                 </div>
               )}
