@@ -299,3 +299,20 @@ describe('famistudio pattern references', () => {
     expect(diff.refs.length).toBe(0);
   });
 });
+
+describe('furnaceToFamistudio VRC6', () => {
+  it('emits 8 streams for 2A03+VRC6, with notes on the pulses and saw, duty 0x4f and the saw volume shift 0x55', () => {
+    const base = nesModule({});
+    const patterns = new Map<string, { rows: Cell[] }>();
+    for (let ch = 0; ch < 8; ch++) patterns.set(`0_${ch}_0`, { rows: Array.from({ length: 16 }, (_, r) => ({ ...empty(), ...(r === 0 && ch >= 5 ? { note: 0, octave: 4, effects: ch === 5 ? [{ type: 0x12, value: 3 }] : [] } : {}) })) });
+    const m = { ...base, systems: [6, 0x88], patterns, subsongs: [{ ...base.subsongs[0], orders: Array.from({ length: 8 }, () => [0]) }] } as unknown as FurnaceModule;
+    const song = furnaceToFamistudio(m);
+    expect(song.vrc6).toBe(true);
+    expect(song.channelsWithNotes.length).toBe(8);
+    expect(song.channelsWithNotes.slice(5)).toEqual([true, true, true]);
+    expect(song.music[1] | (song.music[2] << 8)).toBeGreaterThan(0);
+    expect(has(song.music, [0x4f, 3])).toBe(true);
+    expect(has(song.music, [0x55, 1])).toBe(true);
+    expect(furnaceToFamistudio(nesModule({})).vrc6).toBeFalsy();
+  });
+});

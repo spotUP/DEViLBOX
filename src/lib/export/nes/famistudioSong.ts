@@ -22,6 +22,7 @@ export interface FamistudioMeta { musicAddr: number; musicCap: number; dpcmAddr:
 /** Frames (song start = 0) where the converter knows the pitch cannot match Furnace (a lossy slide), per channel. */
 export interface PitchLossySpan { ch: number; from: number; to: number }
 export interface FamistudioSong { music: Uint8Array; dpcm: Uint8Array; lossy: string[]; pitchLossy: PitchLossySpan[]; channelsWithNotes: boolean[]; firstNotes: number[]; firstNoteFrames: number[];
+  /** The song carries the three VRC6 channels: it needs the mapper-24 player (player-vrc6.nes / .json). */ vrc6?: boolean
   /** Furnace A-4 tuning (Hz); buildFamistudioRom retunes the player's note table to it. */ tuning?: number }
 
 class Lossy {
@@ -30,6 +31,8 @@ class Lossy {
   list(): string[] { return [...this.counts].map(([k, n]) => `${k}: ${n}`); }
 }
 
+const VRC6_SYSTEM = 0x88; // Furnace file system id: VRC6 (channels 5-7 after the five 2A03 ones: pulse, pulse, saw)
+const VRC6_SAW_INS = 26; // Furnace instrument type DIV_INS_VRC6_SAW
 const NES_SYSTEM = 0x06; // Furnace file system id (FurnaceSongParser.ts:172)
 const CHANNELS = 5; // square 1, square 2, triangle, noise, DPCM (FamiStudio 2A03 order = Furnace order)
 const DPCM_CH = 4;
@@ -377,7 +380,9 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   const slideUnit = Number(m.compatFlags?.pitchSlideSpeed ?? 4) || 4;
   if (!s) throw new Error(`subsong ${subsong} missing`);
   if (m.systems[0] !== NES_SYSTEM) throw new Error(`first chip is system ${m.systems[0]}, not NES 2A03`);
-  for (const sys of m.systems.slice(1)) lossy.add(`expansion chip system ${sys} (channels dropped; 2A03 only so far)`);
+  const vrc6 = m.systems[1] === VRC6_SYSTEM; // mapper-24 board + FAMISTUDIO_EXP_VRC6 player (player-vrc6.nes)
+  const NCH = vrc6 ? 8 : CHANNELS;
+  for (const sys of m.systems.slice(vrc6 ? 2 : 1)) lossy.add(`expansion chip system ${sys} (channels dropped; 2A03 only so far)`);
   if (m.subsongs.length > 1) lossy.add('other subsongs (only one exported)');
   // Furnace speeds: the pattern advances one entry per row (playback.cpp curSpeed); 09xx sets entry 0, 0Fxx entry 1 when there are two.
   const speeds = s.speedPattern?.length ? [...s.speedPattern] : s.speed2 !== s.speed1 ? [s.speed1, s.speed2] : [s.speed1];
@@ -394,7 +399,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   for (let o = 0; o < endOrder; o++) {
     let len = s.patLen;
     for (let r = 0; r < s.patLen && len === s.patLen; r++) {
-      for (let ch = 0; ch < CHANNELS; ch++) {
+      for (let ch = 0; ch < NCH; ch++) {
         for (const e of cellAt(ch, o, r)?.effects ?? []) {
           if (e.type === 0x0d) len = r + 1;
           if (e.type === 0x0b) { len = r + 1; if (e.value <= o) { loopOrder = e.value; endOrder = o + 1; } }
@@ -413,7 +418,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     for (let o = 0; o < endOrder; o++) {
       rowFrame.push([]); rowSpeed.push([]);
       for (let r = 0; r < orderLen[o]; r++) {
-        for (let ch = 0; ch < CHANNELS; ch++) for (const e of cellAt(ch, o, r)?.effects ?? []) {
+        for (let ch = 0; ch < NCH; ch++) for (const e of cellAt(ch, o, r)?.effects ?? []) {
           if (e.type === 0x09 && e.value > 0) sp[0] = e.value;
           if (e.type === 0x0f && e.value > 0) sp[sp.length === 2 ? 1 : 0] = e.value;
         }
@@ -487,7 +492,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   const firstNotes: number[] = [];
   const firstNoteFrames: number[] = [];
   const speedFx = new Set([0x09, 0x0f]);
-  for (let ch = 0; ch < CHANNELS; ch++) {
+  for (let ch = 0; ch < NCH; ch++) {
     const out: number[] = [];
     const fx: Array<[number, number]> = [];
     // 2A03 hardware volume state (nes.cpp): 15xx envMode, 16xx length index, volume column = envelope period in envelope modes.
@@ -499,7 +504,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     // slide effect, or the slide reaching its target (note 0 / 179, targetResetsSlides).
     let heldSlide: [number, number] | null = null;
     const efx: Array<[number, number]> = [];
-    const tonal = ch < 3;
+    const tonal = ch < 3 || ch === 5 || ch === 6; // VRC6 pulses share the 2A03 pulse period (divider 16); the saw (14) keeps no vibrato or slides
     const seq: Array<{ cell?: FurnacePatternCell; frame: number }> = [];
     for (let o = 0; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: rowFrame[o][r] });
     /** Frames until the next note or slide effect on this channel (how long a slide runs). */
@@ -521,6 +526,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         const insOps: number[] = [];
         const tail: Array<number | { env: number }> = [];
         let delay = 0, noAttack = false, slide: number[] | null = null, rowByte: number[] | null = null;
+        if (ch === 7 && o === 0 && r === 0) ops.push(0x55, 1); // saw volume shift: full (x4), so 0-15 spans the saw's 0-60
         if (ch === 0 && (rowSpeed[o][r] !== lastSpd || (o === loopOrder && r === 0))) { ops.push(0x46, Math.min(255, rowSpeed[o][r] * spdMul)); lastSpd = rowSpeed[o][r]; }
         if (cell) {
           if (cell.instrument >= 0) { curIns = m.instruments[cell.instrument]; curInsIdx = cell.instrument; }
@@ -532,13 +538,14 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             else if ((t === 0x15 || t === 0x16) && ch < DPCM_CH && ch !== 2) { if (t === 0x15) envMode = v & 3; else lenIdx = v & 0x1f; }
             else if (t === 0x12 && ch < DPCM_CH && ch !== 2) ops.push(0x4f, v & 3);
             else if (t === 0x0b || t === 0x0d) continue;
-            else if (t === 0x00 && ch < DPCM_CH) { if (v !== arpXY) fxChanged = true; arpXY = v; }
+            else if (t === 0x00 && ch !== DPCM_CH) { if (v !== arpXY) fxChanged = true; arpXY = v; }
             else if (t === 0x04 && tonal) { if (v !== vibXY) fxChanged = true; vibXY = v; }
             else if (SLIDE_FX.has(t) && tonal) { slideFx = t; slideVal = v; }
             else if (t === 0xe5 && tonal) { fineRaw = v; fineHere = true; }
-            else if (t === 0x0a && ch < DPCM_CH && ch !== 2) volSlide = v;
-            else if (t === 0xec && ch < DPCM_CH) cutTicks = v;
-            else if (t === 0xed && ch < DPCM_CH) delay = v;
+            else if (t === 0x0a && ch !== DPCM_CH && ch !== 2) volSlide = v;
+            else if (t === 0xec && ch !== DPCM_CH) cutTicks = v;
+            else if (t === 0xed && ch !== DPCM_CH) delay = v;
+            else if (t === 0x12 && (ch === 5 || ch === 6)) ops.push(0x4f, v & 7); // VRC6 duty 0-7
             else lossy.add(`effect ${t.toString(16).toUpperCase().padStart(2, '0')}${ch === DPCM_CH ? ' on DPCM' : ch === NOISE_CH ? ' on noise' : ''}`);
           }
           const nv = convertFurnaceNoteValue(cell);
@@ -618,7 +625,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           // Arpeggio: effect 00xy wins; else a per-note override of the instrument arp macro when FamiStudio's relative
           // steps would not land on Furnace's note: fixed-note steps (pinned to the flat note value), and every noise arp
           // (Furnace's noise period comes from noiseNote, not from note & 15 alone).
-          if (n > 0 && ch < DPCM_CH) {
+          if (n > 0 && ch !== DPCM_CH) {
             const arpMac = curIns?.macros.find((x) => x.code === MACRO_ARP && x.length > 0);
             const fixed = !!arpMac && arpMac.data.slice(0, arpMac.length).some(arpIsFixed);
             const target = (v: number): number => (arpIsFixed(v) ? arpFixedNote(v) : nv + v);
@@ -631,7 +638,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             noteArp = !arpMac || (!fixed && !outside && ch !== NOISE_CH) ? null
               : macroEnvelope(arpMac, 'arp', lossy, ch === NOISE_CH ? (v) => noiseNote(target(v), properNoise) - n : inTable, macroRate, m.version);
           }
-          if (ch < DPCM_CH && (fxChanged || n > 0)) {
+          if (ch !== DPCM_CH && (fxChanged || n > 0)) {
             let env: number[] | null = null;
             if (arpXY !== 0) {
               // Frame-exact: frame f plays step floor(f * ticksPerFrame) % 3, looped over the shortest frame count that holds
@@ -648,7 +655,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           if (withCuts && cutTicks > 0 && seq[ri + 1] && cutTicks * perTick < seq[ri + 1].frame - seq[ri].frame) ops.push(0x48, Math.min(255, Math.round(cutTicks * perTick)));
           if (cell.volume >= 0) {
             if (ch === DPCM_CH) lossy.add('volume column on DPCM');
-            else { furVol = Math.min(15, cell.volume); if (!hwVol && !(baked && n === 0) && cell.volume !== lastVol) { ops.push(0x70 | furVol); lastVol = cell.volume; } }
+            else { furVol = Math.min(15, ch === 7 ? Math.round(cell.volume / 4) : cell.volume); /* VRC6 saw volume is 0-63 */ if (!hwVol && !(baked && n === 0) && cell.volume !== lastVol) { ops.push(0x70 | furVol); lastVol = cell.volume; } }
           }
           if (volSlide >= 0) {
             const x = volSlide >> 4, y = volSlide & 15;
@@ -663,7 +670,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             hwVol = ch !== 2 && ch < DPCM_CH && envMode !== 3;
             const idx = curInsIdx >= 0 ? curInsIdx : 0;
             const volMac = curIns?.macros.some((x) => x.code === MACRO_VOL && x.length > 0);
-            baked = !hwVol && ch < DPCM_CH && ch !== 2 && !!volMac && furVol < 15;
+            baked = !hwVol && ch !== DPCM_CH && ch !== 2 && !!volMac && furVol < 15;
             const key = (hwVol ? idx + 65536 * (1 + (envMode | (furVol << 2) | (lenIdx << 6))) : idx) + (baked ? KEY_BAKE * (1 + furVol) : 0);
             if (key !== lastIns) { insOps.push(0x80 | (insNo(key) << 1)); lastIns = key; }
             const fsVol = hwVol || baked ? 15 : furVol;
@@ -756,16 +763,16 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     const fi = rest % 65536, hw = Math.floor(rest / 65536) - 1;
     const ins = m.instruments[fi];
     const pick = (code: number): FurnaceMacro | undefined => ins?.macros.find((x) => x.code === code && x.length > 0);
-    const slot = (code: number, kind: 'vol' | 'arp' | 'duty' | 'pitch'): number => {
+    const slot = (code: number, kind: 'vol' | 'arp' | 'duty' | 'pitch', step?: (v: number) => number): number => {
       const mac = pick(code);
-      return envId(mac ? macroEnvelope(mac, kind, lossy, undefined, macroRate, m.version) : DEFAULT_ENV[kind]);
+      return envId(mac ? macroEnvelope(mac, kind, lossy, step, macroRate, m.version) : DEFAULT_ENV[kind]);
     };
     if (hw >= 0 && pick(MACRO_VOL)) lossy.add('volume macro under 15xx hardware envelope (APU envelope played, macro ignored)');
     const bakedVol = (): number => {
       const f = macroFrames(pick(MACRO_VOL)!, 'vol', lossy, undefined, macroRate, m.version);
       return envId(encodeEnvelope(f.vals.map((v) => scaleVol(bake, v, m.compatFlags)), f.loop, f.release, 'vol'));
     };
-    insEnvs.push([hw >= 0 ? envId(hwVolumeEnvelope(hw)) : bake >= 0 ? bakedVol() : slot(MACRO_VOL, 'vol'), slot(MACRO_ARP, 'arp'), slot(MACRO_DUTY, 'duty'), slot(MACRO_PITCH, 'pitch')]);
+    insEnvs.push([hw >= 0 ? envId(hwVolumeEnvelope(hw)) : bake >= 0 ? bakedVol() : slot(MACRO_VOL, 'vol', ins?.type === VRC6_SAW_INS ? (v) => Math.round(v / 4) : undefined), slot(MACRO_ARP, 'arp'), slot(MACRO_DUTY, 'duty'), slot(MACRO_PITCH, 'pitch')]);
     for (const mac of ins?.macros ?? []) if (mac.length > 0 && ![MACRO_VOL, MACRO_ARP, MACRO_DUTY, MACRO_PITCH].includes(mac.code)) lossy.add(`macro code ${mac.code}`);
   }
   if (insEnvs.length === 0) insEnvs.push([envId(DEFAULT_ENV.vol), envId(DEFAULT_ENV.arp), envId(DEFAULT_ENV.duty), envId(DEFAULT_ENV.pitch)]);
@@ -796,7 +803,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
 
   // Assemble: header, song header, instruments, sample table, envelopes, streams.
   const base = 0x8000;
-  const headerLen = 1 + 2 + 2 + CHANNELS * 2 + 4;
+  const headerLen = 1 + 2 + 2 + NCH * 2 + 4;
   const insOff = headerLen;
   const smpOff = insOff + insEnvs.length * 8;
   const envOff = smpOff + dpcmList.length * 4;
@@ -810,15 +817,15 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   music[0] = 1;
   w16(1, base + insOff);
   w16(3, base + smpOff - 4);
-  for (let c = 0; c < CHANNELS; c++) w16(5 + c * 2, streamAddr[c]);
+  for (let c = 0; c < NCH; c++) w16(5 + c * 2, streamAddr[c]);
   const hz = s.hz > 0 ? s.hz : 60;
   if (Math.abs(hz - 60) > 0.5) lossy.add(`tick rate ${hz} Hz approximated with FamiTracker tempo`);
   // FamiTracker tempo: frames per row = speed x 150 / tempo, so virtual tempo N/D scales tempo by N/D (engine range 32..255).
   const tempoRaw = tempoBase * spdMul;
   const tempo = Math.max(32, Math.min(255, tempoRaw));
   if (tempo !== tempoRaw) lossy.add(`virtual tempo ${s.virtualTempo}/${s.virtualTempoD} outside FamiTracker tempo 32..255 (clamped)`);
-  w16(5 + CHANNELS * 2, Math.round(256 * tempo / (50 * 60 / 24)));
-  w16(7 + CHANNELS * 2, Math.round(256 * tempo / (60 * 60 / 24)));
+  w16(5 + NCH * 2, Math.round(256 * tempo / (50 * 60 / 24)));
+  w16(7 + NCH * 2, Math.round(256 * tempo / (60 * 60 / 24)));
   insEnvs.forEach((ids, i) => ids.forEach((id, k) => w16(insOff + i * 8 + k * 2, envAddr[id])));
   dpcmList.forEach((d, i) => {
     const at = sampleAt.get(d.sample)!;
@@ -832,7 +839,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     for (const [off, target] of fixups[c]) w16(at + off, streamAddr[c] + target);
     for (const [off, id] of envFixups[c]) w16(at + off, envAddr[id]);
   });
-  return { music, dpcm: Uint8Array.from(dpcm), lossy: lossy.list(), pitchLossy, channelsWithNotes, firstNotes, firstNoteFrames, tuning: m.tuning };
+  return { music, dpcm: Uint8Array.from(dpcm), lossy: lossy.list(), pitchLossy, channelsWithNotes, firstNotes, firstNoteFrames, tuning: m.tuning, vrc6 };
 }
 
 /** On-screen text slot: uppercase ASCII 0x20-0x5F (the player font), space padded to `len`. */

@@ -13,17 +13,19 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseFurnaceSong } from '../src/lib/import/formats/FurnaceSongParser';
 import { buildFamistudioRom, furnaceToFamistudio, type FamistudioMeta, type PitchLossySpan } from '../src/lib/export/nes/famistudioSong';
-import { mesen } from '../src/lib/export/__tests__/nesMesenHarness';
+import { APU_RANGES, mesen } from '../src/lib/export/__tests__/nesMesenHarness';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SONGS = path.join(ROOT, 'public/data/songs/furnace/nes');
 const RESULTS = path.join(ROOT, 'test-data/nes-famistudio-check.json');
 const PLAYER = readFileSync(path.join(ROOT, 'public/nes/famistudio/player.nes'));
 const META: FamistudioMeta = JSON.parse(readFileSync(path.join(ROOT, 'public/nes/famistudio/player.json'), 'utf8'));
+const PLAYER_VRC6 = readFileSync(path.join(ROOT, 'public/nes/famistudio/player-vrc6.nes'));
+const META_VRC6: FamistudioMeta = JSON.parse(readFileSync(path.join(ROOT, 'public/nes/famistudio/player-vrc6.json'), 'utf8'));
 const CPU_NTSC = 1789773;
 // Tick marker at NMI entry (vector at $FFFA), not META.tickAddr (after famistudio_update): the harness drops writes before
 // the first marker, which would lose the first update (note attacks, the $4003 period-high write).
-const NMI_ADDR = PLAYER[16 + 0x7ffa] | (PLAYER[16 + 0x7ffb] << 8);
+const nmiOf = (rom: Uint8Array): number => rom[16 + 0x7ffa] | (rom[16 + 0x7ffb] << 8);
 // Frames run past the last channel's first note, so a channel that enters late is still heard.
 const FIRST_NOTE_MARGIN = 60;
 
@@ -208,7 +210,7 @@ for (const name of names) {
   try {
     const m = await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
     const song = furnaceToFamistudio(m, 0, META.dpcmCap);
-    const rom = buildFamistudioRom(PLAYER, META, song, { title: m.name || name, author: m.author });
+    const rom = buildFamistudioRom(song.vrc6 ? PLAYER_VRC6 : PLAYER, song.vrc6 ? META_VRC6 : META, song, { title: m.name || name, author: m.author });
     if (OUT) writeFileSync(path.join(OUT, `${name}.nes`), rom);
     // Reference first: Furnace stops writing at song end (-loops 0); compare the whole song up to its last register write (+2 for the final row).
     const refWrites = furnaceTicks(path.join(SONGS, `${name}.fur`), 60, MAX_FRAMES);
@@ -222,7 +224,7 @@ for (const name of names) {
     const refD = dpcmFrames(refWrites).slice(0, refEnd);
     const lagGuess = Math.max(0, ...song.firstNoteFrames) + FIRST_NOTE_MARGIN;
     const ticks = refEnd + lagGuess + 60;
-    const run = mesen(rom, ticks, Math.ceil(ticks / 20) + 60, undefined, { tickAddress: NMI_ADDR, region: 'Ntsc' });
+    const run = mesen(rom, ticks, Math.ceil(ticks / 20) + 60, song.vrc6 ? [...APU_RANGES, [0x9000, 0x9002], [0xa000, 0xa002], [0xb000, 0xb002]] : undefined, { tickAddress: nmiOf(rom), region: 'Ntsc' });
     const s = sounding(run.writes);
     // famistudio_init runs before the first NMI marker, so the harness drops its writes; replay the ones that set APU
     // state the frames depend on ($4015 = $0F, triangle $4008 = $80, noise length load $400F = 0; famistudio_ca65.s famistudio_init).
@@ -234,6 +236,19 @@ for (const name of names) {
     const lag = firstOn(got, gotD) - firstOn(ref, refD);
     const channels = lockstep(ref, got, refD, gotD, lag, FURNACE_CLOCK[Number(/clockSel=(\d)/.exec(m.chipFlags?.[0] ?? '')?.[1] ?? 0)] ?? CPU_NTSC, rowOf);
     labelChannels(channels, song);
+    if (song.vrc6) {
+      // No Furnace reference exists for VRC6 (-vgmout has no VRC6 command): report what the ROM writes per VRC6 channel (Mesen bus writes).
+      const names = ['VRC6 pulse 1', 'VRC6 pulse 2', 'VRC6 saw'], base = [0x9000, 0xa000, 0xb000];
+      const vol = [0, 0, 0], hi = [0, 0, 0], lo = [0, 0, 0];
+      const on: number[][] = [[], [], []], periods: Array<Set<number>> = [new Set(), new Set(), new Set()];
+      run.writes.forEach((fw, t) => {
+        for (const [a, val] of fw) for (let c = 0; c < 3; c++) {
+          if (a === base[c]) vol[c] = val; else if (a === base[c] + 1) lo[c] = val; else if (a === base[c] + 2) hi[c] = val;
+        }
+        for (let c = 0; c < 3; c++) if ((hi[c] & 0x80) && (vol[c] & (c === 2 ? 0x3f : 0x0f))) { on[c].push(t); periods[c].add(((hi[c] & 15) << 8) | lo[c]); }
+      });
+      console.log(names.map((n, c) => `  ${n}: first sounding frame ${on[c][0] ?? 'never'}, ${on[c].length} sounding frames, ${periods[c].size} distinct periods`).join('\n'));
+    }
     if (DUMP) for (let t = DUMP[0]; t <= DUMP[1] && t < ref.length; t++) console.log(t, ref[t].map((x) => (x ? `${x.period}/${x.vol}` : '-').padStart(8)).join(' '), ' | ', (got[t + lag] ?? []).map((x) => (x ? `${x.period}/${x.vol}` : '-').padStart(8)).join(' '));
     const wantHz = song.firstNotes[0] >= 0 ? Math.round(440 * 2 ** ((song.firstNotes[0] - 57) / 12)) : undefined;
     v = { inputHash, pass: channels.every((c) => c.bad === 0) && run.writes.length >= refEnd + lag, channels, ticks: run.writes.length, got: run.writes.flat().length, sounding: s.frames, hasNotes: song.channelsWithNotes, firstHz: s.firstHz, wantHz, romBytes: rom.length, songBytes: song.music.length, dpcmBytes: song.dpcm.length, lossy: song.lossy, lag };
