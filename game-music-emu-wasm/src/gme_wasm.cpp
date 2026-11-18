@@ -275,3 +275,201 @@ const char *gme_wasm_info(int track, int which)
 	gme_free_info(info);
 	return text;
 }
+
+/*
+ * NSF per-frame state trace (input for the editable NSF import).
+ *
+ * A second Nsf_Emu, separate from the playback emulator above (playback is
+ * untouched: its play_hook stays null). Nsf_Emu calls play_hook each time it
+ * sets up a PLAY call; Nsf_Trace::snap then copies every voice's live state
+ * into one record of kTraceWords uint16. Record 0 is the state after INIT,
+ * record k the state after PLAY call k. Layout (word offsets, T_* below):
+ *   2A03 square 1/2, MMC5 square 1/2: regs[4] ($4000-3 / $5000-3 style),
+ *     length counter, output volume (envelope or constant, 0 when length 0),
+ *     enabled ($4015 bit), period (11 bit, after sweep)
+ *   triangle: regs[4], length counter, linear counter, enabled, period
+ *   noise: regs[4], length counter, output volume, enabled, 0
+ *   DMC: regs[4] ($4010-3), bytes remaining, next read address, DAC (0-127), enabled
+ *   MMC5 PCM: DAC ($5011)
+ *   VRC6 pulse 1/2, saw: regs[3] ($9000-2 / $A000-2 / $B000-2), period (12 bit + 1)
+ *   FDS: $4040-$4092 as written (wave RAM 64, then $4080-$4092), mod table 64
+ *     (two entries per $4088 write), volume envelope gain, mod (sweep) gain, mod position
+ *   N163: internal RAM 128 (wave RAM + channel registers at $40-$7F)
+ *   VRC7: custom patch regs $00-$07, channel regs $10-$15 / $20-$25 / $30-$35 (by channel)
+ *   S5B (FME-7): regs $00-$0D
+ * T_CHIPS holds the NSF header expansion flags (bit 0 VRC6, 1 VRC7, 2 FDS,
+ * 3 MMC5, 4 N163, 5 S5B); sections of absent chips are 0.
+ */
+#include <vector>
+#include <stdint.h>
+#include "Nsf_Emu.h"
+#include "Nes_Vrc6_Apu.h"
+#include "Nes_Namco_Apu.h"
+#include "Nes_Fme7_Apu.h"
+#include "Nes_Fds_Apu.h"
+#include "Nes_Mmc5_Apu.h"
+#include "Nes_Vrc7_Apu.h"
+
+enum {
+	T_CHIPS = 0,
+	T_SQ1 = 2, T_SQ2 = 10, T_TRI = 18, T_NOISE = 26, T_DMC = 34,
+	T_VRC6 = 42,                        // 3 voices x 4
+	T_MMC5 = 54,                        // 2 squares x 8, then PCM DAC
+	T_FDS = 71,                         // 0x53 regs, 64 mod, env gain, mod gain, mod pos
+	T_N163 = 221,                       // 128
+	T_VRC7 = 349,                       // 8 patch, 6 x 3 channel regs
+	T_S5B = 375,                        // 14
+	kTraceWords = 390
+};
+
+static Music_Emu *trace_emu = 0;
+static std::vector<uint16_t> trace;
+
+struct Nsf_Trace {
+	static void square(uint16_t *o, Nes_Square const &s, int enabled)
+	{
+		for (int i = 0; i < 4; i++) o[i] = s.regs[i];
+		o[4] = s.length_counter; o[5] = s.volume(); o[6] = enabled; o[7] = s.period();
+	}
+	static void apu2a03(uint16_t *o, Nes_Apu &a)
+	{
+		square(o + T_SQ1, a.square1, a.osc_enables & 1);
+		square(o + T_SQ2, a.square2, (a.osc_enables >> 1) & 1);
+		uint16_t *t = o + T_TRI;
+		for (int i = 0; i < 4; i++) t[i] = a.triangle.regs[i];
+		t[4] = a.triangle.length_counter; t[5] = a.triangle.linear_counter;
+		t[6] = (a.osc_enables >> 2) & 1; t[7] = a.triangle.period();
+		uint16_t *n = o + T_NOISE;
+		for (int i = 0; i < 4; i++) n[i] = a.noise.regs[i];
+		n[4] = a.noise.length_counter; n[5] = a.noise.volume(); n[6] = (a.osc_enables >> 3) & 1;
+		uint16_t *d = o + T_DMC;
+		for (int i = 0; i < 4; i++) d[i] = a.dmc.regs[i];
+		d[4] = a.dmc.length_counter; d[5] = a.dmc.address; d[6] = a.dmc.dac; d[7] = a.dmc.length_counter > 0;
+	}
+	static void snap(Nsf_Emu *e, void *)
+	{
+		const nes_time_t now = e->time();
+		e->apu.run_until_(now); // catch envelopes / length counters up to this PLAY call
+		const size_t at = trace.size();
+		trace.resize(at + kTraceWords, 0);
+		uint16_t *o = &trace[at];
+		o[T_CHIPS] = e->header_.chip_flags;
+		apu2a03(o, e->apu);
+		if (e->vrc6) {
+			for (int v = 0; v < 3; v++) {
+				Nes_Vrc6_Apu::Vrc6_Osc const &s = e->vrc6->oscs[v];
+				for (int i = 0; i < 3; i++) o[T_VRC6 + v * 4 + i] = s.regs[i];
+				o[T_VRC6 + v * 4 + 3] = (uint16_t) s.period();
+			}
+		}
+		if (e->mmc5) {
+			Nes_Apu &m = *e->mmc5;
+			m.run_until_(now);
+			square(o + T_MMC5, m.square1, m.osc_enables & 1);
+			square(o + T_MMC5 + 8, m.square2, (m.osc_enables >> 1) & 1);
+			o[T_MMC5 + 16] = m.dmc.dac;
+		}
+		if (e->fds) {
+			Nes_Fds_Apu &f = *e->fds;
+			f.run_until(now);
+			for (unsigned i = 0; i < Nes_Fds_Apu::io_size; i++) o[T_FDS + i] = f.regs_[i];
+			for (unsigned i = 0; i < Nes_Fds_Apu::wave_size; i++) o[T_FDS + 0x53 + i] = f.mod_wave[i];
+			o[T_FDS + 0x93] = f.env_gain; o[T_FDS + 0x94] = f.sweep_gain; o[T_FDS + 0x95] = f.mod_pos;
+		}
+		if (e->namco)
+			for (int i = 0; i < Nes_Namco_Apu::reg_count; i++) o[T_N163 + i] = e->namco->reg[i];
+		if (e->vrc7) {
+			for (int i = 0; i < 8; i++) o[T_VRC7 + i] = e->vrc7->inst[i];
+			for (int c = 0; c < 6; c++)
+				for (int i = 0; i < 3; i++) o[T_VRC7 + 8 + c * 3 + i] = e->vrc7->oscs[c].regs[i];
+		}
+		if (e->fme7)
+			for (unsigned i = 0; i < fme7_apu_state_t::reg_count; i++) o[T_S5B + i] = e->fme7->regs[i];
+	}
+	static int read(Nsf_Emu *e, int addr) { return Nsf_Emu::pcm_read(e, (nes_addr_t) addr); }
+	static void arm(Nsf_Emu *e) { e->play_hook = snap; }
+	static int chips(Nsf_Emu *e) { return e->header_.chip_flags; }
+	// 12 = clock_divisor in Nsf_Emu.cpp
+	static double play_hz(Nsf_Emu *e) { return e->clock_rate_ * 12.0 / e->play_period; }
+};
+
+static Nsf_Emu *trace_nsf(void)
+{
+	if (!trace_emu) return 0;
+	gme_type_t t = gme_type(trace_emu);
+	return (t == gme_nsf_type || t == gme_nsfe_type) ? static_cast<Nsf_Emu *>(trace_emu) : 0;
+}
+
+/* Words per record (kTraceWords). */
+extern "C" EMSCRIPTEN_KEEPALIVE
+int gme_wasm_trace_words(void) { return kTraceWords; }
+
+/*
+ * Open an NSF/NSFE for tracing and start `track` (0-based, no silence skip,
+ * no fade). Returns the header expansion flags (>= 0), or -1 not NSF/NSFE,
+ * -2 out of memory, -3 libgme refused the file, -4 the track would not start.
+ */
+extern "C" EMSCRIPTEN_KEEPALIVE
+int gme_wasm_trace_open(const unsigned char *data, int len, int track)
+{
+	if (trace_emu) gme_delete(trace_emu);
+	trace_emu = 0;
+	std::vector<uint16_t>().swap(trace);
+	if (!data || len < 4) return -1;
+	gme_type_t type = gme_identify_extension(gme_identify_header(data));
+	if (type != gme_nsf_type && type != gme_nsfe_type) return -1;
+	trace_emu = gme_new_emu(type, 44100);
+	if (!trace_emu) return -2;
+	if (gme_load_data(trace_emu, data, len)) { gme_delete(trace_emu); trace_emu = 0; return -3; }
+	gme_set_autoload_playback_limit(trace_emu, 0);
+	gme_ignore_silence(trace_emu, 1); // no look-ahead: record 0 is the state right after INIT
+	Nsf_Emu *e = trace_nsf();
+	Nsf_Trace::arm(e);
+	if (gme_start_track(trace_emu, track)) { gme_delete(trace_emu); trace_emu = 0; return -4; }
+	return Nsf_Trace::chips(e);
+}
+
+/*
+ * Run the traced song until at least `frames` records exist in total (the
+ * emulator runs in audio chunks, so a few more may land). Returns the record
+ * count; it stops early when the track ends.
+ */
+extern "C" EMSCRIPTEN_KEEPALIVE
+int gme_wasm_trace_run(int frames)
+{
+	if (!trace_nsf()) return 0;
+	while ((int) (trace.size() / kTraceWords) < frames && !gme_track_ended(trace_emu))
+		if (gme_play(trace_emu, kChunk * 2, pcm)) break;
+	return (int) (trace.size() / kTraceWords);
+}
+
+/* Record `i` (kTraceWords uint16), or 0 past the end. */
+extern "C" EMSCRIPTEN_KEEPALIVE
+const uint16_t *gme_wasm_trace_frame(int i)
+{
+	return i >= 0 && (size_t) (i + 1) * kTraceWords <= trace.size() ? &trace[(size_t) i * kTraceWords] : 0;
+}
+
+/* A byte as the DMC reads it (current bank mapping), for DPCM sample extraction. */
+extern "C" EMSCRIPTEN_KEEPALIVE
+int gme_wasm_trace_read(int addr)
+{
+	Nsf_Emu *e = trace_nsf();
+	return e && addr >= 0x8000 && addr <= 0xFFFF ? Nsf_Trace::read(e, addr) : -1;
+}
+
+/* NSF PLAY rate in Hz (header speed for the region GME plays), 0 when no trace is open. */
+extern "C" EMSCRIPTEN_KEEPALIVE
+double gme_wasm_trace_play_hz(void)
+{
+	Nsf_Emu *e = trace_nsf();
+	return e ? Nsf_Trace::play_hz(e) : 0;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE
+void gme_wasm_trace_close(void)
+{
+	if (trace_emu) gme_delete(trace_emu);
+	trace_emu = 0;
+	std::vector<uint16_t>().swap(trace);
+}

@@ -52,6 +52,13 @@ public:
 	Nsf_Emu();
 	~Nsf_Emu();
 	Nes_Apu* apu_() { return &apu; }
+
+	// DEViLBOX: called each time a PLAY call is set up (state = after the
+	// previous PLAY, or after INIT for the first). Null = off (playback).
+	void (*play_hook)( Nsf_Emu*, void* );
+	void* play_hook_data;
+private:
+	friend struct Nsf_Trace;
 protected:
 	blargg_err_t track_info_( track_info_t*, int track ) const;
 	blargg_err_t load_( Data_Reader& );

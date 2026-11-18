@@ -33,6 +33,7 @@ public:
 	~Nes_Vrc7_Apu();
 	BLARGG_DISABLE_NOTHROW
 private:
+	friend struct Nsf_Trace; // DEViLBOX: per-frame state readout (game-music-emu-wasm/src/gme_wasm.cpp)
 	// noncopyable
 	Nes_Vrc7_Apu( const Nes_Vrc7_Apu& );
 	Nes_Vrc7_Apu& operator = ( const Nes_Vrc7_Apu& );

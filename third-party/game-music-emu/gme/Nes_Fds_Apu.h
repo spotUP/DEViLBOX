@@ -31,6 +31,7 @@ public:
 
 	void osc_output( int, Blip_Buffer* );
 private:
+	friend struct Nsf_Trace; // DEViLBOX: per-frame state readout (game-music-emu-wasm/src/gme_wasm.cpp)
 	static const unsigned int wave_size       = 0x40;
 	static const unsigned int master_vol_max  =   10;
 	static const int vol_max         = 0x20;

@@ -103,6 +103,7 @@ private:
 	static double nonlinear_tnd_gain() { return 0.75; }
 private:
 	friend struct Nes_Dmc;
+	friend struct Nsf_Trace; // DEViLBOX: per-frame state readout (game-music-emu-wasm/src/gme_wasm.cpp)
 
 	// noncopyable
 	Nes_Apu( const Nes_Apu& );

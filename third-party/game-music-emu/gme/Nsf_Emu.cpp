@@ -59,6 +59,8 @@ Nsf_Emu::Nsf_Emu()
 	fds   = 0;
 	mmc5  = 0;
 	vrc7  = 0;
+	play_hook = 0;
+	play_hook_data = 0;
 
 	set_type( gme_nsf_type );
 	set_silence_lookahead( 6 );
@@ -659,6 +661,8 @@ blargg_err_t Nsf_Emu::run_clocks( blip_time_t& duration, int )
 				low_mem [0x100 + r.sp--] = (badop_addr - 1) >> 8;
 				low_mem [0x100 + r.sp--] = (badop_addr - 1) & 0xFF;
 				GME_FRAME_HOOK( this );
+				if ( play_hook )
+					play_hook( this, play_hook_data );
 			}
 		}
 	}
