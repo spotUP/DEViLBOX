@@ -440,6 +440,14 @@
       "matchPct": 1,
       "cells": 12288
     },
+    "psa": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 2816
+    },
     "ptm": {
       "kind": "variable",
       "method": "encode-pattern",
@@ -802,7 +810,6 @@
     "octamed_mmd0",
     "octamed_mmd1",
     "oktalyzer",
-    "psa",
     "psm",
     "pt36",
     "pt41",
