@@ -32,7 +32,7 @@ describe('famistudio envelope encoder', () => {
 describe('famistudio ROM', () => {
   it('patches music and DPCM at the player addresses and refuses oversize data', () => {
     const player = readFileSync(path.join(DIR, 'player.nes'));
-    const song = { music: new Uint8Array([1, 2, 3]), dpcm: new Uint8Array([9]), lossy: [], pitchLossy: [], channelsWithNotes: [], firstNotes: [], firstNoteFrames: [] };
+    const song = { music: new Uint8Array([1, 2, 3]), dpcm: new Uint8Array([9]), lossy: [], pitchLossy: [], channelsWithNotes: [], firstNotes: [], firstNoteFrames: [], sizes: { header: 0, samples: 0, envelopes: 0, streams: [] } };
     const rom = buildFamistudioRom(player, META, song);
     expect(rom.length).toBe(player.length);
     expect([...rom.subarray(META.prgOffset + META.musicAddr - 0x8000, META.prgOffset + META.musicAddr - 0x8000 + 3)]).toEqual([1, 2, 3]);
@@ -41,7 +41,7 @@ describe('famistudio ROM', () => {
   });
   it('writes title and author, uppercased and space padded, at the player.json slots', () => {
     const player = readFileSync(path.join(DIR, 'player.nes'));
-    const song = { music: new Uint8Array([1]), dpcm: new Uint8Array([1]), lossy: [], pitchLossy: [], channelsWithNotes: [], firstNotes: [], firstNoteFrames: [] };
+    const song = { music: new Uint8Array([1]), dpcm: new Uint8Array([1]), lossy: [], pitchLossy: [], channelsWithNotes: [], firstNotes: [], firstNoteFrames: [], sizes: { header: 0, samples: 0, envelopes: 0, streams: [] } };
     const rom = buildFamistudioRom(player, META, song, { title: 'Sky Sanctuary', author: 'x'.repeat(40) });
     const at = (a: number) => [...rom.subarray(META.prgOffset + a - 0x8000, META.prgOffset + a - 0x8000 + META.textLen)];
     expect(at(META.titleAddr)).toEqual([...famistudioText('SKY SANCTUARY', 32)]);
