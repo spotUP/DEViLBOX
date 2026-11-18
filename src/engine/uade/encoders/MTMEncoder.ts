@@ -18,16 +18,18 @@
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 
+/** Note byte (rawNote << 2) of an XM note: the inverse of the parser's rawNote + 25 (clamped to 96). */
+function mtmNoteByte(note: number): number {
+  return note > 0 ? (Math.max(1, Math.min(63, note - 25)) << 2) & 0xFC : 0;
+}
+
 function encodeMTMCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(3);
   const note = cell.note ?? 0;
   const instr = cell.instrument ?? 0;
 
-  // rawNote: XM note directly (clamped)
-  const rawNote = note > 0 ? Math.min(96, note) : 0;
-
   // Byte 0: (rawNote << 2) | instrHi
-  out[0] = ((rawNote << 2) & 0xFC) | ((instr >> 4) & 0x03);
+  out[0] = mtmNoteByte(note) | ((instr >> 4) & 0x03);
 
   // Byte 1: (instrLo << 4) | cmd
   out[1] = ((instr & 0x0F) << 4) | ((cell.effTyp ?? 0) & 0x0F);
@@ -51,4 +53,4 @@ function encodeMTMCell(cell: TrackerCell): Uint8Array {
 
 registerPatternEncoder('mtm', () => encodeMTMCell);
 
-export { encodeMTMCell };
+export { encodeMTMCell, mtmNoteByte };

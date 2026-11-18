@@ -34,7 +34,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMTMCell } from '@/engine/uade/encoders/MTMEncoder';
+import { encodeMTMCell, mtmNoteByte } from '@/engine/uade/encoders/MTMEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // -- Binary helpers -----------------------------------------------------------
@@ -60,6 +60,36 @@ const BYTES_PER_TRACK_ROW   = 3;
 const TRACK_BLOCK_SIZE      = ROWS_PER_TRACK_STORED * BYTES_PER_TRACK_ROW; // 192
 const MAX_CHANNELS_IN_PAT   = 32;
 const SAMPLE_RATE           = 8363;
+
+/** The grid cell a stored 3-byte MTM cell decodes to (the parser's own decode), with the exact source bytes as carriers. */
+function decodeMTMBytes(bytes: Uint8Array): TrackerCell {
+  const noteInstr = bytes[0];
+  const instrCmd  = bytes[1];
+  const par       = bytes[2];
+  const note  = (noteInstr & 0xFC) !== 0 ? mtmNoteToXM(noteInstr >> 2) : 0;
+  const instr = ((noteInstr & 0x03) << 4) | (instrCmd >> 4);
+  const { effTyp, eff } = mapMTMEffect(instrCmd & 0x0F, par);
+  // The note byte and the effect are lossy (+25/clamp, many-to-one effects): the source bytes ride in invisible carriers.
+  return { note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0, period: noteInstr, pan: instrCmd, cutoff: par };
+}
+
+/** Write an edited grid cell over its stored bytes: only the fields the edit changed are re-encoded, the rest keep their stored byte. */
+function encodeMTMEdit(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
+  if (!stored) return encodeMTMCell(cell);
+  const out = stored.slice(0, 3);
+  const was = decodeMTMBytes(stored);
+  const note = cell.note ?? 0;
+  const instr = (cell.instrument ?? 0) & 0x3F;
+  if (note !== was.note || instr !== was.instrument) {
+    out[0] = (mtmNoteByte(note) & 0xFC) | ((instr >> 4) & 0x03);
+    out[1] = (instr & 0x0F) << 4 | (out[1] & 0x0F);
+  }
+  if ((cell.effTyp ?? 0) !== was.effTyp || (cell.eff ?? 0) !== was.eff) {
+    out[1] = (out[1] & 0xF0) | ((cell.effTyp ?? 0) & 0x0F);
+    out[2] = (cell.eff ?? 0) & 0xFF;
+  }
+  return out;
+}
 
 // -- Format detection ---------------------------------------------------------
 
@@ -353,32 +383,15 @@ export async function parseMTMFile(
     numChannels,
     numPatterns,
     moduleSize: buffer.byteLength,
-    encodeCell: encodeMTMCell,
-    decodeCell: (bytes: Uint8Array): TrackerCell => {
-      // Inverse of parser's 3-byte MTM cell decode
-      const noteInstr = bytes[0];
-      const instrCmd  = bytes[1];
-      const par       = bytes[2];
-
-      const rawNote = noteInstr >> 2;
-      const note    = (noteInstr & 0xFC) !== 0 ? mtmNoteToXM(rawNote) : 0;
-      const instr   = ((noteInstr & 0x03) << 4) | (instrCmd >> 4);
-      const cmd     = instrCmd & 0x0F;
-      const { effTyp, eff } = mapMTMEffect(cmd, par);
-
-      // Byte-exact carriers: the note byte is lossy (decode adds 25 and clamps to 96,
-      // encode reverses with the XM note directly) and mapMTMEffect is many-to-one
-      // (0x0A nibble-filter, 0x08/0x0E sub-commands dropped). Stash all three source
-      // bytes in invisible carriers so encodeMTMCell reproduces them verbatim on
-      // round-trip. Grid cells (built by the parser's own track loop) carry no such
-      // fields, so an edited cell falls back to the canonical derivation.
-      return { note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0, period: noteInstr, pan: instrCmd, cutoff: par };
-    },
+    encodeCell: encodeMTMEdit,
+    decodeCell: decodeMTMBytes,
+    encodeOverStored: true,
+    propagateSharedCells: true,
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const refs = patTrackTable[pattern];
       if (!refs) return 0;
       const trackRef = refs[channel] ?? 0;
-      if (trackRef === 0 || trackRef > numTracks) return 0;
+      if (trackRef === 0 || trackRef > numTracks || row >= ROWS_PER_TRACK_STORED) return -1;
       return trackDataOffset + (trackRef - 1) * TRACK_BLOCK_SIZE + row * BYTES_PER_TRACK_ROW;
     },
   };
@@ -396,5 +409,7 @@ export async function parseMTMFile(
     initialBPM:      125,
     linearPeriods:   false,
     uadePatternLayout,
+    uadeEditableFileData: buffer.slice(0),
+    uadeEditableFileName: filename,
   };
 }

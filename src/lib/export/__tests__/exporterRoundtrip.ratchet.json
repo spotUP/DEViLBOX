@@ -32,6 +32,14 @@
       "cells": 0,
       "bytes": 0
     },
+    "anders0land": {
+      "exporter": "Anders0landExporter.exportAnders0land",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 4738,
+      "bytes": 4738
+    },
     "artOfNoise": {
       "exporter": "ArtOfNoiseExporter.exportArtOfNoise",
       "tier": "byte-exact",
@@ -80,6 +88,14 @@
       "cells": 39936,
       "bytes": 495190
     },
+    "coreDesign": {
+      "exporter": "CoreDesignExporter.exportCoreDesign",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 156532,
+      "bytes": 156532
+    },
     "daveLowe": {
       "exporter": "DaveLoweExporter.exportDaveLowe",
       "tier": "byte-exact",
@@ -119,6 +135,14 @@
       "matchPct": 1,
       "cells": 21514,
       "bytes": 21514
+    },
+    "desire": {
+      "exporter": "DesireExporter.exportDesire",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 87852,
+      "bytes": 87852
     },
     "digiBooster": {
       "exporter": "DIGI (DigiBoosterExporter)",
@@ -181,8 +205,8 @@
       "tier": "byte-exact",
       "status": "byte-exact",
       "matchPct": 1,
-      "cells": 1024,
-      "bytes": 1288
+      "cells": 24388,
+      "bytes": 24388
     },
     "ems": {
       "exporter": "EmsExporter.exportEms",
@@ -223,6 +247,14 @@
       "matchPct": 1,
       "cells": 13724,
       "bytes": 13724
+    },
+    "forgottenWorlds": {
+      "exporter": "ForgottenWorldsExporter.exportForgottenWorlds",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 22400,
+      "bytes": 22400
     },
     "format669": {
       "exporter": "Format669Exporter.exportFormat669",
@@ -312,6 +344,14 @@
       "cells": 1024,
       "bytes": 50836
     },
+    "infogrames": {
+      "exporter": "InfogramesExporter.exportInfogrames",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 999,
+      "bytes": 999
+    },
     "inStereo1": {
       "exporter": "IS10 (InStereo1Exporter)",
       "tier": "byte-exact",
@@ -400,6 +440,30 @@
       "cells": 6912,
       "bytes": 41632
     },
+    "lme": {
+      "exporter": "LMEExporter.exportLME",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 7510,
+      "bytes": 7510
+    },
+    "majortom": {
+      "exporter": "MajorTomExporter.exportMajorTom",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 39488,
+      "bytes": 39488
+    },
+    "maniacsOfNoise": {
+      "exporter": "ManiacsOfNoiseExporter.exportManiacsOfNoise",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 7788,
+      "bytes": 7788
+    },
     "markCooksey": {
       "exporter": "MarkCookseyExporter.exportMarkCooksey",
       "tier": "byte-exact",
@@ -407,6 +471,14 @@
       "matchPct": 1,
       "cells": 61700,
       "bytes": 61700
+    },
+    "maximumEffect": {
+      "exporter": "MaximumEffectExporter.exportMaximumEffect",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 3768,
+      "bytes": 3768
     },
     "mcmd": {
       "exporter": "McmdExporter.exportMcmd",
@@ -447,6 +519,22 @@
       "matchPct": 1,
       "cells": 12127,
       "bytes": 12127
+    },
+    "mtm": {
+      "exporter": "MTMExporter.exportMTM",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 162637,
+      "bytes": 162637
+    },
+    "multiMediaSound": {
+      "exporter": "MultiMediaSoundExporter.exportMultiMediaSound",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 84914,
+      "bytes": 84914
     },
     "musicAssembler": {
       "exporter": "MusicAssemblerExporter.exportAsMusicAssembler",
@@ -504,78 +592,6 @@
       "cells": 2044,
       "bytes": 2044
     },
-    "infogrames": {
-      "exporter": "InfogramesExporter.exportInfogrames",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 999,
-      "bytes": 999
-    },
-    "lme": {
-      "exporter": "LMEExporter.exportLME",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 7510,
-      "bytes": 7510
-    },
-    "silmarils": {
-      "exporter": "SilmarilsExporter.exportSilmarils",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 11448,
-      "bytes": 11448
-    },
-    "synthPack": {
-      "exporter": "SynthPackExporter.exportSynthPack",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 1950,
-      "bytes": 1950
-    },
-    "pierreAdane": {
-      "exporter": "PierreAdaneExporter.exportPierreAdane",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 1998,
-      "bytes": 1998
-    },
-    "peterVerswyvelenPacker": {
-      "exporter": "PeterVerswyvelenPackerExporter.exportPeterVerswyvelenPacker",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 114686,
-      "bytes": 114686
-    },
-    "forgottenWorlds": {
-      "exporter": "ForgottenWorldsExporter.exportForgottenWorlds",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 22400,
-      "bytes": 22400
-    },
-    "majortom": {
-      "exporter": "MajorTomExporter.exportMajorTom",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 39488,
-      "bytes": 39488
-    },
-    "maniacsOfNoise": {
-      "exporter": "ManiacsOfNoiseExporter.exportManiacsOfNoise",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 7788,
-      "bytes": 7788
-    },
     "paulShields": {
       "exporter": "PaulShieldsExporter.exportPaulShields",
       "tier": "byte-exact",
@@ -592,6 +608,22 @@
       "cells": 87472,
       "bytes": 87472
     },
+    "peterVerswyvelenPacker": {
+      "exporter": "PeterVerswyvelenPackerExporter.exportPeterVerswyvelenPacker",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 114686,
+      "bytes": 114686
+    },
+    "pierreAdane": {
+      "exporter": "PierreAdaneExporter.exportPierreAdane",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 1998,
+      "bytes": 1998
+    },
     "piyoPiyo": {
       "exporter": "PiyoPiyoExporter.exportPiyoPiyo",
       "tier": "byte-exact",
@@ -607,6 +639,14 @@
       "matchPct": 0,
       "cells": 0,
       "bytes": 0
+    },
+    "pt41": {
+      "exporter": "ProTracker4Exporter.exportProTracker4",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 2962,
+      "bytes": 2962
     },
     "pumaTracker": {
       "exporter": "PumaTracker (PumaTrackerExporter)",
@@ -696,6 +736,14 @@
       "cells": 11408,
       "bytes": 11408
     },
+    "silmarils": {
+      "exporter": "SilmarilsExporter.exportSilmarils",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 11448,
+      "bytes": 11448
+    },
     "sonicArranger": {
       "exporter": "SonicArrangerExporter.exportSonicArranger",
       "tier": "pattern-data",
@@ -760,6 +808,14 @@
       "cells": 71584,
       "bytes": 71584
     },
+    "speedySystem": {
+      "exporter": "SpeedySystemExporter.exportSpeedySystem",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 264198,
+      "bytes": 264198
+    },
     "stoneTracker": {
       "exporter": "StoneTrackerExporter.exportStoneTracker",
       "tier": "byte-exact",
@@ -808,6 +864,14 @@
       "cells": 0,
       "bytes": 0
     },
+    "synthPack": {
+      "exporter": "SynthPackExporter.exportSynthPack",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 1950,
+      "bytes": 1950
+    },
     "synTracker": {
       "exporter": "SynTracker (SynTrackerExporter)",
       "tier": "byte-exact",
@@ -847,14 +911,6 @@
       "matchPct": 1,
       "cells": 25010,
       "bytes": 25010
-    },
-    "multiMediaSound": {
-      "exporter": "MultiMediaSoundExporter.exportMultiMediaSound",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 84914,
-      "bytes": 84914
     },
     "tme": {
       "exporter": "TMEExporter.exportTME",
@@ -919,54 +975,6 @@
       "matchPct": 1,
       "cells": 1408,
       "bytes": 6689
-    },
-    "coreDesign": {
-      "exporter": "CoreDesignExporter.exportCoreDesign",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 156532,
-      "bytes": 156532
-    },
-    "anders0land": {
-      "exporter": "Anders0landExporter.exportAnders0land",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 4738,
-      "bytes": 4738
-    },
-    "pt41": {
-      "exporter": "ProTracker4Exporter.exportProTracker4",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 2962,
-      "bytes": 2962
-    },
-    "speedySystem": {
-      "exporter": "SpeedySystemExporter.exportSpeedySystem",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 264198,
-      "bytes": 264198
-    },
-    "maximumEffect": {
-      "exporter": "MaximumEffectExporter.exportMaximumEffect",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 3768,
-      "bytes": 3768
-    },
-    "desire": {
-      "exporter": "DesireExporter.exportDesire",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 87852,
-      "bytes": 87852
     }
   },
   "missingFixture": [

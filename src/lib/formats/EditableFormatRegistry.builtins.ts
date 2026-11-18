@@ -108,7 +108,7 @@ registerEditableFormat({ formatId: "mfp", label: "Magnetic Fields Packer", patte
 registerEditableFormat({ formatId: "mikeDavies", label: "Mike Davies", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "mod", label: "MOD", patternCodec: { kind: "fixed" }, newSong: { template: "templates/protracker.mod", name: "ProTracker MOD" } });
 registerEditableFormat({ formatId: "mt2", label: "", patternCodec: { kind: "fixed" } });
-registerEditableFormat({ formatId: "mtm", label: "", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "mtm", label: "MultiTracker", patternCodec: { kind: "fixed" }, exporter: { module: "MTMExporter", fn: "exportMTM", byLayout: true } });
 registerEditableFormat({ formatId: "musicAssembler", label: "Music Assembler", newSong: { template: "templates/musicAssembler.ma" }, patternCodec: { kind: "variable" }, exporter: { module: "MusicAssemblerExporter", fn: "exportAsMusicAssembler", byLayout: true } });
 registerEditableFormat({ formatId: "musicLine", label: "MusicLine Editor", newSong: { template: "templates/musicLine.ml" }, patternCodec: { kind: "variable" }, exporter: { module: "MusicLineExporter", fn: "exportMusicLineFile", ext: "ml", byLayout: true } });
 registerEditableFormat({ formatId: "nru", label: "", newSong: { template: "templates/nru.nru", name: "NoiseRunner" }, patternCodec: { kind: "fixed" }, exporter: { module: "NRUExporter", fn: "exportNRU", byLayout: true } });
