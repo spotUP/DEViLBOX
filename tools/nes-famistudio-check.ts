@@ -1,14 +1,11 @@
 // Headless check, NES FamiStudio route: .fur -> furnaceToFamistudio -> buildFamistudioRom -> Mesen2 APU bus-write log.
-// Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/nes-famistudio-check.ts [--only <name>] [--failed] [--ticks N] [--out <dir>]
+// Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/nes-famistudio-check.ts [--only <name>] [--failed] [--out <dir>]
 // Results: test-data/nes-famistudio-check.json (skips songs whose input hash matches a recorded verdict).
-// FamiStudio is lossy against Furnace by design (plan "FamiStudio route"), so no register diff: the verdict is
-//   pass = the ROM ran the requested NMI ticks (at least to every channel's first note + 1 s) and every 2A03 channel that has notes in the song sounded in some frame
-//   (pulse/noise volume nibble > 0, triangle linear counter > 0, DPCM enable bit written to $4015),
-//   and pitch holds: per channel, at most PITCH_FAIL_SHARE (5%) of the ticks where both sound may differ from the
-//   furnace -vgmout reference by more than CENTS_TOL (35 cents), matching against reference ticks t-1..t+1 (TICK_TOL;
-//   FamiTracker tempo rounds frames per row). A channel over the share fails the song unless the converter recorded a
-//   pitch-class lossy entry (slide / vibrato / arp / pitch), which FamiStudio cannot express; it stays in pitchFail.
-// firstHz reports pulse 1's first sounding frequency next to the song's first pulse 1 note (macros can move it; not failed).
+// Lockstep: Furnace -vgmout vs Mesen2 APU writes, both binned per 60 Hz frame, whole song (to Furnace's song end), zero tolerance.
+// Per frame and channel the emulated APU state must be identical: pulse period/volume/duty/sweep, triangle period/linear counter,
+// noise period/mode/volume, DPCM start/rate/length/play. Frame 0 = first frame where any channel sounds (offset `lag` printed).
+// Each failing channel reports its FIRST bad frame and is labelled "driver limit" (the exporter's lossy entries / pitch spans explain
+// the field) or "converter bug". Lossy entries do not excuse a FAIL.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -30,13 +27,13 @@ const NMI_ADDR = PLAYER[16 + 0x7ffa] | (PLAYER[16 + 0x7ffb] << 8);
 // Frames run past the last channel's first note, so a channel that enters late is still heard.
 const FIRST_NOTE_MARGIN = 60;
 
-interface Verdict { inputHash: string; pass: boolean; ticks: number; got: number; sounding: number[]; hasNotes: boolean[]; firstHz?: number; wantHz?: number; romBytes?: number; songBytes?: number; dpcmBytes?: number; lossy?: string[]; pitch?: PitchDiff[]; dpcm?: DpcmDiff; byPattern?: Record<string, number[]>; pitchFail?: number[]; lag?: number; error?: string }
+interface Verdict { inputHash: string; pass: boolean; ticks: number; got: number; sounding: number[]; hasNotes: boolean[]; firstHz?: number; wantHz?: number; romBytes?: number; songBytes?: number; dpcmBytes?: number; lossy?: string[]; channels?: ChannelVerdict[]; lag?: number; error?: string }
 
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : undefined;
 const failedOnly = args.includes('--failed');
 const OUT = args.includes('--out') ? args[args.indexOf('--out') + 1] : undefined;
-const TICKS = args.includes('--ticks') ? Number(args[args.indexOf('--ticks') + 1]) : 900;
+const MAX_FRAMES = 60 * 1200; // Furnace render cap (20 min); the song end decides the real length
 // --dump a-b: print both sides' per-tick states for ticks a..b (debug).
 const DUMP = args.includes('--dump') ? args[args.indexOf('--dump') + 1].split('-').map(Number) : undefined;
 
@@ -92,7 +89,7 @@ const LEN_TABLE = [10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14,
 /** Per-frame audible state of pulse 1, pulse 2, triangle, noise: period (noise: index | mode<<4) and volume (triangle 15 when on), or null when silent.
  *  Emulates the APU envelope, length counter and triangle linear counter (4 quarter / 2 half frame clocks per 60 Hz frame), so
  *  songs that use Furnace 15xx/16xx/19xx (hardware decay) are measured by the volume the chip outputs, not the raw $4000 nibble. */
-type ChState = { period: number; vol: number } | null;
+type ChState = { period: number; vol: number; duty: number; sweep: number; lin: number; mode: number } | null;
 function apuStates(writes: Array<Array<[number, number]>>): ChState[][] {
   const reg = new Uint8Array(0x18);
   reg[0x15] = 0x0f; // famistudio_init and Furnace's reset both enable the four tone channels before the first logged tick
@@ -118,72 +115,84 @@ function apuStates(writes: Array<Array<[number, number]>>): ChState[][] {
     }
     const en = (k: number): boolean => (reg[0x15] & (1 << k)) !== 0 && len[k] > 0;
     const vol = (k: number): number => (reg[k * 4] & 0x10 ? reg[k * 4] & 15 : decay[k]);
-    const pulse = (k: number): ChState => { const v = vol(k), p = reg[k * 4 + 2] | ((reg[k * 4 + 3] & 7) << 8); return en(k) && v > 0 && p >= 8 ? { period: p, vol: v } : null; };
+    const pulse = (k: number): ChState => { const v = vol(k), p = reg[k * 4 + 2] | ((reg[k * 4 + 3] & 7) << 8); return en(k) && v > 0 && p >= 8 ? { period: p, vol: v, duty: reg[k * 4] >> 6, sweep: reg[k * 4 + 1], lin: 0, mode: 0 } : null; };
     const tp = reg[0xa] | ((reg[0xb] & 7) << 8);
-    return [pulse(0), pulse(1), en(2) && linear > 0 && tp >= 2 ? { period: tp, vol: 15 } : null, en(3) && vol(3) > 0 ? { period: (reg[0xe] & 15) | ((reg[0xe] & 0x80) >> 3), vol: vol(3) } : null];
+    return [pulse(0), pulse(1), en(2) && linear > 0 && tp >= 2 ? { period: tp, vol: 15, duty: 0, sweep: 0, lin: 1, mode: 0 } : null, en(3) && vol(3) > 0 ? { period: reg[0xe] & 15, vol: vol(3), duty: 0, sweep: 0, lin: 0, mode: reg[0xe] >> 7 } : null];
   });
 }
-
-/** Pitch tolerance: a tick whose period is off by more than this many cents counts as diverged. */
-const CENTS_TOL = Number(process.env.CENTS_TOL ?? 20);
-const TICK_TOL = 1;
-/** A channel fails when more than this share of its both-sounding ticks diverge in pitch. */
-const PITCH_FAIL_SHARE = 0.05;
-interface PitchDiff { worst: number; over10: number; badFrames: number[]; pitchBad: number; excused: number; both: number; volBad: number; onlyRef: number; onlyGot: number; first?: string }
 
 /** Furnace 2A03 clock per chip flag clockSel (nes.cpp setFlags): NTSC, PAL, Dendy. The ROM always runs NTSC, so a PAL
  *  song's reference periods are compared as frequencies (a PAL period plays lower than the same NTSC period). */
 const FURNACE_CLOCK = [CPU_NTSC, 4433618.75 * 3 / 8, 4433618.75 * 2 / 5];
 
-/** Compare the ROM's states to Furnace's per channel, the ROM shifted by `lag` ticks; `refClock` = the reference's 2A03 clock. */
-function pitchDiff(ref: ChState[][], got: ChState[][], lag: number, spans: PitchLossySpan[], refClock = CPU_NTSC): PitchDiff[] {
-  return [0, 1, 2, 3].map((ch) => {
-    const d: PitchDiff = { worst: 0, over10: 0, badFrames: [], pitchBad: 0, excused: 0, both: 0, volBad: 0, onlyRef: 0, onlyGot: 0 };
-    const cents = (a: NonNullable<ChState>, b: NonNullable<ChState>): number => ch === 3 ? (a.period === b.period ? 0 : 1200) : 1200 * Math.log2((b.period + 1) / ((a.period + 1) * CPU_NTSC / refClock));
-    for (let t = 0; t < ref.length && t + lag < got.length; t++) {
-      const a = ref[t][ch], b = got[t + lag]?.[ch];
-      if (!a && !b) continue;
-      // TICK_TOL: FamiTracker tempo rounds frames per row, so rows may land one frame off; any neighbour within it counts.
-      const near = (k: number): ChState[] => Array.from({ length: 2 * TICK_TOL + 1 }, (_, i) => (k === 0 ? ref[t + i - TICK_TOL]?.[ch] : got[t + lag + i - TICK_TOL]?.[ch]) ?? null);
-      if (!a || !b) { if (a ? !near(1).some(Boolean) : !near(0).some(Boolean)) { if (a) d.onlyRef++; else d.onlyGot++; } continue; }
-      d.both++;
-      const c = near(0).filter((x): x is NonNullable<ChState> => !!x).map((x) => cents(x, b)).reduce((m, v) => (Math.abs(v) < Math.abs(m) ? v : m), cents(a, b));
-      if (ch !== 3 && !spans.some((sp) => sp.ch === ch && t >= sp.from - TICK_TOL && t <= sp.to + TICK_TOL)) { d.worst = Math.max(d.worst, Math.abs(c)); if (Math.abs(c) > 10) d.over10++; }
-      if (Math.abs(c) > CENTS_TOL && spans.some((sp) => sp.ch === ch && t >= sp.from - TICK_TOL && t <= sp.to + TICK_TOL)) d.excused++;
-      else if (Math.abs(c) > CENTS_TOL) { d.pitchBad++; d.badFrames.push(t); d.first ??= `t${t} ref=${a.period} got=${b.period} (${Math.round(c)}c)`; }
-      if (!near(0).some((x) => x && Math.abs(x.vol - b.vol) <= 1)) { d.volBad++; d.badFrames.push(t); }
-    }
-    return d;
+interface FirstBad { frame: number; field: string; expected: string; got: string; row?: string }
+interface ChannelVerdict { ch: string; bad: number; first?: FirstBad; label?: 'driver limit' | 'converter bug'; why?: string }
+const CH_NAMES = ['pulse1', 'pulse2', 'triangle', 'noise', 'dpcm'];
+// triangle `lin` is the counter's on/off (always 1 while the channel sounds): a held counter's value (control bit set) is inaudible; a finite one shows as sounding -> silent transitions.
+const FIELDS: Array<keyof NonNullable<ChState>> = ['period', 'vol', 'duty', 'sweep', 'lin', 'mode'];
+const fmt = (x: ChState | undefined): string => (x ? FIELDS.map((f) => `${f}=${x[f]}`).join(' ') : 'silent');
+
+/** DPCM per frame: start (a $4015 write with bit 4), the rate/length latched at it, and the last $4015 bit 4 ("play"). */
+type DpcmFrame = { start: boolean; rate: number; len: number; play: boolean };
+function dpcmFrames(writes: Array<Array<[number, number]>>): DpcmFrame[] {
+  let rate = 0, len = 0, play = false, loaded = false;
+  return writes.map((tick) => {
+    let start = false;
+    // $4015 bit 4 with no sample length ever written is the init enable, not a sample start.
+    for (const [a, v] of tick) { if (a === 0x4010) rate = v & 15; else if (a === 0x4013) { len = v; loaded = true; } else if (a === 0x4015) { play = (v & 16) !== 0 && loaded; if (play) start = true; } }
+    return { start, rate, len, play };
   });
 }
 
-/** DPCM starts ($4015 write with bit 4): rate ($4010 low nibble) and length ($4013) at the start, per tick. Sample address differs (ROM layout) and is not compared. */
-interface DpcmStart { t: number; rate: number; len: number }
-interface DpcmDiff { ref: number; got: number; rateBad: number; lenBad: number; first?: string }
-function dpcmStarts(writes: Array<Array<[number, number]>>): DpcmStart[] {
-  const out: DpcmStart[] = [];
-  let rate = 0, len = 0;
-  writes.forEach((tick, t) => { for (const [a, v] of tick) { if (a === 0x4010) rate = v & 15; else if (a === 0x4013) len = v; else if (a === 0x4015 && v & 16) out.push({ t, rate, len }); } });
+/** Exact per-frame compare, the ROM shifted by `lag` frames. Pulse/triangle/noise: silent-vs-sounding or any field differing is bad.
+ *  Noise period is an index (not Hz) and DPCM is rate/length, so only pulse/triangle periods are rescaled for a PAL/Dendy reference clock. */
+function lockstep(ref: ChState[][], got: ChState[][], rd: DpcmFrame[], gd: DpcmFrame[], lag: number, refClock: number, rowOf: (t: number) => string): ChannelVerdict[] {
+  const out: ChannelVerdict[] = [];
+  const n = ref.length;
+  for (let ch = 0; ch < 5; ch++) {
+    const v: ChannelVerdict = { ch: CH_NAMES[ch], bad: 0 };
+    const note = (t: number, field: string, expected: string, g: string): void => { v.bad++; v.first ??= { frame: t, field, expected, got: g, row: rowOf(t) }; };
+    for (let t = 0; t < n; t++) {
+      if (t + lag < 0) continue;
+      if (ch === 4) {
+        const a = rd[t], b = gd[t + lag] ?? { start: false, rate: 0, len: 0, play: false };
+        if (a.start !== b.start) note(t, 'start', String(a.start), String(b.start));
+        else if (a.start && a.rate !== b.rate) note(t, 'rate', String(a.rate), String(b.rate));
+        else if (a.start && a.len !== b.len) note(t, 'length', String(a.len), String(b.len));
+        else if (a.play !== b.play) note(t, 'play', String(a.play), String(b.play));
+        continue;
+      }
+      const a = ref[t][ch], b = got[t + lag]?.[ch] ?? null;
+      if (!a && !b) continue;
+      if (!a || !b) { note(t, 'sounding', fmt(a), fmt(b)); continue; }
+      for (const f of FIELDS) {
+        let x = a[f];
+        if (f === 'period' && ch !== 3 && refClock !== CPU_NTSC) x = Math.round((a.period + 1) * CPU_NTSC / refClock) - 1; // PAL/Dendy reference, same frequency
+        if (x !== b[f]) { note(t, f, fmt(a), fmt(b)); break; }
+      }
+    }
+    out.push(v);
+  }
   return out;
 }
-function dpcmDiff(ref: DpcmStart[], got: DpcmStart[], lag: number): DpcmDiff {
-  const d: DpcmDiff = { ref: ref.length, got: got.length, rateBad: 0, lenBad: 0 };
-  ref.forEach((r) => {
-    const g = got.find((x) => Math.abs(x.t - lag - r.t) <= 2);
-    if (!g) { d.first ??= `t${r.t} no ROM start (rate ${r.rate} len ${r.len})`; return; }
-    if (g.rate !== r.rate) { d.rateBad++; d.first ??= `t${r.t} rate ref=${r.rate} got=${g.rate}`; }
-    if (g.len !== r.len) { d.lenBad++; d.first ??= `t${r.t} len ref=${r.len} got=${g.len}`; }
-  });
-  return d;
-}
 
-/** Feature-song pattern labels from the generator's table: [name, firstFrame, lastFrame]. Other songs: 120-frame buckets. */
-function patternLabels(name: string, ticks: number): Array<[string, number, number]> {
-  const doc = path.join(ROOT, 'thoughts/spot/2026-11-17-nes-feature-test-song.md');
-  if (name === 'nes_feature_test' && existsSync(doc)) {
-    return [...readFileSync(doc, 'utf8').matchAll(/^\| (\d+) \| ([^|]+) \| [^|]+ \| \d+ \| \d+ \| (\d+) \| (\d+) \|$/gm)].map((m) => [`${m[1]} ${m[2].trim()}`, Number(m[3]), Number(m[4])]);
-  }
-  return Array.from({ length: Math.ceil(ticks / 120) }, (_, i) => [`frames ${i * 120}`, i * 120, i * 120 + 119]);
+/** "driver limit" when the exporter's own lossy record explains the first bad field; otherwise "converter bug". */
+function labelChannels(chs: ChannelVerdict[], song: { lossy: string[]; pitchLossy: PitchLossySpan[] }): void {
+  // expansion-chip / subsong notes describe other channels, never an APU-channel mismatch
+  const has = (re: RegExp): string | undefined => song.lossy.find((l) => !/^(expansion chip|other subsongs)/.test(l) && re.test(l));
+  const byField: Record<string, RegExp> = {
+    period: /slide|vibrato|pitch|arp|tempo|tick rate|clamped|sample|note outside/i, sounding: /note cut|dropped to fit|tempo|tick rate|DPCM|past 63|delay/i,
+    vol: /volume|envelope|macro|tempo|tick rate/i, duty: /duty|macro/i, sweep: /sweep|effect/i, lin: /volume|macro|note cut|tempo|tick rate|effect/i, mode: /noise|effect|macro/i,
+    start: /DPCM|tempo|tick rate|dropped|past/i, rate: /DPCM|effect/i, length: /DPCM|cut/i, play: /DPCM|tempo|tick rate/i,
+  };
+  chs.forEach((c, i) => {
+    if (!c.first) return;
+    const f = c.first;
+    const span = song.pitchLossy.some((sp) => sp.ch === i && f.frame >= sp.from - 1 && f.frame <= sp.to + 1);
+    const hit = span ? 'pitchLossy span' : has(byField[f.field] ?? /$^/);
+    c.label = hit ? 'driver limit' : 'converter bug';
+    if (hit) c.why = hit;
+  });
 }
 
 function writeResults(r: unknown): void { writeFileSync(`${RESULTS}.tmp`, `${JSON.stringify(r, null, 1)}\n`); renameSync(`${RESULTS}.tmp`, RESULTS); }
@@ -193,7 +202,7 @@ const names = readdirSync(SONGS).filter((f) => f.endsWith('.fur')).map((f) => f.
 const toolHash = createHash('sha1').update(PLAYER).update(readFileSync(import.meta.filename)).update(readFileSync(path.join(ROOT, 'src/lib/export/nes/famistudioSong.ts'))).digest('hex');
 for (const name of names) {
   const fur = readFileSync(path.join(SONGS, `${name}.fur`));
-  const inputHash = createHash('sha1').update(fur).update(toolHash).update(String(TICKS)).digest('hex');
+  const inputHash = createHash('sha1').update(fur).update(toolHash).digest('hex');
   if (!only && !failedOnly && results[name]?.inputHash === inputHash) { console.log(`[SKIP] ${name}`); continue; }
   let v: Verdict;
   try {
@@ -201,40 +210,41 @@ for (const name of names) {
     const song = furnaceToFamistudio(m, 0, META.dpcmCap);
     const rom = buildFamistudioRom(PLAYER, META, song, { title: m.name || name, author: m.author });
     if (OUT) writeFileSync(path.join(OUT, `${name}.nes`), rom);
-    const ticks = Math.max(TICKS, ...song.firstNoteFrames.map((f) => f + FIRST_NOTE_MARGIN));
-    const run = mesen(rom, ticks, Math.ceil(ticks / 60) + 20, undefined, { tickAddress: NMI_ADDR, region: 'Ntsc' });
-    const s = sounding(run.writes);
-    // Bin the reference in real-time 60 Hz frames like the ROM's NMI, whatever the song's tick rate (a 56 Hz song binned
-    // per tick drifts against the ROM and turns one-frame arp steps into octave errors).
-    const refWrites = furnaceTicks(path.join(SONGS, `${name}.fur`), 60, ticks);
-    // Furnace stops writing at song end (-loops 0) and the held registers read as sounding forever; the ROM loops. Compare only up to the
-    // reference's last register write (+2 for the final row).
-    const refEnd = Math.min(ticks, refWrites.map((w) => w.length > 0).lastIndexOf(true) + 3);
+    // Reference first: Furnace stops writing at song end (-loops 0); compare the whole song up to its last register write (+2 for the final row).
+    const refWrites = furnaceTicks(path.join(SONGS, `${name}.fur`), 60, MAX_FRAMES);
+    const refEnd = refWrites.map((w) => w.length > 0).lastIndexOf(true) + 3;
+    const sub = m.subsongs[0];
+    const hz = sub.hz > 0 ? sub.hz : 60;
+    const spd = (sub.speedPattern?.length ? sub.speedPattern : [sub.speed1, sub.speed2 || sub.speed1]).reduce((x: number, y: number) => x + y, 0) / (sub.speedPattern?.length || 2);
+    const vt = sub.virtualTempo > 0 && sub.virtualTempoD > 0 ? sub.virtualTempoD / sub.virtualTempo : 1;
+    const rowOf = (t: number): string => { const r = Math.floor((t * hz / 60) / (spd * vt)); return `~order ${Math.floor(r / sub.patLen)} row ${r % sub.patLen}`; };
     const ref = apuStates(refWrites).slice(0, refEnd);
+    const refD = dpcmFrames(refWrites).slice(0, refEnd);
+    const lagGuess = Math.max(0, ...song.firstNoteFrames) + FIRST_NOTE_MARGIN;
+    const ticks = refEnd + lagGuess + 60;
+    const run = mesen(rom, ticks, Math.ceil(ticks / 20) + 60, undefined, { tickAddress: NMI_ADDR, region: 'Ntsc' });
+    const s = sounding(run.writes);
     // famistudio_init runs before the first NMI marker, so the harness drops its writes; replay the ones that set APU
-    // state the frames depend on ($4015 = $0F, triangle $4008 = $80, noise length load $400F = 0; famistudio_ca65.s
-    // famistudio_init). Without the $400F load the noise length counter reads 0 and the noise never counts as sounding.
-    const got = apuStates([[[0x4015, 0x0f], [0x4008, 0x80], [0x400f, 0x00], ...(run.writes[0] ?? [])], ...run.writes.slice(1)]);
-    const firstOn = (st: ChState[][]): number => st.findIndex((x) => x.some(Boolean));
-    const lag = Math.max(0, firstOn(got) - firstOn(ref));
-    const pitch = pitchDiff(ref, got, lag, song.pitchLossy, FURNACE_CLOCK[Number(/clockSel=(\d)/.exec(m.chipFlags?.[0] ?? '')?.[1] ?? 0)] ?? CPU_NTSC);
-    const dpcm = dpcmDiff(dpcmStarts(refWrites), dpcmStarts(run.writes), lag);
-    const byPattern: Record<string, number[]> = {};
-    for (const [label, a, b] of patternLabels(name, ticks)) {
-      const c = pitch.map((d) => d.badFrames.filter((t) => t >= a && t <= b).length);
-      if (c.some(Boolean)) byPattern[label] = c;
-    }
+    // state the frames depend on ($4015 = $0F, triangle $4008 = $80, noise length load $400F = 0; famistudio_ca65.s famistudio_init).
+    const gotWrites = [[[0x4015, 0x0f], [0x4001, 0x08], [0x4005, 0x08], [0x4008, 0x80], [0x400f, 0x00], ...(run.writes[0] ?? [])] as Array<[number, number]>, ...run.writes.slice(1)];
+    const got = apuStates(gotWrites);
+    const gotD = dpcmFrames(run.writes);
+    // Frame 0 = first frame any channel starts sounding (tone or DPCM start) on each side; the constant difference is the printed offset.
+    const firstOn = (st: ChState[][], d: DpcmFrame[]): number => { const a = st.findIndex((x) => x.some(Boolean)), b = d.findIndex((x) => x.start); return a < 0 ? b : b < 0 ? a : Math.min(a, b); };
+    const lag = firstOn(got, gotD) - firstOn(ref, refD);
+    const channels = lockstep(ref, got, refD, gotD, lag, FURNACE_CLOCK[Number(/clockSel=(\d)/.exec(m.chipFlags?.[0] ?? '')?.[1] ?? 0)] ?? CPU_NTSC, rowOf);
+    labelChannels(channels, song);
     if (DUMP) for (let t = DUMP[0]; t <= DUMP[1] && t < ref.length; t++) console.log(t, ref[t].map((x) => (x ? `${x.period}/${x.vol}` : '-').padStart(8)).join(' '), ' | ', (got[t + lag] ?? []).map((x) => (x ? `${x.period}/${x.vol}` : '-').padStart(8)).join(' '));
     const wantHz = song.firstNotes[0] >= 0 ? Math.round(440 * 2 ** ((song.firstNotes[0] - 57) / 12)) : undefined;
-    const pitchFail = pitch.flatMap((d, i) => (d.both > 0 && d.pitchBad / d.both > PITCH_FAIL_SHARE ? [i] : []));
-    v = { inputHash, pass: run.writes.length === ticks && song.channelsWithNotes.every((n, i) => !n || s.frames[i] > 0) && pitchFail.length === 0 && dpcm.rateBad === 0 && dpcm.lenBad === 0, pitchFail, ticks: run.writes.length, got: run.writes.flat().length, sounding: s.frames, hasNotes: song.channelsWithNotes, firstHz: s.firstHz, wantHz, romBytes: rom.length, songBytes: song.music.length, dpcmBytes: song.dpcm.length, lossy: song.lossy, pitch, lag, dpcm, byPattern };
+    v = { inputHash, pass: channels.every((c) => c.bad === 0) && run.writes.length >= refEnd + lag, channels, ticks: run.writes.length, got: run.writes.flat().length, sounding: s.frames, hasNotes: song.channelsWithNotes, firstHz: s.firstHz, wantHz, romBytes: rom.length, songBytes: song.music.length, dpcmBytes: song.dpcm.length, lossy: song.lossy, lag };
+    console.log(`  frames=${refEnd} offset(ROM-Furnace first sound)=${lag}`);
   } catch (e) {
     v = { inputHash, pass: false, ticks: 0, got: 0, sounding: [], hasNotes: [], error: e instanceof Error ? e.message : String(e) };
   }
   results[name] = v;
   writeResults(results);
-  v.pitch?.forEach((d, i) => console.log(`  ch${i} both=${d.both} pitchBad=${d.pitchBad} worst=${Math.round(d.worst)}c >10c=${d.over10} excused=${d.excused} volBad=${d.volBad} onlyRef=${d.onlyRef} onlyGot=${d.onlyGot} ${d.first ?? ''}`));
-  if (v.dpcm) console.log(`  dpcm ref=${v.dpcm.ref} got=${v.dpcm.got} rateBad=${v.dpcm.rateBad} lenBad=${v.dpcm.lenBad} ${v.dpcm.first ?? ''}`);
-  for (const [k, c] of Object.entries(v.byPattern ?? {})) console.log(`  bad [p1 p2 tri noi] ${c.join('/')}  ${k}`);
-  console.log(`${v.pass ? '[OK]' : '[FAIL]'} ${name} ticks=${v.ticks} sound=${v.sounding.join('/')} notes=${v.hasNotes.map((n) => (n ? 1 : 0)).join('')} hz=${v.firstHz ?? '-'}/${v.wantHz ?? '-'} song=${v.songBytes ?? '-'}B dpcm=${v.dpcmBytes ?? '-'}B lossy=${v.lossy?.length ?? '-'} lag=${v.lag ?? '-'}${v.error ? ` error=${v.error}` : ''}`);
+  for (const label of ['driver limit', 'converter bug'] as const) {
+    for (const c of (v.channels ?? []).filter((x) => x.label === label)) console.log(`  [${label.toUpperCase()}] ${c.ch} bad=${c.bad} first: frame ${c.first!.frame} ${c.first!.row ?? ''} field=${c.first!.field} expected{${c.first!.expected}} got{${c.first!.got}}${c.why ? ` (lossy: ${c.why})` : ''}`);
+  }
+  console.log(`${v.pass ? '[OK]' : '[FAIL]'} ${name} frames=${v.ticks} sound=${v.sounding.join('/')} notes=${v.hasNotes.map((n) => (n ? 1 : 0)).join('')} song=${v.songBytes ?? '-'}B dpcm=${v.dpcmBytes ?? '-'}B lossy=${v.lossy?.length ?? '-'} lag=${v.lag ?? '-'} driverLimit=${(v.channels ?? []).filter((c) => c.label === 'driver limit').length} converterBug=${(v.channels ?? []).filter((c) => c.label === 'converter bug').length}${v.error ? ` error=${v.error}` : ''}`);
 }
