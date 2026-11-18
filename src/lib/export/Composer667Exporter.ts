@@ -22,6 +22,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { encode669Cell } from '@/engine/uade/encoders/Composer667Encoder';
+import { patchModuleByLayout } from './layoutPatch';
 
 // -- Constants ----------------------------------------------------------------
 
@@ -155,7 +156,23 @@ function extractBreakFromPattern(song: TrackerSong, patIdx: number): number {
 
 // -- Main exporter ------------------------------------------------------------
 
+/**
+ * A song loaded from a 669 file is that file with each edited cell written in place (the layout the parser
+ * recorded), as Format669Exporter does: byte-exact when nothing was edited, the song message, sample file names,
+ * tempo and break lists kept as stored. Without a source, build one.
+ */
 export async function exportComposer667(
+  song: TrackerSong,
+): Promise<{ data: Blob; filename: string; warnings: string[] }> {
+  const src = song.uadeEditableFileData ?? song.libopenmptFileData;
+  if (!src || song.uadePatternLayout?.formatId !== 'composer667') return buildComposer667(song);
+  const r = patchModuleByLayout(src, song.uadePatternLayout, song.patterns);
+  const warnings = r.unplaced.length > 0 ? [`${r.unplaced.length} note(s) typed on rows the module has no place for were not saved`] : [];
+  const filename = (song.uadeEditableFileName ?? `${song.name || 'export'}.669`).split('/').pop() ?? 'export.669';
+  return { data: new Blob([r.bytes as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }), filename, warnings };
+}
+
+async function buildComposer667(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];

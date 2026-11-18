@@ -30,7 +30,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encode669Cell } from '@/engine/uade/encoders/Composer667Encoder';
+import { decode669Bytes, encode669Edit } from './Format669Parser';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
@@ -342,33 +342,15 @@ function _parse669(bytes: Uint8Array, filename: string): TrackerSong | null {
     numChannels: NUM_CHANNELS,
     numPatterns,
     moduleSize: buffer.byteLength,
-    encodeCell: encode669Cell,
-    decodeCell: (raw: Uint8Array): TrackerCell => {
-      const noteInstr = raw[0];
-      const instrVol  = raw[1];
-      const effParam  = raw[2];
-
-      let note = 0, instrument = 0, volume = 0;
-      if (noteInstr < 0xFE) {
-        const rawNote = noteInstr >> 2;
-        instrument = ((noteInstr & 0x03) << 4) | (instrVol >> 4);
-        note = Math.max(1, Math.min(96, rawNote + 37));
-      }
-      if (noteInstr <= 0xFE) {
-        const rawVol = instrVol & 0x0F;
-        volume = Math.round((rawVol * 64 + 8) / 15);
-      }
-
-      let effTyp = 0, eff = 0;
-      if (effParam !== 0xFF) {
-        const command = effParam >> 4;
-        const param   = effParam & 0x0F;
-        const mapped  = map669Effect(command, param);
-        effTyp = mapped.effTyp;
-        eff    = mapped.eff;
-      }
-
-      return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0 };
+    // One codec and file-pattern map with Format669Parser: the grid holds one pattern per song position, the file one per pattern.
+    encodeCell: encode669Edit,
+    decodeCell: decode669Bytes,
+    encodeOverStored: true,
+    propagateSharedCells: true,
+    positionBoundFields: (_row, channel) => (channel === 0 ? ['effTyp', 'eff'] : []),
+    getCellFileOffset: (pattern, row, channel) => {
+      const filePattern = rawOrders[pattern];
+      return filePattern === undefined ? -1 : patternDataBase + filePattern * PATTERN_SIZE + (row * NUM_CHANNELS + channel) * BYTES_PER_CELL;
     },
   };
 

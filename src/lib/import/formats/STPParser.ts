@@ -515,6 +515,8 @@ export async function parseSTPFile(
     initialBPM,
     linearPeriods:   false,
     uadePatternLayout,
+    uadeEditableFileData: buffer.slice(0),
+    uadeEditableFileName: filename,
   };
 }
 

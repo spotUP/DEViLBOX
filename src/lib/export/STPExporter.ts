@@ -52,6 +52,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { gridNoteToStpByte } from '@/lib/import/formats/stpPitch';
+import { patchModuleByLayout } from './layoutPatch';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
 
@@ -221,7 +222,23 @@ function extractSample(inst: { name?: string; sample?: { audioBuffer?: ArrayBuff
 const FILE_HEADER_SIZE = 204;
 const SAMPLE_CHUNK_SIZE = 82; // 31 (path) + 1 (flags) + 30 (name) + 20 (fields)
 
+/**
+ * A song loaded from an STP file is that file with each edited cell written in place (the layout the parser
+ * recorded): byte-exact when nothing was edited, whatever the source version (0, 1 or 2) and its scripts,
+ * drumpad and sample chunks the from-scratch version 0 writer below cannot carry. Without a source, build one.
+ */
 export async function exportSTP(
+  song: TrackerSong,
+): Promise<{ data: Blob; filename: string; warnings: string[] }> {
+  const src = song.uadeEditableFileData ?? song.libopenmptFileData;
+  if (!src || song.uadePatternLayout?.formatId !== 'stp') return buildSTP(song);
+  const r = patchModuleByLayout(src, song.uadePatternLayout, song.patterns);
+  const warnings = r.unplaced.length > 0 ? [`${r.unplaced.length} note(s) typed on rows the module has no place for were not saved`] : [];
+  const filename = (song.uadeEditableFileName ?? `${song.name || 'export'}.stp`).split('/').pop() ?? 'export.stp';
+  return { data: new Blob([r.bytes as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }), filename, warnings };
+}
+
+async function buildSTP(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];

@@ -41,7 +41,7 @@ import { encode669Cell } from '@/engine/uade/encoders/Composer667Encoder';
 // -- Cell codec for write-back ------------------------------------------------
 
 /** The grid cell a stored 3-byte 669 cell decodes to (the parser's own cell decode), with the exact source bytes as carriers. */
-function decode669Bytes(bytes: Uint8Array): TrackerCell {
+export function decode669Bytes(bytes: Uint8Array): TrackerCell {
   const byte0 = bytes[0];
   const byte1 = bytes[1];
   const byte2 = bytes[2];
@@ -68,7 +68,7 @@ function decode669Bytes(bytes: Uint8Array): TrackerCell {
  * 4-bit volume, effect); everything else keeps its stored byte. The grid's injected speed/break effects on channel 0 are not
  * in the cell, so they never overwrite the stored effect byte.
  */
-function encode669Edit(cell: TrackerCell, stored?: Uint8Array, channel?: number): Uint8Array {
+export function encode669Edit(cell: TrackerCell, stored?: Uint8Array, channel?: number): Uint8Array {
   if (!stored) return encode669Cell(cell);
   const out = stored.slice(0, 3);
   const was = decode669Bytes(stored);

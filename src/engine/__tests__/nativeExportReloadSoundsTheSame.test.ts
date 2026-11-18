@@ -318,6 +318,8 @@ const EXPECTED_NO_RIG: string[] = [
   'richard-joseph/cannon fodder (intro).sng', 'synth-dream/sdr.monsterbusiness 1', 'tfm-music-maker/rainstorm.tfe', 'tfmx/mdat.hbtitle',
   'composer-669/speed fighter.669', 'formats/Epic Pinball - Song 0 - Title.psm', 'formats/avoid.amf', 'formats/dreamer.jxs', 'formats/kdmsong.kdm',
   'digital-tracker-dtm/sonic subspace.dtm', 'organya/obj0640-1.org', 'studio-pixel---piyopiyo/obj0176-1.pmd',
+  // Byte-exact since the layout-patch export; UADE refuses both, so only bytes and grid are held.
+  'composer-667/speed fighter.667', 'formats/noname.stp',
 ];
 /**
  * Files UADE takes but plays as noise, so its stream says nothing about the song: the .sog is the
@@ -500,8 +502,6 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   amf: { edited: 'the edit is not written: the exported file equals the original' },
   psm: { edited: 'the edit is not written: the exported file equals the original' },
   digi: { edited: 'the edited note is not heard in the rendered stream' },
-  composer667: { unedited: 'exported bytes differ from the original (first diff at 18)', edited: 'the edit changes the instrument column of other cells' },
-  stp: { unedited: 'exported bytes differ from the original (first diff at 5)', edited: 'songPositions differ and the reloaded cells are zeroed' },
   ptm: { unedited: 'export touches an audio context that is not initialised (ToneEngine)', edited: 'export touches an audio context that is not initialised (ToneEngine)' },
   xm: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed', edited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
   mod: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },

@@ -90,11 +90,11 @@
     },
     "composer667": {
       "exporter": "Composer667Exporter.exportComposer667",
-      "tier": "pattern-data",
-      "status": "pattern-match",
-      "matchPct": 0.8791,
-      "cells": 39936,
-      "bytes": 495190
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 398422,
+      "bytes": 398422
     },
     "coreDesign": {
       "exporter": "CoreDesignExporter.exportCoreDesign",
@@ -882,11 +882,11 @@
     },
     "stp": {
       "exporter": "STPExporter.exportSTP",
-      "tier": "pattern-data",
-      "status": "pattern-match",
-      "matchPct": 0.7722,
-      "cells": 4864,
-      "bytes": 278274
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 278466,
+      "bytes": 278466
     },
     "stx": {
       "exporter": "STXExporter.exportSTX",
@@ -1018,10 +1018,10 @@
     },
     "unic": {
       "exporter": "UNICExporter.exportUNIC",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 5120,
+      "cells": 100942,
       "bytes": 100942
     },
     "wallyBeben": {
