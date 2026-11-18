@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import fixture from './fixtures/e6.uprough-song.json';
 vi.mock('@engine/ToneEngine', () => {
   const engine: unknown = new Proxy({}, { get: (_t, k) => () => (k === 'preloadInstruments' ? Promise.resolve() : undefined) });
   return { getToneEngine: () => engine, ToneEngine: { getInstance: () => engine } };
@@ -16,6 +15,8 @@ import { useProjectStore } from '@stores/useProjectStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useSongLoadStore } from '@/stores/useSongLoadStore';
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
+import { loadFixture } from '../../../engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture<{ song: Record<string, unknown> } & Record<string, unknown>>(import.meta.url, './fixtures/e6.uprough-song.json');
 
 const A = JSON.stringify(fixture);
 const B = JSON.stringify({ ...fixture, song: { ...fixture.song, name: 'song B' }, order: [0, 1, 2] });

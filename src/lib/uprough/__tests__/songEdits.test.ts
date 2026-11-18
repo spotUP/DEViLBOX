@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/e6.uprough-song.json';
 import { parseSongFile, songFileToSong, cellKey } from '../songFile';
 import { deleteRow, editCell, insertRow, moveBlock, transposeCell } from '../songEdits';
+import { loadFixture } from '../../../engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/e6.uprough-song.json');
 
 const fresh = () => songFileToSong(parseSongFile(structuredClone(fixture)));
 const sid = 'verse_0';

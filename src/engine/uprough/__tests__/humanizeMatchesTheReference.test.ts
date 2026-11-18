@@ -5,7 +5,8 @@
 import { describe, expect, it } from 'vitest';
 import { NumpyRandomState } from '@/engine/turntable/turntableSim';
 import { humanizeDraw, humanizeSeed, varyHit } from '../humanize';
-import fixture from './fixtures/humanize.json';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/humanize.json');
 
 interface Case { seed: number; tighten: number; h: Record<string, number>; dtype: string; length: number; samples: number[] }
 const ref = fixture as unknown as { keep: number; cases: Case[] };

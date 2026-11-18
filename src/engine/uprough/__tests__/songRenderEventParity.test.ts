@@ -6,11 +6,12 @@
  * `decide` and `scratchplan` exist only on the host generate path, so render mode carries neither.
  */
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/r2_event_parity.json';
 import { songFileToBarEvents } from '@/lib/uprough/barEvents';
 import type { SongFileDoc } from '@/lib/uprough/songFile';
 import type { R2Event } from '../r2Events';
 import { renderSong, songRenderOptions } from '../songRender';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/r2_event_parity.json');
 
 type Row = (string | string[])[];
 const hostAll = fixture as unknown as { doc: SongFileDoc; shape: Row[]; hatpool_variants: number[] };

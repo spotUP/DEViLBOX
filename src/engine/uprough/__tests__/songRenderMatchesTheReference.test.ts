@@ -16,11 +16,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { brotliDecompressSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import fixture from './fixtures/song_render.json';
 import type { SongFileDoc } from '@/lib/uprough/songFile';
 import * as busEffects from '../effects/busEffects';
 import * as songMix from '../mix/songMix';
 import { renderSongFile, scratchDirt } from '../songRender';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/song_render.json');
 
 interface Arr { n: number; off: number; sha: string; peak: number }
 interface SectionRec { n: number; has_drums: boolean; reinforce: boolean; bass_g: number; drums?: Arr; bass?: Arr; melody?: Arr }

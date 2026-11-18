@@ -6,7 +6,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import * as bus from '../effects/busEffects';
-import fixture from './fixtures/bus_effects.json';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/bus_effects.json');
 
 interface Case { effect: string; options: Record<string, unknown>; length: number; rms: number; samples: number[] }
 const ref = fixture as unknown as { rate: number; keep: number; input: number[]; cases: Case[] };

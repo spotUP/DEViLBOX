@@ -3,8 +3,9 @@
  * Fixture: tools/softsynth-fixtures/gen_melody_bar.py (every 13th sample, + length + RMS). Tolerance 1e-9 per kept sample.
  */
 import { afterAll, describe, expect, it } from 'vitest';
-import fixture from './fixtures/melody_bar.json';
 import { renderMelodyBar } from '../voices/melodyBar';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture<{ rate: number; keep: number; cases: { voice: Parameters<typeof renderMelodyBar>[0]; bpm: number; seed: number; chordRoot: number; notes: number[][]; sig: { length: number; rms: number; kept: number[] } }[] }>(import.meta.url, './fixtures/melody_bar.json');
 
 const TOL = 1e-9;
 const worst: Record<string, number> = {};

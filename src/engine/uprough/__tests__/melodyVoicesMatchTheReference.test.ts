@@ -3,8 +3,9 @@
  * Fixture: tools/softsynth-fixtures/gen_melody_voices.py (every 13th sample, + length + RMS). Tolerance 1e-9.
  */
 import { afterAll, describe, expect, it } from 'vitest';
-import fixture from './fixtures/melody_voices.json';
 import { renderMelodyVoiceNote, type MelodyVoice } from '../voices/melodyVoices';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture<{ rate: number; keep: number; cases: { voice: string; semi: number; dur: number; prev: number; seed: number; rate: number; sig: { length: number; rms: number; kept: number[] } }[] }>(import.meta.url, './fixtures/melody_voices.json');
 
 const TOL = 1e-9;
 const worst: Record<string, number> = {};

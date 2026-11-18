@@ -4,9 +4,10 @@
  * bp / hp / phaseOf were already ported (refDsp, synthDsp); this fixture adds their cases.
  */
 import { afterAll, describe, expect, it } from 'vitest';
-import fixture from './fixtures/melody_primitives.json';
 import { bp, hp } from '@/engine/dj/scratch/refDsp';
 import { chorus, driftCurve, noise, osc, phaseOf, type ChorusKind } from '../synthDsp';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture<{ rate: number; keep: number; cases: unknown }>(import.meta.url, './fixtures/melody_primitives.json');
 
 const TOL = 1e-9;
 const N = 4410;

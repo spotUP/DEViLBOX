@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/e6.uprough-song.json';
 import { visibleChannelMask } from '@/lib/tracker/visibleChannels';
 import { LANES, parseSongFile, songFileToSong, type SongFileDoc } from '../songFile';
+import { loadFixture } from '../../../engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/e6.uprough-song.json');
 
 describe('an imported Up Rough song shows every lane', () => {
   it('keeps the empty clap lane visible: all 11 lanes are shown', () => {

@@ -1,7 +1,6 @@
 /** UPROUGH-GENERATE: hamburger item -> dialog -> server generate -> the tracker holds the generated song. */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
-import fixture from '@/lib/uprough/__tests__/fixtures/e6.uprough-song.json';
 
 vi.mock('@engine/ToneEngine', () => {
   const engine: unknown = new Proxy({}, { get: (_t, k) => () => (k === 'preloadInstruments' ? Promise.resolve() : undefined) });
@@ -45,6 +44,8 @@ import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { patternFillLoaded } from '@/lib/uprough/factory/patternFill';
 import { bankVoice } from '@/lib/uprough/factory/voiceAudition';
 import { songDrumBank } from '@/engine/uprough/drumBank';
+import { loadFixture } from '../../../engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, '../../../lib/uprough/__tests__/fixtures/e6.uprough-song.json');
 
 /** The scripted host stream with the song on the done line, as the server sends it. */
 function scriptedStream(): { events: R2Event[]; text: string } {

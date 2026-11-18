@@ -3,9 +3,10 @@
  * DecideCells names, and the chops / vocals strip summaries read them.
  */
 import { describe, expect, it } from 'vitest';
-import records from './fixtures/decideRecords.json';
 import { chopsSummary, decideToCells, vocalsSummary } from '../decideToCells';
 import type { ChopsBreak, ChopsChopped, DecideCells, DrumHit, R2Event, Trap808Event, VocalWord } from '@/engine/uprough/r2Events';
+import { loadFixture } from '../../../../engine/uprough/__tests__/loadFixture';
+const records = loadFixture<Record<string, unknown>>(import.meta.url, './fixtures/decideRecords.json');
 
 type Decide = Extract<R2Event, { type: 'decide' }>;
 const KINDS = ['drums', 'bass_trap808', 'bass_list', 'vocals', 'chops_break', 'chops_chopped', 'melody'] as const;

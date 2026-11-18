@@ -14,11 +14,12 @@
  */
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import fixture from './fixtures/song_drums.json';
 import { songFileToBarEvents, type BarEvents } from '@/lib/uprough/barEvents';
 import type { SongFileDoc } from '@/lib/uprough/songFile';
 import * as renderDrumBarModule from '../renderDrumBar';
 import { songDrums } from '../songDrums';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/song_drums.json');
 
 interface Arr { n: number; sha: string; head: string; peak: number }
 interface Lane { called: boolean; bars: number; drops: unknown[]; buf: Arr }

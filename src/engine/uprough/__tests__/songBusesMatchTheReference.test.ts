@@ -16,13 +16,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { brotliDecompressSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import fixture from './fixtures/bus_chains.json';
 import { songFileToBarEvents, type BarEvents } from '@/lib/uprough/barEvents';
 import type { SongFileDoc } from '@/lib/uprough/songFile';
 import * as busEffects from '../effects/busEffects';
 import { sectionBassOn } from '../songBass';
 import { cleanDirt, dirtConfig, sectionMelodyOn, songBuses } from '../songBuses';
 import { sectionDrumsOn } from '../songDrums';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/bus_chains.json');
 
 interface Arr { n: number; off: number; sha: string; peak: number }
 type Lane = 'drums' | 'bass' | 'melody';

@@ -4,12 +4,13 @@
  * that a listener never changes the audio.
  */
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/song_render.json';
 import { songFileToBarEvents } from '@/lib/uprough/barEvents';
 import type { SongFileDoc } from '@/lib/uprough/songFile';
 import type { R2Event } from '../r2Events';
 import { renderSong, songRenderOptions } from '../songRender';
 import { renderSongCached, type SectionMixCache } from '../songRenderCache';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/song_render.json');
 
 const cases = (fixture as unknown as { cases: { name: string; doc: SongFileDoc }[] }).cases;
 const pick = cases

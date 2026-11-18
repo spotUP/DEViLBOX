@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/e6.uprough-song.json';
 import { insertKey } from '@/engine/uprough/effects/insertEffects';
 import { parseSongFile, songFileToSong, songToSongFile, type SongFileDoc, type UpRoughSong } from '../songFile';
+import { loadFixture } from '../../../engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture<{ song: Record<string, unknown> } & Record<string, unknown>>(import.meta.url, './fixtures/e6.uprough-song.json');
 
 const fresh = (): UpRoughSong => songFileToSong(parseSongFile(structuredClone(fixture)));
 void (null as unknown as SongFileDoc);

@@ -1,8 +1,9 @@
 /** The R2a peaks summary against the shared vector (independent numpy implementation) and the emitter's numbering. */
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/r2_peaks.json';
 import { createEmitter, type R2Event } from '../r2Events';
 import { envOf, peaks } from '../r2Peaks';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/r2_peaks.json');
 
 const cases = (fixture as unknown as { cases: { name: string; buf: number[]; peaks: ReturnType<typeof peaks> }[] }).cases;
 

@@ -9,7 +9,8 @@ import { DRUM_VOICES, PERCUSSION_VOICES } from '../voices/drums';
 import { getSoftsynthVoice } from '../voiceRegistry';
 import { FILE_VOICES, VOICE_TO_SOFTSYNTH } from '@/lib/uprough/songFile';
 import { SOFTSYNTH_RATE } from '../softsynthVoice';
-import fixture from './fixtures/drums.json';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/drums.json');
 
 interface Case { voice: string; seed: number; params: Record<string, number>; length: number; rms: number; samples: number[] }
 const ref = fixture as unknown as { keep: number; cases: Case[] };

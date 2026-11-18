@@ -13,12 +13,13 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { installRealWebAudio } from '@/test/audio/realWebAudio';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { MELODY_TIMBRE_SOFTSYNTH, parseSongFile, songFileToSong } from '@/lib/uprough/songFile';
-import e6 from '@/lib/uprough/__tests__/fixtures/e6.uprough-song.json';
 import { xmNoteToNoteName } from '@/engine/replayer/PeriodTables';
 import { SOFTSYNTH_RATE, voiceDefaults } from '../softsynthVoice';
 import { getSoftsynthVoice } from '../voiceRegistry';
 import { resetSoftsynthRenderCount, softsynthRenderCount } from '../UpRoughSoftsynth';
-import drumFixture from './fixtures/drums.json';
+import { loadFixture } from './loadFixture';
+const e6 = loadFixture<{ song: { melody_voice: string } }>(import.meta.url, '../../../lib/uprough/__tests__/fixtures/e6.uprough-song.json');
+const drumFixture = loadFixture<{ keep: number; cases: { voice: string; params: Record<string, number>; seed: number; samples: number[] }[] }>(import.meta.url, './fixtures/drums.json');
 
 type Engine = {
   ensureInstrumentReady: (c: InstrumentConfig) => Promise<void>;

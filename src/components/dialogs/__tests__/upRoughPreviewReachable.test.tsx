@@ -1,7 +1,6 @@
 /** UPROUGH-PREVIEW: hamburger item -> exported song text -> server render -> the playback path, once. */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
-import fixture from '@/lib/uprough/__tests__/fixtures/e6.uprough-song.json';
 
 vi.mock('@engine/ToneEngine', () => {
   const engine: unknown = new Proxy({}, { get: (_t, k) => () => (k === 'preloadInstruments' ? Promise.resolve() : undefined) });
@@ -20,6 +19,8 @@ import { FT2Toolbar } from '@components/tracker/FT2Toolbar/FT2Toolbar';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { playAudition } from '@lib/uprough/auditionPlayer';
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
+import { loadFixture } from '../../../engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, '../../../lib/uprough/__tests__/fixtures/e6.uprough-song.json');
 
 afterEach(() => {
   cleanup();

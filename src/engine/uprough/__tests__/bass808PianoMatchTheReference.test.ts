@@ -6,10 +6,11 @@
  * libm in the last ulps, and the Butterworth/one-pole recursions carry that forward.
  */
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/bass808_piano.json';
 import { bass808Voice, render808Sequence } from '../voices/bass808';
 import { pianoVoice } from '../voices/piano';
 import { voiceDefaults, type SoftsynthVoice } from '../softsynthVoice';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture<{ rate: number; keep: number; cases: unknown; sequences: unknown }>(import.meta.url, './fixtures/bass808_piano.json');
 
 const TOL = 1e-9;
 const voices: Record<string, SoftsynthVoice> = { bass808: bass808Voice, piano: pianoVoice };

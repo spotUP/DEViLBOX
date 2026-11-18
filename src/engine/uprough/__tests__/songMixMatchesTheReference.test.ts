@@ -7,7 +7,8 @@
 import { describe, expect, it } from 'vitest';
 import * as bus from '../effects/busEffects';
 import * as mix from '../mix/songMix';
-import fixture from './fixtures/song_mix.json';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/song_mix.json');
 
 interface Out { length: number; rms: number; samples: number[] }
 interface Case extends Partial<Out> {

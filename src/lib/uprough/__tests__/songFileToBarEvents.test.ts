@@ -4,9 +4,10 @@
  * 808 = ebass path, lofi; each also with grid edits that must win over the side table).
  */
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/bar_events.json';
 import { parseSongFile, type SongFileDoc } from '../songFile';
 import { hostNoteName, songFileToBarEvents } from '../barEvents';
+import { loadFixture } from '../../../engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/bar_events.json');
 
 interface Case { name: string; doc: SongFileDoc; events: unknown }
 const cases = fixture as unknown as Case[];

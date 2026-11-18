@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import fixture from './fixtures/e6.uprough-song.json';
 vi.mock('@engine/ToneEngine', () => {
   const engine: unknown = new Proxy({}, { get: (_t, k) => () => (k === 'preloadInstruments' ? Promise.resolve() : undefined) });
   return { getToneEngine: () => engine, ToneEngine: { getInstance: () => engine } };
@@ -15,6 +14,8 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useProjectStore } from '@stores/useProjectStore';
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
+import { loadFixture } from '../../../engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/e6.uprough-song.json');
 
 describe('Up Rough song file through the tracker store', () => {
   it('openUpRoughSong -> exportUpRoughSong runs parse/serialize and returns the same file', async () => {

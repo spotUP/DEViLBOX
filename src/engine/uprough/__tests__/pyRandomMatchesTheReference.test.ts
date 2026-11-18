@@ -3,9 +3,10 @@
  * (tools/softsynth-fixtures/gen_py_random.py, plan 2026-10-19 O6d-0). Every value is compared exactly.
  */
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/py_random.json';
 import { PyRandom } from '../pyRandom';
 import { NumpyRandomState } from '../../turntable/turntableSim';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/py_random.json');
 
 type Mix = [string, number][];
 const ref = fixture as unknown as {

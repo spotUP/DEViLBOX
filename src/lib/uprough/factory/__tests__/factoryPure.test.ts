@@ -8,9 +8,10 @@ import { peaks } from '@/engine/uprough/r2Peaks';
 import type { R2Event } from '@/engine/uprough/r2Events';
 import { songFileToBarEvents } from '../../barEvents';
 import { noteFromText, ROWS_PER_BAR, type SongFileDoc } from '../../songFile';
-import records from './fixtures/decideRecords.json';
-import trapSong from '../../__tests__/fixtures/e6.uprough-song.json';
-import listSong from '../../__tests__/fixtures/ebass_sampled.uprough-song.json';
+import { loadFixture } from '../../../../engine/uprough/__tests__/loadFixture';
+const records = loadFixture<Record<string, unknown>>(import.meta.url, './fixtures/decideRecords.json');
+const trapSong = loadFixture(import.meta.url, '../../__tests__/fixtures/e6.uprough-song.json');
+const listSong = loadFixture(import.meta.url, '../../__tests__/fixtures/ebass_sampled.uprough-song.json');
 
 const tone = (n: number, decay: number): Float64Array => Float64Array.from({ length: n }, (_, i) => Math.sin(i / 5) * Math.exp(-i / decay));
 

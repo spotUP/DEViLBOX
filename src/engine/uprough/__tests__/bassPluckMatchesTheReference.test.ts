@@ -4,8 +4,9 @@
  * Tolerance 1e-9 per kept sample.
  */
 import { afterAll, describe, expect, it } from 'vitest';
-import fixture from './fixtures/bass_pluck.json';
 import { renderPluckBassNote, type PluckBassVoice } from '../voices/bassPluck';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture<{ rate: number; keep: number; cases: { voice: string; semi: number; dur: number; glide: number; seed: number; bcut: number; sig: { length: number; rms: number; kept: number[] } }[] }>(import.meta.url, './fixtures/bass_pluck.json');
 
 const TOL = 1e-9;
 const worst: Record<string, number> = {};

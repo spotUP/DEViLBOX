@@ -8,7 +8,6 @@
  * call counts on startUpRoughSong (vi.spyOn on the real export; must stay at zero).
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import fixture from '../../lib/uprough/__tests__/fixtures/e6.uprough-song.json';
 
 const clock = vi.hoisted(() => ({ t: 10 }));
 const synthCalls = vi.hoisted(() => ({ names: [] as string[], channels: [] as number[], muted: new Set<number>() }));
@@ -49,6 +48,8 @@ import { TrackerReplayer, type TrackerSong } from '../TrackerReplayer';
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { loadFixture } from '../uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, '../../lib/uprough/__tests__/fixtures/e6.uprough-song.json');
 
 /** The tracker's song for what the opener loaded into the stores (the notes are on the grid; only play() decides who sounds). */
 function loadedTrackerSong(): TrackerSong {

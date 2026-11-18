@@ -6,11 +6,12 @@
  * lengths, the same voice set in the same order.
  */
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/drum_bank.json';
 import {
   SNARE_ACCENT_VOICE, SNARE_GHOST_VOICE, STYLE_DRUMS, addSnareAccent, addSnareGhost, boombapSnare, songDrumBank,
   type HipHopStyle,
 } from '../drumBank';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/drum_bank.json');
 
 interface Pinned { n: number; kept: number[]; rms: number }
 interface Bank { style: HipHopStyle; seed: number; machine: string; keys: string[]; voices: Record<string, Pinned> }

@@ -5,8 +5,9 @@
  * Tolerance 1e-9 per kept sample. karplus(fractional) has no host reference (the host raises), so it is not asserted here.
  */
 import { afterAll, describe, expect, it } from 'vitest';
-import fixture from './fixtures/bass_primitives.json';
 import { distort, driftCurve, env, fm2op, karplus, moogLadder, osc, type OscKind } from '../synthDsp';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture<{ rate: number; keep: number; cases: unknown }>(import.meta.url, './fixtures/bass_primitives.json');
 
 const TOL = 1e-9;
 const N = 4410;

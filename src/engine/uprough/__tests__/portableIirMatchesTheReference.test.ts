@@ -7,7 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { kernelCos, kernelSin, portableButter, portableTan } from '@/engine/dj/scratch/portableIir';
 import { pasin, pcos, pexp, pexpm1, psin, ptanh } from '@/engine/dj/scratch/portableMath';
 import { besselI0, butter, firwinKaiser, resamplePoly } from '@/engine/dj/scratch/refDsp';
-import ref from './fixtures/portable_iir.json';
+import { loadFixture } from './loadFixture';
+const ref = loadFixture(import.meta.url, './fixtures/portable_iir.json');
 
 type Case = { N: number; Wn: number | [number, number]; btype: 'low' | 'high' | 'band'; b: number[]; a: number[] };
 const fx = ref as { tan: [number, number][]; sin: [number, number][]; cos: [number, number][]; butter: Case[];

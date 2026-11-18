@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/e6.uprough-song.json';
 import { FILE_VOICES, MELODY_TIMBRE_SOFTSYNTH, parseSongFile, songBassCut, songMelodyVoice, softsynthOfFileVoice, songFileToSong, songToSongFile, type SongFileDoc } from '../songFile';
+import { loadFixture } from '../../../engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/e6.uprough-song.json');
 
 const load = (): SongFileDoc => structuredClone(fixture) as unknown as SongFileDoc;
 

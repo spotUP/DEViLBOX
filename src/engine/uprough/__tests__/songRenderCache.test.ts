@@ -5,12 +5,13 @@
  * the cache module imports it from, which counts the host's section renders.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import fixture from './fixtures/song_render.json';
 import { songFileToBarEvents } from '@/lib/uprough/barEvents';
 import type { SongFileDoc } from '@/lib/uprough/songFile';
 import * as songRender from '../songRender';
 import { renderSong, songRenderOptions } from '../songRender';
 import { renderSongCached, sectionKey, type SectionMixCache } from '../songRenderCache';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/song_render.json');
 
 const TOL = 1e-9;
 const cases = (fixture as unknown as { cases: { name: string; doc: SongFileDoc }[] }).cases;

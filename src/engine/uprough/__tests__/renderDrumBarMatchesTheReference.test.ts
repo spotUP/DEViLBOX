@@ -8,10 +8,11 @@
  */
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/render_drum_bar.json';
 import { drumBank, type DrumBank, type HipHopStyle } from '../drumBank';
 import { ProbabilityMemory, buildHatPool } from '../hatPath';
 import { renderDrumBar, type BarEventInput } from '../renderDrumBar';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/render_drum_bar.json');
 
 interface Arr { n: number; sha: string; head: string }
 interface Bar { seed: number; events: BarEventInput[]; buf: Arr; next: number; w: number[]; last: number; skipped: number; peak: number }

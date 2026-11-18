@@ -7,12 +7,13 @@
  */
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/hat_path.json';
 import {
   ProbabilityMemory, ZONE_EQ_PARAMS, applyHatVary, barHatRng, buildHatPool, drawHatVary, pickHatIndex,
   renderOpenHatChoke, type HatVary,
 } from '../hatPath';
 import type { HipHopStyle } from '../drumBank';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/hat_path.json');
 
 interface Arr { n: number; sha: string; b64?: string }
 interface PoolSrc { style: HipHopStyle; rate: number; seed: number; n: number }

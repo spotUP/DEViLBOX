@@ -15,12 +15,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { brotliDecompressSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import fixture from './fixtures/song_melody.json';
 import { songFileToBarEvents, type BarEvents } from '@/lib/uprough/barEvents';
 import { songMelodyVoice, type SongFileDoc } from '@/lib/uprough/songFile';
 import * as melodyBarModule from '../voices/melodyBar';
 import { CHORDS, MODES, melodyBarNotes } from '../melodyNotes';
 import { songMelody } from '../songMelody';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/song_melody.json');
 
 interface Arr { n: number; off: number; sha: string; peak: number }
 

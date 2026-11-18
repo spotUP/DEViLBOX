@@ -5,8 +5,9 @@
  * (the song_file.py CLI has no use_trap808 switch, and golden_era plays the deep-trap 808 by default).
  */
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/ebass_sampled.uprough-song.json';
 import { parseSongFile, songFileToSong, songToSongFile, type SongFileDoc } from '../songFile';
+import { loadFixture } from '../../../engine/uprough/__tests__/loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/ebass_sampled.uprough-song.json');
 
 const load = (): SongFileDoc => structuredClone(fixture) as unknown as SongFileDoc;
 const firstEbass = (d: SongFileDoc): Record<string, unknown> => {

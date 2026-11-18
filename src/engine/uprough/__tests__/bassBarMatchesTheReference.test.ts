@@ -3,8 +3,9 @@
  * Fixture: tools/softsynth-fixtures/gen_bass_bar.py (every 13th sample, + length + RMS). Tolerance 1e-9 per kept sample.
  */
 import { afterAll, describe, expect, it } from 'vitest';
-import fixture from './fixtures/bass_bar.json';
 import { renderBassBar } from '../voices/bassBar';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture<{ rate: number; keep: number; cases: { style: string; voice: Parameters<typeof renderBassBar>[0]; bpm: number; seed: number; bcut: number; groove: Parameters<typeof renderBassBar>[2]['groove']; events: number[][]; sig: { length: number; rms: number; kept: number[] } }[] }>(import.meta.url, './fixtures/bass_bar.json');
 
 const TOL = 1e-9;
 const worst: Record<string, number> = {};

@@ -22,7 +22,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { brotliDecompressSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import fixture from './fixtures/song_bass.json';
 import { songFileToBarEvents, type BarEvents } from '@/lib/uprough/barEvents';
 import { songBassVoice, type SongFileDoc, type SongFileGroove } from '@/lib/uprough/songFile';
 import * as bass808Module from '../voices/bass808';
@@ -31,6 +30,8 @@ import { STYLE_808_PROFILE, classifyKickRelationship, kickTimesS, planKickRelati
 import * as bassBarModule from '../voices/bassBar';
 import type { BassVoice } from '../voices/bassSynth';
 import { songBass } from '../songBass';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/song_bass.json');
 
 interface Arr { n: number; off: number; sha: string; peak: number }
 

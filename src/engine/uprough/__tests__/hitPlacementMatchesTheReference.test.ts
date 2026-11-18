@@ -5,12 +5,13 @@
  * draw are compared exactly: the TypeScript keeps the host's float64 operation order and Math.trunc for int().
  */
 import { describe, expect, it } from 'vitest';
-import fixture from './fixtures/hit_placement.json';
 import {
   Lfsr, drumBarContext, drumHitPlacement, performanceProfile, type DrumEvent,
 } from '../hitPlacement';
 import type { HipHopStyle } from '../drumBank';
 import type { HitHumanize } from '../humanize';
+import { loadFixture } from './loadFixture';
+const fixture = loadFixture(import.meta.url, './fixtures/hit_placement.json');
 
 interface Bar {
   name: string; style: HipHopStyle; seed: number; bpm: number; rate: number; as_notes: boolean;
