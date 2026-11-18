@@ -157,6 +157,12 @@ export function expandProcMacro(mac: FurnaceMacro, version = 245): FurnaceMacro 
 }
 
 function macroEnvelope(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch', lossy: Lossy, step?: (v: number) => number, rate = 1, version = 245): number[] {
+  const f = macroFrames(macIn, kind, lossy, step, rate, version);
+  return encodeEnvelope(f.vals, f.loop, f.release, kind, f.relative);
+}
+
+/** Per-frame envelope values of a Furnace macro (what macroEnvelope encodes). */
+function macroFrames(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch', lossy: Lossy, step?: (v: number) => number, rate = 1, version = 245): { vals: number[]; loop: number; release: number; relative: boolean } {
   const mac = expandProcMacro(macIn, version);
   const speed = Math.max(1, mac.speed || 1);
   const delay = Math.max(0, mac.delay || 0);
@@ -188,7 +194,38 @@ function macroEnvelope(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitc
   if (vals.length > 240) { lossy.add(`${kind} macro longer than 240 frames (cut)`); vals.length = 240; if (loop >= 240) loop = -1; if (release >= 240) release = -1; }
   if (vals.length > 0 && loop < 0 && kind !== 'vol' && kind !== 'pitch') loop = -1;
   // `step` maps a macro value to envelope units (arp: per-note target; pitch: linear 1/128 semitone -> period units).
-  return encodeEnvelope(vals.map((v) => (step && (kind === 'arp' || kind === 'pitch') ? step(v) : kind !== 'arp' ? v : (v << 2) >> 2)), loop, kind === 'vol' ? release : -1, kind, kind === 'pitch' && (mac.mode & 1) === 1);
+  return { vals: vals.map((v) => (step && (kind === 'arp' || kind === 'pitch') ? step(v) : kind !== 'arp' ? v : (v << 2) >> 2)), loop, release: kind === 'vol' ? release : -1, relative: kind === 'pitch' && (mac.mode & 1) === 1 };
+}
+
+/**
+ * Furnace adds vibrato (chan.pitch) and the pitch macro (pitch2); FamiStudio's 0x49 override replaces the instrument
+ * pitch envelope, so both go into one relative envelope: per-frame deltas of (macro offset + vibrato), +-63 per step.
+ * `vib` is one looping vibrato cycle (absolute offsets); `mac` is the macro as macroFrames gives it (period units).
+ */
+export function mergeVibratoPitch(vib: number[], mac: { vals: number[]; loop: number; relative: boolean }, lossy: { add(s: string): void }): { deltas: number[]; loop: number } {
+  let len = mac.vals.length;
+  // A held tail (ADSR sustain, trailing zero increments) repeats already: end the macro part where it stops moving.
+  if (mac.loop < 0) while (len > 1 && (mac.relative ? mac.vals[len - 1] === 0 : mac.vals[len - 1] === mac.vals[len - 2])) len--;
+  const lp = mac.loop >= 0 && mac.loop < len ? len - mac.loop : 0;
+  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+  const period = lp ? (lp * vib.length) / gcd(lp, vib.length) : vib.length;
+  // Past the macro's last frame both parts repeat (macro loop or hold, vibrato cycle), so the deltas loop from there.
+  let end = len + period, loop = len;
+  if (end > 240) { lossy.add('vibrato + pitch macro envelope longer than 240 frames (cut, no loop)'); end = 240; loop = -1; }
+  const macAt = (f: number): number => (f < len ? f : lp ? mac.loop + ((f - len) % lp) : -1);
+  const deltas: number[] = [];
+  let macAbs = 0, prev = 0;
+  for (let f = 0; f < end; f++) {
+    const i = macAt(f);
+    if (mac.relative) macAbs += i >= 0 ? mac.vals[i] : 0;
+    else macAbs = i >= 0 ? mac.vals[i] : mac.vals[len - 1] ?? 0;
+    const total = macAbs + vib[f % vib.length];
+    let d = total - prev;
+    if (Math.abs(d) > 63) { lossy.add('vibrato + pitch macro step past 63 period units (clamped)'); d = Math.sign(d) * 63; }
+    deltas.push(d);
+    prev += d;
+  }
+  return { deltas, loop };
 }
 
 /** 8-bit level stream -> 1-bit delta DPCM bytes (FamiStudio DPCM encoder logic, no resampling). */
@@ -447,15 +484,17 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           if (tonal && (fxChanged || n > 0)) {
             // Speed is exact (a snapped speed changes the vibrato rate audibly); identical rounded envelopes share one id.
             const x = vibXY >> 4, y = vibXY & 15;
-            let pid = -1;
+            let pid = -1, vib: number[] | null = null;
             if (x > 0 && y > 0) {
               // Furnace steps a 64-entry sine x per tick and has stepped once on the note tick: loop the whole cycle set
               // (64/gcd(x,64) ticks) so a rate like 64/6 does not drift.
               const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
               const len = Math.max(2, Math.min(240, Math.round(64 / gcd(x, 64) * perTick)));
               const amp = linear ? pulsePeriod(src || 46) * (2 ** ((vibXY & 15) / 192) - 1) : y;
-              pid = envId(encodeEnvelope(Array.from({ length: len }, (_, i) => Math.round(-amp * Math.sin(2 * Math.PI * x * (i / perTick + 1) / 64))), 0, -1, 'pitch'));
-            } else if (linear) {
+              vib = Array.from({ length: len }, (_, i) => Math.round(-amp * Math.sin(2 * Math.PI * x * (i / perTick + 1) / 64)));
+              pid = envId(encodeEnvelope(vib, 0, -1, 'pitch'));
+            }
+            if (linear) {
               const pm = curIns?.macros.find((mc) => mc.code === MACRO_PITCH && mc.length > 0);
               if (pm) {
                 const P = pulsePeriod(src || 46);
@@ -464,11 +503,14 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 // An ADSR/LFO pitch macro in absolute mode is a position curve: FamiStudio's +-63 range only holds per-frame
                 // steps, so send the differences of the period offsets as a relative envelope.
                 const ex = expandProcMacro(pm, m.version);
-                if (ex !== pm && (pm.mode & 1) === 0) {
-                  const abs = ex.data.map((v) => Math.round(P * (2 ** (-v / 1536) - 1)));
-                  const deltas = abs.map((a, i) => { const d = a - (i ? abs[i - 1] : 0); if (Math.abs(d) > 63) lossy.add('pitch macro step past 63 period units (clamped)'); return d; });
-                  pid = envId(macroEnvelope({ ...ex, mode: 1, data: deltas }, 'pitch', lossy, undefined, 1, m.version));
-                } else pid = envId(macroEnvelope(pm, 'pitch', lossy, toPeriod, macroRate, m.version));
+                const mf = ex !== pm && (pm.mode & 1) === 0
+                  ? macroFrames({ ...ex, mode: 0 }, 'pitch', lossy, (v) => Math.round(P * (2 ** (-v / 1536) - 1)), 1, m.version)
+                  : macroFrames(pm, 'pitch', lossy, vib ? (v) => Math.round(P * (2 ** (-v / 1536) - 1)) : toPeriod, macroRate, m.version);
+                if (vib || (!mf.relative && ex !== pm)) {
+                  // Vibrato on top, or an ADSR/LFO position curve (+-63 only holds per-frame steps): one relative envelope.
+                  const mg = mergeVibratoPitch(vib ?? [0], mf, lossy);
+                  pid = envId(encodeEnvelope(mg.deltas, mg.loop, -1, 'pitch', true));
+                } else pid = envId(encodeEnvelope(mf.vals, mf.loop, -1, 'pitch', mf.relative));
               }
             }
             // An override persists across notes and instrument changes in the engine: send it only when it changes.

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { FurnaceModule } from '../../import/formats/FurnaceSongParser';
 import { MESEN } from './nesMesenHarness';
-import { buildFamistudioRom, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, noiseNote, type FamistudioMeta } from '../nes/famistudioSong';
+import { buildFamistudioRom, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, mergeVibratoPitch, noiseNote, type FamistudioMeta } from '../nes/famistudioSong';
 
 const ROOT = path.resolve(__dirname, '../../../..');
 const DIR = path.join(ROOT, 'public/nes/famistudio');
@@ -127,6 +127,17 @@ describe('furnaceToFamistudio', () => {
     expect(song.music.includes(0x49)).toBe(true);
     expect(song.music.includes(0x4a)).toBe(true);
     expect(song.lossy.some((l) => l.startsWith('effect 04'))).toBe(false);
+  });
+  it('adds 04 vibrato to the instrument pitch macro in one relative envelope (Furnace sums pitch and pitch2)', () => {
+    const notes: string[] = [];
+    const vib = [0, 5, 0, -5];
+    const mg = mergeVibratoPitch(vib, { vals: [0, 20, 40], loop: -1, relative: false }, { add: (s) => notes.push(s) });
+    const sums = mg.deltas.map((_, i) => mg.deltas.slice(0, i + 1).reduce((a, b) => a + b, 0));
+    expect(sums).toEqual([0, 25, 40, 35, 40, 45, 40]); // macro holds 40 after its end, vibrato keeps going
+    expect(mg.loop).toBe(3);
+    expect(mg.deltas.slice(3).reduce((a, b) => a + b, 0)).toBe(0); // the looped part does not drift
+    expect(mergeVibratoPitch(vib, { vals: [100], loop: -1, relative: false }, { add: (s) => notes.push(s) }).deltas[0]).toBe(63);
+    expect(notes.some((n) => n.includes('clamped'))).toBe(true);
   });
   it('maps 00 arpeggio to an arp envelope override and stops it with 0x4c', () => {
     const song = music({ 0: { 0: { ...A4, ...fx(0x00, 0x37) }, 8: fx(0x00, 0) } });
