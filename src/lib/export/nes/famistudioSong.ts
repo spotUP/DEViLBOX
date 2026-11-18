@@ -231,6 +231,24 @@ export function mergeVibratoPitch(vib: number[], mac: { vals: number[]; loop: nu
   return { deltas, loop };
 }
 
+/**
+ * An LFO pitch macro is expanded to a 240-frame delta list; its rounded deltas repeat exactly, so a tail that repeats
+ * twice with a zero-sum cycle becomes one cycle plus a loop point (the engine replays it forever, as the LFO does).
+ */
+export function loopPeriodicTail(d: number[]): { deltas: number[]; loop: number } {
+  const n = d.length;
+  let best = { cut: n, loop: -1 };
+  for (let q = 1; 2 * q <= n; q++) {
+    let l = n - q;
+    while (l > 0 && d[l - 1] === d[l - 1 + q]) l--;
+    if (n - l < 2 * q || l + q >= best.cut) continue;
+    let sum = 0;
+    for (let i = l; i < l + q; i++) sum += d[i];
+    if (sum === 0) best = { cut: l + q, loop: l };
+  }
+  return { deltas: d.slice(0, best.cut), loop: best.loop };
+}
+
 /** 8-bit level stream -> 1-bit delta DPCM bytes (FamiStudio DPCM encoder logic, no resampling). */
 function pcmToDpcm(levels: number[]): number[] {
   const out: number[] = [];
@@ -440,6 +458,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   const dpcmMap = new Map<string, number>();
   const dpcmList: Array<{ sample: number; pitch: number; delta: number }> = [];
   let lastDpcmPitch = 0;
+  // nes.cpp:516-527: with dpcmMode=false Furnace streams non-NES-type samples as 7-bit PCM through $4011 until an NES-type note switches it to DPCM.
+  let pcmMode = /dpcmMode=false/.test(m.chipFlags?.[0] ?? '');
   const dpcmNote = (ins: FurnaceInstrument | undefined, flat: number): number => {
     // Furnace DivInstrumentAmiga defaults to initSample 0 (instrument.h:607); nes.cpp:538-540 pitch = note & 15.
     let sample = ins?.amiga?.initSample ?? 0;
@@ -458,6 +478,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
       if (nm.delta >= 0 && nm.delta <= 63) delta = nm.delta;
     }
     if (sample < 0 || !m.samples[sample]) { lossy.add('DPCM note without a sample'); return -1; }
+    if (!ins || ins.type === 34) pcmMode = false;
+    else if (pcmMode) lossy.add('PCM-mode sample ($4011 stream in Furnace) played as 1-bit DPCM');
     // nes.cpp:425-456: a non-NES-type (Amiga/sample) instrument writes calcDPCMRate(min(sample rate at the note, 48000)) to $4010.
     if (ins && ins.type !== 34) {
       const hz = Math.min(48000, (m.samples[sample].c4Rate || 0) * 2 ** ((flat - 48) / 12));
@@ -619,7 +641,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 if (vib || (!mf.relative && ex !== pm)) {
                   // Vibrato on top, or an ADSR/LFO position curve (+-63 only holds per-frame steps): one relative envelope.
                   const mg = mergeVibratoPitch(vib ?? [0], mf, lossy);
-                  pid = envId(encodeEnvelope(mg.deltas, mg.loop, -1, 'pitch', true));
+                  const lt = !vib && ex !== pm && (mg.loop < 0 || mg.loop >= mg.deltas.length - 1) ? loopPeriodicTail(mg.deltas) : mg;
+                  pid = envId(encodeEnvelope(lt.deltas, lt.loop, -1, 'pitch', true));
                 } else pid = envId(encodeEnvelope(mf.vals, mf.loop, -1, 'pitch', mf.relative));
               }
             }

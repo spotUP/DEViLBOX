@@ -7,7 +7,8 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { FurnaceModule } from '../../import/formats/FurnaceSongParser';
 import { MESEN } from './nesMesenHarness';
-import { buildFamistudioRom, compressRefs, expandRefs, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, mergeVibratoPitch, noiseNote, type FamistudioMeta } from '../nes/famistudioSong';
+import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
+import { buildFamistudioRom, compressRefs, expandRefs, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, loopPeriodicTail, mergeVibratoPitch, noiseNote, type FamistudioMeta } from '../nes/famistudioSong';
 
 const ROOT = path.resolve(__dirname, '../../../..');
 const DIR = path.join(ROOT, 'public/nes/famistudio');
@@ -139,6 +140,22 @@ describe('furnaceToFamistudio', () => {
     expect(mergeVibratoPitch(vib, { vals: [100], loop: -1, relative: false }, { add: (s) => notes.push(s) }).deltas[0]).toBe(63);
     expect(notes.some((n) => n.includes('clamped'))).toBe(true);
   });
+  it('loops the repeating tail of an LFO pitch delta list instead of storing every cycle', () => {
+    const cycle = [1, 0, -1, -1, 0, 1];
+    const d = [3, -3, ...Array.from({ length: 40 }, (_, i) => cycle[i % 6])];
+    const lt = loopPeriodicTail(d);
+    expect(lt.deltas.length).toBeLessThan(10);
+    const replay = Array.from({ length: d.length }, (_, i) => (i < lt.deltas.length ? lt.deltas[i] : lt.deltas[lt.loop + ((i - lt.loop) % (lt.deltas.length - lt.loop))]));
+    expect(replay).toEqual(d);
+    expect(loopPeriodicTail([1, 2, 3, 4, 5, 6]).loop).toBe(-1); // no repeat: unchanged
+    expect(loopPeriodicTail([1, 0, 1, 0, 1, 0]).loop).toBe(-1); // drifting cycle (sum != 0): unchanged
+  });
+  it('fits infinity.fur in the 16 KiB music area without dropping cuts or held slides', async () => {
+    const buf = readFileSync(path.join(ROOT, 'public/data/songs/furnace/nes/infinity.fur'));
+    const song = furnaceToFamistudio(await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer));
+    expect(song.music.length).toBeLessThanOrEqual(META.musicCap);
+    expect(song.lossy.some((l) => l.includes('dropped to fit'))).toBe(false);
+  });
   it('maps 00 arpeggio to an arp envelope override and stops it with 0x4c', () => {
     const song = music({ 0: { 0: { ...A4, ...fx(0x00, 0x37) }, 8: fx(0x00, 0) } });
     expect(song.music.includes(0x4b)).toBe(true);
@@ -253,7 +270,7 @@ end, emu.eventType.inputPolled)
       expect(a[5].split(',')[4]).toBe('1'); // no DPCM in this song: only the resting cap line
       expect(d.F30[6]).toContain('SONG - SOME AUTHOR'); // scroller falls back to TITLE - AUTHOR (row 27 of nametable $2800 read as a 32-column ring: it scrolls by hardware)
       expect(b[4].slice(0, 2)).toBe('= '); // Start pauses
-      expect(b[5]).toBe('1,1,1,1,1'); // pause silences the engine: bars empty but the resting cap line
+      expect(b[5]).toBe('2,2,2,2,1'); // pause silences the engine: bars empty, cap line resting on the floor (h=7 spills one row on the four tone channels)
       expect(c[4].slice(0, 2)).toBe('> '); // Start resumed
       expect(Number(out.match(/PPUEND (\d+)/)![1])).toBeLessThan(2273 - 7); // last VRAM write ($2006/$2007) of any NMI; the scroller split's $2001/$2005/$2006 writes at scanline 212 are meant to be mid-frame and not counted, counted from the NMI vector (7 cycles)
     } finally { rmSync(dir, { recursive: true, force: true }); }

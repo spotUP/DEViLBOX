@@ -5,14 +5,14 @@
  "dpcmCap": 8192,
  "prgOffset": 16,
  "tickAddr": 60003,
- "titleAddr": 61381,
- "authorAddr": 61413,
+ "titleAddr": 61397,
+ "authorAddr": 61429,
  "textLen": 32,
- "chipAddr": 61445,
+ "chipAddr": 61461,
  "chipLen": 16,
- "scrollAddr": 61461,
+ "scrollAddr": 61477,
  "scrollLen": 128,
- "nsubAddr": 61589,
+ "nsubAddr": 61605,
  "nmiAddr": 59983,
- "sourceHash": "ef0c624e4580c7d316ebc3af84fa5b8343af9f56"
+ "sourceHash": "5565b0cb88bdcbd7ce8a48662a141ffb680f1070"
 }

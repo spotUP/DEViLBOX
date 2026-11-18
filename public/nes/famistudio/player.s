@@ -574,10 +574,19 @@ fs_plan:                        ; diff the wanted bar tiles against fs_shadow an
     bcc :+
     lda #8
 :   sta fs_pf                   ; fill of the cap tile
+    cmp #0                      ; sta keeps the flags of the cmp #9 above (Z never set): a zero fill used to snap the cap to the tile base
     beq @nosnap
     cmp fs_peh
     bcs @nosnap
-    sta fs_peh                  ; a gap inside the cap tile is closed: cap sits on the level (at most 7 pixels lower)
+    asl a                       ; gap between the fill and the cap inside the cap tile: no such CHR tile (42 would be needed).
+    cmp fs_peh                  ; The cap stays exact; the fill is snapped to the nearer of 0 and the cap row (error <= 3 pixels).
+    bcc @lower
+    lda fs_peh
+    sta fs_pf
+    jmp @nosnap
+@lower:
+    lda #0
+    sta fs_pf
 @nosnap:
     lda #0
     sta fs_pb
