@@ -7,7 +7,8 @@
  * Mapping: Furnace instrument -> PT3 sample (volume, waveform and noise macros) plus a PT3 ornament (arpeggio macro),
  * both resampled from the Furnace tick rate to the player's fixed 50 Hz frame; order -> position; pattern rows -> one
  * skip-counted PT3 line each, with per-row delays from the accumulated Furnace tick time (groove included).
- * Hardware envelope, pitch macros and slide effects are not converted and are reported lossy.
+ * Pitch slides (01/02, E1/E2, linear pitch) become PT3 glissando (command 1) fitted per row. Pitch macros and other
+ * slide effects are not converted and are reported lossy.
  */
 
 import type { FurnaceModule } from '../../import/formats/FurnaceSongParser';
@@ -32,6 +33,8 @@ const MACRO_ENV_SHAPE = 6, MACRO_AUTO_NUM = 7, MACRO_AUTO_DEN = 8, MACRO_ENV_PER
 const ENV_MACROS = [MACRO_ENV_SHAPE, MACRO_AUTO_NUM, MACRO_AUTO_DEN, MACRO_ENV_PERIOD];
 const MAX_SAMPLES = 31, MAX_ORNAMENTS = 15, MAX_TICKS = 64;
 const FRAME_HZ = 50;
+/** A running glissando is kept for the next row while its worst frame stays this close (the checker allows 35). */
+const GLISS_REUSE_CENTS = 30;
 const ZX_CLOCK = 1773400;
 /** Furnace's default AY clock (clockSel 0). Notes below its 12-bit period floor play at period 4095 in Furnace too.
  * shortcut: clockSel flags are not read, upgrade when a song sets another AY clock. */
@@ -161,6 +164,21 @@ function ornamentBytes(mac: FurnaceMacro, lossy: Lossy, tickHz: number): { bytes
 }
 
 export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author = ''): Pt3Song {
+  // Glissando commands break the row skip runs, so a song near the cap can only fit with slides dropped on some channels.
+  const masks = [7, 3, 5, 6, 1, 2, 4, 0];
+  for (const [i, mask] of masks.entries()) {
+    try {
+      const out = buildPt3(m, subsong, title, author, mask);
+      if (mask !== 7) for (let ch = 0; ch < 3; ch++) if (!((mask >> ch) & 1)) out.lossy.push(`pitch slides on channel ${ch + 1} (dropped so the module fits 16 KB)`);
+      return out;
+    } catch (e) {
+      if (i === masks.length - 1 || !(e instanceof Error) || !e.message.startsWith('The PT3 module is')) throw e;
+    }
+  }
+  throw new Error('unreachable');
+}
+
+function buildPt3(m: FurnaceModule, subsong: number, title: string, author: string, slideMask: number): Pt3Song {
   const lossy = new Lossy();
   const s = m.subsongs[subsong];
   if (!s) throw new Error(`subsong ${subsong} missing`);
@@ -255,7 +273,16 @@ export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author =
   // difference of the accumulated tick time, so 60 Hz songs and odd speeds keep their timing within one frame.
   const speeds = s.speedPattern?.length ? [...s.speedPattern] : s.speed2 !== s.speed1 ? [s.speed1, s.speed2] : [s.speed1];
   let speedIdx = 0, ticksAt = 0, frames = 0, curDelay = -1, firstDelay = -1;
-  const chan = [0, 1, 2].map(() => ({ ins: -1, arp: -1, shift: 0, outSample: -1, outOrn: -1, n: 0, env22: false, autoNum: 0, autoDen: 0, envOut: false }));
+  const chan = [0, 1, 2].map(() => ({ ins: -1, arp: -1, shift: 0, outSample: -1, outOrn: -1, n: 0, env22: false, autoNum: 0, autoDen: 0, envOut: false,
+    // Furnace slide: note (nv), pitch in 1/128 note, target, speed per tick (0 = none), E1/E2 (target becomes the note).
+    fnv: -1, pos: 0, slTarget: 0, slSpeed: 0, slNote: false,
+    // PT3 glissando: CrTnSl the player holds, last emitted "d,s" ('' = stopped), counter back at d on the next row start.
+    cur: 0, gl: '', glPhase: false }));
+  const flags = m.compatFlags ?? {};
+  const linear = Number(flags.linearPitch ?? 1) > 0;
+  const slideOn = (ch: number): boolean => linear && ((slideMask >> ch) & 1) === 1;
+  const slideMul = Number(flags.pitchSlideSpeed ?? 4) || 4;
+  const tuneHz = m.tuning > 0 ? m.tuning : 440;
   // Hardware envelope: one generator per chip, shape (R13) and period are chip state in Furnace and in PT3.
   let envShape = 0, envPeriod = 0;
   const firstVal = (macros: FurnaceMacro[], code: number): number | null => {
@@ -279,6 +306,49 @@ export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author =
     // Shapes 0-3 play as 9 and 4-7 as 15 on the AY; PT3 has no 0x10 + 0 envelope byte.
     const shape = envShape < 4 ? 9 : envShape < 8 ? 15 : envShape;
     return [0x10 + shape, period >> 8, period & 0xff];
+  };
+  /** Furnace slide over this row's ticks -> PT3 glissando arguments (delay, step lo, step hi), or null for no command.
+   * PT3 plays CrTnSl + s * floor(f / d) at frame f of the row (period units added to the note period); (d, s) is the
+   * least-squares fit to the period Furnace plays at each frame, the next row's first frame included. */
+  const glissando = (st: (typeof chan)[number], spd: number, n: number): number[] | null => {
+    if (!linear || st.fnv < 0 || (st.slSpeed <= 0 && !st.gl)) return null;
+    const posAt: number[] = [];
+    let p = st.pos;
+    for (let k = 0; k < spd; k++) {
+      if (st.slSpeed > 0) {
+        p = p < st.slTarget ? Math.min(st.slTarget, p + st.slSpeed) : Math.max(st.slTarget, p - st.slSpeed);
+        if (p === st.slTarget) { st.slSpeed = 0; if (st.slNote) st.fnv = p / 128; }
+      }
+      posAt.push(p);
+    }
+    const moving = posAt.some((x) => x !== st.pos);
+    st.pos = p;
+    if (!moving) { const was = st.gl; st.gl = ''; return was ? [0, 0, 0] : null; }
+    const t0 = ticksAt - spd, f0 = frames - n;
+    const base = pt3Period(tune, st.n) + st.shift;
+    const want = Array.from({ length: n + 1 }, (_, f) => {
+      const k = Math.max(0, Math.min(spd - 1, Math.floor(((f0 + f + 0.5) * tickHz) / FRAME_HZ) - t0));
+      return ZX_CLOCK / (16 * furnaceHz(tuneHz, posAt[k] / 128)) - base - st.cur;
+    });
+    const b0 = base + st.cur;
+    const worstCents = (d: number, s: number): number => Math.max(...want.map((w, f) => Math.abs(1200 * Math.log2(Math.max(1, b0 + s * Math.floor(f / d)) / Math.max(1, b0 + w)))));
+    // Keep the running command when it still fits: one fewer 4-byte command per row (the module has one 16 KB bank).
+    if (st.gl && st.glPhase) {
+      const [pd, ps] = st.gl.split(',').map(Number);
+      if (worstCents(pd, ps) <= GLISS_REUSE_CENTS) { st.cur += ps * Math.floor(n / pd); st.glPhase = n % pd === 0; return null; }
+    }
+    let best = { err: Infinity, d: 1, s: 0 };
+    for (let d = 1; d <= n; d++) {
+      let num = 0, den = 0;
+      want.forEach((w, f) => { const q = Math.floor(f / d); num += q * w; den += q * q; });
+      const s = den ? Math.max(-32768, Math.min(32767, Math.round(num / den))) : 0;
+      const err = want.reduce((a, w, f) => a + (s * Math.floor(f / d) - w) ** 2, 0);
+      if (err < best.err - 1e-9) best = { err, d, s };
+    }
+    const { d, s } = best;
+    st.cur += s * Math.floor(n / d);
+    st.gl = `${d},${s}`; st.glPhase = n % d === 0;
+    return [d, s & 0xff, (s >> 8) & 0xff];
   };
   const channelsWithNotes = [false, false, false];
   const patternBytes: number[][][] = []; // [order][channel]
@@ -325,6 +395,20 @@ export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author =
             st.shift = p.shift;
             st.n = p.n;
             note = 0x50 + p.n;
+            // A PT3 note byte zeroes CrTnSl and the slide counter.
+            st.fnv = nv; st.pos = nv * 128; st.cur = 0; st.gl = '';
+          }
+          if (note === 0xc0) st.slSpeed = 0; // shortcut: note off ends the slide (Furnace only with noteOffResetsSlides)
+          if (slideOn(ch) && st.fnv >= 0) for (const e of cell.effects) {
+            if (e.type === 0xe1 || e.type === 0xe2) {
+              const y = e.value & 15;
+              st.slSpeed = y ? (e.value >> 4) * 4 * slideMul : 0;
+              st.slTarget = (st.fnv + (e.type === 0xe1 ? y : -y)) * 128; st.slNote = true;
+            }
+            if (e.type === 0x01 || e.type === 0x02) {
+              // shortcut: Furnace stops 01/02 at note 179/0 (limitSlides 156); the AY period clamp ends them first here.
+              st.slSpeed = e.value * slideMul; st.slTarget = e.type === 0x01 ? 1e9 : -1e9; st.slNote = false;
+            }
           }
           if (st.ins >= 0 && (note !== 0xd0 || cell.instrument >= 0)) {
             const ins = instrument(st.ins);
@@ -347,10 +431,14 @@ export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author =
           }
           for (const e of cell.effects) {
             if (e.type < 0 || [0x00, 0x09, 0x0f, 0x0b, 0x0d, 0x22, 0x23, 0x24, 0x29].includes(e.type)) continue;
+            if (slideOn(ch) && [0x01, 0x02, 0xe1, 0xe2].includes(e.type)) continue;
             lossy.add(`effect ${e.type.toString(16).toUpperCase().padStart(2, '0')}`);
           }
         }
-        if (ch === 0 && delay !== curDelay) { curDelay = delay; ops.push(0x09); args.push(delay); }
+        const gl = slideOn(ch) ? glissando(chan[ch], spd, delay) : null;
+        if (gl) { ops.push(0x01); args.push(...gl); }
+        // The player runs the special commands last-pushed first, so the last op's arguments come first.
+        if (ch === 0 && delay !== curDelay) { curDelay = delay; ops.push(0x09); args.unshift(delay); }
         rows[ch].push({ ops, note, args });
       }
     }

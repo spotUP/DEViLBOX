@@ -23,6 +23,17 @@ describe('furnaceToPt3', () => {
     expect(m[202]).toBe(0xff);
     expect(r.channelsWithNotes).toEqual([true, false, false]);
   });
+  it('encodes an E1 slide on a row with no note as PT3 glissando, not a lossy effect', () => {
+    const plain = furnaceToPt3(tinyModule());
+    const mod = tinyModule();
+    const rows = (mod.patterns.get('0_0_0') as unknown as { rows: { effects: { type: number; value: number }[] }[] }).rows;
+    rows[1].effects = [{ type: 0xe1, value: 0x13 }];
+    const r = furnaceToPt3(mod);
+    expect(r.lossy.some((x) => x.startsWith('effect E1'))).toBe(false);
+    expect(r.module.length).toBeGreaterThan(plain.module.length);
+    (mod as unknown as { compatFlags: Record<string, unknown> }).compatFlags = { linearPitch: 0 };
+    expect(furnaceToPt3(mod).lossy.some((x) => x.startsWith('effect E1'))).toBe(true);
+  });
   it('rejects a non-AY chip', () => {
     const mod = tinyModule();
     (mod as unknown as { systems: number[] }).systems = [0x05];
