@@ -499,6 +499,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     let envMode = 3, lenIdx = 0x1f, furVol = 15, hwVol = false, baked = false, lastSpd = -1;
     let lastIns = -1, lastVol = -1, empty = 0, hasNotes = false, loopAt = 0, first = -1, firstFrame = -1;
     let curIns: FurnaceInstrument | undefined;
+    let vibPos = 0, vibFrame = 0; // Furnace's vibratoPos (64-step sine) at the row start
     let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, arpXY = 0, arpOn = -1, noteArp: number[] | null = null, fineRaw = 128, fineSent = 0;
     // Furnace 01xx/02xx is channel state (playback.cpp portaSpeed): it keeps sliding every new note until x00, another
     // slide effect, or the slide reaching its target (note 0 / 179, targetResetsSlides).
@@ -530,6 +531,9 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         if (ch === 0 && (rowSpeed[o][r] !== lastSpd || (o === loopOrder && r === 0))) { ops.push(0x46, Math.min(255, rowSpeed[o][r] * spdMul)); lastSpd = rowSpeed[o][r]; }
         if (cell) {
           if (cell.instrument >= 0) { curIns = m.instruments[cell.instrument]; curInsIdx = cell.instrument; }
+          // Furnace steps vibratoPos by the rate each tick (a new note zeroes it unless continuousVibrato) while the depth is above 0; the elapsed ticks run with the previous 04xy.
+          if ((vibXY & 15) > 0) vibPos = (vibPos + (vibXY >> 4) * Math.round((rowFrame[o][r] - vibFrame) / perTick)) & 63;
+          vibFrame = rowFrame[o][r];
           let fxChanged = false, fineHere = false, slideFx = 0, slideVal = 0, volSlide = -1, cutTicks = 0;
           for (const e of cell.effects) {
             if (e.type < 0) continue;
@@ -576,6 +580,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           // pitch (measured with furnace -vgmout), so the amplitude in period units follows the playing note.
           // Without vibrato, a linear-pitch instrument pitch macro (value v = v/128 semitone up) goes through the same
           // override, scaled to the note: FamiStudio pitch envelopes add period units (positive = lower), note-independent.
+          if (n > 0 && !m.compatFlags?.continuousVibrato) vibPos = 0;
           if (tonal && (fxChanged || n > 0)) {
             // Speed is exact (a snapped speed changes the vibrato rate audibly); identical rounded envelopes share one id.
             const x = vibXY >> 4, y = vibXY & 15;
@@ -591,7 +596,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               // are taken against the fractional base period, not the table's rounded one.
               const P = pulsePeriod(src || 46), X = pulsePeriodRaw(src || 46);
               vib = Array.from({ length: len }, (_, i) => {
-                const phase = x * (Math.floor(i / perTick + 1e-9) + 1);
+                const phase = vibPos + x * (Math.floor(i / perTick + 1e-9) + 1);
                 if (!linear) return Math.round(-amp * Math.sin(2 * Math.PI * phase / 64));
                 // Furnace: vibTable = (short)(127 sin) truncates; pitch = ((depth * vibTable * vibratoFine(15)) >> 4) / 15, C division truncates.
                 const u = Math.trunc(((y * Math.trunc(127 * Math.sin(2 * Math.PI * (phase & 63) / 64)) * 15) >> 4) / 15);
