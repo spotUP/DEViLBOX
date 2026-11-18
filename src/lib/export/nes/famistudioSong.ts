@@ -252,12 +252,16 @@ const clamp8 = (v: number): number => Math.max(-127, Math.min(127, Math.round(v)
 const MUSIC_CAP = 16384;
 
 export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2000): FamistudioSong {
-  const song = convert(m, subsong, dpcmCap, true);
-  // Note cuts cost 2 bytes per row; when they push the song over the cap, drop them (the song then plays as before).
-  if (song.music.length <= MUSIC_CAP) return song;
-  const lean = convert(m, subsong, dpcmCap, false);
-  lean.lossy.push('note cut EC dropped to fit the 16 KiB music area');
-  return lean;
+  // Note cuts cost 2 bytes per row, a held 01/02 slide 3 extra bytes per note; when the song is over the cap, drop cuts
+  // first, then held slides (the notes then play unslid), then both.
+  let song = convert(m, subsong, dpcmCap, true, true);
+  for (const [cuts, held] of [[false, true], [true, false], [false, false]]) {
+    if (song.music.length <= MUSIC_CAP) break;
+    song = convert(m, subsong, dpcmCap, cuts, held);
+    if (!cuts) song.lossy.push('note cut EC dropped to fit the 16 KiB music area');
+    if (!held) song.lossy.push('01/02 slide held over later notes dropped to fit the 16 KiB music area');
+  }
+  return song;
 }
 
 const APU_LENGTH = [10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30];
@@ -283,7 +287,7 @@ export function hwVolumeEnvelope(hw: number): number[] {
   return encodeEnvelope(out, halt ? 0 : out.length - 1, -1, 'vol');
 }
 
-function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean): FamistudioSong {
+function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean): FamistudioSong {
   const lossy = new Lossy();
   const pitchLossy: PitchLossySpan[] = [];
   const s = m.subsongs[subsong];
@@ -413,6 +417,9 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     let lastIns = -1, lastVol = -1, empty = 0, hasNotes = false, loopAt = 0, first = -1, firstFrame = -1;
     let curIns: FurnaceInstrument | undefined;
     let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, arpXY = 0, arpOn = -1, noteArp: number[] | null = null, fineRaw = 128, fineSent = 0;
+    // Furnace 01xx/02xx is channel state (playback.cpp portaSpeed): it keeps sliding every new note until x00, another
+    // slide effect, or the slide reaching its target (note 0 / 179, targetResetsSlides).
+    let heldSlide: [number, number] | null = null;
     const efx: Array<[number, number]> = [];
     const tonal = ch < 3;
     const seq: Array<{ cell?: FurnacePatternCell; frame: number }> = [];
@@ -471,6 +478,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               rowByte = n >= 13 && n <= 75 ? [n - 12] : [0x40, n];
             }
           }
+          if (slideFx) heldSlide = (slideFx === 0x01 || slideFx === 0x02) && slideVal > 0 ? [slideFx, slideVal] : null;
+          else if (n > 0 && heldSlide && withHeld) [slideFx, slideVal] = heldSlide;
           const src = n > 0 ? n : curNote;
           // Fine pitch (E5xx, 80 = centre): +-1 semitone, as a signed period offset scaled to the playing note.
           if (tonal && (fineHere || (n > 0 && fineRaw !== 128))) {
@@ -587,6 +596,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 if (linear) {
                   const semi = slideVal * slideUnit / 128;
                   to = Math.max(1, Math.min(96, src + dir * Math.round(semi * span(ri) * perFrame)));
+                  // Furnace note = FamiStudio note + 59; the slide stops at note 0 (down) or 179 (up).
+                  if (semi * span(ri) * perFrame >= (dir < 0 ? src + 59 : 120 - src) && m.compatFlags?.targetResetsSlides !== false) heldSlide = null;
                   if (to !== src) mag = linStep(src, to, semi);
                 } else {
                   const pn = Math.max(1, pFrom(src) - dir * slideVal * span(ri) * perFrame);

@@ -153,6 +153,12 @@ describe('furnaceToFamistudio', () => {
     const song = music({ 0: { 0: { ...A4, ...fx(0x01, 0x20) }, 8: { note: 9, octave: 5 } } });
     expect(song.music.includes(0x50)).toBe(true);
   });
+  it('keeps a 02 slide on later notes until 0200 (Furnace portaSpeed is channel state)', () => {
+    // Rise_against triangle kick: one 02xx, then bare notes that each slide down in Furnace.
+    const song = music({ 2: { 0: { ...A4, ...fx(0x02, 0x44) }, 4: A4, 8: { ...A4, ...fx(0x02, 0x00) }, 12: A4 } });
+    const slidesFromA4 = [...song.music].filter((b, i) => b === 0x50 && song.music[i + 2] === 58).length;
+    expect(slidesFromA4).toBe(2);
+  });
   it('maps E1 note slide up to a 0x50 slide', () => {
     const song = music({ 0: { 0: { ...A4, ...fx(0xe1, 0x47) } } });
     expect(song.music.includes(0x50)).toBe(true);
