@@ -31,7 +31,7 @@ export const WHOLE_SONG_SYNTH_TYPES: ReadonlySet<string> = new Set([
   'HippelSynth', 'HivelySynth', 'InStereo1WasmSynth', 'InStereo2WasmSynth',
   'IxalanceSynth', 'JamCrackerSynth', 'KlysSynth', 'MaxTraxSynth', 'MdxminiSynth',
   'MusicAssemblerSynth', 'MusicLineSynth', 'OktalyzerWasmSynth', 'OrganyaSynth',
-  'PmdminiSynth', 'PreTrackerSynth', 'PumaTrackerSynth', 'PxtoneSynth', 'QsfSynth',
+  'PmdminiSynth', 'PreTrackerSynth', 'ProTracker4Synth', 'PumaTrackerSynth', 'PxtoneSynth', 'QsfSynth',
   'QuadraComposerWasmSynth', 'RonKlarenWasmSynth', 'SawteethSynth', 'Sc68Synth',
   'SidMon1Synth', 'SidMon2Synth', 'SonicArrangerWasmSynth', 'SonixSynth',
   'SoundControlWasmSynth', 'SoundFactory2WasmSynth', 'SoundFxWasmSynth', 'SoundMonWasmSynth',

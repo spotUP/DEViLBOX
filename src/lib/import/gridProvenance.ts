@@ -496,7 +496,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   paulShields: 'G11-paulShields',
   paulRobotham: 'G11-paulRobotham',
   pierreAdane: 'G11-pierreAdane',
-  peterVerswyvelenPacker: 'G11-peterVerswyvelenPacker',
   andrewParton: 'G11-andrewParton',
   jesperOlsen: 'U18',
   kimChristensen: 'G11-kimChristensen',
@@ -618,6 +617,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'davidHanney',
   // Howie Davies: the position lists and patterns decode to a read-only tick grid (howieDaviesGrid.ts), no oracle yet.
   'howieDavies',
+  // Silmarils, Forgotten Worlds, Major Tom: the native parser decodes the stream to an editable grid, exported byte-exact with note edits written in place.
+  'silmarils', 'forgottenWorlds', 'majortom',
 ];
 
 export function gridProvenanceOf(key: string): GridProvenance | null {
