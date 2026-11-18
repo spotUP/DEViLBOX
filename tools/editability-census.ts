@@ -1,4 +1,5 @@
 // Census: which corpus songs are truly editable (grid edit reaches export)?
+// DOM-bound rows (it/s3m/xm/psm, soundMon/hippelCoSo via Tone): `CENSUS_ONLY=it,s3m nice -n 19 npx vitest run src/lib/export/__tests__/editabilityCensusRows.test.ts --maxWorkers=2` (same env as the exporter tests).
 // Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/editability-census.ts [--only <substr>] [--all] [--failed]
 // Default = one song per extension/prefix key (--all = every file, recursive). Results: test-data/editability-census.json (resumable; recorded rows skipped).
 // Row: formatId (songFormatId) | registered (EditableFormatRegistry) | exporter route | nonEmpty cells | roundtrip (byte-exact / differs / no-exporter / export-error / parse-error).
@@ -10,11 +11,11 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const DIR = 'public/data/songs/formats';
 const OUT = path.join(ROOT, 'test-data/editability-census.json');
 const args = process.argv.slice(2);
-const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : undefined;
+const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : process.env.CENSUS_ONLY;
 const ALL = args.includes('--all');
 const FAILED = args.includes('--failed');
 
-interface Row { file: string; formatId: string; registered: boolean; route: string; cells: number; roundtrip: string; error?: string }
+interface Row { file: string; formatId: string; registered: boolean; route: string; cells: number; roundtrip: string; error?: string; diff?: string }
 
 const walk = (d: string): string[] => readdirSync(path.join(ROOT, d)).flatMap((n) => {
   const rel = `${d}/${n}`;
@@ -29,7 +30,7 @@ const keyOf = (rel: string): string => {
 
 const same = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
 
-async function measure(rel: string): Promise<Row> {
+export async function measure(rel: string): Promise<Row> {
   const { parseAs, readFixture, runDescriptorExporter, invokeLayoutExport, normalizeExport } = await import('../src/lib/export/__tests__/exporterHarness.shared');
   const { songFormatId, getEditableFormat } = await import('../src/lib/formats/EditableFormatRegistry');
   await import('../src/lib/formats/EditableFormatRegistry.builtins');
@@ -51,16 +52,20 @@ async function measure(rel: string): Promise<Row> {
       const r = await exportNativeSong(song);
       if (r) { row.route = 'native'; out = await normalizeExport(r); }
     }
-    if (out) row.roundtrip = same(out, raw) ? 'byte-exact' : 'differs';
+    if (out) {
+      if (process.env.CENSUS_DUMP) writeFileSync(path.join(process.env.CENSUS_DUMP, `${path.basename(rel)}.export`), out);
+      row.roundtrip = same(out, raw) ? 'byte-exact' : 'differs';
+      if (row.roundtrip === 'differs') { let i = 0; while (i < out.length && i < raw.length && out[i] === raw[i]) i++; row.diff = `first diff at 0x${i.toString(16)} (export ${out.length} B, original ${raw.length} B)`; }
+    }
   } catch (e) { row.roundtrip = 'export-error'; row.error = String((e as Error).message).slice(0, 120); }
   return row;
 }
 
-async function main() {
+export async function main() {
   const rows: Record<string, Row> = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : {};
   let files = walk(DIR).sort();
   if (!ALL) { const seen = new Set<string>(); files = files.filter((f) => { const k = keyOf(f); if (seen.has(k)) return false; seen.add(k); return true; }); }
-  if (only) files = files.filter((f) => f.includes(only));
+  if (only) files = files.filter((f) => only.split(',').some((o) => f.includes(o)));
   if (FAILED) files = files.filter((f) => rows[f] && !['byte-exact'].includes(rows[f].roundtrip));
   console.log(`${files.length} songs (${ALL ? 'all' : 'one per key'})`);
   mkdirSync(path.dirname(OUT), { recursive: true });
@@ -73,4 +78,5 @@ async function main() {
   const c = (k: string) => v.filter((r) => r.roundtrip === k).length;
   console.log(`rows ${v.length}: byte-exact ${c('byte-exact')}, differs ${c('differs')}, no-exporter ${c('no-exporter')}, export-error ${c('export-error')}, parse-error ${c('parse-error')}`);
 }
-main().then(() => process.exit(0));
+// Under vitest (CENSUS_VITEST=1) the importing test runs main() inside the app's happy-dom env; DOM/Tone exporters need it.
+if (!process.env.VITEST) main().then(() => process.exit(0));
