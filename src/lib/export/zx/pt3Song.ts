@@ -7,7 +7,7 @@
  * Mapping: Furnace instrument -> PT3 sample (volume, waveform and noise macros) plus a PT3 ornament (arpeggio macro),
  * both resampled from the Furnace tick rate to the player's fixed 50 Hz frame; order -> position; pattern rows -> one
  * skip-counted PT3 line each, with per-row delays from the accumulated Furnace tick time (groove included).
- * Pitch slides (01/02, E1/E2, linear pitch) become PT3 glissando (command 1) fitted per row. Pitch macros and other
+ * Pitch slides (01/02, E1/E2; linear or period slides) become PT3 glissando (command 1) fitted per row. Pitch macros and other
  * slide effects are not converted and are reported lossy.
  */
 
@@ -275,14 +275,21 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
   let speedIdx = 0, ticksAt = 0, frames = 0, curDelay = -1, firstDelay = -1;
   const chan = [0, 1, 2].map(() => ({ ins: -1, arp: -1, shift: 0, outSample: -1, outOrn: -1, n: 0, env22: false, autoNum: 0, autoDen: 0, envOut: false,
     // Furnace slide: note (nv), pitch in 1/128 note, target, speed per tick (0 = none), E1/E2 (target becomes the note).
-    fnv: -1, pos: 0, slTarget: 0, slSpeed: 0, slNote: false,
+    fnv: -1, pos: 0, slTarget: 0, slSpeed: 0, slNote: false, slTargetNote: 0,
     // PT3 glissando: CrTnSl the player holds, last emitted "d,s" ('' = stopped), counter back at d on the next row start.
     cur: 0, gl: '', glPhase: false }));
   const flags = m.compatFlags ?? {};
-  const linear = Number(flags.linearPitch ?? 1) > 0;
-  const slideOn = (ch: number): boolean => linear && ((slideMask >> ch) & 1) === 1;
-  const slideMul = Number(flags.pitchSlideSpeed ?? 4) || 4;
+  // linearPitch 1 before format 237 is the removed partial mode: only 04/E5 linear, slides move the AY period
+  // (papers/format.md; ay.cpp NOTE_PORTA adds the speed to baseFreq, which is then the period).
+  const lp = flags.linearPitch == null ? 2 : Number(flags.linearPitch);
+  const linear = lp === 2 || (lp === 1 && m.version >= 237);
+  const slideOn = (ch: number): boolean => ((slideMask >> ch) & 1) === 1;
+  const slideMul = linear ? Number(flags.pitchSlideSpeed ?? 4) || 4 : 1;
   const tuneHz = m.tuning > 0 ? m.tuning : 440;
+  // Slide position: 1/128 note (linear) or Furnace AY period (non-linear, so pitch up = smaller value).
+  const toPos = (nv: number): number => (linear ? nv * 128 : FURNACE_AY_CLOCK / (16 * furnaceHz(tuneHz, nv)));
+  const posHz = (pos: number): number => (linear ? furnaceHz(tuneHz, pos / 128) : FURNACE_AY_CLOCK / (16 * Math.max(1, pos)));
+  const up = linear ? 1 : -1;
   // Hardware envelope: one generator per chip, shape (R13) and period are chip state in Furnace and in PT3.
   let envShape = 0, envPeriod = 0;
   const firstVal = (macros: FurnaceMacro[], code: number): number | null => {
@@ -311,13 +318,13 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
    * PT3 plays CrTnSl + s * floor(f / d) at frame f of the row (period units added to the note period); (d, s) is the
    * least-squares fit to the period Furnace plays at each frame, the next row's first frame included. */
   const glissando = (st: (typeof chan)[number], spd: number, n: number): number[] | null => {
-    if (!linear || st.fnv < 0 || (st.slSpeed <= 0 && !st.gl)) return null;
+    if (st.fnv < 0 || (st.slSpeed <= 0 && !st.gl)) return null;
     const posAt: number[] = [];
     let p = st.pos;
     for (let k = 0; k < spd; k++) {
       if (st.slSpeed > 0) {
         p = p < st.slTarget ? Math.min(st.slTarget, p + st.slSpeed) : Math.max(st.slTarget, p - st.slSpeed);
-        if (p === st.slTarget) { st.slSpeed = 0; if (st.slNote) st.fnv = p / 128; }
+        if (p === st.slTarget) { st.slSpeed = 0; if (st.slNote) st.fnv = st.slTargetNote; }
       }
       posAt.push(p);
     }
@@ -328,7 +335,7 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
     const base = pt3Period(tune, st.n) + st.shift;
     const want = Array.from({ length: n + 1 }, (_, f) => {
       const k = Math.max(0, Math.min(spd - 1, Math.floor(((f0 + f + 0.5) * tickHz) / FRAME_HZ) - t0));
-      return ZX_CLOCK / (16 * furnaceHz(tuneHz, posAt[k] / 128)) - base - st.cur;
+      return ZX_CLOCK / (16 * posHz(posAt[k])) - base - st.cur;
     });
     const b0 = base + st.cur;
     const worstCents = (d: number, s: number): number => Math.max(...want.map((w, f) => Math.abs(1200 * Math.log2(Math.max(1, b0 + s * Math.floor(f / d)) / Math.max(1, b0 + w)))));
@@ -384,6 +391,7 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
           }
           if (cell.volume >= 0) ops.push(cell.volume === 0 ? 0xc0 : 0xc0 | Math.min(15, cell.volume));
           let nv = convertFurnaceNoteValue(cell);
+          const prevPos = st.fnv >= 0 ? st.pos : -1;
           if (nv === 253 || nv === 254 || nv === 255) note = 0xc0;
           else if (nv >= 0) {
             channelsWithNotes[ch] = true;
@@ -396,18 +404,27 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
             st.n = p.n;
             note = 0x50 + p.n;
             // A PT3 note byte zeroes CrTnSl and the slide counter.
-            st.fnv = nv; st.pos = nv * 128; st.cur = 0; st.gl = '';
+            st.fnv = nv; st.pos = toPos(nv); st.cur = 0; st.gl = '';
           }
           if (note === 0xc0) st.slSpeed = 0; // shortcut: note off ends the slide (Furnace only with noteOffResetsSlides)
           if (slideOn(ch) && st.fnv >= 0) for (const e of cell.effects) {
             if (e.type === 0xe1 || e.type === 0xe2) {
               const y = e.value & 15;
               st.slSpeed = y ? (e.value >> 4) * 4 * slideMul : 0;
-              st.slTarget = (st.fnv + (e.type === 0xe1 ? y : -y)) * 128; st.slNote = true;
+              st.slTargetNote = st.fnv + (e.type === 0xe1 ? y : -y); st.slTarget = toPos(st.slTargetNote); st.slNote = true;
             }
             if (e.type === 0x01 || e.type === 0x02) {
               // shortcut: Furnace stops 01/02 at note 179/0 (limitSlides 156); the AY period clamp ends them first here.
-              st.slSpeed = e.value * slideMul; st.slTarget = e.type === 0x01 ? 1e9 : -1e9; st.slNote = false;
+              st.slSpeed = e.value * slideMul; st.slTarget = (e.type === 0x01 ? up : -up) * 1e9; st.slNote = false;
+            }
+            // 03 shares the slide state (playback.cpp): it replaces a running 01/02 and bends from the old pitch to
+            // the row note. shortcut: PT3 still retriggers the sample on the note byte, so 03 stays in the lossy list.
+            if (e.type === 0x03) {
+              if (e.value === 0) st.slSpeed = 0;
+              else {
+                if (nv >= 0 && prevPos >= 0) st.pos = prevPos;
+                st.slSpeed = e.value * slideMul; st.slTargetNote = st.fnv; st.slTarget = toPos(st.fnv); st.slNote = true;
+              }
             }
           }
           if (st.ins >= 0 && (note !== 0xd0 || cell.instrument >= 0)) {

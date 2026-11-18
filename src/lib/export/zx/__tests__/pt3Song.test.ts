@@ -31,8 +31,11 @@ describe('furnaceToPt3', () => {
     const r = furnaceToPt3(mod);
     expect(r.lossy.some((x) => x.startsWith('effect E1'))).toBe(false);
     expect(r.module.length).toBeGreaterThan(plain.module.length);
-    (mod as unknown as { compatFlags: Record<string, unknown> }).compatFlags = { linearPitch: 0 };
-    expect(furnaceToPt3(mod).lossy.some((x) => x.startsWith('effect E1'))).toBe(true);
+    // linearPitch 1 before format 237 is partial linearity: Furnace slides the AY period, a different glissando.
+    Object.assign(mod as unknown as Record<string, unknown>, { version: 228, compatFlags: { linearPitch: 1 } });
+    const partial = furnaceToPt3(mod);
+    expect(partial.lossy.some((x) => x.startsWith('effect E1'))).toBe(false);
+    expect(Buffer.from(partial.module).equals(Buffer.from(r.module))).toBe(false);
   });
   it('rejects a non-AY chip', () => {
     const mod = tinyModule();
