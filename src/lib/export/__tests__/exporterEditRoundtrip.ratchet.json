@@ -294,6 +294,12 @@
       "slotClean": true,
       "detail": ""
     },
+    "mdl": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
     "medley": {
       "verdict": "pass",
       "edited": "note",

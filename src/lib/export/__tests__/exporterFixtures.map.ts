@@ -62,6 +62,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   stm: 'public/data/songs/scream-tracker-2/slideshow i.stm',
   stx: 'public/data/songs/formats/futurebrain.stx',
   ams: 'public/data/songs/formats/kernel.ams',
+  mdl: 'public/data/songs/digi-trakker/rohadtjo.mdl',
   ult: 'public/data/songs/formats/seasons.ult',
   stoneTracker: 'public/data/songs/stonetracker/hypnosphere.spm',
   daveLowe: 'public/data/songs/dave-lowe/incredibleshrinkingsphere.dl',

@@ -504,6 +504,14 @@
       "cells": 9102,
       "bytes": 9102
     },
+    "mdl": {
+      "exporter": "MDLExporter.exportMDL",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 371806,
+      "bytes": 371806
+    },
     "medley": {
       "exporter": "MedleyExporter.exportMedley",
       "tier": "byte-exact",

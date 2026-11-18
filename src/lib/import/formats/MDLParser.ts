@@ -108,7 +108,7 @@ interface MDLEffPair {
  * Convert a single MDL effect command + param into effTyp/eff.
  * Mirrors OpenMPT's ConvertMDLCommand().
  */
-function convertMDLCommand(command: number, param: number): MDLEffPair {
+export function convertMDLCommand(command: number, param: number): MDLEffPair {
   // MDL effect table (0-based index = MDL command number)
   // Commands 0..21 per MDLEffTrans in Load_mdl.cpp:
   // idx: 0=none,1=portaUp,2=portaDn,3=tonePorta,4=vibrato,5=arpeggio,6=none,
@@ -954,6 +954,8 @@ export async function parseMDLFile(
     initialSpeed:    Math.max(1, speed),
     initialBPM:      Math.max(4, tempo),
     linearPeriods:   false,
+    uadeEditableFileData: buffer.slice(0),
+    uadeEditableFileName: filename,
     uadeVariableLayout: {
       formatId: 'mdl',
       numChannels,

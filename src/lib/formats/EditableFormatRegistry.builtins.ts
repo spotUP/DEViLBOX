@@ -101,7 +101,7 @@ registerEditableFormat({ formatId: "klystrack", label: "Klystrack", patternCodec
 registerEditableFormat({ formatId: "kris", label: "KRIS / ChipTracker", newSong: { template: "templates/kris.kris" }, patternCodec: { kind: "fixed" }, exporter: { module: "KRISExporter", fn: "exportKRIS", ext: "kris", byLayout: true } });
 registerEditableFormat({ formatId: "leggless", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "markII", label: "Mark II", patternCodec: { kind: "fixed" } });
-registerEditableFormat({ formatId: "mdl", label: "", patternCodec: { kind: "variable" } });
+registerEditableFormat({ formatId: "mdl", label: "", patternCodec: { kind: "variable" }, exporter: { module: "MDLExporter", fn: "exportMDL", byLayout: true } });
 registerEditableFormat({ formatId: "med_mmd0", label: "OctaMED", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "med_mmd1", label: "OctaMED", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "mfp", label: "Magnetic Fields Packer", patternCodec: { kind: "fixed" } });
