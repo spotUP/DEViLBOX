@@ -19,11 +19,18 @@ FAMISTUDIO_USE_SLIDE_NOTES = 1
 FAMISTUDIO_USE_VOLUME_SLIDES = 1
 FAMISTUDIO_USE_FAMITRACKER_DELAYED_NOTES_OR_CUTS = 1
 FAMISTUDIO_DPCM_OFF              = $c000
+.ifdef VRC6
+FAMISTUDIO_EXP_VRC6              = 1     ; -D VRC6=1: mapper-24 board, 2A03 + 3 VRC6 channels (player-vrc6.nes)
+.endif
 
 .include "famistudio_ca65.s"
 
 .segment "HEADER"
+.ifdef VRC6
+    .byte "NES", $1a, 2, 1, $80, $10, 0, 0, 0, 0, 0, 0, 0, 0   ; mapper 24
+.else
     .byte "NES", $1a, 2, 1, $00, $00, 0, 0, 0, 0, 0, 0, 0, 0
+.endif
 
 ; Screen (drafted design, thoughts/shared/plans/2026-11-15-hardware-player-ui-design.md): 32x30 grid, margin 2.
 ; Tiles (public/nes/screen.chr, tools/hwplayer/assets.ts): 0-63 dim glyphs (ASCII-$20), 73 rule, 74 play, 75 pause, 76-79 logo,
@@ -41,6 +48,8 @@ T_EDGE  = 217
 NBARS         = 5               ; pulse 1, pulse 2, triangle, noise, DPCM
 BARROWS       = 18              ; rows 6-23
 QMAX          = 16              ; bar tile updates per NMI (keeps the PPU writes inside vblank)
+RISE          = 12              ; bar attack, pixels per frame
+FALL          = 4               ; bar release, pixels per frame
 HOLD          = 32              ; frames the peak cap rests before it falls
 
 .segment "ZEROPAGE"
@@ -86,6 +95,22 @@ fs_dpcm:
 fs_reset:
     sei
     cld
+.ifdef VRC6
+    lda #0
+    sta $8000                   ; 16 KB bank 0 at $8000 = music
+    lda #2
+    sta $c000                   ; 8 KB bank 2 at $C000 = DPCM; $E000 is fixed to the last bank
+    lda #$24
+    sta $b003                   ; normal CHR banking, horizontal mirroring like the NROM header
+    ldx #3
+:   txa
+    sta $d000,x                 ; CHR 1 KB banks 0-3 / 4-7 = the 8 KB CHR
+    clc
+    adc #4
+    sta $e000,x
+    dex
+    bpl :-
+.endif
     ldx #$40
     stx $4017
     ldx #$ff
@@ -474,7 +499,7 @@ fs_level:                       ; X = bar -> A = level 0..15 from the engine's p
 @off:
     rts
 
-fs_levels:                      ; level: instant attack, 4 pixels per frame fall. Cap: follows the level, rests HOLD frames, falls 1 pixel
+fs_levels:                      ; level: RISE pixels per frame attack, FALL pixels per frame fall (smooth: at most ~2 tile rows per bar per frame, inside QMAX). Cap: follows the level, rests HOLD frames, falls 1 pixel
     ldx #NBARS-1
 @bar:
     jsr fs_level
@@ -482,14 +507,23 @@ fs_levels:                      ; level: instant attack, 4 pixels per frame fall
     lda fs_tgt,y
     sta fs_tmpa
     lda fs_L,x
+    cmp fs_tmpa
+    bcc @rise                   ; below target: rise RISE pixels (not past it)
     sec
-    sbc #4
+    sbc #FALL
     bcs :+
     lda #0
 :   cmp fs_tmpa
-    bcs :+
+    bcs @set
     lda fs_tmpa
-:   sta fs_L,x
+    jmp @set
+@rise:
+    adc #RISE                   ; carry is clear here
+    cmp fs_tmpa
+    bcc @set
+    lda fs_tmpa
+@set:
+    sta fs_L,x
     cmp fs_C,x
     bcc @fall
     cmp #143
