@@ -26,4 +26,15 @@ describe('UNIC export keeps header bytes the song did not change', () => {
     expect(diff).toEqual([20 + 30 + 25]);
     expect(out[75]).toBe(20);
   });
+
+  it('an edited voice 0 note comes back from export + reparse, and no other cell moves', async () => {
+    const { song } = await load();
+    const row = song.patterns[0].channels[0].rows[0];
+    row.note = 30;
+    const out = await bytes(await exportUNIC(song));
+    const back = await parseUNICFile(out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer, 'african dreams.unic');
+    expect(back.patterns[0].channels[0].rows[0].note).toBe(30);
+    const orig = await load();
+    expect(back.patterns[1].channels[2].rows[5]).toEqual(orig.song.patterns[1].channels[2].rows[5]);
+  });
 });

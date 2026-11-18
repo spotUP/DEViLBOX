@@ -243,7 +243,7 @@ const FORMATS: FormatRow[] = [
   { key: 'stp', rig: 'paula', files: ['formats/noname.stp'] },
   { key: 'stx', rig: 'paula', held: 'no exporter in the registry', files: ['formats/futurebrain.stx'] },
   { key: 'ult', rig: 'paula', held: 'no exporter in the registry', files: ['formats/seasons.ult'] },
-  { key: 'unic', rig: 'paula', files: ['formats/african dreams.unic'] },
+  { key: 'unic', rig: 'paula', files: ['formats/african dreams.unic'], pick: (s) => Promise.resolve(pickNote(s, s.songPositions[0])) },
   { key: 'xm', rig: 'paula', files: ['xm/flo boarding - level 1.xm'] },
 ];
 
@@ -502,7 +502,6 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   digi: { edited: 'the edited note is not heard in the rendered stream' },
   composer667: { unedited: 'exported bytes differ from the original (first diff at 18)', edited: 'the edit changes the instrument column of other cells' },
   stp: { unedited: 'exported bytes differ from the original (first diff at 5)', edited: 'songPositions differ and the reloaded cells are zeroed' },
-  unic: { edited: 'voice 0 plays a different note after the edit' },
   ptm: { unedited: 'export touches an audio context that is not initialised (ToneEngine)', edited: 'export touches an audio context that is not initialised (ToneEngine)' },
   xm: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed', edited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
   mod: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },

@@ -118,7 +118,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   digi: 'fail',
   composer667: 'fail',
   stp: 'fail',
-  unic: 'fail',
+  unic: 'pass',
   ptm: 'fail',
   xm: 'fail',
   mod: 'fail',
