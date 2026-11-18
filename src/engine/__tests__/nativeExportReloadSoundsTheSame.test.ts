@@ -311,12 +311,13 @@ const NO_RIG = new Set<string>();
 // dns.ptc: a Dynamic Synthesizer song plays from its dns. module plus an smp. sample companion; the corpus has no smp.ptc, so UADE refuses it and only bytes and grid are held.
 // richard-joseph/cannon fodder (intro).sng: UADE refuses it (no Richard Joseph player match), so only bytes and grid are held; no audio verdict.
 // face-the-music/rock.ftm, hivelytracker/waiting for a message.hvl, synth-dream/sdr.monsterbusiness 1, tfm-music-maker/rainstorm.tfe,
+// digital-tracker-dtm/sonic subspace.dtm: UADE refuses it; the edited-stage now reaches the render since the dtm export is routed.
 // tfmx/mdat.hbtitle: UADE refuses each of them as loaded here (measured in the hook run of the G16 batch), so only bytes and grid are held; no audio verdict.
 const EXPECTED_NO_RIG: string[] = [
   'face-the-music/rock.ftm', 'formats/dns.ptc', 'formats/fuzzball-title.fred', 'hivelytracker/waiting for a message.hvl',
   'richard-joseph/cannon fodder (intro).sng', 'synth-dream/sdr.monsterbusiness 1', 'tfm-music-maker/rainstorm.tfe', 'tfmx/mdat.hbtitle',
   'composer-669/speed fighter.669', 'formats/Epic Pinball - Song 0 - Title.psm', 'formats/avoid.amf', 'formats/dreamer.jxs', 'formats/kdmsong.kdm',
-  'organya/obj0640-1.org', 'studio-pixel---piyopiyo/obj0176-1.pmd',
+  'digital-tracker-dtm/sonic subspace.dtm', 'organya/obj0640-1.org', 'studio-pixel---piyopiyo/obj0176-1.pmd',
 ];
 /**
  * Files UADE takes but plays as noise, so its stream says nothing about the song: the .sog is the
@@ -501,11 +502,11 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   digi: { edited: 'the edited note is not heard in the rendered stream' },
   composer667: { unedited: 'exported bytes differ from the original (first diff at 18)', edited: 'the edit changes the instrument column of other cells' },
   stp: { unedited: 'exported bytes differ from the original (first diff at 5)', edited: 'songPositions differ and the reloaded cells are zeroed' },
-  unic: { unedited: 'exported bytes differ from the original (first diff at 78)', edited: 'voice 0 plays a different note after the edit' },
+  unic: { edited: 'voice 0 plays a different note after the edit' },
   ptm: { unedited: 'export touches an audio context that is not initialised (ToneEngine)', edited: 'export touches an audio context that is not initialised (ToneEngine)' },
   xm: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed', edited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
-  mod: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed', edited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
-  dtm: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed', edited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
+  mod: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
+  dtm: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
   fur: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed', edited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
   it: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed', edited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
   s3m: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed', edited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },

@@ -587,5 +587,6 @@ export async function parseUNICFile(
     initialBPM:      125,
     linearPeriods:   false,
     uadePatternLayout,
+    uadeEditableFileData: buffer.slice(0),
   };
 }

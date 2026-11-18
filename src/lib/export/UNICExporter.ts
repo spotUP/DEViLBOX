@@ -15,6 +15,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { parseUNICFile } from '@/lib/import/formats/UNICParser';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -95,7 +96,28 @@ function extractPCM(inst: TrackerSong['instruments'][number]): Uint8Array {
 
 // ── Main exporter ─────────────────────────────────────────────────────────────
 
+/**
+ * The exporter cannot hold everything the header carries (a non-"M.K." magic, name bytes after the
+ * terminator, raw finetune values outside the nibble map, a loop length of 1). Any header byte the
+ * song did not change (current output == what the source's own parse exports) keeps the source byte.
+ */
 export async function exportUNIC(
+  song: TrackerSong,
+): Promise<{ data: Blob; filename: string; warnings: string[] }> {
+  const res = await buildUNIC(song);
+  const src = song.uadeEditableFileData ? new Uint8Array(song.uadeEditableFileData) : null;
+  if (!src || src.length < HEADER_SIZE) return res;
+  const base = await parseUNICFile(song.uadeEditableFileData as ArrayBuffer, 'source.unic').catch(() => null);
+  if (!base) return res;
+  const cur = new Uint8Array(await res.data.arrayBuffer());
+  const was = new Uint8Array(await (await buildUNIC(base)).data.arrayBuffer());
+  // liveSong gives every stored song restartPosition 0 (the store keeps none, the UI cannot set one): 0 is not an edit.
+  if (!song.restartPosition) cur[951] = was[951];
+  for (let i = 0; i < HEADER_SIZE; i++) if (cur[i] === was[i]) cur[i] = src[i];
+  return { ...res, data: new Blob([cur], { type: 'application/octet-stream' }) };
+}
+
+async function buildUNIC(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];
