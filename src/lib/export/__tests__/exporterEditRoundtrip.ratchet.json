@@ -12,6 +12,12 @@
       "slotClean": null,
       "detail": ""
     },
+    "ams": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
     "anders0land": {
       "verdict": "pass",
       "edited": "note",
@@ -516,16 +522,16 @@
       "slotClean": true,
       "detail": ""
     },
-    "stx": {
-      "verdict": "pass",
-      "edited": "note",
-      "slotClean": null,
-      "detail": ""
-    },
     "stoneTracker": {
       "verdict": "pass",
       "edited": "note",
       "slotClean": true,
+      "detail": ""
+    },
+    "stx": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
       "detail": ""
     },
     "sunTronic": {

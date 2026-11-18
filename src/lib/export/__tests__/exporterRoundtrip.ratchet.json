@@ -32,6 +32,14 @@
       "cells": 0,
       "bytes": 0
     },
+    "ams": {
+      "exporter": "AMSExporter.exportAMS",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 533066,
+      "bytes": 533066
+    },
     "anders0land": {
       "exporter": "Anders0landExporter.exportAnders0land",
       "tier": "byte-exact",
@@ -848,14 +856,6 @@
       "cells": 220494,
       "bytes": 220494
     },
-    "stx": {
-      "exporter": "STXExporter.exportSTX",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 123862,
-      "bytes": 123862
-    },
     "stoneTracker": {
       "exporter": "StoneTrackerExporter.exportStoneTracker",
       "tier": "byte-exact",
@@ -871,6 +871,14 @@
       "matchPct": 0.7722,
       "cells": 4864,
       "bytes": 278274
+    },
+    "stx": {
+      "exporter": "STXExporter.exportSTX",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 123862,
+      "bytes": 123862
     },
     "sunTronic": {
       "exporter": "SunTronicExporter.exportAsSunTronic",

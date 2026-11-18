@@ -377,7 +377,7 @@ const XM_KEYOFF_EFF  = 0x14;
 const XM_CHAN_VOL    = 0x0C; // channel volume — map to set-volume
 
 /** Decode a MOD-style effect (0..0xF) + param into [effTyp, eff] */
-function decodeModEffect(effect: number, param: number): [number, number] {
+export function decodeModEffect(effect: number, param: number): [number, number] {
   // These match standard XM/MOD effect numbering
   switch (effect) {
     case 0x0: return param !== 0 ? [0x00, param] : [0, 0]; // arpeggio
@@ -415,7 +415,7 @@ function decodeModEffect(effect: number, param: number): [number, number] {
 }
 
 /** Decode an AMS extended effect (effTrans[] index 0..0x1C) into [effTyp, eff] */
-function decodeExtEffect(effect: number, param: number): [number, number] {
+export function decodeExtEffect(effect: number, param: number): [number, number] {
   // Based on effTrans[] + post-fixups in OpenMPT ReadAMSPattern
   const idx = effect - 0x10; // 0..0x1C
   switch (idx) {
@@ -499,7 +499,7 @@ function decodeExtEffect(effect: number, param: number): [number, number] {
   }
 }
 
-interface AMSCell {
+export interface AMSCell {
   note:      number;  // 0=empty, 97=keyoff, 1..96=note
   instr:     number;  // 0=empty, 1..
   volume:    number;  // 0=no volume col, 1..65=vol+1
@@ -514,7 +514,7 @@ interface AMSCell {
  * Returns a 2D array: rows × channels, each entry is AMSCell.
  * @param newVersion true = AMS 2.x (Velvet Studio), false = AMS 1.x (Extreme's Tracker)
  */
-function parseAMSPattern(
+export function parseAMSPattern(
   data: Uint8Array,
   numRows: number,
   numChannels: number,
@@ -1045,6 +1045,8 @@ function parseAMS1(bytes: Uint8Array, filename: string): TrackerSong | null {
     initialBPM:      125,
     linearPeriods:   false,
     uadeVariableLayout,
+    uadeEditableFileData: bytes.slice().buffer,
+    uadeEditableFileName: filename,
     metadata: {
       tracker: `Extreme's Tracker ${versionHigh}.${versionLow}`,
       format: 'AMS',
@@ -1305,6 +1307,7 @@ function parseAMS2(bytes: Uint8Array, filename: string): TrackerSong | null {
 
   // ── Order list ────────────────────────────────────────────────────────────────
   if (pos + numOrds * 2 > bytes.length) return null;
+  const amsOrderAt = pos;
   const orderList: number[] = [];
   for (let i = 0; i < numOrds; i++) {
     orderList.push(u16le(bytes, pos));
@@ -1641,7 +1644,10 @@ function parseAMS2(bytes: Uint8Array, filename: string): TrackerSong | null {
     initialBPM,
     linearPeriods:   linearSlides,
     uadeVariableLayout,
+    uadeEditableFileData: bytes.slice().buffer,
+    uadeEditableFileName: filename,
     metadata: {
+      amsOrderAt,
       tracker: `Velvet Studio ${versionHigh}.${String(versionLow).padStart(2, '0')}`,
       format: 'AMS',
     },
