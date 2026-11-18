@@ -43,9 +43,10 @@ describe('the song native export and the MOD export take', () => {
     useTrackerStore.getState().setCell(0, 63, { note: 37, instrument: 1 });
     expect(liveTrackerSong().patterns[0].channels[0].rows[63].note).toBe(37);
 
-    // A classic MOD has no native serializer (it exports through OpenMPT);
-    // the router says so rather than exporting something stale.
-    expect(await exportNativeSong(null, {})).toBeNull();
+    // The router routes a classic MOD to its exporter (6f6b4ad41), so it exports the live song.
+    const out = await exportNativeSong(null, {});
+    expect(out).not.toBeNull();
+    expect(out!.data.length).toBeGreaterThan(0);
   }, 60000);
 
   it('carries a native-engine song\'s data (an AHX exports from the stores)', async () => {
