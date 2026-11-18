@@ -6,9 +6,7 @@
  * and after each PLAY call (layout in game-music-emu-wasm/src/gme_wasm.cpp).
  * The Phase 2 converter turns these records into Furnace notes and instruments.
  *
- * Only 2A03 songs exist in the corpus (public/data/songs/nsf/dr mario.nsf);
- * VRC6 / VRC7 / FDS / MMC5 / N163 / S5B sections stay untested until real
- * files for those chips are added.
+ * One real song per expansion chip lives next to dr mario.nsf (from modland).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -77,6 +75,24 @@ describe('NSF per-frame state trace', () => {
     expect(triOn.length).toBeGreaterThan(300);
     expect(new Set(triOn.map((r) => r[TRI + PERIOD])).size).toBeGreaterThan(10);
     expect(distinct(rows, NOISE + VOLUME)).toBeGreaterThan(1);
+  });
+
+  // chip bit (NSF header 0x7B), file, track, then the words that must move: [offset, gate offset | -1]
+  const CHIPS: [string, number, string, number, number[]][] = [
+    ['VRC6', 0x01, 'akumajou densetsu.nsf', 0, [42 + 3, 42 + 7, 42 + 11]],
+    ['VRC7', 0x02, 'lagrange point.nsf', 2, [349 + 8, 349 + 11, 349 + 14]],
+    ['FDS', 0x04, 'metroid (famicom disk system).nsf', 3, [71 + 0x42, 71 + 0x93]],
+    ['MMC5', 0x08, 'just breed.nsf', 0, [54 + 7, 54 + 15]],
+    ['N163', 0x10, 'king of kings (n106).nsf', 0, [221 + 0x40, 221 + 0x48, 221 + 0x50, 221 + 0x58, 221 + 0x60, 221 + 0x68, 221 + 0x70, 221 + 0x78]],
+    ['S5B', 0x20, 'gimmick!.nsf', 0, [375, 375 + 2, 375 + 4]],
+  ];
+  it.each(CHIPS)('%s: expansion state words are live over 10 s', (_name, bit, file, track, words) => {
+    const { chips, rows } = trace(`public/data/songs/nsf/${file}`, track, 600);
+    b.module._gme_wasm_trace_close();
+    expect(chips & bit).toBe(bit);
+    expect(rows.length).toBe(600);
+    const moving = words.map((w) => new Set(rows.map((r) => r[w])).size);
+    expect(Math.max(...moving)).toBeGreaterThan(5);
   });
 
   it('reads PRG bytes through the bank mapping and rejects non-NSF data', () => {
