@@ -1,0 +1,18 @@
+{
+ "musicAddr": 32768,
+ "musicCap": 16384,
+ "dpcmAddr": 49152,
+ "dpcmCap": 8192,
+ "prgOffset": 16,
+ "tickAddr": 60557,
+ "titleAddr": 61943,
+ "authorAddr": 61975,
+ "textLen": 32,
+ "chipAddr": 62007,
+ "chipLen": 16,
+ "scrollAddr": 62023,
+ "scrollLen": 128,
+ "nsubAddr": 62151,
+ "nmiAddr": 60537,
+ "sourceHash": "a402549f22025773369d11cd09998c9aaddb0632"
+}
