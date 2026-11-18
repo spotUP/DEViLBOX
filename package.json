@@ -26,6 +26,7 @@
     "dev:persistent": "./dev-persistent.sh",
     "build": "npm run asbuild && npm run type-check && vite build",
     "type-check": "tsc -b --force",
+    "type-check:fast": "tsc -b",
     "test": "vitest run",
     "nuade-compare": "npx tsx --tsconfig tsconfig.app.json tools/nuade/compare-batch.ts",
     "nuade-row-preview": "npx tsx --tsconfig tsconfig.app.json tools/nuade/rowPreviewGate.ts",

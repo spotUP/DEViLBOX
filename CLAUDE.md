@@ -11,6 +11,7 @@
 | Start dev fullstack for agents (no automatic page reload: no HMR, no engine-change reload; reload the tab on purpose after a code change) | `DEVILBOX_NO_RELOAD=1 npm run dev:fullstack` |
 | Stop dev | Ctrl-C in terminal running dev script |
 | Type-check (strict) | `npm run type-check` (`tsc -b --force` — catch more than `tsc --noEmit`) |
+| Type-check (incremental, while iterating) | `npm run type-check:fast` (`tsc -b`, reuses `node_modules/.tmp/*.tsbuildinfo`; seconds after a small edit). Agents use it between edits; `npm run type-check` stays the gate before commit / done |
 | Lint | `npm run lint` |
 | Test (interactive watch) | `npm run test` |
 | Test (CI mode, headless) | `npm run test:ci` |
