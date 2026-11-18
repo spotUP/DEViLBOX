@@ -6,6 +6,7 @@
  *
  * Verdicts live in exporterEditRoundtrip.ratchet.json: pass | fail | no-edit-path.
  * The test fails only when a recorded pass row regresses. Regenerate:
+ * Single rows: ROW=id1,id2 (module-level measure, -t does not filter).
  *   DEVILBOX_GEN_RATCHET=1 npx vitest run src/lib/export/__tests__/exporterEditRoundtrip.test.ts
  */
 import { describe, it, expect } from 'vitest';
@@ -27,7 +28,7 @@ interface Row { verdict: Verdict; edited: 'note' | 'instrument' | 'none'; slotCl
 const base = JSON.parse(readFileSync(join(DIR, 'exporterRoundtrip.ratchet.json'), 'utf8')) as {
   results: Record<string, { status: string }>;
 };
-const ids = Object.entries(base.results).filter(([, v]) => v.status === 'byte-exact').map(([k]) => k).sort();
+const ids = Object.entries(base.results).filter(([, v]) => v.status === 'byte-exact').map(([k]) => k).filter((k) => !process.env.ROW || process.env.ROW.split(',').includes(k)).sort();
 const fixtureOf = (id: string): string | undefined =>
   id in LAYOUT_EXPORTERS ? LAYOUT_FIXTURES[id] : NAMED_EXPORTERS.find((n) => n.id === id)?.fixture;
 
@@ -56,34 +57,41 @@ async function measure(id: string): Promise<Row> {
   setGridBaseline(baselineOf(song.patterns));
   const pos = pickCell(song);
   if (!pos) return none('no-edit-path', 'no cell with a file offset');
-  const [p, r, c] = pos;
-  const layout = song.uadePatternLayout;
-  const off = layout ? getCellFileOffset(layout, p, r, c) : -1;
-  const slot = layout?.bytesPerCell ?? 0;
-  const cell = song.patterns[p].channels[c].rows[r];
   let last: Row = none('fail', '');
-  for (const field of ['note', 'instrument'] as const) {
-    const fresh = await parseAs(fx, raw);
-    setGridBaseline(baselineOf(fresh.patterns));
-    const orig = fresh.patterns[p].channels[c].rows[r];
-    const nv = field === 'note' ? (orig.note === 49 ? 50 : 49) : (orig.instrument === 3 ? 4 : 3);
-    fresh.patterns[p].channels[c].rows[r] = { ...orig, [field]: nv };
-    let out: Uint8Array;
-    try { out = id in LAYOUT_EXPORTERS ? await invokeLayoutExport(id, fresh) : await invokeNamedExport(id, fresh); }
-    catch (e) { last = { verdict: 'fail', edited: field, slotClean: null, detail: `export: ${(e as Error).message}` }; continue; }
-    let slotClean: boolean | null = null;
-    if (off >= 0 && out.length === raw.length) {
-      slotClean = true;
-      for (let i = 0; i < raw.length; i++) if (raw[i] !== out[i] && (i < off || i >= off + slot)) { slotClean = false; break; }
+  // Without a layout the first cell is often an empty row of a voice that holds no instrument yet, which cannot take a note;
+  // the first row that already has a note is tried too.
+  const noted = song.uadePatternLayout ? undefined : ((): [number, number, number] | undefined => {
+    for (let p = 0; p < song.patterns.length; p++) for (let c = 0; c < song.patterns[p].channels.length; c++)
+      for (let r = 0; r < song.patterns[p].channels[c].rows.length; r++) if (song.patterns[p].channels[c].rows[r].note) return [p, r, c];
+  })();
+  for (const [p, r, c] of noted ? [pos, noted] : [pos]) {
+    const layout = song.uadePatternLayout;
+    const off = layout ? getCellFileOffset(layout, p, r, c) : -1;
+    const slot = layout?.bytesPerCell ?? 0;
+    // Each format's note table covers a different range (ProTracker 13..48, TCB 52..87), so several probe notes follow.
+    const tries = [['note', 49], ['note', 25], ['note', 61], ['instrument', 3]] as const;
+    for (const [field, probe] of tries) {
+      const fresh = await parseAs(fx, raw);
+      setGridBaseline(baselineOf(fresh.patterns));
+      const orig = fresh.patterns[p].channels[c].rows[r];
+      const nv = orig[field] === probe ? probe + 1 : probe;
+      fresh.patterns[p].channels[c].rows[r] = { ...orig, [field]: nv };
+      let out: Uint8Array;
+      try { out = id in LAYOUT_EXPORTERS ? await invokeLayoutExport(id, fresh) : await invokeNamedExport(id, fresh); }
+      catch (e) { last = { verdict: 'fail', edited: field, slotClean: null, detail: `export: ${(e as Error).message}` }; continue; }
+      let slotClean: boolean | null = null;
+      if (off >= 0 && out.length === raw.length) {
+        slotClean = true;
+        for (let i = 0; i < raw.length; i++) if (raw[i] !== out[i] && (i < off || i >= off + slot)) { slotClean = false; break; }
+      }
+      try {
+        const re = await parseAs(fx, out);
+        const got = re.patterns[p]?.channels[c]?.rows[r];
+        if (got && got[field] === nv) return { verdict: 'pass', edited: field, slotClean, detail: '' };
+        last = { verdict: 'fail', edited: field, slotClean, detail: `${field} read back ${got?.[field]} want ${nv}${out.length === raw.length && out.every((b, i) => b === raw[i]) ? ' (bytes unchanged)' : ''}` };
+      } catch (e) { last = { verdict: 'fail', edited: field, slotClean, detail: `reparse: ${(e as Error).message}` }; }
     }
-    try {
-      const re = await parseAs(fx, out);
-      const got = re.patterns[p]?.channels[c]?.rows[r];
-      if (got && got[field] === nv) return { verdict: 'pass', edited: field, slotClean, detail: '' };
-      last = { verdict: 'fail', edited: field, slotClean, detail: `${field} read back ${got?.[field]} want ${nv}${out.length === raw.length && out.every((b, i) => b === raw[i]) ? ' (bytes unchanged)' : ''}` };
-    } catch (e) { last = { verdict: 'fail', edited: field, slotClean, detail: `reparse: ${(e as Error).message}` }; }
   }
-  void cell;
   return last;
 }
 

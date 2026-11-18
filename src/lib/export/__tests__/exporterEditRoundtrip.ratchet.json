@@ -1,10 +1,10 @@
 {
   "results": {
     "actionamics": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": null,
-      "detail": "instrument read back 0 want 3"
+      "detail": ""
     },
     "activisionPro": {
       "verdict": "pass",
@@ -61,10 +61,10 @@
       "detail": "instrument read back 0 want 3 (bytes unchanged)"
     },
     "deltaMusic1": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3"
+      "detail": ""
     },
     "deltaMusic2": {
       "verdict": "pass",
@@ -169,10 +169,10 @@
       "detail": ""
     },
     "hippelCoSo": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": null,
-      "detail": "instrument read back 0 want 3"
+      "detail": ""
     },
     "hivelyAHX": {
       "verdict": "fail",
@@ -409,10 +409,10 @@
       "detail": "instrument read back 0 want 3 (bytes unchanged)"
     },
     "richardJoseph": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3"
+      "detail": ""
     },
     "riffRaff": {
       "verdict": "pass",
@@ -541,10 +541,10 @@
       "detail": ""
     },
     "tcbTracker": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3"
+      "detail": ""
     },
     "tfmx7v": {
       "verdict": "fail",
