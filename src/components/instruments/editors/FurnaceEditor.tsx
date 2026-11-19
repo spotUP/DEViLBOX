@@ -237,6 +237,14 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   useEffect(() => { configRef.current = config; }, [config]);
 
   // Push config changes to live FurnaceSynth via register re-map
+  // Edits one DPCM note-map entry; the NES export reads pitch 0-15 and start level 0-63 (-1 = unset / keep previous).
+  const setDpcmEntry = (index: number, field: 'freq' | 'delta', value: number, max: number) => {
+    const map = configRef.current.nes?.dpcmMap;
+    if (!map || !configRef.current.nes || !Number.isFinite(value)) return;
+    const next = map.map((e, k) => (k === index ? { ...e, [field]: Math.max(-1, Math.min(max, Math.round(value))) } : e));
+    pushLiveUpdate({ nes: { ...configRef.current.nes, dpcmMap: next } });
+  };
+
   const pushLiveUpdate = useCallback((updates: Partial<FurnaceConfig>) => {
     onChange(updates);
     // Fire-and-forget: re-map registers on the running synth
@@ -750,8 +758,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
               <thead className="sticky top-0 bg-dark-bg">
                 <tr className="text-text-muted">
                   <th className="px-2 py-1 text-left">Note</th>
-                  <th className="px-2 py-1 text-right">Freq</th>
-                  <th className="px-2 py-1 text-right">Delta</th>
+                  <th className="px-2 py-1 text-right">Pitch (0-15)</th>
+                  <th className="px-2 py-1 text-right">Start Level (0-63)</th>
                 </tr>
               </thead>
               <tbody>
@@ -762,13 +770,30 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
                   return (
                     <tr key={i} className="border-t border-dark-border/50 hover:bg-dark-bg/50">
                       <td className="px-2 py-0.5 text-text-secondary">{noteName}</td>
-                      <td className="px-2 py-0.5 text-right text-text-primary">{entry.freq}</td>
-                      <td className="px-2 py-0.5 text-right text-accent-highlight">{entry.delta}</td>
+                      <td className="px-2 py-0.5 text-right">
+                        <input
+                          type="number" min={-1} max={15} value={entry.freq}
+                          aria-label={`DPCM pitch for ${noteName}`}
+                          onChange={(e) => setDpcmEntry(i, 'freq', Number(e.target.value), 15)}
+                          className="w-14 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs text-right"
+                        />
+                      </td>
+                      <td className="px-2 py-0.5 text-right">
+                        <input
+                          type="number" min={-1} max={63} value={entry.delta}
+                          aria-label={`DPCM start level for ${noteName}`}
+                          onChange={(e) => setDpcmEntry(i, 'delta', Number(e.target.value), 63)}
+                          className="w-14 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs text-right"
+                        />
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          </div>
+          <div className="mt-2 text-[10px] font-mono text-text-muted">
+            The NES export reads Pitch and Start Level from this map. The sample each note plays comes from the sample map; loop is not exported.
           </div>
         </div>
       )}
