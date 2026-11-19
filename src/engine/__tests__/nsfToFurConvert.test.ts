@@ -99,6 +99,30 @@ function nsfToNsfe(nsf: Uint8Array): Uint8Array {
   return new Uint8Array(parts);
 }
 
+// Owner report 2026-11-19 ("audio in channel 1 3 4 only, or it varies"): the NSFe time chunk ends
+// track 2 at 2301 frames (row 329 of 384), and the empty tail of the last pattern played for 6 s
+// before the restart, holding or dropping voices. The song must break at its last traced row.
+if (fs.existsSync(BIONIC)) describe('NSF song end', { timeout: 120000 }, () => {
+  it('bioniccommando.nsfe track 2 ends at the traced length, not at the pattern end', async () => {
+    const { nsfToFurWasm, NSF_DEFAULT_FRAMES } = await import('../../lib/import/wasm/FurnaceFileOps');
+    const { parseFurnaceFile } = await import('../../lib/import/parsers/FurnaceToSong');
+    const fur = await nsfToFurWasm(new Uint8Array(fs.readFileSync(BIONIC)), 2, NSF_DEFAULT_FRAMES);
+    const song = await parseFurnaceFile(fur, 'bioniccommando.fur');
+    let rows = 0;
+    for (const pi of song.songPositions) {
+      const p = song.patterns[pi];
+      const brk = Array.from({ length: p.length }, (_, r) => r)
+        .find((r) => p.channels.some((ch) => ch.rows[r]?.effTyp === 0x0d || ch.rows[r]?.effTyp2 === 0x0d));
+      rows += brk === undefined ? p.length : brk + 1;
+      if (brk !== undefined) break;
+    }
+    const traced = Math.round((38283 * 60.0988) / 1000); // NSFe time chunk, track 2
+    const frames = rows * song.initialSpeed;
+    expect(frames, 'played frames per loop').toBeGreaterThanOrEqual(traced);
+    expect(frames, 'played frames per loop').toBeLessThan(traced + 2 * song.initialSpeed + 8);
+  });
+});
+
 describe('NSFe input', { timeout: 120000 }, () => {
   it('converts the raw song index to the same .fur as the NSF', async () => {
     const { nsfToFurWasm } = await import('../../lib/import/wasm/FurnaceFileOps');

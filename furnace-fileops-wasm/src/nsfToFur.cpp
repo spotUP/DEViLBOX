@@ -646,6 +646,16 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
     g.cell->ins = (short)found;
   }
 
+  // The trace ends at row R, mid-pattern unless R is a multiple of patLen. Break there so the empty
+  // tail of the last pattern never plays (it held notes or silence for up to patLen rows, then the
+  // song restarted). 0D00 on the last order wraps to order 0, the same loop the song had before.
+  if (R % patLen) {
+    int ci = 0;
+    while (ci < nCh && cells[ci][R - 1].fx >= 0) ci++;
+    // shortcut: every channel carrying ED on the last row leaves the tail in; add a second effect column if a song shows it
+    if (ci < nCh) { cells[ci][R - 1].fx = 0x0D; cells[ci][R - 1].fxv = 0; }
+  }
+
   // Patterns: patLen-row blocks per channel, identical blocks share one pattern index.
   int chanPats = 0;
   for (int ci = 0; ci < nCh; ci++) {
