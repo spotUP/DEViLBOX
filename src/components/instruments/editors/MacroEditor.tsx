@@ -16,6 +16,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { FurnaceMacroType, type FurnaceMacro } from '@typedefs/instrument';
 import { RotateCcw, Plus, Minus, Repeat, Flag, Zap } from 'lucide-react';
+import type { MacroRange } from '@/lib/furnace/chipMacroProfiles';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,8 @@ interface MacroEditorProps {
   label?: string;
   bipolar?: boolean;      // For pitch/arp macros that can be negative
   playbackPosition?: number; // Current playing step (undefined = not playing)
+  /** Names for enumerated values, indexed by value (duty cycles, noise modes). */
+  valueNames?: readonly string[];
 }
 
 interface MacroListEditorProps {
@@ -39,6 +42,10 @@ interface MacroListEditorProps {
   playbackPositions?: Record<number, number>; // macroType → current playback step
   /** Names to show, and the only macro types offered by Add, when a voice uses a few slots with its own meaning (SSG). */
   labels?: Readonly<Record<number, string>>;
+  /** Value range per macro type, when the target driver keeps a different range than the default. */
+  ranges?: Readonly<Partial<Record<number, MacroRange>>>;
+  /** Names for enumerated values per macro type. */
+  valueNames?: Readonly<Partial<Record<number, readonly string[]>>>;
 }
 
 // ── Macro type metadata ────────────────────────────────────────────────────────
@@ -137,7 +144,9 @@ const MACRO_PRESETS: Partial<Record<number, MacroPreset[]>> = {
 
 // ── Value display formatting ───────────────────────────────────────────────────
 
-function formatMacroValue(value: number, macroType: number): string {
+function formatMacroValue(value: number, macroType: number, valueNames?: readonly string[]): string {
+  const named = valueNames?.[value];
+  if (named) return `${value} (${named})`;
   const sign = (v: number) => v > 0 ? `+${v}` : `${v}`;
   switch (macroType) {
     case FurnaceMacroType.ARP: {
@@ -170,6 +179,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
   label,
   bipolar = false,
   playbackPosition,
+  valueNames,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -592,7 +602,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
             }}
           >
             <span className="text-text-muted mr-1">#{hoveredStep.step}:</span>
-            {formatMacroValue(hoveredStep.value, macroType)}
+            {formatMacroValue(hoveredStep.value, macroType, valueNames)}
           </div>
         )}
 
@@ -636,11 +646,15 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
   onChange,
   playbackPositions,
   labels,
+  ranges,
+  valueNames,
 }) => {
   const typeNames = labels ?? MACRO_TYPE_NAMES;
   const [showAddMenu, setShowAddMenu] = useState(false);
 
-  const getMacroRange = (macroType: number): { min: number; max: number; bipolar: boolean } => {
+  const getMacroRange = (macroType: number): MacroRange => {
+    const override = ranges?.[macroType];
+    if (override) return override;
     switch (macroType) {
       case FurnaceMacroType.VOL:   return { min: 0,    max: 15,  bipolar: false };
       case FurnaceMacroType.ARP:   return { min: -12,  max: 12,  bipolar: true  };
@@ -710,12 +724,13 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
                   {typeNames[macro.type] || MACRO_TYPE_NAMES[macro.type] || `Macro ${macro.type}`}
                 </span>
                 {typeof playbackPositions?.[macro.type] === 'number' && (
-                  <span className="text-[9px] text-yellow-400">▶ {playbackPositions[macro.type]}</span>
+                  <span className="text-[9px] text-accent-warning">▶ {playbackPositions[macro.type]}</span>
                 )}
               </div>
               <button
                 onClick={() => removeMacro(index)}
-                className="text-red-400 hover:text-red-300 text-xs px-1 hover:bg-red-500/10 rounded"
+                className="text-accent-error hover:text-text-primary text-xs px-1 hover:bg-accent-error/10 rounded"
+                aria-label="Remove macro"
               >
                 ×
               </button>
@@ -726,7 +741,10 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
               macro={macro}
               macroType={macro.type}
               onChange={(m) => updateMacro(index, m)}
-              {...getMacroRange(macro.type)}
+              minValue={getMacroRange(macro.type).min}
+              maxValue={getMacroRange(macro.type).max}
+              bipolar={getMacroRange(macro.type).bipolar}
+              valueNames={valueNames?.[macro.type]}
               color={getMacroColor(macro.type)}
               height={50}
               playbackPosition={playbackPositions?.[macro.type]}

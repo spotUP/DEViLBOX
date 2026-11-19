@@ -38,6 +38,8 @@ import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { MacroListEditor } from './MacroEditor';
 import { SNESPanel, SNESEchoPanel } from './SNESPanels';
 import { SNES_MACRO_LABELS } from '@/lib/furnace/snesDsp';
+import { chipMacroProfile } from '@/lib/furnace/chipMacroProfiles';
+import { NESPanel } from './NESPanel';
 import { FurnaceWaveList } from './FurnaceWaveList';
 import { WavetableListEditor, type WavetableData } from './WavetableEditor';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
@@ -224,7 +226,11 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   const sampleInputRef = useRef<HTMLInputElement>(null);
   const configRef = useRef(config);
   // chipType holds a Furnace instrument type on imports (VERA=24) but a chip id on new ones (SNES=24), so gate SNES UI on synthType
-  const isSnes = useInstrumentStore((s) => s.instruments.find((i) => i.id === instrumentId)?.synthType) === 'FurnaceSNES' || !!config.snes;
+  const synthType = useInstrumentStore((s) => s.instruments.find((i) => i.id === instrumentId)?.synthType);
+  const isSnes = synthType === 'FurnaceSNES' || !!config.snes;
+  // chipType is ambiguous between imports and new instruments, so native-player chips gate on synthType.
+  const isNes = synthType === 'FurnaceNES';
+  const macroProfile = chipMacroProfile(synthType);
 
   // Keep configRef in sync
   useEffect(() => { configRef.current = config; }, [config]);
@@ -380,7 +386,9 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           macros={config.macros}
           onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
           chipType={config.chipType}
-          labels={neoKind?.id === 'ssg' ? SSG_MACRO_LABELS : isSnes ? SNES_MACRO_LABELS : undefined}
+          labels={neoKind?.id === 'ssg' ? SSG_MACRO_LABELS : isSnes ? SNES_MACRO_LABELS : macroProfile?.labels}
+          ranges={macroProfile?.ranges}
+          valueNames={macroProfile?.valueNames}
         />
       ) : (
         <MacroListEditor
@@ -712,7 +720,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       {config.fixedDrums != null && (<OPLDrumPanel config={config} onChange={pushLiveUpdate} />)}
 
       {/* PSG / PULSE PANEL (for other PSG chips) */}
-      {category === "PSG" && ![5, 10, 24].includes(config.chipType) && (
+      {isNes && <NESPanel config={config} />}
+      {category === "PSG" && !isNes && ![5, 10, 24].includes(config.chipType) && (
         <PSGPanel config={config} onChange={pushLiveUpdate} />
       )}
 
