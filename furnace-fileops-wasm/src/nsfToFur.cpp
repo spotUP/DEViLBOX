@@ -1,7 +1,7 @@
 /**
  * nsfToFur.cpp - NSF to editable Furnace song (NSF import, Phase 2).
  *
- * Runs the NSF in game-music-emu's Nsf_Emu (compiled into this module as the
+ * Runs the NSF (or NSFe) in game-music-emu's Nsf_Emu (compiled into this module as the
  * static library gme_nsf), records the per-PLAY-call voice state with the
  * shared Nsf_Trace (game-music-emu-wasm/src/nsf_trace.h), and turns it into a
  * DivSong: one channel per voice (2A03 + DPCM, then VRC6, VRC7, FDS, MMC5,
@@ -18,8 +18,9 @@
  * as the nearest note plus a pitch macro (linear pitch: 1/128 semitone).
  */
 
+#include <memory>
 #include "engine.h"
-#include "Nsf_Emu.h"
+#include "Nsfe_Emu.h"
 #include "nsf_trace.h"
 #include <algorithm>
 #include <cmath>
@@ -282,10 +283,14 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   if (patLen < 1 || patLen > DIV_MAX_ROWS) patLen = 64;
   if (frames < 1) frames = 1;
   if (frames > patLen * DIV_MAX_PATTERNS) frames = patLen * DIV_MAX_PATTERNS;
-  Nsf_Emu emu;
+  // NSFe is a chunked NSF; after load both run the same Nsf_Emu core.
+  const bool nsfe = len >= 4 && !memcmp(data, "NSFE", 4);
+  std::unique_ptr<Nsf_Emu> emuOwn(nsfe ? new Nsfe_Emu : new Nsf_Emu);
+  Nsf_Emu& emu = *emuOwn;
   Ctx c;
   if (emu.set_sample_rate(44100)) { err = "NSF: sample rate"; return false; }
   if (const char* e = emu.load_mem(data, (long)len)) { err = std::string("NSF: ") + e; return false; }
+  emu.clear_playlist(); // NSFe plst: track stays the raw song index
   emu.ignore_silence(true);
   Nsf_Trace::arm(&emu, hook, &c);
   if (const char* e = emu.start_track(track)) { err = std::string("NSF track: ") + e; return false; }
@@ -334,8 +339,8 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   }
   song.systemLen = sysN;
   song.recalcChans();
-  song.name = std::string(emu.header().game, strnlen(emu.header().game, 32));
-  song.author = std::string(emu.header().author, strnlen(emu.header().author, 32));
+  track_info_t ti; // NSFe keeps names in its auth chunk, not the header
+  if (!emu.track_info(&ti, track)) { song.name = ti.game; song.author = ti.author; }
 
   DivSubSong* sub = song.subsong[0];
   sub->hz = hz > 1.0 ? (float)hz : 60.0f;

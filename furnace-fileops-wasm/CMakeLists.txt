@@ -117,7 +117,7 @@ add_library(gme_nsf STATIC
   ${GME}/Blip_Buffer.cpp ${GME}/Classic_Emu.cpp ${GME}/Data_Reader.cpp ${GME}/Gme_File.cpp
   ${GME}/M3u_Playlist.cpp ${GME}/Multi_Buffer.cpp ${GME}/Music_Emu.cpp ${GME}/Nes_Apu.cpp
   ${GME}/Nes_Cpu.cpp ${GME}/Nes_Fds_Apu.cpp ${GME}/Nes_Fme7_Apu.cpp ${GME}/Nes_Namco_Apu.cpp
-  ${GME}/Nes_Oscs.cpp ${GME}/Nes_Vrc6_Apu.cpp ${GME}/Nes_Vrc7_Apu.cpp ${GME}/Nsf_Emu.cpp
+  ${GME}/Nes_Oscs.cpp ${GME}/Nes_Vrc6_Apu.cpp ${GME}/Nes_Vrc7_Apu.cpp ${GME}/Nsf_Emu.cpp ${GME}/Nsfe_Emu.cpp
   ${GME}/ext/emu2413.c
 )
 target_include_directories(gme_nsf PRIVATE ${GME} ${CMAKE_SOURCE_DIR}/../game-music-emu-wasm/src)

@@ -71,3 +71,35 @@ describe('NSF to editable Furnace song', { timeout: 120000 }, () => {
     });
   }
 });
+
+/** NSFe built from an NSF: INFO, BANK, auth, a non-identity plst (index 0 -> last song), DATA, NEND. */
+function nsfToNsfe(nsf: Uint8Array): Uint8Array {
+  const dv = new DataView(nsf.buffer, nsf.byteOffset, nsf.byteLength);
+  const songs = nsf[6];
+  const cstr = (off: number): Uint8Array => { const s = nsf.subarray(off, off + 32); const z = s.indexOf(0); return s.subarray(0, z < 0 ? 32 : z); };
+  const info = new Uint8Array(9);
+  const iv = new DataView(info.buffer);
+  iv.setUint16(0, dv.getUint16(8, true), true); iv.setUint16(2, dv.getUint16(10, true), true); iv.setUint16(4, dv.getUint16(12, true), true);
+  info[6] = nsf[0x7a]; info[7] = nsf[0x7b]; info[8] = songs;
+  const auth = [cstr(0x0e), cstr(0x2e), cstr(0x4e)].flatMap((s) => [...s, 0]);
+  const chunks: [string, Uint8Array][] = [['INFO', info], ['BANK', nsf.subarray(0x70, 0x78)], ['auth', new Uint8Array(auth)],
+    ['plst', new Uint8Array([songs - 1, 0])], ['DATA', nsf.subarray(0x80)], ['NEND', new Uint8Array(0)]];
+  const parts: number[] = [...new TextEncoder().encode('NSFE')];
+  for (const [id, d] of chunks) {
+    parts.push(d.length & 255, (d.length >> 8) & 255, (d.length >> 16) & 255, d.length >>> 24, ...new TextEncoder().encode(id), ...d);
+  }
+  return new Uint8Array(parts);
+}
+
+describe('NSFe input', { timeout: 120000 }, () => {
+  it('converts the raw song index to the same .fur as the NSF', async () => {
+    const { nsfToFurWasm } = await import('../../lib/import/wasm/FurnaceFileOps');
+    const nsf = new Uint8Array(readSong('nsf/dr mario.nsf'));
+    expect(nsf[6], 'test song needs 2+ songs so the plst remap shows').toBeGreaterThan(1);
+    const fromNsf = await nsfToFurWasm(nsf, 0, FRAMES);
+    const other = await nsfToFurWasm(nsf, nsf[6] - 1, FRAMES);
+    const fromNsfe = await nsfToFurWasm(nsfToNsfe(nsf), 0, FRAMES);
+    expect(Buffer.from(other).equals(Buffer.from(fromNsf)), 'songs 0 and last differ').toBe(false);
+    expect(Buffer.from(fromNsfe).equals(Buffer.from(fromNsf)), 'NSFe song 0 == NSF song 0').toBe(true);
+  });
+});
