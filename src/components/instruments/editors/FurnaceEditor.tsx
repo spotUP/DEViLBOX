@@ -1066,130 +1066,72 @@ const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceCo
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
       {/* Envelope Settings */}
-      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-emerald-500/30">
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-accent-primary/30">
         <div className="flex items-center gap-2 mb-4">
-          <Activity size={16} className="text-emerald-400" />
-          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">GB Envelope</h3>
+          <Activity size={16} className="text-accent-primary" />
+          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Game Boy Volume Envelope</h3>
         </div>
 
+        {/* Only fields hUGEDriver reads (src/lib/export/gb/hugeSong.ts); duty and wave are macros. */}
         <div className="space-y-4">
           <div className="flex justify-between gap-4">
             <Knob
-              label="VOL"
+              label="Start Volume"
               value={gb.envVol}
               min={0} max={15}
               onChange={(v) => updateGB({ envVol: Math.round(v) })}
-              size="md" color="#34d399"
+              size="md"
               formatValue={(v) => String(Math.round(v))}
             />
             <Knob
-              label="LEN"
+              label="Envelope Speed"
               value={gb.envLen}
               min={0} max={7}
               onChange={(v) => updateGB({ envLen: Math.round(v) })}
-              size="md" color="#10b981"
-              formatValue={(v) => String(Math.round(v))}
+              size="md"
+              formatValue={(v) => Math.round(v) === 0 ? 'Off' : String(Math.round(v))}
             />
             <Knob
-              label="SND"
+              label="Sound Length"
               value={gb.soundLen}
               min={0} max={64}
               onChange={(v) => updateGB({ soundLen: Math.round(v) })}
-              size="md" color="#059669"
-              formatValue={(v) => v === 0 || v > 63 ? '∞' : String(Math.round(v))}
+              size="md"
+              formatValue={(v) => v === 0 || v > 63 ? 'Infinite' : String(Math.round(v))}
             />
           </div>
 
-          {/* Direction */}
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-text-muted font-mono">Direction:</span>
             <button
               onClick={() => updateGB({ envDir: 1 })}
               className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
                 gb.envDir === 1
-                  ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
+                  ? 'bg-accent-primary/20 border-accent-primary/50 text-accent-primary'
                   : 'bg-dark-bg border-dark-border text-text-muted hover:text-text-primary'
               }`}
             >
-              ↑ UP
+              Up
             </button>
             <button
               onClick={() => updateGB({ envDir: 0 })}
               className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
                 gb.envDir === 0
-                  ? 'bg-rose-600/20 border-rose-500/50 text-rose-400'
+                  ? 'bg-accent-error/20 border-accent-error/50 text-accent-error'
                   : 'bg-dark-bg border-dark-border text-text-muted hover:text-text-primary'
               }`}
             >
-              ↓ DOWN
+              Down
             </button>
           </div>
 
-          {/* Options */}
-          <div className="flex flex-wrap gap-2 pt-2 border-t border-dark-border">
-            <button
-              onClick={() => updateGB({ softEnv: !gb.softEnv })}
-              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
-                gb.softEnv
-                  ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
-                  : 'bg-dark-bg border-dark-border text-text-muted'
-              }`}
-            >
-              Soft Envelope
-            </button>
-            <button
-              onClick={() => updateGB({ alwaysInit: !gb.alwaysInit })}
-              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
-                gb.alwaysInit
-                  ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
-                  : 'bg-dark-bg border-dark-border text-text-muted'
-              }`}
-            >
-              Always Init
-            </button>
-            <button
-              onClick={() => updateGB({ hwSeqEnabled: !gb.hwSeqEnabled })}
-              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
-                gb.hwSeqEnabled
-                  ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
-                  : 'bg-dark-bg border-dark-border text-text-muted'
-              }`}
-            >
-              HW Sequence
-            </button>
-            <button
-              onClick={() => updateGB({ doubleWave: !gb.doubleWave })}
-              className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
-                gb.doubleWave
-                  ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
-                  : 'bg-dark-bg border-dark-border text-text-muted'
-              }`}
-              title="Double wave length (GBA only)"
-            >
-              Double Wave (GBA)
-            </button>
-          </div>
-
-          {/* Duty Cycle */}
-          <div className="flex items-center gap-4 pt-2 border-t border-dark-border">
-            <Knob
-              label="DUTY"
-              value={gb.duty ?? 2}
-              min={0} max={3}
-              onChange={(v) => updateGB({ duty: Math.round(v) })}
-              size="sm" color="#6ee7b7"
-              formatValue={(v) => ['12.5%', '25%', '50%', '75%'][Math.round(v)] ?? String(Math.round(v))}
+          <div className="flex items-center gap-2 pt-2 border-t border-dark-border">
+            <Toggle
+              label="Soft Envelope (volume macro instead of hardware envelope)"
+              value={!!gb.softEnv}
+              onChange={(v) => updateGB({ softEnv: v })}
+              size="sm"
             />
-            {gb.hwSeqEnabled && (
-              <Knob
-                label="SEQ LEN"
-                value={gb.hwSeqLen ?? 0}
-                min={0} max={64}
-                onChange={(v) => updateGB({ hwSeqLen: Math.round(v) })}
-                size="sm" color="#34d399"
-                formatValue={(v) => String(Math.round(v))}
-              />
-            )}
           </div>
         </div>
       </div>
@@ -1197,7 +1139,7 @@ const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceCo
       {/* Envelope Visualization */}
       <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
         <div className="flex items-center gap-2 mb-4">
-          <Waves size={16} className="text-emerald-400" />
+          <Waves size={16} className="text-accent-primary" />
           <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Envelope Shape</h3>
         </div>
         <GBEnvelopeVisualization
@@ -1210,11 +1152,12 @@ const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceCo
 
       {/* HW Sequence Editor */}
       {gb.hwSeqEnabled && (
-        <div className="col-span-1 md:col-span-2 bg-dark-bgSecondary p-4 rounded-lg border border-emerald-500/30">
+        <div className="col-span-1 md:col-span-2 bg-dark-bgSecondary p-4 rounded-lg border border-accent-primary/30">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Activity size={16} className="text-emerald-400" />
-              <h3 className="font-mono text-xs font-bold text-text-primary uppercase">HW Sequence Commands</h3>
+              <Activity size={16} className="text-accent-primary" />
+              <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Hardware Sequence Commands</h3>
+              <span className="text-[9px] font-mono text-accent-warning">In-app playback only: not exported to a Game Boy ROM</span>
               <span className="text-[9px] text-text-muted font-mono">({(gb.hwSeq ?? []).length}/64)</span>
             </div>
             <button
@@ -1226,7 +1169,7 @@ const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceCo
                 }
               }}
               disabled={(gb.hwSeq ?? []).length >= 64}
-              className="p-1 text-emerald-400 hover:text-emerald-300 disabled:text-text-muted disabled:opacity-50 transition-colors"
+              className="p-1 text-accent-primary hover:text-text-primary disabled:text-text-muted disabled:opacity-50 transition-colors"
               title="Add command"
             >
               <Plus size={14} />
@@ -1335,7 +1278,7 @@ const GBHWSeqRow: React.FC<{
             <button
               onClick={() => onChange(cmd, pack(vol, !dir, len, soundLen))}
               className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
-                dir ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400' : 'bg-rose-600/20 border-rose-500/50 text-rose-400'
+                dir ? 'bg-accent-primary/20 border-accent-primary/50 text-accent-primary' : 'bg-accent-error/20 border-accent-error/50 text-accent-error'
               }`}
             >
               {dir ? '\u2191' : '\u2193'}
@@ -1360,7 +1303,7 @@ const GBHWSeqRow: React.FC<{
             <button
               onClick={() => onChange(cmd, pack(shift, !dir, speed))}
               className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
-                dir ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400' : 'bg-rose-600/20 border-rose-500/50 text-rose-400'
+                dir ? 'bg-accent-primary/20 border-accent-primary/50 text-accent-primary' : 'bg-accent-error/20 border-accent-error/50 text-accent-error'
               }`}
             >
               {dir ? '\u2191' : '\u2193'}
@@ -1390,7 +1333,7 @@ const GBHWSeqRow: React.FC<{
 
   return (
     <div className="flex items-center gap-1 py-0.5 px-1 rounded bg-dark-bg/50 border border-dark-border/50">
-      <span className="text-[8px] text-emerald-400 font-mono w-4 text-right">{index}</span>
+      <span className="text-[8px] text-accent-primary font-mono w-4 text-right">{index}</span>
       <CustomSelect
         value={String(cmd)}
         onChange={(v) => onChange(parseInt(v), 0)}
@@ -1409,7 +1352,7 @@ const GBHWSeqRow: React.FC<{
         <ChevronDown size={10} />
       </button>
       <button onClick={onRemove}
-        className="p-0.5 text-text-muted hover:text-rose-400 transition-colors">
+        className="p-0.5 text-text-muted hover:text-accent-error transition-colors">
         <Trash2 size={10} />
       </button>
     </div>
