@@ -153,6 +153,8 @@ export interface FormatStore {
   sndhSubtune: number | null;
   /** NSF/NSFE, GBS, HES, KSS, SPC, VGM/VGZ or GYM file for GmeEngine (game-music-emu) */
   gmeFileData: ArrayBuffer | null;
+  /** NSF/NSFe a converted Furnace song came from: a subsong switch converts another track (lib/import/fileSubsongs) */
+  nsfFileData: ArrayBuffer | null;
   /** Track GmeEngine starts (0-based), with gmeFileData */
   gmeTrack: number | null;
   /** Song AsapEngine starts (0-based), with asapFileData; null = the file's default */
@@ -716,6 +718,7 @@ export const useFormatStore = create<FormatStore>()(
     hippelStFileData: null,
     sndhSubtune: null,
     gmeFileData: null,
+    nsfFileData: null,
     gmeTrack: null,
     asapSong: null,
     nativeSubsongs: null,
@@ -1440,6 +1443,7 @@ export const useFormatStore = create<FormatStore>()(
         state.hippelStFileData = song.hippelStFileData ?? null;
         state.sndhSubtune = (song as any).sndhSubtune ?? null;
         state.gmeFileData = (song as any).gmeFileData ?? null;
+        state.nsfFileData = (song as any).nsfFileData ?? null;
         state.gmeTrack = (song as any).gmeTrack ?? null;
         state.asapSong = (song as any).asapSong ?? null;
         // The new song's engine reports its subsongs once it has loaded.
@@ -1828,6 +1832,7 @@ export const useFormatStore = create<FormatStore>()(
       state.hippelStFileData = null;
       state.sndhSubtune = null;
       state.gmeFileData = null;
+      state.nsfFileData = null;
       state.gmeTrack = null;
       state.asapSong = null;
       state.nativeSubsongs = null;

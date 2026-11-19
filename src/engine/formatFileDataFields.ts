@@ -76,6 +76,7 @@ export const FILE_DATA_FIELDS = [
   'tfmFileData',
   'sndhFileData',             // Atari ST SNDH for PsgplayEngine
   'hippelStFileData',         // Jochen Hippel Atari ST playback image for HippelStEngine
+  'nsfFileData',              // NSF/NSFe a converted Furnace song came from (fileSubsongs reopens another track)
   'gmeFileData',              // NSF/GBS/HES/KSS/SPC/VGM/GYM for GmeEngine (game-music-emu)
   's98FileData',              // S98 register log for S98Engine (ymfm)
   'stoneTrackerFileData',

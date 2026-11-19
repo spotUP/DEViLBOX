@@ -591,9 +591,14 @@ export async function setFurWaveListWasm(waves: ReadonlyArray<{ data: number[]; 
   api.fur_truncate_waves(waves.length);
 }
 
+/** PLAY calls recorded per NSF track when the file gives no length: game-music-emu's 150 s default. */
+export const NSF_DEFAULT_FRAMES = 9000;
+
 /**
  * Convert an NSF track to .fur bytes in the wasm (nsfToFur.cpp): one channel
- * per voice, one row per PLAY call. Feed the result to the normal .fur load path.
+ * per voice, rows on the detected speed. `track` -1 converts every track, one
+ * subsong each (only when they fit 256 instruments; the drop path converts one).
+ * Feed the result to the normal .fur load path.
  */
 export async function nsfToFurWasm(nsf: Uint8Array, track: number, frames: number, patLen = 64): Promise<ArrayBuffer> {
   const m = await getModule();

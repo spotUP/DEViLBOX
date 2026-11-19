@@ -103,3 +103,31 @@ describe('NSFe input', { timeout: 120000 }, () => {
     expect(Buffer.from(fromNsfe).equals(Buffer.from(fromNsf)), 'NSFe song 0 == NSF song 0').toBe(true);
   });
 });
+
+// Phase 4: a dropped NSF goes through the chip-dump dispatcher, converts every track to a
+// Furnace subsong and opens on the normal .fur path (owner report: "drag n dropping metroid nsf gives me no pattern data").
+// Owner report 2026-11-19: "drag n dropping metroid nsf gives me no pattern data" (the drop opened the
+// read-only game-music-emu view). Every track is a subsong; the switch reopens the file at the track.
+describe('NSF drop opens an editable song', { timeout: 120000 }, () => {
+  const notes = (pats: { channels: { rows: { note: number }[] }[] }[]): number =>
+    pats.reduce((n, p) => n + p.channels.reduce((m, ch) => m + ch.rows.filter((r) => r.note > 0 && r.note < 97).length, 0), 0);
+  for (const file of ['dr mario.nsf', 'gimmick!.nsf']) {
+    it(`${file}: note cells, one subsong per track, another track on a switch`, async () => {
+      const { tryChipDumpParse } = await import('../../lib/import/parsers/ChipDumpParsers');
+      const bytes = readSong(`nsf/${file}`);
+      const tracks = new Uint8Array(bytes)[6];
+      let t0 = performance.now();
+      const song = await tryChipDumpParse(bytes, file, file, 0);
+      const ms0 = performance.now() - t0;
+      expect(song?.gmeFileData, 'not the read-only game-music-emu view').toBeUndefined();
+      expect(song?.fileSubsongs).toEqual({ count: tracks, current: 0, fileName: file });
+      expect(song?.nsfFileData?.byteLength).toBe(bytes.byteLength);
+      expect(notes(song!.patterns), 'note cells in track 1').toBeGreaterThan(0);
+      t0 = performance.now();
+      const next = await tryChipDumpParse(bytes, file, file, 1);
+      console.log(`${file}: ${tracks} tracks; track 1 in ${ms0.toFixed(0)} ms (${song!.instruments.length} instruments), track 2 in ${(performance.now() - t0).toFixed(0)} ms`);
+      expect(next?.fileSubsongs?.current).toBe(1);
+      expect(notes(next!.patterns), 'track 2 holds other pattern data').not.toBe(notes(song!.patterns));
+    });
+  }
+});

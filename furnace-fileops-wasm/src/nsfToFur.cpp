@@ -276,8 +276,9 @@ V voice(Builder& b, const Chan& ch, const uint16_t* o, const uint16_t* prev, int
 } // namespace
 
 /**
- * Build song from NSF bytes: `track` 0-based, `frames` PLAY calls to record, `patLen` rows per pattern.
- * Returns false and sets err on failure.
+ * Build song from NSF bytes: `track` 0-based, or -1 for every track (one subsong each, sharing
+ * instruments, samples and waves). `frames` = PLAY calls to record per track when the file gives
+ * no length (NSFe `time` chunk wins), `patLen` rows per pattern. Returns false and sets err on failure.
  */
 bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int frames, int patLen, std::string& err) {
   if (patLen < 1 || patLen > DIV_MAX_ROWS) patLen = 64;
@@ -288,25 +289,41 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   std::unique_ptr<Nsf_Emu> emuOwn(nsfe ? new Nsfe_Emu : new Nsf_Emu);
   Nsf_Emu& emu = *emuOwn;
   Ctx c;
-  if (emu.set_sample_rate(44100)) { err = "NSF: sample rate"; return false; }
+  // the trace reads registers, not audio: a low output rate only cuts synthesis time
+  if (emu.set_sample_rate(11025)) { err = "NSF: sample rate"; return false; }
   if (const char* e = emu.load_mem(data, (long)len)) { err = std::string("NSF: ") + e; return false; }
   emu.clear_playlist(); // NSFe plst: track stays the raw song index
   emu.ignore_silence(true);
   Nsf_Trace::arm(&emu, hook, &c);
-  if (const char* e = emu.start_track(track)) { err = std::string("NSF track: ") + e; return false; }
+  // shortcut: at most 255 subsongs (the .fur count is one byte); NSF files stay far below
+  const int nTracks = std::min(255, std::max(1, emu.track_count()));
+  const int first = track < 0 ? 0 : track, last = track < 0 ? nTracks : track + 1;
+  song.unload();
+  Builder b(song);
+  std::map<int, int> dpcmIns;                // template -> song instrument (all tracks)
+  std::map<int, std::vector<int>> byTmpl;    // template -> song instruments (all tracks)
+  std::vector<Chan> chans;
+  int chips = 0, n163Sys = -1, n163Max = 1;
+  double hz = 60.0;
+  for (int tr = first; tr < last; tr++) {
+  c.w.clear(); c.dpcmTrig.clear(); c.prevLeft = c.prevPlay = 0; // DPCM samples stay shared
+  if (const char* e = emu.start_track(tr)) { err = std::string("NSF track: ") + e; return false; }
+  hz = Nsf_Trace::play_hz(&emu);
+  track_info_t ti; // NSFe keeps names in its auth/tlbl chunks and lengths in time, not the header
+  const bool info = !emu.track_info(&ti, tr);
+  int want = frames;
+  if (info && ti.length > 0) want = (int)(ti.length * (hz > 1.0 ? hz : 60.0) / 1000.0);
+  want = std::max(1, std::min(want, patLen * DIV_MAX_PATTERNS));
   short pcm[4096];
-  while ((int)(c.w.size() / kTraceWords) < frames && !emu.track_ended())
+  while ((int)(c.w.size() / kTraceWords) < want && !emu.track_ended())
     if (emu.play(4096, pcm)) break;
   int n = (int)(c.w.size() / kTraceWords);
-  if (n > frames) n = frames;
+  if (n > want) n = want;
   if (n < 1) { err = "NSF: no frames"; return false; }
-  const int chips = Nsf_Trace::chips(&emu);
-  const double hz = Nsf_Trace::play_hz(&emu);
 
+  if (song.subsong.empty()) {
+  chips = Nsf_Trace::chips(&emu);
   // Song skeleton: systems in this order, channels follow it.
-  song.unload();
-  song.subsong.push_back(new DivSubSong);
-  std::vector<Chan> chans;
   int sysN = 0;
   auto addSys = [&](DivSystem s, int nCh) {
     song.system[sysN] = s;
@@ -323,13 +340,8 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   if (chips & 4) { addSys(DIV_SYSTEM_FDS, 1); chans.push_back({K_FDS, 0}); }
   if (chips & 8) { addSys(DIV_SYSTEM_MMC5, 3); for (int i = 0; i < 2; i++) chans.push_back({K_MMC5_SQ, i}); chans.push_back({K_MMC5_SQ, -1}); }
   if (chips & 16) {
-    int maxCh = 1;
-    for (int f = 0; f < n; f++) {
-      const int k = ((c.w[(size_t)f * kTraceWords + T_N163 + 0x7F] >> 4) & 7) + 1;
-      if (k > maxCh) maxCh = k;
-    }
     addSys(DIV_SYSTEM_N163, 8);
-    song.systemFlags[sysN - 1].set("channels", maxCh - 1);
+    n163Sys = sysN - 1;
     for (int i = 0; i < 8; i++) chans.push_back({K_N163, i});
   }
   if (chips & 32) {
@@ -339,15 +351,19 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   }
   song.systemLen = sysN;
   song.recalcChans();
-  track_info_t ti; // NSFe keeps names in its auth chunk, not the header
-  if (!emu.track_info(&ti, track)) { song.name = ti.game; song.author = ti.author; }
+  if (info) { song.name = ti.game; song.author = ti.author; }
+  }
+  if (chips & 16)
+    for (int f = 0; f < n; f++) n163Max = std::max(n163Max, ((c.w[(size_t)f * kTraceWords + T_N163 + 0x7F] >> 4) & 7) + 1);
 
-  DivSubSong* sub = song.subsong[0];
+  DivSubSong* sub = new DivSubSong;
+  song.subsong.push_back(sub);
+  sub->name = info && ti.song[0] ? ti.song : "Track " + std::to_string(tr + 1);
   sub->hz = hz > 1.0 ? (float)hz : 60.0f;
   sub->patLen = patLen;
 
-  // DPCM samples
-  for (size_t k = 0; k < c.pcm.size(); k++) {
+  // DPCM samples new in this track (c.pcm is shared, so indexes hold across tracks)
+  for (size_t k = song.sample.size(); k < c.pcm.size(); k++) {
     DivSample* s = new DivSample;
     s->name = "DPCM " + std::to_string(k + 1);
     s->depth = DIV_SAMPLE_DEPTH_1BIT_DPCM;
@@ -360,7 +376,6 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
     song.sample.push_back(s);
   }
 
-  Builder b(song);
   const int nCh = (int)chans.size();
   // Per-frame voice state per channel; templates are created as voices appear.
   struct Fr { bool on, trig; int note, fine, vol, duty, tmpl; };
@@ -444,7 +459,6 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   struct Seg { int ci, tmpl, len; std::vector<int> vol, arp, pit, duty; Cell* cell; };
   std::vector<Seg> segs;
   int dpcmHits = 0, dpcmTrigs = 0;
-  std::map<int, int> dpcmIns; // template -> song instrument
   for (int ci = 0; ci < nCh; ci++) {
     if (chans[ci].idx < 0) continue;
     const Kind k = chans[ci].kind;
@@ -517,7 +531,6 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
     for (int i = 0; i < m.len; i++) m.val[i] = i < (int)a.size() ? a[i] : 0;
   };
   std::stable_sort(segs.begin(), segs.end(), [](const Seg& x, const Seg& y) { return x.len > y.len; });
-  std::map<int, std::vector<int>> byTmpl;
   for (Seg& g: segs) {
     const bool du = hasDuty(g.ci);
     int found = -1;
@@ -528,6 +541,21 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
         ok = macroAt(m.volMacro, t) == g.vol[t] && macroAt(m.arpMacro, t) == g.arp[t] && macroAt(m.pitchMacro, t) == g.pit[t] &&
              (!du || macroAt(m.dutyMacro, t) == g.duty[t]);
       if (ok) { found = ii; break; }
+    }
+    // .fur instrument column is one byte: past 256, the note takes the same-template instrument whose macros
+    // are closest (squared error over the segment). Longest segments got exact instruments first (sort above).
+    if (found < 0 && song.ins.size() >= 256 && !byTmpl[g.tmpl].empty()) {
+      long best = -1;
+      for (int ii: byTmpl[g.tmpl]) {
+        const DivInstrumentSTD& m = song.ins[ii]->std;
+        long e = 0;
+        for (int t = 0; t < g.len; t++) {
+          const long dv = macroAt(m.volMacro, t) - g.vol[t], da = macroAt(m.arpMacro, t) - g.arp[t], dp = macroAt(m.pitchMacro, t) - g.pit[t];
+          const long dd = du ? macroAt(m.dutyMacro, t) - g.duty[t] : 0;
+          e += dv * dv * 16 + da * da * 4 + dp * dp + dd * dd * 4;
+        }
+        if (best < 0 || e < best) { best = e; found = ii; }
+      }
     }
     if (found < 0) {
       DivInstrument* d = new DivInstrument;
@@ -616,6 +644,11 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   st[0] = S; st[1] = phase; st[2] = fitPm; st[3] = active ? (int)(1000 * match / active) : 1000;
   st[4] = (int)match; st[5] = (int)active; st[6] = dpcmHits; st[7] = dpcmTrigs;
   st[8] = chanPats; st[9] = sub->ordersLen; st[10] = (int)song.ins.size();
+  } // tracks
+  if (n163Sys >= 0) song.systemFlags[n163Sys].set("channels", n163Max - 1);
+  // instrument column is one byte in .fur; more than 256 cannot be saved
+  if (song.ins.size() > 256) { err = "NSF: more than 256 instruments across tracks"; return false; }
+  g_nsfStats[11] = (int)song.subsong.size();
   song.insLen = (int)song.ins.size();
   song.waveLen = (int)song.wave.size();
   song.sampleLen = (int)song.sample.size();

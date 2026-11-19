@@ -157,6 +157,19 @@ const FORMATS: Record<string, FileSubsongFormat> = {
       return !!walk && walk.events.some((e) => e.kind === MA_WALK.note || e.kind === MA_WALK.legato);
     },
   },
+  // NSF/NSFe: nsfToFur.cpp converts one track to a Furnace song; .fur keeps at most 256 instruments, and a whole
+  // file's tracks need more (dr mario: 36 on track 0 alone), so each track opens as its own song.
+  nsf: {
+    key: 'nsf',
+    names: /\.nsfe?$/,
+    fileDataField: 'nsfFileData',
+    count: async (bytes) => (await import('./formats/GameMusicParser')).gameMusicTrackCount(bytes, 'x.nsf'),
+    audible: async (bytes, subsong) => {
+      const { nsfToFurWasm, nsfLastStatsWasm } = await import('./wasm/FurnaceFileOps');
+      await nsfToFurWasm(new Uint8Array(bytes), subsong, AUDIBLE_NSF_FRAMES);
+      return (await nsfLastStatsWasm()).activeFrames > 0;
+    },
+  },
   futurePlayer: {
     key: 'futurePlayer',
     fileDataField: 'futurePlayerFileData',
@@ -174,6 +187,8 @@ const FORMATS: Record<string, FileSubsongFormat> = {
 
 /** Rows of a tune searched for its first note: a tune silent that long is silent (an intro rest is not). */
 const AUDIBLE_ROWS = 2048;
+/** PLAY frames of an NSF track searched for sound (20 s at 60 Hz). */
+const AUDIBLE_NSF_FRAMES = 1200;
 
 /** The registered format of a file name, or null for a file that has one tune or is no such format. */
 export async function fileSubsongFormat(fileName: string, head?: Uint8Array): Promise<FileSubsongFormat | null> {

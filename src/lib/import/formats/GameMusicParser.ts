@@ -190,6 +190,12 @@ function readHeader(type: GameMusicType, b: Uint8Array): Header {
   }
 }
 
+/** Tracks the file header names (NSF byte 6, NSFe INFO); 0 when not a game-music file. */
+export function gameMusicTrackCount(buffer: ArrayBuffer, filename = ''): number {
+  const type = gameMusicType(buffer, filename);
+  return type ? readHeader(type, new Uint8Array(buffer)).tracks : 0;
+}
+
 /**
  * Parse a game-music file. `subsong` is the 0-based track game-music-emu
  * starts; out of range starts track 0.

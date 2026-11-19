@@ -34,6 +34,25 @@ export async function tryChipDumpParse(
     return parseVGMFile(buffer, originalFileName);
   }
 
+  // ── NSF/NSFe: editable Furnace song ──────────────────────────────────────
+  // The wasm converter (furnace-fileops-wasm/src/nsfToFur.cpp) turns the track into a Furnace song and the
+  // normal .fur load path opens it. One track per open: the subsong control converts another on a switch
+  // (lib/import/fileSubsongs, format 'nsf'). Fallback rule: when the converter rejects the file (load
+  // error, no PLAY frames, more than 256 instruments) it plays read-only on game-music-emu below.
+  if (/\.nsfe?$/.test(filename)) {
+    try {
+      const [{ nsfToFurWasm, NSF_DEFAULT_FRAMES }, { parseFurnaceFile }, subs] = await Promise.all([
+        import('@lib/import/wasm/FurnaceFileOps'), import('./FurnaceToSong'), import('@lib/import/fileSubsongs'),
+      ]);
+      const tune = await subs.chooseFileSubsong(subs.fileSubsongFormatByKey('nsf')!, buffer, originalFileName, subsong);
+      const fur = await nsfToFurWasm(new Uint8Array(buffer), tune.current, NSF_DEFAULT_FRAMES);
+      const song = await parseFurnaceFile(fur, originalFileName, 0);
+      return { ...song, nsfFileData: buffer.slice(0), ...subs.fileSubsongsField(tune) };
+    } catch (e) {
+      console.warn(`[ChipDumpParsers] ${originalFileName}: NSF conversion failed, opening on game-music-emu:`, e);
+    }
+  }
+
   // ── Console game music on game-music-emu: NSF/NSFE, GBS, HES, KSS, SPC, GYM ──
   if (/\.(nsfe?|gbs|hes|kss|spc|gym)$/.test(filename)) {
     const { gameMusicType, parseGameMusicFile } = await import('@lib/import/formats/GameMusicParser');

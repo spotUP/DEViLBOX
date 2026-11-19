@@ -396,6 +396,8 @@ export interface TrackerSong {
   sndhSubtune?: number;
   /** NSF/NSFE, GBS, HES, KSS, SPC, VGM/VGZ or GYM file for GmeEngine (game-music-emu) */
   gmeFileData?: ArrayBuffer;
+  /** NSF/NSFe a converted Furnace song came from (lib/import/fileSubsongs converts another track on a switch) */
+  nsfFileData?: ArrayBuffer;
   /** Track GmeEngine starts (0-based) */
   gmeTrack?: number;
   /** Tracks the file holds (read from its header at import, before any engine loads): the subsong control shows from it. */
