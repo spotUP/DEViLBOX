@@ -304,7 +304,7 @@ export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author =
     const orns = Math.max(0, MAX_ORNAMENTS + 1 - base.orns);
     // The free slots go to the tails that the most notes release into (counted in the base build, where all are cut).
     const ranked = [...base.tailUses].sort((a, b) => b[1] - a[1]).map(([k]) => k);
-    for (let k = Math.min(MAX_SAMPLES - base.samples, ranked.length); k > 0; k >>= 1) {
+    for (let k = Math.min(MAX_SAMPLES - base.samples, ranked.length); k > 0; k--) {
       const t = fit(mask, bendCap, { samples: k, orns, keys: new Set(ranked.slice(0, k)) });
       if (t) return t.song;
     }
@@ -598,9 +598,9 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
         const ops: number[] = [], args: number[] = [];
         let note = 0xd0;
         const st = chan[ch];
-        // Each pattern sets its channel volume afresh: identical Furnace patterns then pack to the same PT3 bytes (shared),
+        // Each pattern sets its channel volume, sample and ornament afresh: identical Furnace patterns then pack to the same PT3 bytes (shared),
         // and the song loop jumps in from the end, where the volume is whatever the last rows left.
-        if (r === 0) st.outVol = -1;
+        if (r === 0) { st.outVol = -1; st.outSample = -1; st.outOrn = -1; }
         if (cell) {
           if (cell.instrument >= 0) st.ins = cell.instrument;
           for (const e of cell.effects) {
@@ -688,7 +688,9 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
               if (eb[0] - 0x10 <= 14) ops.push(0xb1 + eb[0] - 0x10, eb[1], eb[2]);
               else lossy.add('envelope shape 15 set without a note (PT3 0xB2..0xBF reaches 1..14)');
             } else if (sample !== st.outSample || orn !== st.outOrn || st.envOut) {
-              ops.unshift(0xf0 | orn, sample * 2); st.outSample = sample; st.outOrn = orn; st.envOut = false;
+              // On a note row (positions reset anyway) one changed field takes a 1-byte op: 0xD1..0xEF sample (0xD0 would end the row), 0x40..0x4F ornament.
+              const one = isNote && !st.envOut ? (orn === st.outOrn && sample > 0 ? [0xd0 + sample] : sample === st.outSample ? [0x40 | orn] : null) : null;
+              ops.unshift(...(one ?? [0xf0 | orn, sample * 2])); st.outSample = sample; st.outOrn = orn; st.envOut = false;
             }
           }
           for (const e of cell.effects) {

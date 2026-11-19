@@ -122,4 +122,20 @@ describe('furnaceToPt3', () => {
     expect(r.lossy.join(' | ')).toContain('pitch macro on some notes (dropped so the module fits)');
     expect(r.module.length).toBeGreaterThan(0);
   });
+  it('switches the sample with a 1-byte 0xD1..0xEF op on note rows and restates it at each pattern start', () => {
+    // pt3player.asm PD_LP2: 0xD1..0xEF sets the sample alone; 0xF0..0xFF sets ornament + sample in 2 bytes.
+    const mod = Object.assign(tinyModule(), { instruments: [{ macros: [{ code: 0, length: 4, loop: -1, release: 1, delay: 0, speed: 1, data: [15, 15, 8, 4] }] }] });
+    const rows = (mod.patterns.get('0_0_0') as unknown as { rows: { note: number; instrument: number }[] }).rows;
+    rows[1].note = 102; rows[2].note = 50; rows[2].instrument = 0;
+    Object.assign(mod.subsongs[0], { ordersLen: 2, orders: [[0, 0], [0, 0], [0, 0]] });
+    const m = furnaceToPt3(mod).module;
+    // Both orders play one shared pattern: the sample state does not leak in from the previous order or the loop jump.
+    expect(m[201]).toBe(m[202]);
+    const patTab = m[103] | (m[104] << 8), a = m[patTab] | (m[patTab + 1] << 8);
+    const chA = Array.from(m.subarray(a, m.indexOf(0, a)));
+    // First note: ornament + sample (2 bytes). Release tail: sample 2 alone. Next note: sample 1 alone.
+    expect(chA.filter((b) => b >= 0xf0)).toHaveLength(1);
+    expect(chA).toContain(0xd2);
+    expect(chA.indexOf(0xd1)).toBeGreaterThan(chA.indexOf(0xd2));
+  });
 });
