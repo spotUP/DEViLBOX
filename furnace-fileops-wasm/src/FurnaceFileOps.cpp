@@ -44,6 +44,9 @@ static void ensureInit() {
 // ============================================================
 // C API exports
 // ============================================================
+// nsfToFur.cpp (C++ linkage)
+bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int frames, int patLen, std::string& err);
+
 extern "C" {
 
 /**
@@ -97,6 +100,21 @@ uint8_t* fur_save(size_t* outLen) {
   *outLen = sz;
   delete w;
   return result;
+}
+
+/**
+ * Convert NSF bytes to .fur bytes (nsfToFur.cpp): track 0-based, frames = PLAY calls to record.
+ * Leaves the converted song loaded. Returns buffer for fur_free_buffer, or NULL with fur_get_error set.
+ */
+uint8_t* nsf_to_fur(const uint8_t* data, size_t len, int track, int frames, int patLen, size_t* outLen) {
+  ensureInit();
+  *outLen = 0;
+  std::string err;
+  if (!nsfBuildSong(g_engine.song, data, len, track, frames, patLen, err)) {
+    snprintf(g_errorBuf, sizeof(g_errorBuf), "%s", err.c_str());
+    return NULL;
+  }
+  return fur_save(outLen);
 }
 
 void fur_free_buffer(uint8_t* buf) {

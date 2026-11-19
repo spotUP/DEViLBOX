@@ -33,3 +33,4 @@ Owner decision 2026-11-18: all chips at once (2A03 + DPCM, VRC6, VRC7, FDS, MMC5
 ## Progress
 
 - [x] Phase 1 (2026-11-18): per-frame state trace in game-music-emu-wasm (`gme_wasm_trace_*`), 2A03 verified on dr mario.nsf, expansion chips untested (no real files); converter goes in furnace-fileops-wasm. Findings: thoughts/spot/2026-11-18-nsf-phase1.md
+- [x] Phase 2 (2026-11-19): C++ converter `nsfToFur.cpp` in furnace-fileops-wasm (`nsf_to_fur` export, TS wrapper `nsfToFurWasm`); 7 real NSFs (one per chip) convert and parse through parseFurnaceFile with notes on the chip channels. Findings: thoughts/spot/2026-11-19-nsf-phase2.md

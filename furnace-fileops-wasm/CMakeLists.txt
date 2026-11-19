@@ -82,6 +82,7 @@ set(FILEOPS_SOURCES
 
   # Our stubs and wrapper
   src/FurnaceFileOps.cpp
+  src/nsfToFur.cpp
   stubs/engine_stubs.cpp
   stubs/dispatch_stub.cpp
 )
@@ -107,6 +108,24 @@ include_directories(
   ${FURNACE_EXTERN}/blip_buf
   ${FURNACE_EXTERN}/adpcm
 )
+
+# ============================================================
+# game-music-emu NSF core for nsf_to_fur (own target: C++11, no preempt header)
+# ============================================================
+set(GME ${CMAKE_SOURCE_DIR}/../third-party/game-music-emu/gme)
+add_library(gme_nsf STATIC
+  ${GME}/Blip_Buffer.cpp ${GME}/Classic_Emu.cpp ${GME}/Data_Reader.cpp ${GME}/Gme_File.cpp
+  ${GME}/M3u_Playlist.cpp ${GME}/Multi_Buffer.cpp ${GME}/Music_Emu.cpp ${GME}/Nes_Apu.cpp
+  ${GME}/Nes_Cpu.cpp ${GME}/Nes_Fds_Apu.cpp ${GME}/Nes_Fme7_Apu.cpp ${GME}/Nes_Namco_Apu.cpp
+  ${GME}/Nes_Oscs.cpp ${GME}/Nes_Vrc6_Apu.cpp ${GME}/Nes_Vrc7_Apu.cpp ${GME}/Nsf_Emu.cpp
+  ${GME}/ext/emu2413.c
+)
+target_include_directories(gme_nsf PRIVATE ${GME} ${CMAKE_SOURCE_DIR}/../game-music-emu-wasm/src)
+target_compile_definitions(gme_nsf PRIVATE GEN_TYPES_H BLARGG_LITTLE_ENDIAN=1 NDEBUG)
+set_target_properties(gme_nsf PROPERTIES CXX_STANDARD 11)
+set_source_files_properties(src/nsfToFur.cpp PROPERTIES
+  INCLUDE_DIRECTORIES "${GME};${CMAKE_SOURCE_DIR}/../game-music-emu-wasm/src"
+  COMPILE_DEFINITIONS "GEN_TYPES_H;BLARGG_LITTLE_ENDIAN=1")
 
 # ============================================================
 # Build WASM executable
@@ -136,6 +155,8 @@ target_compile_options(FurnaceFileOps PRIVATE
   -Wno-implicit-fallthrough
 )
 
+target_link_libraries(FurnaceFileOps PRIVATE gme_nsf)
+
 # Output configuration
 set_target_properties(FurnaceFileOps PROPERTIES
   OUTPUT_NAME "FurnaceFileOps"
@@ -151,7 +172,7 @@ target_link_options(FurnaceFileOps PRIVATE
   "SHELL:-s ALLOW_MEMORY_GROWTH=1"
   "SHELL:-s ENVIRONMENT='web,worker'"
   "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','setValue','getValue','HEAPU8']"
-  "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_fur_load','_fur_save','_fur_free_buffer','_fur_get_error','_fur_get_num_subsongs','_fur_get_num_channels','_fur_get_num_instruments','_fur_get_num_samples','_fur_get_num_wavetables','_fur_get_pat_len','_fur_get_orders_len','_fur_get_cell','_fur_get_order','_fur_get_effect_cols','_fur_get_system_id','_fur_get_system_len','_fur_get_system_channels','_fur_get_system_name','_fur_get_ins_system','_fur_get_ins_chip_channel','_fur_get_system_flags','_fur_get_song_name','_fur_get_song_author','_fur_get_speed','_fur_get_tempo','_fur_get_hz','_fur_get_virtual_tempo','_fur_get_arp_len','_fur_get_groove','_fur_get_ins_data','_fur_get_sample_data','_fur_set_sample','_fur_get_sample_info','_fur_get_wave_data','_fur_set_wave','_fur_truncate_waves','_fur_remap_waves','_fur_get_wave_info','_fur_get_channel_name','_fur_get_channel_type','_fur_set_cell','_fur_get_subsong_name','_fur_get_tuning','_fur_get_packed_compat_flags','_fur_get_speed_len','_fur_get_dispatch_compat_flags','_fur_get_dispatch_compat_flags_size','_fur_get_master_vol','_fur_get_system_vol','_fur_get_system_pan','_fur_get_system_pan_fr','_fur_ins_load_file','_fur_ins_get_name','_fur_ins_get_type','_fur_ins_to_fui','_fur_ins_to_dmp','_fur_ins_from_ins2','_fur_wave_load','_fur_wave_set','_fur_wave_get_max','_fur_wave_get_value','_fur_wave_to_file','_fur_save_text']"
+  "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_fur_load','_fur_save','_nsf_to_fur','_fur_free_buffer','_fur_get_error','_fur_get_num_subsongs','_fur_get_num_channels','_fur_get_num_instruments','_fur_get_num_samples','_fur_get_num_wavetables','_fur_get_pat_len','_fur_get_orders_len','_fur_get_cell','_fur_get_order','_fur_get_effect_cols','_fur_get_system_id','_fur_get_system_len','_fur_get_system_channels','_fur_get_system_name','_fur_get_ins_system','_fur_get_ins_chip_channel','_fur_get_system_flags','_fur_get_song_name','_fur_get_song_author','_fur_get_speed','_fur_get_tempo','_fur_get_hz','_fur_get_virtual_tempo','_fur_get_arp_len','_fur_get_groove','_fur_get_ins_data','_fur_get_sample_data','_fur_set_sample','_fur_get_sample_info','_fur_get_wave_data','_fur_set_wave','_fur_truncate_waves','_fur_remap_waves','_fur_get_wave_info','_fur_get_channel_name','_fur_get_channel_type','_fur_set_cell','_fur_get_subsong_name','_fur_get_tuning','_fur_get_packed_compat_flags','_fur_get_speed_len','_fur_get_dispatch_compat_flags','_fur_get_dispatch_compat_flags_size','_fur_get_master_vol','_fur_get_system_vol','_fur_get_system_pan','_fur_get_system_pan_fr','_fur_ins_load_file','_fur_ins_get_name','_fur_ins_get_type','_fur_ins_to_fui','_fur_ins_to_dmp','_fur_ins_from_ins2','_fur_wave_load','_fur_wave_set','_fur_wave_get_max','_fur_wave_get_value','_fur_wave_to_file','_fur_save_text']"
   "SHELL:-s INITIAL_MEMORY=67108864"
   "SHELL:-s STACK_SIZE=2097152"
   "SHELL:-s NO_EXIT_RUNTIME=1"

@@ -43,6 +43,7 @@ async function getModule(): Promise<WasmModule> {
 interface FurnaceFileOpsAPI {
   fur_load(dataPtr: number, len: number): number;
   fur_save(outLenPtr: number): number;
+  nsf_to_fur(dataPtr: number, len: number, track: number, frames: number, patLen: number, outLenPtr: number): number;
   fur_save_text(outLenPtr: number, separatePatterns: number): number;
   fur_free_buffer(ptr: number): void;
   fur_get_error(): string;
@@ -110,6 +111,7 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
   return {
     fur_load: m.cwrap('fur_load', 'number', ['number', 'number']),
     fur_save: m.cwrap('fur_save', 'number', ['number']),
+    nsf_to_fur: m.cwrap('nsf_to_fur', 'number', ['number', 'number', 'number', 'number', 'number', 'number']),
     fur_save_text: m.cwrap('fur_save_text', 'number', ['number', 'number']),
     fur_free_buffer: m.cwrap('fur_free_buffer', null, ['number']),
     fur_get_error: m.cwrap('fur_get_error', 'string', []),
@@ -585,6 +587,27 @@ export async function setFurWaveListWasm(waves: ReadonlyArray<{ data: number[]; 
     } finally { m._free(vp); }
   }
   api.fur_truncate_waves(waves.length);
+}
+
+/**
+ * Convert an NSF track to .fur bytes in the wasm (nsfToFur.cpp): one channel
+ * per voice, one row per PLAY call. Feed the result to the normal .fur load path.
+ */
+export async function nsfToFurWasm(nsf: Uint8Array, track: number, frames: number, patLen = 64): Promise<ArrayBuffer> {
+  const m = await getModule();
+  if (!cachedAPI) cachedAPI = getAPI(m);
+  const api = cachedAPI;
+  const dataPtr = m._malloc(nsf.length);
+  m.HEAPU8.set(nsf, dataPtr);
+  const outLenPtr = m._malloc(4);
+  const bufPtr = api.nsf_to_fur(dataPtr, nsf.length, track, frames, patLen, outLenPtr);
+  const len = m.getValue(outLenPtr, 'i32');
+  m._free(outLenPtr);
+  m._free(dataPtr);
+  if (!bufPtr) throw new Error(`NSF conversion failed: ${api.fur_get_error()}`);
+  const result = new Uint8Array(m.HEAPU8.buffer, bufPtr, len).slice();
+  api.fur_free_buffer(bufPtr);
+  return result.buffer;
 }
 
 /**
