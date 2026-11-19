@@ -113,6 +113,8 @@ export function liveTrackerSong(overrides: Partial<TrackerSong> = {}): TrackerSo
     tfmxTimingTable: fmt.tfmxTimingTable ?? undefined,
     sndhSubtune: fmt.sndhSubtune ?? undefined,
     gmeTrack: fmt.gmeTrack ?? undefined,
+    // Same as nuadeSubsongs: a restored session has no import to read the header.
+    gmeTracks: fmt.nativeSubsongs?.engine === 'Gme' ? fmt.nativeSubsongs.count : undefined,
     fileSubsongs: fmt.fileSubsongs ?? undefined,
     asapSong: fmt.asapSong ?? undefined,
   };

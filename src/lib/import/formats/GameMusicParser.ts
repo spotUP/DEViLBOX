@@ -223,5 +223,6 @@ export async function parseGameMusicFile(buffer: ArrayBuffer, filename = 'song',
     initialBPM: 125,
     gmeFileData: buffer.slice(0),
     gmeTrack: track,
+    gmeTracks: h.tracks,
   };
 }

@@ -1445,9 +1445,13 @@ export const useFormatStore = create<FormatStore>()(
         // The new song's engine reports its subsongs once it has loaded.
         // A song on nuade already knows its count (asked of the player at import): the control shows before play.
         const nuadeSubs = (song as { nuadeSubsongs?: { count: number; defaultSubsong: number } }).nuadeSubsongs;
+        // A game-music file knows its track count from its header: the control shows before play too.
+        const gmeTracks = (song as { gmeTracks?: number }).gmeTracks;
         state.nativeSubsongs = nuadeSubs && (song as { nuadePlayerId?: string }).nuadePlayerId
           ? normalizeSubsongs('Nuade', nuadeSubs.count, (song as { nuadeSubsong?: number }).nuadeSubsong ?? nuadeSubs.defaultSubsong)
-          : null;
+          : (song as any).gmeFileData && gmeTracks && gmeTracks > 1
+            ? normalizeSubsongs('Gme', gmeTracks, (song as any).gmeTrack ?? 0)
+            : null;
         state.fileSubsongs = (song as any).fileSubsongs ?? null;
         state.s98FileData = (song as any).s98FileData ?? null;
         state.stoneTrackerFileData = (song as any).stoneTrackerFileData ?? null;

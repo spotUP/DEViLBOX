@@ -398,6 +398,8 @@ export interface TrackerSong {
   gmeFileData?: ArrayBuffer;
   /** Track GmeEngine starts (0-based) */
   gmeTrack?: number;
+  /** Tracks the file holds (read from its header at import, before any engine loads): the subsong control shows from it. */
+  gmeTracks?: number;
   /** S98 register log for S98Engine (one ymfm chip per logged device) */
   s98FileData?: ArrayBuffer;
   /** Whole StoneTracker SPM song for StoneTrackerEngine WASM playback (the authors' player on a 68020 core) */
