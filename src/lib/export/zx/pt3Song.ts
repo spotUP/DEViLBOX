@@ -103,7 +103,7 @@ function sustain(mac: FurnaceMacro, lossy: Lossy): FurnaceMacro {
   return { ...mac, length: rel + 1, loop: mac.loop >= 0 && mac.loop < rel ? mac.loop : -1 };
 }
 /** Furnace macros after a macro release (note 254/255; macroInt.cpp doMacro): a macro held at its release point plays
- * on from the next step to its end, looping only when loop > rel; a macro without one keeps running. Null: no macro has a tail.
+ * on from its held step to its end, looping only when loop > rel; a macro without one keeps running. Null: no macro has a tail.
  * shortcut: assumes the note reached the release point before the release; a looping macro without one restarts. */
 function releaseTail(macros: FurnaceMacro[]): FurnaceMacro[] | null {
   if (!macros.some((x) => x.release >= 0 && x.release < x.length - 1)) return null;
@@ -111,7 +111,8 @@ function releaseTail(macros: FurnaceMacro[]): FurnaceMacro[] | null {
     if (x.length <= 0) return x;
     const loop = x.loop >= 0 && x.loop < x.length ? x.loop : -1, rel = x.release;
     // shortcut: loop == rel (back to the held step) plays the tail once and holds its end.
-    if (rel >= 0 && rel < x.length - 1) return { ...x, data: x.data.slice(rel + 1, x.length), length: x.length - rel - 1, loop: loop > rel ? loop - rel - 1 : -1, delay: 0, release: -1 };
+    // The first released tick replays the held step (macroInt.cpp: val=val[pos++] re-reads rel before moving on).
+    if (rel >= 0 && rel < x.length - 1) return { ...x, data: x.data.slice(rel, x.length), length: x.length - rel, loop: loop > rel ? loop - rel : -1, delay: 0, release: -1 };
     if (rel >= 0) return { ...x, data: [x.data[rel]], length: 1, loop: -1, delay: 0, release: -1 };
     return loop >= 0 ? x : { ...x, data: [x.data[x.length - 1]], length: 1, delay: 0, release: -1 };
   });
@@ -287,7 +288,7 @@ function ornamentBytes(mac: FurnaceMacro, lossy: Lossy, tickHz: number): { bytes
 export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author = '', clock = ZX_CLOCK): Pt3Song {
   // Glissando commands break the row skip runs, so a song near the cap can only fit with slides dropped on some channels.
   // Per-note pitch-macro samples go first (fewer bent notes), then slides: a lost bend is one note, a lost slide a channel.
-  const masks = [7, 3, 5, 6, 1, 2, 4, 0], bendCaps = [MAX_SAMPLES, 24, 16, 8, 0];
+  const masks = [7, 3, 5, 6, 1, 2, 4, 0];
   let last: unknown;
   const fit = (mask: number, bendCap: number, room?: Room): Built | null => {
     try { return buildPt3(m, subsong, title, author, mask, clock, bendCap, room); } catch (e) {
@@ -296,27 +297,41 @@ export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author =
       return null;
     }
   };
-  for (const mask of masks) {
-    for (const bendCap of bendCaps) {
-      const base = fit(mask, bendCap);
-      if (!base) continue;
-      // Release tails only take the sample and ornament slots the song leaves free, and only while the module fits.
-      let out = base.song;
-      const orns = Math.max(0, MAX_ORNAMENTS + 1 - base.orns);
-      for (let k = MAX_SAMPLES - base.samples; k > 0; k >>= 1) {
-        const t = fit(mask, bendCap, { samples: k, orns });
-        if (t) { out = t.song; break; }
-      }
-      if (mask !== 7) for (let ch = 0; ch < 3; ch++) if (!((mask >> ch) & 1)) out.lossy.push(`pitch slides on channel ${ch + 1} (dropped so the module fits 16 KB)`);
-      return out;
+  // Release tails only take the sample and ornament slots the song leaves free, and only while the module fits.
+  const withTails = (mask: number, bendCap: number): Pt3Song | null => {
+    const base = fit(mask, bendCap);
+    if (!base) return null;
+    const orns = Math.max(0, MAX_ORNAMENTS + 1 - base.orns);
+    // The free slots go to the tails that the most notes release into (counted in the base build, where all are cut).
+    const ranked = [...base.tailUses].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+    for (let k = Math.min(MAX_SAMPLES - base.samples, ranked.length); k > 0; k >>= 1) {
+      const t = fit(mask, bendCap, { samples: k, orns, keys: new Set(ranked.slice(0, k)) });
+      if (t) return t.song;
     }
+    return base.song;
+  };
+  // A cut tail silences the release and a dropped bend detunes a note: each bent-sample slot given up for tails
+  // must save more cut notes than it detunes, so the cap only drops while that note count falls.
+  const lostNotes = (s: Pt3Song): number => s.lossy.reduce((n, l) => n + (/^(macro release tail \(no free PT3|pitch macro on some notes)/.test(l) ? Number(l.slice(l.lastIndexOf(':') + 1)) : 0), 0);
+  for (const mask of masks) {
+    let out: Pt3Song | null = null, cost = Infinity;
+    for (let bendCap = MAX_SAMPLES; bendCap >= 0 && cost > 0; bendCap--) {
+      const t = withTails(mask, bendCap);
+      if (!t) continue;
+      const c = lostNotes(t);
+      if (c < cost) { out = t; cost = c; }
+    }
+    if (!out) continue;
+    if (mask !== 7) for (let ch = 0; ch < 3; ch++) if (!((mask >> ch) & 1)) out.lossy.push(`pitch slides on channel ${ch + 1} (dropped so the module fits 16 KB)`);
+    return out;
   }
   throw last;
 }
 
 /** Free sample and ornament slots a build may give to release tails. */
-interface Room { samples: number; orns: number }
-interface Built { song: Pt3Song; samples: number; orns: number }
+interface Room { samples: number; orns: number; keys?: Set<string> }
+/** tailUses: notes released into each tail sample (by sample bytes), cut or not. */
+interface Built { song: Pt3Song; samples: number; orns: number; tailUses: Map<string, number> }
 
 function buildPt3(m: FurnaceModule, subsong: number, title: string, author: string, slideMask: number, clock: number, bendCap = MAX_SAMPLES, room: Room = { samples: 0, orns: 0 }): Built {
   const lossy = new Lossy();
@@ -373,13 +388,16 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
   // semi: a constant arp tail moves the retriggered note instead of taking an ornament slot.
   interface TailIns extends Ins { semi: number }
   let tailSamples = 0, tailOrns = 0;
+  const tailUses = new Map<string, number>();
   /** The instrument's macros past note release; null when releasing changes nothing, 'cut' when its ornament has no free slot. */
   const releaseIns = (i: number): TailIns | 'cut' | null => {
     if (!tailCache.has(i)) {
       const t = releaseTail(m.instruments[i]?.macros ?? []);
       const arp = t?.find((x) => x.code === MACRO_ARP && x.length > 0);
       const steps = arp?.data.slice(0, arp.length) ?? [0];
-      const semi = steps.every((x) => x === steps[0] && !arpFixed(x)) ? steps[0] | 0 : null;
+      const flat = (xs: number[]): number | null => (xs.length > 0 && xs.every((x) => x === xs[0] && !arpFixed(x)) ? xs[0] | 0 : null);
+      // shortcut: an arp tail flat after its replayed held step skips that one frame instead of taking an ornament slot.
+      const semi = flat(steps) ?? flat(steps.slice(1));
       const o = arp && semi === null ? ornamentBytes(arp, lossy, tickHz) : null;
       const known = o ? ornKey.get(o.bytes.join(',')) : 0;
       // shortcut: a fixed-note arp tail is cut; upgrade when a song releases into one.
@@ -404,7 +422,8 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
       return sampleFor(ins, shift, forceEnv, n, slide, false, cut);
     }
     if (bends) bent++;
-    if (cut && (tailSamples >= room.samples || samples.length >= MAX_SAMPLES)) return 0;
+    if (cut) tailUses.set(k, (tailUses.get(k) ?? 0) + 1);
+    if (cut && (tailSamples >= room.samples || samples.length >= MAX_SAMPLES || (room.keys && !room.keys.has(k)))) return 0;
     if (cut) tailSamples++;
     if (samples.length >= MAX_SAMPLES) { lossy.add(`samples past ${MAX_SAMPLES} (sample ${MAX_SAMPLES} reused)`); return MAX_SAMPLES; }
     samples.push(b); sampleKey.set(k, samples.length);
@@ -741,7 +760,7 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
   mod.set(body, patTab + patList.length * 6);
   if (mod.length > MODULE_CAP) throw new Error(`The PT3 module is ${mod.length} bytes; one 16 KB bank holds ${MODULE_CAP}. Shorten the song.`);
   if (!channelsWithNotes.some(Boolean)) lossy.add('no notes in the first three channels');
-  return { song: { module: mod, lossy: lossy.list(), channelsWithNotes, frames }, samples: samples.length, orns: ornaments.length };
+  return { song: { module: mod, lossy: lossy.list(), channelsWithNotes, frames }, samples: samples.length, orns: ornaments.length, tailUses };
 }
 
 export interface Pt3Player { bytes: Uint8Array; loadAddress: number; entry: number; dataAddress: number; bankOffset: number }

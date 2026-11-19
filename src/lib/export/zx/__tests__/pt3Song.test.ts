@@ -104,6 +104,15 @@ describe('furnaceToPt3', () => {
     expect(Buffer.from(released.module).equals(Buffer.from(furnaceToPt3(withRelease(100)).module))).toBe(false);
     expect(Buffer.from(furnaceToPt3(withRelease(101)).module).equals(Buffer.from(released.module))).toBe(true);
   });
+  it('starts the release tail sample on the held step, which Furnace replays on the first released tick', () => {
+    // macroInt.cpp doMacro: val = val[pos++] re-reads the release step before moving on, so the tail is 15, 8, 4, not 8, 4.
+    const mod = Object.assign(tinyModule(), { instruments: [{ macros: [{ code: 0, length: 4, loop: -1, release: 1, delay: 0, speed: 1, data: [15, 15, 8, 4] }] }] });
+    (mod.patterns.get('0_0_0') as unknown as { rows: { note: number }[] }).rows[2].note = 102;
+    const m = furnaceToPt3(mod).module;
+    const samples = Array.from({ length: 32 }, (_, i) => m[105 + 2 * i] | (m[106 + 2 * i] << 8)).filter((p) => p > 0)
+      .map((p) => Array.from({ length: m[p + 1] }, (_, f) => m[p + 2 + 4 * f + 1] & 15).join(','));
+    expect(samples).toContain('15,8,4');
+  });
   it('falls back to the unbent sample once bent notes fill the 31 PT3 samples', () => {
     const mod = Object.assign(tinyModule(), { instruments: [{ macros: [{ code: 0, length: 1, loop: -1, delay: 0, speed: 1, data: [15] }, { code: 4, length: 3, loop: -1, delay: 0, speed: 1, data: [0, 40, 80] }] }] });
     const rows = Array.from({ length: 64 }, (_, r) => ({ note: 24 + r, instrument: 0, volume: -1, effects: [] }));
