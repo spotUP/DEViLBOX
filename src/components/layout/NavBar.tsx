@@ -191,11 +191,13 @@ const NavBarComponent: React.FC = () => {
             <Button
               variant={isPlayingSong ? 'danger' : 'primary'}
               size="sm"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => ft2Actions.playSong?.()}
             >{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
             <Button
               variant={isPlayingPattern ? 'danger' : 'primary'}
               size="sm"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => ft2Actions.playPattern?.()}
             >{isPlayingPattern ? 'Stop Pattern' : 'Play Pattern'}</Button>
             <div className="w-px h-4 bg-dark-border mx-0.5 shrink-0" />

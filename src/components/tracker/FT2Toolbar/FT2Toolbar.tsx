@@ -610,7 +610,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       >
         <Menu size={16} />
       </DropdownButton>
+      {/* Transport buttons never take focus: keys belong to the pattern editor, and a focused button shows the focus ring on the next key press. */}
       <Button variant={isPlayingSong ? 'danger' : 'primary'} size="sm"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={(e) => {
           if (isPlayingSong && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
           else if (isPlaying && (e.altKey || e.metaKey)) {
@@ -627,6 +629,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         title={isPlayingSong ? 'Click: Stop (spindown) · Alt+click: Restart · Shift+click: Power off' : 'Play Song'}
         className="min-w-[72px]">{isPlayingSong ? 'Stop Song' : 'Play Song'}</Button>
       <Button variant="primary" size="sm"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={(e) => {
           if (isPlayingPattern && e.shiftKey) { e.preventDefault(); getTrackerScratchController().triggerPowerCut(); }
           else if (isPlaying && (e.altKey || e.metaKey)) {
