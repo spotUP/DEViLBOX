@@ -1814,6 +1814,15 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     nativeParser: { module: '@lib/import/formats/GameMusicParser', parseFn: 'parseGameMusicFile' },
   },
   {
+    key: 'ned',
+    label: 'NerdTracker II',
+    description: 'NerdTracker II NES song (editable Furnace import)',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.ned$/i,
+    nativeOnly: true,
+  },
+  {
     key: 'sap',
     label: 'SAP',
     description: 'Atari 8-bit POKEY',

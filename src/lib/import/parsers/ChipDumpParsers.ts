@@ -34,6 +34,16 @@ export async function tryChipDumpParse(
     return parseVGMFile(buffer, originalFileName);
   }
 
+  // ── NerdTracker II (.ned): editable Furnace NES song ─────────────────────
+  // The wasm converter (furnace-fileops-wasm/src/nedToFur.cpp) maps patterns, orders and instruments
+  // directly; the normal .fur load path opens the result.
+  if (/\.ned$/.test(filename)) {
+    const [{ nedToFurWasm }, { parseFurnaceFile }] = await Promise.all([
+      import('@lib/import/wasm/FurnaceFileOps'), import('./FurnaceToSong'),
+    ]);
+    return parseFurnaceFile(await nedToFurWasm(new Uint8Array(buffer)), originalFileName, 0);
+  }
+
   // ── NSF/NSFe: editable Furnace song ──────────────────────────────────────
   // The wasm converter (furnace-fileops-wasm/src/nsfToFur.cpp) turns the track into a Furnace song and the
   // normal .fur load path opens it. One track per open: the subsong control converts another on a switch

@@ -46,6 +46,7 @@ static void ensureInit() {
 // ============================================================
 // nsfToFur.cpp (C++ linkage)
 bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int frames, int patLen, std::string& err);
+bool nedBuildSong(DivSong& song, const uint8_t* data, size_t len, std::string& err);
 
 extern "C" {
 
@@ -111,6 +112,18 @@ uint8_t* nsf_to_fur(const uint8_t* data, size_t len, int track, int frames, int 
   *outLen = 0;
   std::string err;
   if (!nsfBuildSong(g_engine.song, data, len, track, frames, patLen, err)) {
+    snprintf(g_errorBuf, sizeof(g_errorBuf), "%s", err.c_str());
+    return NULL;
+  }
+  return fur_save(outLen);
+}
+
+// NerdTracker II .ned -> .fur bytes (nedToFur.cpp). NULL on error (fur_get_error).
+uint8_t* ned_to_fur(const uint8_t* data, size_t len, size_t* outLen) {
+  ensureInit();
+  *outLen = 0;
+  std::string err;
+  if (!nedBuildSong(g_engine.song, data, len, err)) {
     snprintf(g_errorBuf, sizeof(g_errorBuf), "%s", err.c_str());
     return NULL;
   }

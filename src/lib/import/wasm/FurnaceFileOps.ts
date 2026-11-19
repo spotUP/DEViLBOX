@@ -45,6 +45,7 @@ interface FurnaceFileOpsAPI {
   fur_save(outLenPtr: number): number;
   nsf_to_fur(dataPtr: number, len: number, track: number, frames: number, patLen: number, outLenPtr: number): number;
   nsf_get_stat(i: number): number;
+  ned_to_fur(dataPtr: number, len: number, outLenPtr: number): number;
   fur_save_text(outLenPtr: number, separatePatterns: number): number;
   fur_free_buffer(ptr: number): void;
   fur_get_error(): string;
@@ -114,6 +115,7 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_save: m.cwrap('fur_save', 'number', ['number']),
     nsf_to_fur: m.cwrap('nsf_to_fur', 'number', ['number', 'number', 'number', 'number', 'number', 'number']),
     nsf_get_stat: m.cwrap('nsf_get_stat', 'number', ['number']),
+    ned_to_fur: m.cwrap('ned_to_fur', 'number', ['number', 'number', 'number']),
     fur_save_text: m.cwrap('fur_save_text', 'number', ['number', 'number']),
     fur_free_buffer: m.cwrap('fur_free_buffer', null, ['number']),
     fur_get_error: m.cwrap('fur_get_error', 'string', []),
@@ -612,6 +614,28 @@ export async function nsfToFurWasm(nsf: Uint8Array, track: number, frames: numbe
   m._free(outLenPtr);
   m._free(dataPtr);
   if (!bufPtr) throw new Error(`NSF conversion failed: ${api.fur_get_error()}`);
+  const result = new Uint8Array(m.HEAPU8.buffer, bufPtr, len).slice();
+  api.fur_free_buffer(bufPtr);
+  return result.buffer;
+}
+
+/**
+ * Convert a NerdTracker II .ned file to .fur bytes in the wasm (nedToFur.cpp):
+ * patterns, orders and instruments map directly onto one 2A03 song.
+ * Feed the result to the normal .fur load path.
+ */
+export async function nedToFurWasm(ned: Uint8Array): Promise<ArrayBuffer> {
+  const m = await getModule();
+  if (!cachedAPI) cachedAPI = getAPI(m);
+  const api = cachedAPI;
+  const dataPtr = m._malloc(ned.length);
+  m.HEAPU8.set(ned, dataPtr);
+  const outLenPtr = m._malloc(4);
+  const bufPtr = api.ned_to_fur(dataPtr, ned.length, outLenPtr);
+  const len = m.getValue(outLenPtr, 'i32');
+  m._free(outLenPtr);
+  m._free(dataPtr);
+  if (!bufPtr) throw new Error(`NerdTracker II conversion failed: ${api.fur_get_error()}`);
   const result = new Uint8Array(m.HEAPU8.buffer, bufPtr, len).slice();
   api.fur_free_buffer(bufPtr);
   return result.buffer;
