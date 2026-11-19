@@ -16,6 +16,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { FurnaceMacroType, type FurnaceMacro } from '@typedefs/instrument';
 import { RotateCcw, Plus, Minus, Repeat, Flag, Zap } from 'lucide-react';
+import { resolveColor } from '@components/ui/controlColor';
 import { macroCode, type MacroRange } from '@/lib/furnace/chipMacroProfiles';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -187,7 +188,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
   minValue = 0,
   maxValue = 15,
   height = 120,
-  color = '#a78bfa',
+  color = 'var(--color-accent)',
   label,
   bipolar = false,
   playbackPosition,
@@ -239,11 +240,11 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
     const range = maxValue - minValue;
 
     // Background
-    ctx.fillStyle = '#1a1a2e';
+    ctx.fillStyle = resolveColor('var(--color-bg-secondary)');
     ctx.fillRect(0, 0, w, h);
 
     // Horizontal grid lines (4 divisions)
-    ctx.strokeStyle = '#2a2a4e';
+    ctx.strokeStyle = resolveColor('var(--color-border)');
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const y = (h / 4) * i;
@@ -253,7 +254,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
     // Zero line for bipolar macros
     if (bipolar && minValue < 0) {
       const zeroY = h * (maxValue / range);
-      ctx.strokeStyle = '#5a5a8e';
+      ctx.strokeStyle = resolveColor('var(--color-border-light)');
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(0, zeroY); ctx.lineTo(w, zeroY); ctx.stroke();
     }
@@ -276,7 +277,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
     }
 
     // Vertical grid (every 4 steps)
-    ctx.strokeStyle = '#2a2a4e';
+    ctx.strokeStyle = resolveColor('var(--color-border)');
     ctx.lineWidth = 1;
     for (let i = 0; i < macro.data.length; i += 4) {
       const x = (i / macro.data.length) * w;
@@ -300,7 +301,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
       const y = h - barHeight;
 
       const isHovered = hoveredStep?.step === i;
-      ctx.fillStyle   = isHovered ? 'rgba(255, 255, 255, 0.85)' : color;
+      ctx.fillStyle   = isHovered ? 'rgba(255, 255, 255, 0.85)' : resolveColor(color);
       ctx.strokeStyle = isHovered ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.15)';
       ctx.lineWidth = 1;
       ctx.fillRect(x + 1, y, barWidth - 2, barHeight);
@@ -310,11 +311,11 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
     // Loop point marker
     if (macro.loop >= 0 && macro.loop < macro.data.length) {
       const loopX = (macro.loop / macro.data.length) * w;
-      ctx.strokeStyle = '#3b82f6';
+      ctx.strokeStyle = resolveColor('var(--color-accent-highlight)');
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(loopX, 0); ctx.lineTo(loopX, h); ctx.stroke();
       // Arrow pointing down
-      ctx.fillStyle = '#3b82f6';
+      ctx.fillStyle = resolveColor('var(--color-accent-highlight)');
       ctx.beginPath();
       ctx.moveTo(loopX - 6, 10); ctx.lineTo(loopX, 0); ctx.lineTo(loopX + 6, 10);
       ctx.closePath(); ctx.fill();
@@ -323,11 +324,11 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
     // Release point marker
     if (macro.release >= 0 && macro.release < macro.data.length) {
       const releaseX = (macro.release / macro.data.length) * w;
-      ctx.strokeStyle = '#ef4444';
+      ctx.strokeStyle = resolveColor('var(--color-error)');
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(releaseX, 0); ctx.lineTo(releaseX, h); ctx.stroke();
       // Square marker
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = resolveColor('var(--color-error)');
       ctx.fillRect(releaseX - 5, 5, 10, 10);
     }
 
@@ -497,7 +498,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
             {macro.data.length} steps
           </span>
           {isArpMacro && (
-            <span className="text-[9px] text-blue-400/70 font-mono hidden sm:inline">
+            <span className="text-[9px] text-accent-highlight/70 font-mono hidden sm:inline">
               shift+drag = line
             </span>
           )}
@@ -531,7 +532,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
           <button
             onClick={() => { setIsSettingLoop(!isSettingLoop); setIsSettingRelease(false); }}
             className={`p-1 rounded transition-colors ${
-              isSettingLoop ? 'bg-blue-500 text-text-primary' : 'text-blue-400 hover:bg-blue-500/20'
+              isSettingLoop ? 'bg-accent-highlight text-text-inverse' : 'text-accent-highlight hover:bg-accent-highlight/20'
             }`}
             title={isSettingLoop ? 'Click canvas to set loop point' : 'Set loop point'}>
             <Repeat size={12} />
@@ -541,7 +542,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
           {allowRelease && <button
             onClick={() => { setIsSettingRelease(!isSettingRelease); setIsSettingLoop(false); }}
             className={`p-1 rounded transition-colors ${
-              isSettingRelease ? 'bg-red-500 text-text-primary' : 'text-red-400 hover:bg-red-500/20'
+              isSettingRelease ? 'bg-accent-error text-text-inverse' : 'text-accent-error hover:bg-accent-error/20'
             }`}
             title={isSettingRelease ? 'Click canvas to set release point' : 'Set release point'}>
             <Flag size={12} />
@@ -554,8 +555,8 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
                 onClick={() => setShowPresets(!showPresets)}
                 className={`p-1 rounded transition-colors ${
                   showPresets
-                    ? 'bg-amber-500/30 text-amber-300'
-                    : 'text-amber-400 hover:bg-amber-500/20'
+                    ? 'bg-accent-warning/30 text-accent-warning'
+                    : 'text-accent-warning hover:bg-accent-warning/20'
                 }`}
                 title="Preset patterns">
                 <Zap size={12} />
@@ -626,7 +627,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
           {macro.loop >= 0 ? (
             <button
               onClick={() => onChange({ ...macro, loop: -1 })}
-              className="flex items-center gap-1 text-blue-400 hover:text-blue-300">
+              className="flex items-center gap-1 text-accent-highlight hover:text-accent-highlight/80">
               <Repeat size={9} /> Loop@{macro.loop}
               <span className="text-text-muted ml-0.5">×</span>
             </button>
@@ -637,7 +638,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
           {macro.release >= 0 ? (
             <button
               onClick={() => onChange({ ...macro, release: -1 })}
-              className="flex items-center gap-1 text-red-400 hover:text-red-300">
+              className="flex items-center gap-1 text-accent-error hover:text-accent-error/80">
               <Flag size={9} /> Release@{macro.release}
               <span className="text-text-muted ml-0.5">×</span>
             </button>
@@ -688,13 +689,13 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
 
   const getMacroColor = (macroType: number): string => {
     const colors: Record<number, string> = {
-      [FurnaceMacroType.VOL]:   '#22c55e',
-      [FurnaceMacroType.ARP]:   '#3b82f6',
-      [FurnaceMacroType.DUTY]:  '#f59e0b',
-      [FurnaceMacroType.WAVE]:  '#06b6d4',
-      [FurnaceMacroType.PITCH]: '#ec4899',
+      [FurnaceMacroType.VOL]:   'var(--color-success)',
+      [FurnaceMacroType.ARP]:   'var(--color-deck-a)',
+      [FurnaceMacroType.DUTY]:  'var(--color-warning)',
+      [FurnaceMacroType.WAVE]:  'var(--color-deck-c)',
+      [FurnaceMacroType.PITCH]: 'var(--color-deck-b)',
     };
-    return colors[macroType] ?? '#a78bfa';
+    return colors[macroType] ?? 'var(--color-accent)';
   };
 
   const addMacro = (type: number) => {
