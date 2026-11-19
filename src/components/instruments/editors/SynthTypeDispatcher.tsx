@@ -842,7 +842,16 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
         return <Suspense fallback={<LoadingControls />}><FurnaceFMHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} /></Suspense>;
       }
       if (isFurnacePSGType(instrument.synthType)) {
-        return <Suspense fallback={<LoadingControls />}><FurnacePSGHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} synthType={instrument.synthType} /></Suspense>;
+        return (
+          <>
+            {instrument.synthType === 'FurnaceNES' && (
+              <div className="px-3 py-1 text-[10px] font-mono text-accent-warning bg-dark-bgSecondary border-b border-dark-border">
+                In-app playback only, not exported to a NES ROM: Sweep (Enabled, Period, Shift, Negate) and Envelope Mode. The NES export reads volume, arpeggio, duty and pitch macros; hardware envelope and length counter come from pattern effects 15xx and 16xx.
+              </div>
+            )}
+            <Suspense fallback={<LoadingControls />}><FurnacePSGHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} synthType={instrument.synthType} /></Suspense>
+          </>
+        );
       }
       if (isFurnaceWaveType(instrument.synthType)) {
         return <Suspense fallback={<LoadingControls />}><FurnaceWaveHardware config={furnaceConfig} onChange={handleFurnaceHardwareChange} synthType={instrument.synthType} /></Suspense>;
