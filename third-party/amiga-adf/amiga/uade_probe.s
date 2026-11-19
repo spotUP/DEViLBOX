@@ -201,6 +201,8 @@ _start:
         STAGE   'INIT'
         bsr     _music_start
         STAGE   'PLAY'
+	xref	_screen_init,_screen_frame,_screen_paused
+	bsr	_screen_init
 
         ; --- 50 Hz pump ----------------------------------------------------
         ; Polled, not an ISR, on purpose: this is arm 1 of the "does the play
@@ -355,8 +357,12 @@ UADE_SWITCH_PERIOD      equ     250             ; ~5 s at 50 Hz
         else
         bsr     _music_select_pump
         endc
+	tst.b	_screen_paused
+	bne.b	.scr_skip
         bsr     _music_play1
         bsr     _music_play2
+.scr_skip:
+	bsr	_screen_frame
         btst    #6,$bfe001              ; CIA-A PRA bit 6 = left mouse button
         bne     .mainloop
 

@@ -2866,6 +2866,7 @@ _uade_player_src:
 ; (the arena is sized for it); the browser patches this word and the slot.
         xdef    _uade_module_len
         xdef    _uade_module_src
+	xdef	_uade_reloc_base,_uade_sub_min,_uade_sub_cur,_uade_sub_max
         cnop    0,4
 _uade_module_len:
         dc.l    UADE_MODULE_LEN

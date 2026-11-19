@@ -41,12 +41,28 @@ PTK_CHKFAIL_WORD = bytes.fromhex('33fcffff00001f7b')
 PTK_CHKFAIL_BYTE = bytes.fromhex('13fc00ff00001f7b')
 
 
+# PTK-Prowiz also parses its eagleoption "type:xxxx" from an even buffer (hunk 0
+# +$8AE): `cmpi.l #'type',(a0)+ / bne / addq.l #1,a0 / cmpi.l #'st20',(a0)`, a long
+# compare at the odd value (+$8B3). Reachable since the glue answers eagleoptions;
+# a 68000 takes an address error (measured 2026-11-19: ADRE, PC $1D578, access
+# $1D8BB). Fix: score fills the buffer through the option tag list pointer (+$896),
+# so move that to +$8AF and the value lands even at +$8B4; the parse then checks
+# 'ype:' at +$8B0 and the addq becomes a nop. Same lengths, relocs untouched.
+PTK_OPTBUF_PTR = (bytes.fromhex('00000001000008ce000008db000008ae'), bytes.fromhex('00000001000008ce000008db000008af'))
+PTK_OPTPARSE = (bytes.fromhex('41f9000008ae0c98747970656600016452880c90'),
+                bytes.fromhex('41f9000008b00c987970653a660001644e710c90'))
+
+
 def patch_player_for_68000(path):
     b = open(path, 'rb').read()
-    if b.count(PTK_CHKFAIL_WORD) == 1:
-        open(path, 'wb').write(b.replace(PTK_CHKFAIL_WORD, PTK_CHKFAIL_BYTE))
-    elif PTK_CHKFAIL_BYTE not in b:
-        sys.exit(f'{path}: PTK-Prowiz pt_chkfail store not found; the player changed, re-check its 68000 safety')
+    for old, new, what in ((PTK_CHKFAIL_WORD, PTK_CHKFAIL_BYTE, 'pt_chkfail store'),
+                           PTK_OPTBUF_PTR + ('option buffer pointer',),
+                           PTK_OPTPARSE + ('type option parse',)):
+        if b.count(old) == 1:
+            b = b.replace(old, new)
+        elif new not in b:
+            sys.exit(f'{path}: PTK-Prowiz {what} not found; the player changed, re-check its 68000 safety')
+    open(path, 'wb').write(b)
 
 
 def main():
@@ -79,7 +95,7 @@ def main():
     inc = ['-I', HERE, '-I', os.path.join(HERE, 'score'), '-I', stage,
            '-I', os.path.join(UADE_ROOT, 'amigasrc', 'score')]
     objs = []
-    for src in ('amiga/uade_probe.s', 'amiga/uade_glue.s', 'amiga/input_sdk.s'):
+    for src in ('amiga/uade_probe.s', 'amiga/uade_glue.s', 'amiga/input_sdk.s', 'amiga/screen.s'):
         o = os.path.join(stage, os.path.basename(src) + '.o')
         run(ASM + inc + ['-o', o, os.path.join(HERE, src)], cwd=HERE)
         objs.append(o)
