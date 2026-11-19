@@ -376,6 +376,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
     ...(fmMacrosPlayable ? [{ id: 'macros' as const, label: 'Macros' }] : []),
     ...(paramRanges.hasDT2 ? [{ id: 'chip' as const, label: 'Chip Settings' }] : []),
   ];
+  // The stored tab can vanish (Neo Geo FM loses Macros when the instrument has none): fall back to the first tab.
+  const shownTab = mainTabs.some((t) => t.id === activeTab) ? activeTab : mainTabs[0].id;
   const macroTabs = [
     { id: 'global', label: 'Global' },
     ...displayOrder.map((_, position) => ({ id: String(position + 1), label: `Operator ${position + 1}` })),
@@ -497,11 +499,11 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 
       {/* Tab Navigation */}
       {showFmPanels && (
-        <TabStrip tabs={mainTabs} active={activeTab} onChange={setActiveTab} ariaLabel="Instrument editor sections" />
+        <TabStrip tabs={mainTabs} active={shownTab} onChange={setActiveTab} ariaLabel="Instrument editor sections" />
       )}
 
       {/* FM OPERATOR PANEL */}
-      {showFmPanels && activeTab === 'fm' && (
+      {showFmPanels && shownTab === 'fm' && (
         <div className="space-y-3">
           {/* Algorithm: current routing, all routings to pick from, voice controls */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
@@ -635,7 +637,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       )}
 
       {/* MACROS TAB */}
-      {showFmPanels && activeTab === 'macros' && (
+      {showFmPanels && shownTab === 'macros' && (
         <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
           <div className="flex items-center gap-2 mb-4">
             <Activity size={16} className="text-accent-secondary" />
@@ -648,7 +650,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       )}
 
       {/* CHIP SETTINGS TAB */}
-      {showFmPanels && activeTab === 'chip' && (
+      {showFmPanels && shownTab === 'chip' && (
         <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
           <div className="flex items-center gap-2 mb-4">
             <Settings size={16} className="text-accent-highlight" />
@@ -799,7 +801,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       )}
 
       {/* WAVETABLE PANEL */}
-      {(category === "Wavetable" || config.wavetables.length > 0) && (
+      {/* Game Boy always shows it: hUGEDriver plays up to 16 waves and a new instrument has none yet. */}
+      {(category === "Wavetable" || config.wavetables.length > 0 || config.chipType === 5) && (
         <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-2 mb-4">
             <Waves size={16} className="text-accent-highlight" />
