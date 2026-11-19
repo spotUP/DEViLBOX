@@ -34,11 +34,13 @@ function listNed(dir: string): string[] {
 
 // dpcmNotes: the reference dump (nt2dump.c) shows notes in the DMC column
 type Case = { file: string; dpcmNotes: boolean };
+const ICE = 'Memblers/beyond the ice palace.ned';
 const CASES: Case[] = [
   { file: 'Memblers/kungfu.ned', dpcmNotes: false },
   { file: 'Memblers/gradius.ned', dpcmNotes: true },
   // one 2-byte DPCM instrument, never played
   { file: "Memblers/super fighter (lan's theme).ned", dpcmNotes: false },
+  { file: ICE, dpcmNotes: true },
 ];
 
 beforeAll(async () => {
@@ -78,6 +80,27 @@ describe.skipIf(!HAVE)('NerdTracker II to editable Furnace song', { timeout: 120
     });
   }
 
+  // NT2 effects last one row and an instrument cell reloads the volume; Furnace 0A and the
+  // volume column persist, so an unstopped A02 or C04 left pulse 1/2 and noise silent here.
+  it.skipIf(!fs.existsSync(path.join(DIR, ICE)))(`${ICE}: volume slides stop and instrument cells reset the volume`, async () => {
+    const { nedToFurWasm } = await import('../../lib/import/wasm/FurnaceFileOps');
+    const { parseFurnaceFile } = await import('../../lib/import/parsers/FurnaceToSong');
+    const song = await parseFurnaceFile(await nedToFurWasm(new Uint8Array(fs.readFileSync(path.join(DIR, ICE)))), 'ice.fur');
+    for (const ch of [0, 1, 3]) {
+      // walk play order: a sliding or volume-changed channel must reach a stop and a reset
+      let sliding = false, dirty = false, stops = 0, resets = 0;
+      for (const pi of song.songPositions) for (const r of song.patterns[pi].channels[ch].rows) {
+        if (r.instrument && dirty) { expect(r.volume, `channel ${ch} volume reset on instrument cell`).toBeGreaterThan(0); resets++; }
+        if (r.instrument) dirty = false;
+        if (r.volume) dirty = true;
+        if (r.effTyp === 10 && r.eff) sliding = dirty = true;
+        else if (r.effTyp === 10 && sliding) { sliding = false; stops++; }
+      }
+      expect(stops, `channel ${ch} slide stops`).toBeGreaterThan(0);
+      expect(resets, `channel ${ch} volume resets`).toBeGreaterThan(0);
+    }
+  });
+
   it('every .ned in the folder converts', async () => {
     const { nedToFurWasm } = await import('../../lib/import/wasm/FurnaceFileOps');
     const { parseFurnaceFile } = await import('../../lib/import/parsers/FurnaceToSong');
@@ -93,4 +116,16 @@ describe.skipIf(!HAVE)('NerdTracker II to editable Furnace song', { timeout: 120
     console.log(`NED sweep: ${files.length - failed.length}/${files.length} converted\n${failed.join('\n')}`);
     expect(failed).toEqual([]);
   }, 600000);
+  // The converter builds into the engine's shared song; a "Noname" .ned must not keep the
+  // previous song's name (DivSong::unload leaves header text), so the parser falls back to the filename.
+  it('a .ned opened after a named .fur takes the filename, not the old name', async () => {
+    const { loadFurFileWasm, nedToFurWasm } = await import('../../lib/import/wasm/FurnaceFileOps');
+    const { parseFurnaceFile } = await import('../../lib/import/parsers/FurnaceToSong');
+    const fur = fs.readFileSync(path.join(process.cwd(), 'public/data/songs/furnace/nes/Byte-Sized Bop.fur'));
+    const prev = await loadFurFileWasm(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.byteLength));
+    expect(prev.name).not.toBe('');
+    const bytes = new Uint8Array(fs.readFileSync(path.join(DIR, 'Memblers/kungfu.ned')));
+    const song = await parseFurnaceFile(await nedToFurWasm(bytes), 'kungfu.fur');
+    expect(song.name).toBe('kungfu');
+  });
 });

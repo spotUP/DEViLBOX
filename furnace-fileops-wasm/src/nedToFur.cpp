@@ -141,6 +141,7 @@ bool nedBuildSong(DivSong& song, const uint8_t* data, size_t len, std::string& e
   {
     std::string nm(reinterpret_cast<const char*>(data) + 5, std::min<size_t>(0x1d, len - 5));
     nm = nm.substr(0, nm.find('\0'));
+    nm.erase(nm.find_last_not_of(' ') + 1); // NT2 pads the name with spaces or NULs
     if (len >= 0x34 && !memcmp(data, "NED:", 4) && nm != "Noname") song.name = nm;
   }
 
@@ -241,7 +242,9 @@ bool nedBuildSong(DivSong& song, const uint8_t* data, size_t len, std::string& e
           if (si >= 0) cell[DIV_PAT_INS] = (short)si;
         }
         if (bits & 4) {
-          const int fx = readNib();
+          int fx = readNib();
+          // the replay ignores every command on DPCM and volume slides on the triangle
+          if (ch == 4 || (ch == 2 && fx == 0xA)) fx = 0;
           const int fv = (bits & 8) ? readByte() : 0;
           int ef = -1, ev = fv;
           switch (fx) {
@@ -251,8 +254,10 @@ bool nedBuildSong(DivSong& song, const uint8_t* data, size_t len, std::string& e
             case 0x4: ef = 0x04; break;
             case 0x7: ef = 0x07; break;
             case 0x8: ef = 0x00; if (fv) lastArp[ch] = fv; ev = lastArp[ch]; break; // 0 reuses the last
-            case 0xA: if (fv) lastVolSlide[ch] = fv; ev = lastVolSlide[ch]; // 6-bit scale; 0 reuses the last
-              ef = 0x0A; ev = (((ev >> 4) + 3) / 4) << 4 | (((ev & 15) + 3) / 4); break;
+            // NT2 slides the 6-bit volume by x up (priority) or y down per tick; a Furnace 0A step is
+            // 1/4 of a 4-bit volume step, the same unit, but Furnace gives y priority. 0 reuses the last.
+            case 0xA: if (fv) lastVolSlide[ch] = fv; ev = lastVolSlide[ch];
+              ef = 0x0A; if (ev & 0xF0) ev &= 0xF0; break;
             case 0xC: cell[DIV_PAT_VOL] = (short)(std::min(63, fv) >> 2); break;
             case 0xD: ef = 0x0D; break;
             case 0xF: ef = 0x0F; break;
@@ -276,6 +281,28 @@ bool nedBuildSong(DivSong& song, const uint8_t* data, size_t len, std::string& e
     memcpy(bp->newData, a->newData, sizeof a->newData);
     bp->newData[63][DIV_PAT_FX(1)] = 0x0B; bp->newData[63][DIV_PAT_FXVAL(1)] = (short)loopPos;
     sub->orders.ord[0][last] = (unsigned char)dst;
+  }
+  // NT2 clears the effect every row and reloads the instrument volume on every instrument cell.
+  // Furnace 0A and the volume column persist, so a slide or Cxx would leave the channel silent:
+  // stop the slide on the next row and reset the channel volume on the next instrument cell.
+  // shortcut: walks the orders once and ignores D breaks into mid-pattern rows; a stop that finds
+  // the effect column taken is skipped.
+  for (int ch : {0, 1, 3}) {
+    bool sliding = false, dirty = false;
+    for (int o = 0; o < songLen; o++) {
+      DivPattern* pat = sub->pat[ch].getPattern(sub->orders.ord[ch][o], true);
+      for (int r = 0; r < 64; r++) {
+        short* c = pat->newData[r];
+        if (c[DIV_PAT_INS] >= 0) {
+          if (dirty && c[DIV_PAT_VOL] < 0) c[DIV_PAT_VOL] = 15;
+          dirty = false;
+        }
+        if (c[DIV_PAT_VOL] >= 0) dirty = true;
+        if (c[DIV_PAT_FX(0)] == 0x0A) { sliding = dirty = true; }
+        else if (sliding && c[DIV_PAT_FX(0)] < 0) { c[DIV_PAT_FX(0)] = 0x0A; c[DIV_PAT_FXVAL(0)] = 0; sliding = false; }
+        if (c[DIV_PAT_FX(0)] == 0x0D) break;
+      }
+    }
   }
   song.insLen = (int)song.ins.size();
   song.waveLen = 0;

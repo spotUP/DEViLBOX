@@ -103,6 +103,15 @@ uint8_t* fur_save(size_t* outLen) {
   return result;
 }
 
+// DivSong::unload() frees instruments, samples and subsongs but keeps the header text, so a
+// converter that builds into g_engine.song would inherit the previous song's name and author.
+static void clearSongText(DivSong& s) {
+  for (String* f : {&s.name, &s.author, &s.systemName, &s.carrier, &s.composer, &s.vendor, &s.category,
+                    &s.writer, &s.arranger, &s.copyright, &s.manGroup, &s.manInfo, &s.createdDate,
+                    &s.revisionDate, &s.nameJ, &s.authorJ, &s.categoryJ, &s.systemNameJ, &s.notes})
+    f->clear();
+}
+
 /**
  * Convert NSF bytes to .fur bytes (nsfToFur.cpp): track 0-based, frames = PLAY calls to record.
  * Leaves the converted song loaded. Returns buffer for fur_free_buffer, or NULL with fur_get_error set.
@@ -111,6 +120,7 @@ uint8_t* nsf_to_fur(const uint8_t* data, size_t len, int track, int frames, int 
   ensureInit();
   *outLen = 0;
   std::string err;
+  clearSongText(g_engine.song);
   if (!nsfBuildSong(g_engine.song, data, len, track, frames, patLen, err)) {
     snprintf(g_errorBuf, sizeof(g_errorBuf), "%s", err.c_str());
     return NULL;
@@ -123,6 +133,7 @@ uint8_t* ned_to_fur(const uint8_t* data, size_t len, size_t* outLen) {
   ensureInit();
   *outLen = 0;
   std::string err;
+  clearSongText(g_engine.song);
   if (!nedBuildSong(g_engine.song, data, len, err)) {
     snprintf(g_errorBuf, sizeof(g_errorBuf), "%s", err.c_str());
     return NULL;
