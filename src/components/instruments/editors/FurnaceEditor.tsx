@@ -18,7 +18,7 @@ import { notify } from '@stores/useNotificationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { parseWavToAudioBuffer } from '@utils/audio/wavParser';
 import { FurnaceModuleSampleEditor, FurnaceUserSampleEditor } from './FurnaceUserSampleEditor';
-import { OPNB_VOICE_KINDS, SSG_MACRO_LABELS, isOpnbChipType, opnbFirstChannel, opnbVoiceKind, withSsgDefaultMacros } from '@engine/furnace-dispatch/opnbVoices';
+import { OPNB_VOICE_KINDS, isOpnbChipType, opnbFirstChannel, opnbVoiceKind, withSsgDefaultMacros } from '@engine/furnace-dispatch/opnbVoices';
 import { TabStrip } from '@components/ui/TabStrip';
 import { resolveColor, toneColor, type ControlTone } from '@components/ui/controlColor';
 import {
@@ -38,7 +38,8 @@ import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { MacroListEditor } from './MacroEditor';
 import { SNESPanel, SNESEchoPanel } from './SNESPanels';
 import { SNES_MACRO_LABELS } from '@/lib/furnace/snesDsp';
-import { chipMacroProfile } from '@/lib/furnace/chipMacroProfiles';
+import { chipMacroProfile, NEOGEO_MACRO_PROFILES } from '@/lib/furnace/chipMacroProfiles';
+import { AYPanel } from './AYPanel';
 import { NESPanel } from './NESPanel';
 import { FurnaceWaveList } from './FurnaceWaveList';
 import { WavetableListEditor, type WavetableData } from './WavetableEditor';
@@ -333,6 +334,11 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   // YM2610 / YM2610B: one chip, four voice kinds. Only the FM kind has operators.
   const neoKind = isOpnbChipType(config.chipType) ? opnbVoiceKind(config.divInsType) : null;
   const showFmPanels = category === "FM" && (!neoKind || neoKind.id === 'fm');
+  // Neo Geo voices take nullsound's limits per voice kind; other chips take their synth's profile.
+  const voiceProfile = neoKind ? NEOGEO_MACRO_PROFILES[neoKind.id] : macroProfile;
+  const showAyPanel = neoKind?.id === 'ssg' || synthType === 'FurnaceAY';
+  // nullsound plays no FM macros: offer the tab only to show macros an imported song already carries.
+  const fmMacrosPlayable = neoKind?.id !== 'fm' || config.macros.length > 0 || hasOpMacros;
 
   const setVoiceKind = (id: string) => {
     const kind = OPNB_VOICE_KINDS.find((k) => k.id === id);
@@ -359,7 +365,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 
   const mainTabs: Array<{ id: 'fm' | 'macros' | 'chip'; label: string }> = [
     { id: 'fm', label: 'Operators' },
-    { id: 'macros', label: 'Macros' },
+    ...(fmMacrosPlayable ? [{ id: 'macros' as const, label: 'Macros' }] : []),
     ...(paramRanges.hasDT2 ? [{ id: 'chip' as const, label: 'Chip Settings' }] : []),
   ];
   const macroTabs = [
@@ -386,9 +392,13 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           macros={config.macros}
           onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
           chipType={config.chipType}
-          labels={neoKind?.id === 'ssg' ? SSG_MACRO_LABELS : isSnes ? SNES_MACRO_LABELS : macroProfile?.labels}
-          ranges={macroProfile?.ranges}
-          valueNames={macroProfile?.valueNames}
+          labels={isSnes ? SNES_MACRO_LABELS : voiceProfile?.labels}
+          ranges={voiceProfile?.ranges}
+          valueNames={voiceProfile?.valueNames}
+          maxSteps={voiceProfile?.maxSteps}
+          allowRelease={voiceProfile?.allowRelease}
+          allowSpeed={voiceProfile?.allowSpeed}
+          note={voiceProfile?.note}
         />
       ) : (
         <MacroListEditor
@@ -721,7 +731,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 
       {/* PSG / PULSE PANEL (for other PSG chips) */}
       {isNes && <NESPanel config={config} />}
-      {category === "PSG" && !isNes && ![5, 10, 24].includes(config.chipType) && (
+      {showAyPanel && <AYPanel config={config} onChange={onChange} showNoise={neoKind?.id !== 'ssg'} />}
+      {category === "PSG" && !isNes && !showAyPanel && ![5, 10, 24].includes(config.chipType) && (
         <PSGPanel config={config} onChange={pushLiveUpdate} />
       )}
 

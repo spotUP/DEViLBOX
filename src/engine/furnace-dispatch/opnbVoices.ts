@@ -81,14 +81,7 @@ export function opnbVoiceKindOfChannel(chipType: number, chipChannel: number): O
 // frequency, ex2 = envelope shape, ex3 / alg = auto-envelope numerator /
 // denominator.
 
-export const SSG_MACRO_LABELS: Readonly<Record<number, string>> = {
-  0: 'Volume',
-  2: 'Noise Frequency',
-  3: 'Tone, Noise and Envelope',
-  6: 'Envelope Shape',
-  7: 'Auto Envelope Numerator',
-  8: 'Auto Envelope Denominator',
-};
+// Labels and ranges per macro: SSG_NEOGEO_MACRO_PROFILE in src/lib/furnace/chipMacroProfiles.ts.
 
 interface DefaultMacro { code: number; type: number; data: number[]; loop: number; release: number; mode: number }
 
@@ -98,7 +91,7 @@ export function withSsgDefaultMacros<T extends { code?: number; type: number }>(
   let added = false;
   for (const [code, value] of [[0, 15], [3, 1]] as const) {
     if (!out.some(m => (m.code ?? m.type) === code)) {
-      out.push({ code, type: 0, data: [value], loop: -1, release: -1, mode: 0 });
+      out.push({ code, type: code, data: [value], loop: -1, release: -1, mode: 0 });
       added = true;
     }
   }

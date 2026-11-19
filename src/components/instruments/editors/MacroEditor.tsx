@@ -16,7 +16,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { FurnaceMacroType, type FurnaceMacro } from '@typedefs/instrument';
 import { RotateCcw, Plus, Minus, Repeat, Flag, Zap } from 'lucide-react';
-import type { MacroRange } from '@/lib/furnace/chipMacroProfiles';
+import { macroCode, type MacroRange } from '@/lib/furnace/chipMacroProfiles';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -33,6 +33,12 @@ interface MacroEditorProps {
   playbackPosition?: number; // Current playing step (undefined = not playing)
   /** Names for enumerated values, indexed by value (duty cycles, noise modes). */
   valueNames?: readonly string[];
+  /** Most steps the target driver keeps. Default 256. */
+  maxSteps?: number;
+  /** False hides the release control (the driver drops release points). */
+  allowRelease?: boolean;
+  /** False hides the speed control (the driver plays speed 1 only). */
+  allowSpeed?: boolean;
 }
 
 interface MacroListEditorProps {
@@ -46,6 +52,12 @@ interface MacroListEditorProps {
   ranges?: Readonly<Partial<Record<number, MacroRange>>>;
   /** Names for enumerated values per macro type. */
   valueNames?: Readonly<Partial<Record<number, readonly string[]>>>;
+  /** Most steps per macro type the target driver keeps. */
+  maxSteps?: Readonly<Partial<Record<number, number>>>;
+  allowRelease?: boolean;
+  allowSpeed?: boolean;
+  /** One line above the macros: what the target driver does with them. */
+  note?: string;
 }
 
 // ── Macro type metadata ────────────────────────────────────────────────────────
@@ -180,6 +192,9 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
   bipolar = false,
   playbackPosition,
   valueNames,
+  maxSteps = 256,
+  allowRelease = true,
+  allowSpeed = true,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -437,7 +452,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
   // ── Length controls ─────────────────────────────────────────────────────────
 
   const addStep = () => {
-    if (macro.data.length >= 256) return;
+    if (macro.data.length >= maxSteps) return;
     onChange({ ...macro, data: [...macro.data, macro.data[macro.data.length - 1] ?? 0] });
   };
 
@@ -490,7 +505,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
 
         <div className="flex items-center gap-1">
           {/* Speed */}
-          <label className="flex items-center gap-1 text-[10px] text-text-muted mr-1">
+          {allowSpeed && <label className="flex items-center gap-1 text-[10px] text-text-muted mr-1">
             <span>Spd:</span>
             <input
               type="number" min={1} max={16}
@@ -498,7 +513,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
               onChange={(e) => onChange({ ...macro, speed: parseInt(e.target.value) || 1 })}
               className="w-8 bg-dark-bg border border-dark-border rounded px-1 py-0.5 text-text-primary text-[10px] font-mono"
             />
-          </label>
+          </label>}
 
           {/* Step count */}
           <button onClick={removeStep}
@@ -523,14 +538,14 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
           </button>
 
           {/* Release */}
-          <button
+          {allowRelease && <button
             onClick={() => { setIsSettingRelease(!isSettingRelease); setIsSettingLoop(false); }}
             className={`p-1 rounded transition-colors ${
               isSettingRelease ? 'bg-red-500 text-text-primary' : 'text-red-400 hover:bg-red-500/20'
             }`}
             title={isSettingRelease ? 'Click canvas to set release point' : 'Set release point'}>
             <Flag size={12} />
-          </button>
+          </button>}
 
           {/* Preset patterns */}
           {presets.length > 0 && (
@@ -626,9 +641,9 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
               <Flag size={9} /> Release@{macro.release}
               <span className="text-text-muted ml-0.5">×</span>
             </button>
-          ) : (
+          ) : allowRelease ? (
             <span className="text-text-muted">No release</span>
-          )}
+          ) : null}
 
           {typeof playbackPosition === 'number' && (
             <span className="text-yellow-400 ml-auto">▶ {playbackPosition}</span>
@@ -648,6 +663,10 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
   labels,
   ranges,
   valueNames,
+  maxSteps,
+  allowRelease,
+  allowSpeed,
+  note,
 }) => {
   const typeNames = labels ?? MACRO_TYPE_NAMES;
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -682,7 +701,7 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
     const range = getMacroRange(type);
     const newMacro: FurnaceMacro = {
       type,
-      data:    Array(16).fill(range.bipolar ? 0 : range.min),
+      data:    Array(Math.min(16, maxSteps?.[type] ?? 16)).fill(range.bipolar ? 0 : range.min),
       loop:    -1,
       release: -1,
       mode:    0,
@@ -704,11 +723,12 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
 
   // Types not yet added
   const availableTypes = Object.entries(typeNames)
-    .filter(([typeNum]) => !macros.some(m => m.type === parseInt(typeNum)))
+    .filter(([typeNum]) => !macros.some(m => macroCode(m) === parseInt(typeNum)))
     .map(([typeNum, name]) => ({ type: parseInt(typeNum), name }));
 
   return (
     <div className="flex flex-col gap-2">
+      {note && <p className="text-[10px] font-mono text-text-muted">{note}</p>}
       {/* Macros — side by side grid, always visible */}
       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
         {macros.map((macro, index) => (
@@ -718,13 +738,13 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
               <div className="flex items-center gap-1.5">
                 <div
                   className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                  style={{ backgroundColor: getMacroColor(macro.type) }}
+                  style={{ backgroundColor: getMacroColor(macroCode(macro)) }}
                 />
                 <span className="font-mono text-[10px] font-bold text-text-primary">
-                  {typeNames[macro.type] || MACRO_TYPE_NAMES[macro.type] || `Macro ${macro.type}`}
+                  {typeNames[macroCode(macro)] || MACRO_TYPE_NAMES[macroCode(macro)] || `Macro ${macroCode(macro)}`}
                 </span>
-                {typeof playbackPositions?.[macro.type] === 'number' && (
-                  <span className="text-[9px] text-accent-warning">▶ {playbackPositions[macro.type]}</span>
+                {typeof playbackPositions?.[macroCode(macro)] === 'number' && (
+                  <span className="text-[9px] text-accent-warning">▶ {playbackPositions[macroCode(macro)]}</span>
                 )}
               </div>
               <button
@@ -739,15 +759,18 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
             {/* Always-visible editor */}
             <MacroEditor
               macro={macro}
-              macroType={macro.type}
+              macroType={macroCode(macro)}
               onChange={(m) => updateMacro(index, m)}
-              minValue={getMacroRange(macro.type).min}
-              maxValue={getMacroRange(macro.type).max}
-              bipolar={getMacroRange(macro.type).bipolar}
-              valueNames={valueNames?.[macro.type]}
-              color={getMacroColor(macro.type)}
+              minValue={getMacroRange(macroCode(macro)).min}
+              maxValue={getMacroRange(macroCode(macro)).max}
+              bipolar={getMacroRange(macroCode(macro)).bipolar}
+              valueNames={valueNames?.[macroCode(macro)]}
+              maxSteps={maxSteps?.[macroCode(macro)]}
+              allowRelease={allowRelease}
+              allowSpeed={allowSpeed}
+              color={getMacroColor(macroCode(macro))}
               height={50}
-              playbackPosition={playbackPositions?.[macro.type]}
+              playbackPosition={playbackPositions?.[macroCode(macro)]}
             />
           </div>
         ))}
