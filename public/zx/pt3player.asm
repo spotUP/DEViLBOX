@@ -13,11 +13,17 @@ BOOT	LD SP,0x7F00
 	LD A,(BANK)
 	LD BC,0x7FFD
 	OUT (C),A
+	PUSH AF
+	CALL SCRINIT
+	POP AF
 	CALL START
 MAINLP	EI
 	HALT
 	DI
 	CALL START+5
+	PUSH AF			; keep PLAY's exit flags across the screen code
+	CALL SCRFRAME
+	POP AF
 TonA	EQU 0
 TonB	EQU 2
 TonC	EQU 4
@@ -1406,6 +1412,468 @@ T_PACK	DB #06EC*2/256,#06EC*2
 	DB #0D60-#0C80
 	DB #0E10-#0D60
 	DB #0EF8-#0E10
+
+; ---- Player screen: thoughts/shared/design/player-ui/player-screens.html entry 'zx', drawn with the screen.inc tiles.
+; Static parts once before playback (SCRINIT); per frame (SCRFRAME, after PLAY wrote the AY) the three bars, the clock
+; and every 8th frame the coarse scroller. The worst frame (all bars jump 0 -> full) stays well inside the 69888 T frame,
+; so the HALT after it still catches the next interrupt and the AY writes keep their frames.
+; Colours (design npal(ZX_HW)): text bright white #47, dim white #07, bar yellow #06, cap + time cyan #05, logo red #02.
+NBARS	EQU 3			; stubs for screen.inc's NES-style screen_static, which this player does not call
+chiptxt	EQU s_chip
+statustxt EQU s_chip
+bartxt	EQU s_chip
+scrtxt	EQU msgbuf
+SCRLEN	EQU 33
+BARTOP	EQU 40			; bar rows 5-18: pixel lines 40-151
+BARBOT	EQU 152
+
+SCRINIT	XOR A
+	OUT (#FE),A
+	LD HL,#4000
+	LD DE,#4001
+	LD BC,#1AFF
+	LD (HL),A
+	LDIR
+	LD HL,s_attr
+.a1	LD D,(HL)
+	LD A,D
+	CP #FF
+	JR Z,.a9
+	INC HL
+	LD E,(HL)
+	INC HL
+	LD B,(HL)
+	INC HL
+	LD C,(HL)
+	INC HL
+	PUSH HL
+	CALL attrptr
+.a2	LD (HL),C
+	INC HL
+	DJNZ .a2
+	POP HL
+	JR .a1
+.a9	LD HL,MDLADDR+30	; PT3 header: title at +30, author at +66 (32 characters each)
+	LD DE,titlebuf
+	LD B,32
+	CALL scrsan
+	LD HL,MDLADDR+66
+	LD DE,authbuf
+	LD B,32
+	CALL scrsan
+	LD DE,msgbuf		; scroller: DEVILBOX - <title> BY <author> - AY-3-8912 (design 2600 marquee; PT3 has no comments)
+	LD HL,m_head
+	LD BC,11
+	LDIR
+	LD HL,titlebuf
+	CALL scrcpy
+	LD HL,authbuf
+	LD B,32
+.m1	LD A,(HL)		; author all spaces: leave out " BY "
+	INC HL
+	CP " "
+	JR NZ,.m2
+	DJNZ .m1
+	JR .m3
+.m2	LD HL,m_by
+	LD BC,4
+	LDIR
+	LD HL,authbuf
+	CALL scrcpy
+.m3	LD HL,m_tail
+	LD BC,m_end-m_tail
+	LDIR
+	LD (msgend),DE
+	LD HL,s_text
+	CALL st1		; screen.inc's text-table loop (row, col, length, string; #FF ends)
+	LD A,73			; play glyph
+	LD DE,20*256+1
+	CALL puttile
+	LD HL,msgbuf		; scroller row 22, columns 1-30
+	LD DE,22*256+1
+.s1	PUSH HL
+	LD A,(HL)
+	SUB #20
+	CALL puttile
+	POP HL
+	CALL msgnext
+	INC E
+	LD A,E
+	CP 31
+	JR NZ,.s1
+	LD (msgin),HL
+	RET
+
+scrsan	LD A,(HL)		; B characters HL -> DE, lower case folded, outside #20-#5F shown as ?
+	CP "a"
+	JR C,.n1
+	CP "z"+1
+	JR NC,.n1
+	SUB #20
+.n1	CP #20
+	JR C,.n2
+	CP #60
+	JR C,.n3
+.n2	LD A,"?"
+.n3	LD (DE),A
+	INC HL
+	INC DE
+	DJNZ scrsan
+	RET
+
+scrcpy	PUSH HL			; HL 32-character field -> DE without its trailing spaces
+	LD BC,32
+	ADD HL,BC
+	LD B,C
+.t1	DEC HL
+	LD A,(HL)
+	CP " "
+	JR NZ,.t2
+	DJNZ .t1
+	POP HL
+	RET
+.t2	LD C,B
+	LD B,0
+	POP HL
+	LDIR
+	RET
+
+msgnext	INC HL			; HL = next scroller character, wrapping at msgend; keeps DE
+	PUSH DE
+	LD DE,(msgend)
+	OR A
+	SBC HL,DE
+	ADD HL,DE
+	POP DE
+	RET C
+	LD HL,msgbuf
+	RET
+
+SCRFRAME
+	LD IX,barst
+	LD HL,AYREGS+AmplA
+	LD B,3
+.b1	PUSH BC
+	PUSH HL
+	LD A,(HL)		; driver volume 0-15, hardware envelope = 15
+	BIT 4,A
+	JR Z,.b2
+	LD A,15
+.b2	AND 15
+	LD E,A
+	LD D,0
+	LD HL,voltab
+	ADD HL,DE
+	LD C,(HL)		; C = target height in pixels
+	LD A,(IX+0)		; instant attack, fall 3 pixels a frame
+	CP C
+	JR C,.b4
+	SUB 3
+	JR C,.b4
+	CP C
+	JR NC,.b5
+.b4	LD A,C
+.b5	LD (IX+0),A
+	CP (IX+1)		; peak cap: holds 32 frames, then falls 1 pixel a frame
+	JR C,.b6
+	LD (IX+1),A
+	LD (IX+2),32
+	JR .b8
+.b6	LD A,(IX+2)
+	OR A
+	JR Z,.b7
+	DEC (IX+2)
+	JR .b8
+.b7	LD A,(IX+1)
+	DEC A
+	CP (IX+0)
+	JR NC,.b7a
+	LD A,(IX+0)
+.b7a	LD (IX+1),A
+.b8	LD A,(IX+3)		; old threshold and cap lines
+	LD (otr),A
+	LD A,(IX+5)
+	LD (ocb),A
+	LD A,(IX+4)
+	LD (ocy),A
+	LD A,BARBOT
+	SUB (IX+0)
+	LD (IX+3),A		; thr: lines >= thr are lit
+	LD DE,#FFFF
+	LD A,(IX+1)
+	OR A
+	JR Z,.b9
+	LD A,BARBOT-2		; cy = max(top, bot - cap - 2); the cap cell is (cy + 1) >> 3, cy shows only inside it
+	SUB (IX+1)
+	CP BARTOP
+	JR NC,.b8a
+	LD A,BARTOP
+.b8a	LD D,A
+	INC A
+	LD E,A
+	AND 7
+	JR NZ,.b9
+	LD D,#FF
+.b9	LD (IX+4),D
+	LD (IX+5),E
+	LD A,(otr)		; cells between the old and new threshold
+	LD C,A
+	LD A,(IX+3)
+	CP C
+	JR Z,.c3
+	JR C,.c1
+	LD L,A
+	LD A,C
+	LD C,L
+.c1	DEC C			; A = low line, C = high line - 1
+	RRCA
+	RRCA
+	RRCA
+	AND #1F
+	LD L,A
+	LD A,C
+	RRCA
+	RRCA
+	RRCA
+	AND #1F
+	LD H,A
+.c2	LD D,L
+	PUSH HL
+	CALL barcell
+	POP HL
+	LD A,L
+	INC L
+	CP H
+	JR NZ,.c2
+.c3	LD A,(ocb)		; cap moved: redraw the old and the new cap cell
+	CP (IX+5)
+	JR NZ,.c4
+	LD A,(ocy)
+	CP (IX+4)
+	JR Z,.c6
+.c4	LD A,(ocb)
+	CALL capcell
+	LD A,(IX+5)
+	CALL capcell
+.c6	LD DE,7
+	ADD IX,DE
+	POP HL
+	INC HL
+	POP BC
+	DEC B
+	JP NZ,.b1
+	LD HL,clkfr		; clock MM:SS, one second = 50 frames
+	INC (HL)
+	LD A,(HL)
+	CP 50
+	JR C,.k9
+	LD (HL),0
+	LD HL,clocktxt+4
+	LD B,4
+.k1	INC (HL)
+	LD A,(HL)
+	CP "9"+1
+	JR Z,.k2
+	CP "6"
+	JR NZ,.k3
+	LD A,B
+	CP 3
+	JR NZ,.k3
+.k2	LD (HL),"0"
+	DEC HL
+	LD A,B
+	CP 3
+	JR NZ,.k2a
+	DEC HL			; skip ':'
+.k2a	DJNZ .k1
+.k3	LD HL,clocktxt
+	LD B,5
+	LD DE,20*256+3
+	CALL puttext
+.k9	LD HL,scrfr		; coarse scroller: one character every 8 frames
+	INC (HL)
+	LD A,(HL)
+	AND 7
+	RET NZ
+	LD HL,#50C2		; row 22 column 2 -> column 1, 8 pixel lines
+	LD B,8
+.r1	PUSH BC
+	PUSH HL
+	LD D,H
+	LD E,#C1
+	LD BC,29
+	LDIR
+	POP HL
+	POP BC
+	INC H
+	DJNZ .r1
+	LD HL,(msgin)
+	LD A,(HL)
+	SUB #20
+	CALL msgnext
+	LD (msgin),HL
+	LD DE,22*256+30
+	JP puttile
+
+capcell	CP #FF			; A = cap line (or #FF): redraw its cell
+	RET Z
+	RRCA
+	RRCA
+	RRCA
+	AND #1F
+	LD D,A
+barcell				; D = row of bar IX: pixels from (IX+3..5), attribute cap colour on the cap cell
+	LD E,(IX+6)
+	PUSH DE
+	CALL cellptr
+	LD A,D
+	ADD A,A
+	ADD A,A
+	ADD A,A
+	LD C,A			; C = first line of the cell
+	LD D,(IX+3)
+	LD A,(IX+5)
+	AND #F8
+	CP C
+	JR Z,.g1		; the cap cell: line by line
+	LD A,C
+	CP D
+	JR NC,.f2		; whole cell at or below the threshold: lit
+	ADD A,7
+	CP D
+	JR NC,.g1		; threshold inside the cell
+	XOR A
+	JR .f1
+.f2	LD A,#FF
+.f1	LD B,A
+	RES 0,B
+	DUP 8
+	LD (HL),A
+	INC L
+	LD (HL),A
+	INC L
+	LD (HL),A
+	INC L
+	LD (HL),B
+	DEC L
+	DEC L
+	DEC L
+	INC H
+	EDUP
+	JR .g9
+.g1	LD E,(IX+4)
+	LD B,(IX+5)
+.g2	LD A,C
+	CP D
+	JR NC,.g3
+	CP E
+	JR Z,.g3
+	CP B
+	JR Z,.g3
+	XOR A
+	JR .g4
+.g3	LD A,#FF
+.g4	LD (HL),A
+	INC L
+	LD (HL),A
+	INC L
+	LD (HL),A
+	INC L
+	AND #FE
+	LD (HL),A
+	DEC L
+	DEC L
+	DEC L
+	INC H
+	INC C
+	LD A,C
+	AND 7
+	JR NZ,.g2
+.g9	POP DE
+	CALL attrptr
+	LD A,(IX+5)
+	RRCA
+	RRCA
+	RRCA
+	AND #1F
+	CP D
+	LD A,#06
+	JR NZ,.h1
+	LD A,#05
+.h1	LD (HL),A
+	INC L
+	LD (HL),A
+	INC L
+	LD (HL),A
+	INC L
+	LD (HL),A
+	RET
+
+; 7 bytes per bar: 0 level, 1 cap, 2 hold, 3 thr, 4 cap line cy (#FF = hidden), 5 cap line cy + 1 (#FF = no cap), then column
+barst	DB 0,0,0,BARBOT,#FF,#FF,10
+	DB 0,0,0,BARBOT,#FF,#FF,14
+	DB 0,0,0,BARBOT,#FF,#FF,18
+voltab				; round(v * 112 / 15)
+v = 0
+	DUP 16
+	DB (v * 112 * 2 + 15) / 30
+v = v + 1
+	EDUP
+otr	DB 0
+ocb	DB 0
+ocy	DB 0
+clkfr	DB 0
+scrfr	DB 0
+msgin	DW 0
+msgend	DW 0
+clocktxt DB "00:00"
+; row, col, length, attribute
+s_attr	DB 1,1,8,#02, 1,10,21,#47, 2,1,30,#07, 3,1,9,#06, 3,20,11,#07
+r = 5
+	DUP 14
+	DB r,10,12,#06
+r = r + 1
+	EDUP
+	DB 19,11,9,#07, 20,1,7,#05, 20,23,8,#47, 22,1,30,#47, #FF
+; row, col, length, string (design layout(): logo, title, BY author, chip + platform, labels, time, song)
+s_text	DB 1,1,8
+	DW s_logo
+	DB 1,10,21
+	DW titlebuf
+	DB 2,1,3
+	DW s_by
+	DB 2,4,27
+	DW authbuf
+	DB 3,1,9
+	DW s_chip
+	DB 3,20,11
+	DW s_plat
+	DB 19,11,1
+	DW s_lab
+	DB 19,15,1
+	DW s_lab+1
+	DB 19,19,1
+	DW s_lab+2
+	DB 20,3,5
+	DW clocktxt
+	DB 20,23,8
+	DW s_song
+	DB #FF
+s_logo	DB "DEVILBOX"
+s_by	DB "BY "
+s_chip	DB "AY-3-8912"
+s_plat	DB "ZX SPECTRUM"
+s_lab	DB "123"
+s_song	DB "SONG 1/1"
+m_head	DB "DEVILBOX - "
+m_by	DB " BY "
+m_tail	DB " - AY-3-8912   "
+m_end
+titlebuf DS 32
+authbuf	DS 32
+msgbuf	DS 11 + 32 + 4 + 32 + 15
+	include "screen.inc"
+
 
 ;vars from here can be stripped
 ;you can move VARS to any other address
