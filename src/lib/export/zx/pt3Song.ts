@@ -88,6 +88,14 @@ function expand(mac: FurnaceMacro | undefined, ticks: number, fallback: number):
   const loop = mac.loop >= 0 && mac.loop < mac.length ? (mac.delay || 0) + mac.loop * speed : -1;
   return Array.from({ length: ticks }, (_, t) => (t < raw.length ? raw[t] : loop >= 0 ? raw[loop + ((t - raw.length) % (raw.length - loop))] : raw[raw.length - 1]));
 }
+/** Furnace macro up to its release point (macroInt.cpp: past rel the macro holds, or loops when loop < rel, until the
+ * note is released). PT3 has no note release, so the post-release tail is not played; the sustain lasts the whole note. */
+function sustain(mac: FurnaceMacro, lossy: Lossy): FurnaceMacro {
+  const rel = mac.release;
+  if (!(rel >= 0 && rel < mac.length)) return mac;
+  if (rel < mac.length - 1) lossy.add('macro release tail (PT3 has no note release; the sustain step holds)');
+  return { ...mac, length: rel + 1, loop: mac.loop >= 0 && mac.loop < rel ? mac.loop : -1 };
+}
 const macroSpan = (m: FurnaceMacro | undefined): number => (m ? (m.delay || 0) + m.length * Math.max(1, m.speed || 1) : 1);
 const macroLoop = (m: FurnaceMacro | undefined): number => (m && m.loop >= 0 && m.loop < m.length ? (m.delay || 0) + m.loop * Math.max(1, m.speed || 1) : -1);
 
@@ -223,7 +231,7 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
   const instrument = (i: number): Ins => {
     const hit = insCache.get(i);
     if (hit) return hit;
-    const macros = m.instruments[i]?.macros ?? [];
+    const macros = (m.instruments[i]?.macros ?? []).map((x) => sustain(x, lossy));
     const arp = macros.find((x) => x.code === MACRO_ARP && x.length > 0);
     const o = arp ? ornamentBytes(arp, lossy, tickHz) : null;
     const e = { macros, orn: o ? addOrnament(o.bytes) : 0, fixed: o?.fixed ?? null };
@@ -300,7 +308,7 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
   };
   /** PT3 envelope command bytes for a channel note: Furnace auto-envelope (ay.cpp: (freq * den / num) >> 4 on the played
    * tone period) or the fixed period, converted from the Furnace AY clock. */
-  const envBytes = (st: (typeof chan)[number], macros: FurnaceMacro[], onNote = true): number[] => {
+  const envBytes = (st: (typeof chan)[number], macros: FurnaceMacro[], onNote = true, arpOff = 0): number[] => {
     const shapeM = onNote ? firstVal(macros, MACRO_ENV_SHAPE) : null;
     if (shapeM !== null) envShape = shapeM & 15;
     const numM = firstVal(macros, MACRO_AUTO_NUM), denM = firstVal(macros, MACRO_AUTO_DEN);
@@ -308,7 +316,7 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
     const fixedM = firstVal(macros, MACRO_ENV_PERIOD);
     let period: number;
     if (num > 0 && den > 0) {
-      const tone = Math.max(0, Math.min(4095, Math.round(pt3Period(tune, st.n, clock)) + st.shift));
+      const tone = Math.max(0, Math.min(4095, Math.round(pt3Period(tune, Math.max(0, Math.min(95, st.n + arpOff)), clock)) + st.shift));
       period = Math.floor(Math.floor((tone * den) / num) / 16);
     } else period = Math.round(((fixedM ?? envPeriod) * clock) / FURNACE_AY_CLOCK);
     period = Math.max(0, Math.min(0xffff, period));
@@ -334,10 +342,12 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
     st.pos = p;
     if (!moving) { const was = st.gl; st.gl = ''; return was ? [0, 0, 0] : null; }
     const t0 = ticksAt - spd, f0 = frames - n;
-    const base = pt3Period(tune, st.n, clock) + st.shift;
+    // PT3 adds the slide in period units to the ornament-shifted tone: fit it at the step the ornament holds.
+    const ob = ornaments[st.outOrn] ?? ornaments[0], held = (ob[2 + ob[0]] << 24) >> 24;
+    const base = pt3Period(tune, Math.max(0, Math.min(95, st.n + held)), clock) + st.shift;
     const want = Array.from({ length: n + 1 }, (_, f) => {
       const k = Math.max(0, Math.min(spd - 1, Math.floor(((f0 + f + 0.5) * tickHz) / FRAME_HZ) - t0));
-      return clock / (16 * posHz(posAt[k])) - base - st.cur;
+      return clock / (16 * posHz(posAt[k]) * 2 ** (held / 12)) - base - st.cur;
     });
     const b0 = base + st.cur;
     const worstCents = (d: number, s: number): number => Math.max(...want.map((w, f) => Math.abs(1200 * Math.log2(Math.max(1, b0 + s * Math.floor(f / d)) / Math.max(1, b0 + w)))));
@@ -436,12 +446,15 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
             if (sampleUsesEnv(samples[sample - 1] ?? [])) {
               // shortcut: PT3 retriggers R13 on every envelope command; Furnace only when the shape value changes.
               // Repeating shapes (8, 10, 12, 14) can differ in phase per note; exact only with a player that sets the period alone.
-              if (orn !== 0 && ins.macros.some((x) => (x.code === MACRO_AUTO_NUM || x.code === MACRO_AUTO_DEN) && x.length > 0) || (st.autoNum > 0 && orn !== 0)) lossy.add('auto-envelope with arpeggio (period follows the row note only)');
-              ops.unshift(...envBytes(st, ins.macros), sample * 2, ...(orn !== st.outOrn ? [0x40 | orn] : []));
+              // The envelope period is set once per note: it follows the step the ornament ends on (held), exact when the
+              // ornament settles on one step (a sustained arp macro), lossy when it keeps cycling.
+              const ob = ornaments[orn], tail = ob.slice(2 + ob[0]), held = (tail[0] << 24) >> 24;
+              if (tail.some((x) => x !== tail[0]) && (ins.macros.some((x) => (x.code === MACRO_AUTO_NUM || x.code === MACRO_AUTO_DEN) && x.length > 0) || st.autoNum > 0)) lossy.add('auto-envelope with arpeggio (period follows the row note only)');
+              ops.unshift(...envBytes(st, ins.macros, true, held), sample * 2, ...(orn !== st.outOrn ? [0x40 | orn] : []));
               st.outSample = sample; st.outOrn = orn; st.envOut = true;
             } else if (note === 0xd0 && st.envOut && cell.effects.some((e) => [0x22, 0x23, 0x24, 0x29].includes(e.type))) {
               // Envelope effect without a note: 0xB2..0xBF sets shape 1..14 and the period, keeping the sample.
-              const eb = envBytes(st, ins.macros, false);
+              const ob = ornaments[orn], eb = envBytes(st, ins.macros, false, (ob[2 + ob[0]] << 24) >> 24);
               if (eb[0] - 0x10 <= 14) ops.push(0xb1 + eb[0] - 0x10, eb[1], eb[2]);
               else lossy.add('envelope shape 15 set without a note (PT3 0xB2..0xBF reaches 1..14)');
             } else if (sample !== st.outSample || orn !== st.outOrn || st.envOut) {

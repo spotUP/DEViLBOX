@@ -168,7 +168,9 @@ for (const name of names) {
     const lag = Math.max(0, firstOn(got) - firstOn(ref));
     const pitch = pitchDiff(ref, got, lag);
     const sounding = [0, 1, 2].map((ch) => got.filter((f) => f[ch].vol > 0).length);
-    if (DUMP) for (let t = DUMP[0]; t <= DUMP[1] && t < ref.length; t++) console.log(t, ref[t].map((x) => `${x.hz?.toFixed(0) ?? '-'}/${x.vol}`.padStart(9)).join(' '), ' | ', (got[t + lag] ?? []).map((x) => `${x.hz?.toFixed(0) ?? '-'}/${x.vol}`.padStart(9)).join(' '));
+    // Dump cell: tone Hz/volume, then e<env Hz>/<shape> when the channel plays the envelope, n<R6> when noise is on.
+    const cell = (x: ChState): string => `${x.hz?.toFixed(0) ?? '-'}/${x.vol}${x.envHz !== null ? `e${x.envHz.toFixed(1)}/${x.shape}` : ''}${x.noise !== null ? `n${x.noise}` : ''}`.padStart(20);
+    if (DUMP) for (let t = DUMP[0]; t <= DUMP[1] && t < ref.length; t++) console.log(t, ref[t].map(cell).join(' '), ' | ', (got[t + lag] ?? []).map(cell).join(' '));
     const pitchOk = pitch.every((d, i) => !song.channelsWithNotes[i] || (d.pitchBad <= PITCH_FAIL_SHARE * d.both && (d.envBad ?? 0) <= PITCH_FAIL_SHARE * Math.max(1, d.envBoth ?? 0)));
     v = { inputHash, pass: got.length >= FRAMES && song.channelsWithNotes.every((n, i) => !n || sounding[i] > 0) && pitchOk, frames: got.length, sounding, hasNotes: song.channelsWithNotes, pitch, lag, lossy: song.lossy, tapBytes: tap.length };
   } catch (e) {

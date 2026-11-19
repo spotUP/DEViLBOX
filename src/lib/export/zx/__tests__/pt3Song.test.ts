@@ -37,6 +37,23 @@ describe('furnaceToPt3', () => {
     expect(partial.lossy.some((x) => x.startsWith('effect E1'))).toBe(false);
     expect(Buffer.from(partial.module).equals(Buffer.from(r.module))).toBe(false);
   });
+  it('plays macros up to their release point and holds there, as Furnace does until note release', () => {
+    // "Drifting in Colour" ELd Saw: tone+envelope wave, +19 arp, auto-envelope 1/6, all with release 0 then a plain-tone tail.
+    const mac = (code: number, data: number[], release: number) => ({ code, length: data.length, loop: 255, release, delay: 0, speed: 1, data });
+    const withMacros = (macros: unknown[]): FurnaceModule => Object.assign(tinyModule(), { instruments: [{ macros }] });
+    const released = (arp: number, rel: number) => withMacros([mac(3, [5, 1], rel), mac(1, [arp, 0], rel), mac(6, [8], 255), mac(7, [1], 255), mac(8, [6], 255)]);
+    const held = (arp: number) => withMacros([mac(3, [5], 255), mac(1, [arp], 255), mac(6, [8], 255), mac(7, [1], 255), mac(8, [6], 255)]);
+    const bytes = (r: { module: Uint8Array }) => Buffer.from(r.module);
+    for (const clock of [1773400, 1500000]) {
+      const r = furnaceToPt3(released(19, 0), 0, '', '', clock);
+      expect(bytes(r).equals(bytes(furnaceToPt3(held(19), 0, '', '', clock)))).toBe(true);
+      expect(bytes(r).equals(bytes(furnaceToPt3(released(19, 255), 0, '', '', clock)))).toBe(false);
+      expect(r.lossy.some((x) => x.startsWith('auto-envelope with arpeggio'))).toBe(false);
+      // The auto-envelope period follows the held +19 step: a third of the period without the arp.
+      const envPeriod = (m: Uint8Array) => { const i = m.indexOf(0x18, 201); return (m[i + 1] << 8) | m[i + 2]; };
+      expect(envPeriod(furnaceToPt3(held(0), 0, '', '', clock).module) / envPeriod(r.module)).toBeCloseTo(2 ** (19 / 12), 0); // integer periods: 159 / 52
+    }
+  });
   it('rejects a non-AY chip', () => {
     const mod = tinyModule();
     (mod as unknown as { systems: number[] }).systems = [0x05];
