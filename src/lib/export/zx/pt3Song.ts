@@ -51,12 +51,13 @@ const TONE_TABLES: Array<{ version: number; table: number; periods: number[] }> 
   { version: 6, table: 3, periods: [0xCDA, 0xC22, 0xB73, 0xACF, 0xA33, 0x9A1, 0x917, 0x894, 0x819, 0x7A4, 0x737, 0x6CF] },
 ];
 interface Tuning { version: number; table: number; periods: number[]; noteOffset: number; cents: number }
-const pt3Period = (t: Tuning, n: number): number => t.periods[n % 12] / 2 ** Math.floor(n / 12);
+/** clock scales the table the way the Vectrex exporter retunes it (pt3Tables.ts): periods x clock / ZX_CLOCK. */
+const pt3Period = (t: Tuning, n: number, clock = ZX_CLOCK): number => t.periods[n % 12] * (clock / ZX_CLOCK) / 2 ** Math.floor(n / 12);
 /** Hz Furnace plays for note nv (C-0 = 0, A-4 = 57), period floor of the 12-bit AY counter included. */
 const furnaceHz = (tuningHz: number, nv: number): number => Math.max(FURNACE_AY_CLOCK / (16 * 4095), tuningHz * 2 ** ((nv - 57) / 12));
 /** Table, version and note offset with the smallest worst-case pitch error over the notes the song uses. The residual
  * is a PT3 limit: the player has four fixed tone tables and no fine tune. */
-function pickTuning(tuningHz: number, notes: number[]): Tuning {
+function pickTuning(tuningHz: number, notes: number[], clock = ZX_CLOCK): Tuning {
   const hz = tuningHz > 0 ? tuningHz : 440;
   const used = notes.length ? notes : [48, 57, 60];
   let best: Tuning | undefined;
@@ -66,7 +67,7 @@ function pickTuning(tuningHz: number, notes: number[]): Tuning {
     for (const nv of used) {
       const n = nv - k;
       if (n < 0 || n > 95) continue;
-      worst = Math.max(worst, Math.abs(1200 * Math.log2(ZX_CLOCK / (16 * pt3Period(cand, n)) / furnaceHz(hz, nv))));
+      worst = Math.max(worst, Math.abs(1200 * Math.log2(clock / (16 * pt3Period(cand, n, clock)) / furnaceHz(hz, nv))));
     }
     cand.cents = worst;
     if (!best || worst < best.cents - 1e-9) best = cand;
@@ -163,12 +164,13 @@ function ornamentBytes(mac: FurnaceMacro, lossy: Lossy, tickHz: number): { bytes
   return { bytes: [loop, idx.length, ...idx.map((t) => Math.max(-96, Math.min(96, steps[t])) & 0xff)], fixed: base };
 }
 
-export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author = ''): Pt3Song {
+/** clock: the AY clock the module will play at (ZX 1773400; Vectrex 1500000 with the retuned tables of pt3Tables.ts). */
+export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author = '', clock = ZX_CLOCK): Pt3Song {
   // Glissando commands break the row skip runs, so a song near the cap can only fit with slides dropped on some channels.
   const masks = [7, 3, 5, 6, 1, 2, 4, 0];
   for (const [i, mask] of masks.entries()) {
     try {
-      const out = buildPt3(m, subsong, title, author, mask);
+      const out = buildPt3(m, subsong, title, author, mask, clock);
       if (mask !== 7) for (let ch = 0; ch < 3; ch++) if (!((mask >> ch) & 1)) out.lossy.push(`pitch slides on channel ${ch + 1} (dropped so the module fits 16 KB)`);
       return out;
     } catch (e) {
@@ -178,7 +180,7 @@ export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author =
   throw new Error('unreachable');
 }
 
-function buildPt3(m: FurnaceModule, subsong: number, title: string, author: string, slideMask: number): Pt3Song {
+function buildPt3(m: FurnaceModule, subsong: number, title: string, author: string, slideMask: number, clock: number): Pt3Song {
   const lossy = new Lossy();
   const s = m.subsongs[subsong];
   if (!s) throw new Error(`subsong ${subsong} missing`);
@@ -258,15 +260,15 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
     const nv = cell ? convertFurnaceNoteValue(cell) : -1;
     if (nv >= 0 && nv < 253) used.add(nv);
   }
-  const tune = pickTuning(m.tuning, [...used]);
+  const tune = pickTuning(m.tuning, [...used], clock);
   if (tune.cents > 35) lossy.add(`tone table off by up to ${Math.round(tune.cents)} cents (PT3 has four fixed tables, no fine tune)`);
   /** PT3 note and sample tone offset for Furnace note nv: past C-1..B-8 the edge note plays with the period difference. */
   const placeNote = (nv: number): { n: number; shift: number } => {
     const n = nv - tune.noteOffset;
     if (n >= 0 && n <= 95) return { n, shift: 0 };
     const edge = n < 0 ? 0 : 95;
-    const want = Math.max(1, Math.min(4095, Math.round(ZX_CLOCK / (16 * furnaceHz(m.tuning > 0 ? m.tuning : 440, nv)))));
-    return { n: edge, shift: want - Math.round(pt3Period(tune, edge)) };
+    const want = Math.max(1, Math.min(4095, Math.round(clock / (16 * furnaceHz(m.tuning > 0 ? m.tuning : 440, nv)))));
+    return { n: edge, shift: want - Math.round(pt3Period(tune, edge, clock)) };
   };
 
   // Rows: Furnace speeds cycle per row (groove); 09 sets speed 1, 0F speed 2. Each row's PT3 delay is the frame
@@ -306,9 +308,9 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
     const fixedM = firstVal(macros, MACRO_ENV_PERIOD);
     let period: number;
     if (num > 0 && den > 0) {
-      const tone = Math.max(0, Math.min(4095, Math.round(pt3Period(tune, st.n)) + st.shift));
+      const tone = Math.max(0, Math.min(4095, Math.round(pt3Period(tune, st.n, clock)) + st.shift));
       period = Math.floor(Math.floor((tone * den) / num) / 16);
-    } else period = Math.round(((fixedM ?? envPeriod) * ZX_CLOCK) / FURNACE_AY_CLOCK);
+    } else period = Math.round(((fixedM ?? envPeriod) * clock) / FURNACE_AY_CLOCK);
     period = Math.max(0, Math.min(0xffff, period));
     // Shapes 0-3 play as 9 and 4-7 as 15 on the AY; PT3 has no 0x10 + 0 envelope byte.
     const shape = envShape < 4 ? 9 : envShape < 8 ? 15 : envShape;
@@ -332,10 +334,10 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
     st.pos = p;
     if (!moving) { const was = st.gl; st.gl = ''; return was ? [0, 0, 0] : null; }
     const t0 = ticksAt - spd, f0 = frames - n;
-    const base = pt3Period(tune, st.n) + st.shift;
+    const base = pt3Period(tune, st.n, clock) + st.shift;
     const want = Array.from({ length: n + 1 }, (_, f) => {
       const k = Math.max(0, Math.min(spd - 1, Math.floor(((f0 + f + 0.5) * tickHz) / FRAME_HZ) - t0));
-      return ZX_CLOCK / (16 * posHz(posAt[k])) - base - st.cur;
+      return clock / (16 * posHz(posAt[k])) - base - st.cur;
     });
     const b0 = base + st.cur;
     const worstCents = (d: number, s: number): number => Math.max(...want.map((w, f) => Math.abs(1200 * Math.log2(Math.max(1, b0 + s * Math.floor(f / d)) / Math.max(1, b0 + w)))));

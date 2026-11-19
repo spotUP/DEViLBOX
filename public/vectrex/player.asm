@@ -41,7 +41,7 @@ title:  fcc "DEVILBOX        "
         fcb $80         ; ptxt start mark for the author row
 author: fcc "DEVILBOX        "
         fcb $80
-scroll: fcc "    DEVILBOX VECTREX AY-3-8910 PLAYER - MUSIC CAPTURED FROM FURNACE                                                             "
+scroll: fcc "    DEVILBOX VECTREX AY-3-8910 PLAYER - PT3 SONG DATA - 6809 PORT                                                               "
 scrollEnd:
 sLogo:  ; DEViLBOX wordmark for vlist: dy, dx, beam ($FF line, 0 move); at scale $20, after the scale $7F move to 112,-120
         fcb 72,0,$FF
@@ -156,66 +156,43 @@ bc:     lda ,x+
         lda #$80
         sta buf-1
         sta buf+12
-        ldx #data
-frame:  stx ptr
+        jsr pt3init
 frame2: jsr Wait_Recal
         jsr tick
         jsr screen
+        jsr pt3play
         lda #$D0
         tfr a,dp
-        ldx ptr
-        lda rep
-        beq getf
-        dec rep
-        bra frame2
-getf:   lda ,x+
-        ldb ,x+
-        cmpb #$FE
-        bne chkrl
-        jsr mute
-        jsr resetclk
-        ldx #data
-        bra getf
-chkrl:  cmpb #$FD
-        bne play
-        deca
-        sta rep
-        lbra frame
-play:   sta mask+1
-        stb mask
         clr reg
-nextr:  lsr mask
-        ror mask+1
-        bcc skip
-        ldb ,x+
-        lda reg
-        cmpa #7
+nextr:  lda reg
+        ldx #AYREGS
+        ldb a,x
+        cmpa #13
+        bne nenv
+        tstb
+        bmi skip        ; envelope type $FF: no retrigger this frame
+nenv:   cmpa #7
         bne wr
         andb #$3F
-wr:     pshs b          ; volume shadow for the bars
-        lda reg
-        cmpa #8
+wr:     cmpa #8         ; volume shadow for the bars
         blo nov
         cmpa #10
         bhi nov
         ldy #vol-8
         leay a,y
-        ldb ,s
+        pshs b
         bitb #$10
         beq lowv
         ldb #15
 lowv:   andb #$0F
         stb ,y
-nov:    puls b
-        lda reg
-        stx ptr
-        jsr Sound_Byte
-        ldx ptr
+        puls b
+nov:    jsr Sound_Byte
 skip:   inc reg
         lda reg
         cmpa #14
         bne nextr
-        lbra frame
+        bra frame2
 mute:   clr vol
         clr vol+1
         clr vol+2
@@ -444,4 +421,5 @@ scc:    lda ,x+
         lda #-122
         ldb #-54         ; 12 characters centred (the 16 character window started at -72)
         jmp ptxt
+        include pt3core.asm
 data:

@@ -336,10 +336,20 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   ) => {
     setVectrexCartBusy(true);
     try {
-      const { recordVectrexCartridge } = await import('@lib/export/vectrex/vectrexCapture');
-      const r = await recordVectrexCartridge((metadata.name || 'song').slice(0, 16), metadata.author && metadata.author !== 'Unknown' ? metadata.author : undefined);
-      downloadFn(new Blob([r.bin as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.bin`);
-      notify.success(`Vectrex cartridge exported (${r.frames} frames, ${Math.round(r.seconds)} s, ${r.bin.byteLength} bytes).`);
+      const { exportFurnaceAyScrambleFile } = await import('@lib/export/moduleExportService');
+      const { parseFurnaceSong } = await import('@lib/import/formats/FurnaceSongParser');
+      const { furnaceToPt3 } = await import('@lib/export/zx/pt3Song');
+      const { buildVectrexPt3Cartridge, fetchVectrexPlayer } = await import('@lib/export/vectrex/vectrexCartridge');
+      const { VECTREX_AY_CLOCK } = await import('@lib/export/vectrex/pt3Tables');
+      const fur = exportFurnaceAyScrambleFile('vectrex');
+      fur.warnings.forEach((w) => notify.warning(w));
+      const title = metadata.name || 'song';
+      const author = metadata.author && metadata.author !== 'Unknown' ? metadata.author : '';
+      const song = furnaceToPt3(await parseFurnaceSong(fur.bytes.slice().buffer), 0, title, author, VECTREX_AY_CLOCK);
+      song.lossy.forEach((w) => notify.warning(w));
+      const r = buildVectrexPt3Cartridge(song.module, await fetchVectrexPlayer(), title.slice(0, 16), author || undefined);
+      downloadFn(new Blob([r.bin as BlobPart], { type: 'application/octet-stream' }), `${title}.bin`);
+      notify.success(`Vectrex cartridge exported (PT3 song data ${r.moduleBytes} bytes, ${Math.round(song.frames / 50)} s, ${r.bin.byteLength} bytes).`);
       onClose();
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Vectrex cartridge export failed.');

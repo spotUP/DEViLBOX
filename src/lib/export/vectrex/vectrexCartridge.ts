@@ -5,6 +5,7 @@
  */
 import { AY_REG_COUNT, captureToFrames, encodeFrames, ZX_CTRL_LOOP } from '../zx/zxAyStream';
 import type { RegisterWrite } from '../VGMExporter';
+import { pt3NoteTable, pt3VolumeTable, VECTREX_AY_CLOCK } from './pt3Tables';
 
 export interface VectrexPlayer {
   bytes: Uint8Array;
@@ -15,6 +16,9 @@ export interface VectrexPlayer {
   authorLength: number;
   scrollOffset: number;
   scrollLength: number;
+  /** Note table (96 big-endian words) and volume table (256 bytes) of the PT3 core, built by pt3Tables.ts. */
+  ntOffset: number;
+  vtOffset: number;
   maxCartridge: number;
 }
 
@@ -91,4 +95,25 @@ export function buildVectrexCartridge(writes: readonly RegisterWrite[], sampleRa
   for (const f of encoded) { bin.set(f, o); o += f.length; }
   bin[o++] = 0; bin[o] = ZX_CTRL_LOOP;
   return { bin, frames: frames.length, dataBytes, rawBytes: raw.reduce((n, f) => n + f.length, 0) + 2, seconds: frames.length / 50 };
+}
+
+/** PT3 cartridge: the 6809 port of Bulba's PT3 player (public/vectrex/pt3core.asm) plus the module from furnaceToPt3
+ * (run at VECTREX_AY_CLOCK). The note table is Bulba's for the module's header, scaled to clock. */
+export function buildVectrexPt3Cartridge(module: Uint8Array, player: VectrexPlayer, title = 'devilbox', author = 'devilbox', scrollText = '', clock = VECTREX_AY_CLOCK): { bin: Uint8Array; moduleBytes: number } {
+  const size = player.dataOffset + module.length;
+  if (size > player.maxCartridge) {
+    throw new Error(`The song does not fit: a Vectrex cartridge holds ${player.maxCartridge} bytes, this one needs ${size}.`);
+  }
+  let padded = 4096;
+  while (padded < size) padded *= 2;
+  const bin = new Uint8Array(padded);
+  bin.set(player.bytes.subarray(0, player.dataOffset));
+  bin.set(vectrexTitle(title, player.titleLength), player.titleOffset);
+  bin.set(vectrexTitle(author, player.authorLength), player.authorOffset);
+  const pad = ' '.repeat(16);
+  if (scrollText) bin.set(vectrexTitle(pad + scrollText + pad, player.scrollLength), player.scrollOffset);
+  pt3NoteTable(module, clock).forEach((p, i) => { bin[player.ntOffset + 2 * i] = p >> 8; bin[player.ntOffset + 2 * i + 1] = p & 0xFF; });
+  bin.set(pt3VolumeTable(module), player.vtOffset);
+  bin.set(module, player.dataOffset);
+  return { bin, moduleBytes: module.length };
 }
