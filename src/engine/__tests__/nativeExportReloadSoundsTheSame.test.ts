@@ -235,7 +235,7 @@ const FORMATS: FormatRow[] = [
   { key: 'piyoPiyo', rig: 'paula', files: ['studio-pixel---piyopiyo/obj0176-1.pmd'] },
   { key: 'plm', rig: 'paula', held: 'no exporter in the registry', files: ['disorder-tracker-2/hyper geckoo.plm'] },
   { key: 'psm', rig: 'paula', files: ['formats/Epic Pinball - Song 0 - Title.psm'] },
-  { key: 'ptm', rig: 'paula', files: ['protracker-iff/the drainer.ptm'] },
+  { key: 'ptm', rig: 'paula', files: ['formats/rew_vibr.ptm'] },
   { key: 'rtm', rig: 'paula', held: 'no exporter in the registry', files: ['real-tracker/odyssey.rtm'] },
   { key: 's3m', rig: 'paula', files: ['s3m/andante.s3m'] },
   { key: 'sidFactory2', rig: 'paula', held: 'no exporter in the registry', files: ['sid-factory-2/Driver 11 Test - Filter.sf2'] },
@@ -319,7 +319,7 @@ const EXPECTED_NO_RIG: string[] = [
   'composer-669/speed fighter.669', 'formats/Epic Pinball - Song 0 - Title.psm', 'formats/avoid.amf', 'formats/dreamer.jxs', 'formats/kdmsong.kdm',
   'digital-tracker-dtm/sonic subspace.dtm', 'organya/obj0640-1.org', 'studio-pixel---piyopiyo/obj0176-1.pmd',
   // Byte-exact since the layout-patch export; UADE refuses both, so only bytes and grid are held.
-  'composer-667/speed fighter.667', 'formats/noname.stp',
+  'composer-667/speed fighter.667', 'formats/noname.stp', 'formats/rew_vibr.ptm',
 ];
 /**
  * Files UADE takes but plays as noise, so its stream says nothing about the song: the .sog is the
@@ -502,7 +502,6 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   amf: { edited: 'the edit is not written: the exported file equals the original' },
   psm: { edited: 'the edit is not written: the exported file equals the original' },
   digi: { edited: 'the edited note is not heard in the rendered stream' },
-  ptm: { unedited: 'export touches an audio context that is not initialised (ToneEngine)', edited: 'export touches an audio context that is not initialised (ToneEngine)' },
   xm: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed', edited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
   mod: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
   dtm: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },

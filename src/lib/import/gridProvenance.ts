@@ -119,7 +119,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   composer667: 'pass',
   stp: 'pass',
   unic: 'pass',
-  ptm: 'fail',
+  ptm: 'pass',
   xm: 'fail',
   mod: 'fail',
   dtm: 'fail',
