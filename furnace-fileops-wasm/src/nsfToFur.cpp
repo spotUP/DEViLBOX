@@ -561,8 +561,37 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   std::vector<int> cum(K + 1, 0);
   for (int i = 0; i < K; i++) cum[i + 1] = cum[i] + sp[i];
   const int P = cum[K];
-  auto rowStart = [&](int r) { return r / K * P + cum[r % K]; };
-  auto rowOf = [&](int vf) { int i = 0; while (cum[i + 1] <= vf % P) i++; return vf / P * K + i; };
+  // Driver loop stall: a loop of L = Lr * S + rem frames (integer speed) repeats with every onset
+  // rem frames later each pass (Metroid: the R&D1 driver spends one frame restarting the song), so
+  // a fixed grid drifts off the music one frame per loop. Rows longRow + k * longLr are rem frames
+  // longer (0Fxx on that row, back to S on the next); the loop is then exactly Lr whole rows.
+  int longRow = -1, longLr = 1, longRem = 0;
+  auto rowStart = [&](int r) {
+    int x = r / K * P + cum[r % K];
+    if (longRow >= 0 && r > longRow) x += ((r - longRow - 1) / longLr + 1) * longRem;
+    return x;
+  };
+  auto rowOf = [&](int vf) {
+    int r = vf / P * K;
+    while (r > 0 && rowStart(r) > vf) r--;
+    while (rowStart(r + 1) <= vf) r++;
+    return r;
+  };
+  if (K == 1 && loopF >= 0 && loopL % P && !allOn.empty()) {
+    // the stall row and phase that put the most onsets on row starts, over the whole trace
+    longRem = loopL % P; longLr = loopL / P;
+    int best = -1, bx = -1, bp = 0;
+    for (int p = 0; p < P; p++) {
+      const int pd = (P - p) % P, x0 = (loopF + pd) / P;
+      for (int x = x0; x < x0 + longLr; x++) {
+        longRow = x;
+        int hit = 0;
+        for (int f: allOn) { const int v = f + pd; hit += rowStart(rowOf(v)) == v; }
+        if (hit > best) { best = hit; bx = x; bp = p; }
+      }
+    }
+    longRow = bx; phase = bp; fitPm = (int)(1000LL * best / (long long)allOn.size());
+  }
   // Pad < P frames of silence in front so the dominant phase falls on row starts.
   const int pad = (P - phase) % P;
   for (int i = 0; i < K; i++) sub->speeds.val[i] = (unsigned short)sp[i];
@@ -581,7 +610,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
     while (frameOfRow(Ls) < loopF) Ls++;
     // shortcut: a loop that is not a whole number of speed cycles rounds to the nearest row (the
     // repeat drifts by under a row each pass); upgrade to a per-loop speed change if a song shows it
-    const int Lr = loopL % P == 0 ? loopL / P * K : std::max(1, (int)std::lround((double)loopL * K / P));
+    const int Lr = loopL % P == 0 || longRow >= 0 ? loopL / P * K : std::max(1, (int)std::lround((double)loopL * K / P));
     int best = -1;
     double bestScore = 1e9;
     for (int pl = 16; pl <= DIV_MAX_ROWS; pl++) {
@@ -604,7 +633,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   sub->patLen = patLen;
   sub->ordersLen = (R + patLen - 1) / patLen;
 
-  struct Cell { short note = -1, ins = -1, fx = -1, fxv = -1, fx2 = -1, fxv2 = -1; };
+  struct Cell { short note = -1, ins = -1, fx = -1, fxv = -1, fx2 = -1, fxv2 = -1, fx3 = -1, fxv3 = -1; };
   std::vector<std::vector<Cell>> cells(nCh, std::vector<Cell>(R));
   auto place = [&](Cell& cl, int vf) { const int o = vf - rowStart(rowOf(vf)); if (o) { cl.fx = 0xED; cl.fxv = (short)o; } };
 
@@ -724,11 +753,16 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   }
 
   cells[0][R - 1].fx2 = (short)endFx; cells[0][R - 1].fxv2 = (short)endFxv;
+  for (int r = longRow; longRow >= 0 && r < R; r += longLr) {
+    cells[0][r].fx3 = 0x0F; cells[0][r].fxv3 = (short)(S + longRem);
+    const int back = r + 1 < R ? r + 1 : loopF >= 0 ? endFxv * patLen : -1; // the loop target row restores S
+    if (back >= 0) { cells[0][back].fx3 = 0x0F; cells[0][back].fxv3 = (short)S; }
+  }
 
   // Patterns: patLen-row blocks per channel, identical blocks share one pattern index.
   int chanPats = 0;
   for (int ci = 0; ci < nCh; ci++) {
-    sub->pat[ci].effectCols = ci ? 1 : 2; // channel 1 carries the song end (0Bxx / FF00)
+    sub->pat[ci].effectCols = ci ? 1 : longRow >= 0 ? 3 : 2; // channel 1 carries the song end (0Bxx / FF00) and loop-stall speeds
     std::map<std::string, int> seen;
     for (int blk = 0; blk < sub->ordersLen; blk++) {
       std::string key;
@@ -748,6 +782,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
           row[DIV_PAT_NOTE] = cl.note; row[DIV_PAT_INS] = cl.ins;
           row[DIV_PAT_FX(0)] = cl.fx; row[DIV_PAT_FXVAL(0)] = cl.fxv;
           row[DIV_PAT_FX(1)] = cl.fx2; row[DIV_PAT_FXVAL(1)] = cl.fxv2;
+          row[DIV_PAT_FX(2)] = cl.fx3; row[DIV_PAT_FXVAL(2)] = cl.fxv3;
         }
       }
       sub->orders.ord[ci][blk] = it->second;

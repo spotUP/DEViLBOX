@@ -108,12 +108,18 @@ function nsfToNsfe(nsf: Uint8Array): Uint8Array {
 // or FF00 for a song that stops. Expected loops come from an independent GME register-trace loop
 // finder (frames at 60.0988 Hz). Files outside the repo: run only when present.
 const GONDAMIN = '/Users/spot/Downloads/Nintendo Sound Format/Gondamin/bionic commando.nsf';
-type EndCase = { name: string; path: string; track: number; loopFrames?: number; lastSound?: number };
+type EndCase = { name: string; path: string; track: number; loopFrames?: number; lastSound?: number; minGridFit?: number };
 const END_CASES: EndCase[] = [
   { name: 'bioniccommando.nsfe track 2', path: BIONIC, track: 2, loopFrames: 1120 },
   { name: 'bioniccommando.nsfe track 4', path: BIONIC, track: 4, loopFrames: 3648 },
   { name: 'Gondamin bionic commando.nsf track 2 (no time chunk)', path: GONDAMIN, track: 2, loopFrames: 1120 },
-  { name: 'metroid.nsf track 2 (Brinstar)', path: METROID, track: 2, loopFrames: 2881 },
+  // Metroid's R&D1 driver stalls one frame per loop pass (2881 = 360 * 8 + 1, 2137 = 178 * 12 + 1): one 0Fxx long row per
+  // loop keeps the grid on the onsets for the whole 9000-frame trace (316 / 238 permille before) and the loop exact
+  { name: 'metroid.nsf track 2 (Brinstar)', path: METROID, track: 2, loopFrames: 2881, minGridFit: 950 },
+  { name: 'metroid.nsf track 3', path: METROID, track: 3, loopFrames: 2137, minGridFit: 950 },
+  // tonal voices repeat from frame 2 every 3936 frames (656 rows at 6); only the triangle length/linear counters and the
+  // silent noise registers (stale values from pass 1) differ in raw registers, so no exact raw repeat exists
+  { name: 'bioniccommando.nsfe track 7', path: BIONIC, track: 7, loopFrames: 3936 },
   { name: 'bioniccommando.nsfe track 0 (stops)', path: BIONIC, track: 0, lastSound: 893 },
   { name: 'metroid.nsf track 1 (jingle)', path: METROID, track: 1, lastSound: 511 },
 ].filter((c) => fs.existsSync(c.path));
@@ -136,12 +142,26 @@ describe('NSF loop and end come from the music', { timeout: 300000 }, () => {
       const [end] = ends;
       expect(end.pos, 'end effect in the last order').toBe(sub.ordersLen - 1);
       expect(sub.patLen, 'stats patLen').toBe(st.patLen);
+      if (c.minGridFit) expect(st.gridFit, 'onsets on row starts (permille)').toBeGreaterThanOrEqual(c.minGridFit);
       if (c.loopFrames) {
         expect(end.cmd).toBe(0x0b);
         expect(end.row, 'loop jump on the last row').toBe(sub.patLen - 1);
         expect(end.val, 'jump target').toBe(st.loopOrder);
         const loopRows = (sub.ordersLen - end.val) * sub.patLen;
-        expect(Math.abs(loopRows * framesPerRow - c.loopFrames), 'loop length in frames').toBeLessThanOrEqual(Math.max(...sp));
+        if (sp.length === 1) {
+          // one speed: walk the rows with channel 0's 0Fxx speed changes, the loop is exact in frames
+          let speed = sp[0], frames = 0;
+          for (let pos = 0; pos < sub.ordersLen; pos++) {
+            const rows = sub.channels[0].patterns.get(sub.orders[0][pos])?.rows ?? [];
+            for (let row = 0; row < sub.patLen; row++) {
+              rows[row]?.effects.forEach((e) => { if (e.cmd === 0x0f) speed = e.val; });
+              if (pos >= end.val) frames += speed;
+            }
+          }
+          expect(frames, 'loop length in frames').toBe(c.loopFrames);
+        } else {
+          expect(Math.abs(loopRows * framesPerRow - c.loopFrames), 'loop length in frames').toBeLessThanOrEqual(Math.max(...sp));
+        }
       } else {
         expect(end.cmd, 'a song that stops ends with FF').toBe(0xff);
         expect(st.loopOrder).toBe(-2);
