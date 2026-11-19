@@ -4,7 +4,7 @@
  */
 import { useFormatStore, useTransportStore, useTrackerStore } from '@stores';
 import { FurnaceDispatchEngine } from '../../../engine/furnace-dispatch/FurnaceDispatchEngine';
-import { orderPassLength } from '../vectrex/vectrexCapture';
+import { orderPassLength } from '../orderPassLength';
 import { buildZxBeeperTap, fetchZxBeeperPlayer } from './zxTap';
 import { encodeQuadTone, quadToneFramesFromBatches, quadToneSampleBits, QUADTONE_PLATFORM } from './zxQuadToneData';
 

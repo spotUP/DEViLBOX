@@ -10,7 +10,7 @@ import { buildFamistudioRom, furnaceToFamistudio, type FamistudioMeta } from './
 import { saveFurFileWasm } from '../../import/wasm/FurnaceFileOps';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
 import { switchSubsong } from '../../tracker/subsongSwitch';
-import { orderPassLength } from '../vectrex/vectrexCapture';
+import { orderPassLength } from '../orderPassLength';
 
 const MAX_RECORD_MS = 10 * 60 * 1000;
 
