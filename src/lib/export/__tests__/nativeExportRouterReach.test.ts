@@ -104,6 +104,21 @@ describe('exportNativeSong reaches the existing exporter', () => {
     expect(out!.warnings.join(' ')).toMatch(/converted to a ProTracker MOD/);
   });
 
+  it('amf as the app loads it (no writer): an edited grid comes back as the original with a warning that the edit is missing', async () => {
+    const { useFormatStore } = await import('@stores/useFormatStore');
+    const { baselineOf, setGridBaseline } = await import('@/lib/song/gridBaseline');
+    const rel = 'public/data/songs/formats/avoid.amf';
+    const bytes = readFixture(rel);
+    const base = await load(rel);
+    useFormatStore.setState({ libopenmptFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, uadeEditableFileName: 'avoid.amf' });
+    const song = { ...base, format: 'AMF_DSMI', patterns: structuredClone(base.patterns) } as unknown as TrackerSong;
+    setGridBaseline(baselineOf(song.patterns));
+    const warn = (await exportNativeSong(song))!.warnings.join(' ');
+    expect(warn).not.toMatch(/edits are not included/);
+    song.patterns[0].channels[0].rows[0] = { ...song.patterns[0].channels[0].rows[0], note: 49 };
+    expect((await exportNativeSong(song))!.warnings.join(' ')).toMatch(/edits are not included/);
+  });
+
   it('fur without Neo Geo voices warns instead of returning the original silently', async () => {
     const { parseFurnaceFile } = await import('@lib/import/parsers/FurnaceToSong');
     const bytes = readFixture('public/data/songs/furnace/misc/Inner Machinations YM2610B.fur');

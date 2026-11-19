@@ -27,6 +27,7 @@ import type { TrackerSong } from '@engine/TrackerReplayer';
 import '@lib/formats/EditableFormatRegistry.builtins';
 import { getLayoutExporters, songFormatId, songLayoutFormatId, type LayoutExporterEntry } from '@lib/formats/EditableFormatRegistry';
 import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
+import { gridIsEdited } from '@/lib/song/gridBaseline';
 import { moduleHeldIn } from '@/engine/formatFileDataFields';
 import { furnaceModuleExportAvailable } from './FurnaceModuleExporter';
 
@@ -520,6 +521,8 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
   // (so an edited layout format can never silently export its un-edited original).
   if (!result && !layoutFormatId) {
     result = await rawOriginalBytes(baseName);
+    // No writer exists for this format (amf, psm, ...): the original comes back, so say that the edits are not in it.
+    if (result && gridIsEdited(song.patterns)) result.warnings.push('This format has no export writer: this is the original file, your edits are not included.');
   }
 
   return result;
