@@ -115,7 +115,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   piyoPiyo: 'pass',
   amf: 'fail',
   psm: 'fail',
-  digi: 'fail',
+  digi: 'pass',
   composer667: 'pass',
   stp: 'pass',
   unic: 'pass',

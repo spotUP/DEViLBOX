@@ -326,7 +326,9 @@ const EXPECTED_NO_RIG: string[] = [
  * Hippel ST SOURCE the editor packs for the player (the Compress step of jochenHippelSTGridMatchesPlayer),
  * not a module the 68k player reads. Their sound is held by that test's packed form; here only bytes and grid.
  */
-const NO_RIG_BY_DESIGN = new Set(['formats/astaroth.sog', 'hippel-st/demo music10.sog']);
+const NO_RIG_BY_DESIGN = new Set(['formats/astaroth.sog', 'hippel-st/demo music10.sog', 'digibooster/the day after.digi']);
+// digibooster/the day after.digi: an 8-channel DigiBooster module; UADE has 4 Paula voices and plays it as a stub stream (6 distinct periods in 8 s, none of them the
+// edited cell's period 339 on voice 0), so its render cannot hear a note edit. The file edit is held by the byte diff (one period byte at the cell's offset) and the grid reload.
 /** The loaded file's own render, once per file. */
 async function originalTrace(rig: RigName, rel: string, bytes: Uint8Array, name: string): Promise<Trace | null> {
   if (NO_RIG_BY_DESIGN.has(rel)) return null;
@@ -501,7 +503,6 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   'suntronic|smooth': { unedited: 'G16-sunSmooth: the score has no notes, the song parses to a stub and the router exports a MOD of it', edited: 'G16-sunSmooth: no note to edit' },
   amf: { edited: 'the edit is not written: the exported file equals the original' },
   psm: { edited: 'the edit is not written: the exported file equals the original' },
-  digi: { edited: 'the edited note is not heard in the rendered stream' },
   xm: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed', edited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
   mod: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
   dtm: { unedited: 'the router found no exporter for it (no entry of NATIVE_EXPORTERS or the registry\'s layout exporters matches); an exporter file exists but is not routed' },
