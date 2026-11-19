@@ -34,11 +34,9 @@ describe('play tool', () => {
     expect(transport.currentRow).toBe(0);
   });
 
-  it('song mode after a stop starts at order 0; pattern mode keeps the order position', async () => {
+  it.each(['song', 'pattern'])('%s mode after a stop starts at the current order position, not the song start', async (mode) => {
     useTrackerStore.setState({ currentPositionIndex: 2 });
-    await play({ mode: 'pattern' });
+    await play({ mode });
     expect(useTrackerStore.getState().currentPositionIndex).toBe(2);
-    await play({ mode: 'song' });
-    expect(useTrackerStore.getState().currentPositionIndex).toBe(0);
   });
 });

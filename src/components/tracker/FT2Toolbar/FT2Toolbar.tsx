@@ -400,8 +400,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     }
 
     setIsLooping(false);
+    // Play Song starts at row 0 of the current order position, not the song start.
     setCurrentRow(0);
-    setCurrentPosition(0);
     await engine.init();
 
     // WASM singleton engines (MusicLine, JamCracker): skip engine.stop()+delay.
