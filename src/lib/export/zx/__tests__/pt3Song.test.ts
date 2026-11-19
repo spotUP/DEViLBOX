@@ -91,4 +91,26 @@ describe('furnaceToPt3', () => {
     const tap = buildZxPt3Tap(furnaceToPt3(tinyModule()).module, player, 'tiny');
     expect(tap.length).toBeGreaterThan(200);
   });
+  it('plays the volume macro release tail after a note release instead of cutting the note', () => {
+    // Furnace std.release(): the macro leaves its release step and runs the tail; 253 is the hard note off.
+    // Raw cell notes: 100 note off, 101 note release, 102 macro release.
+    const withRelease = (nv: number): FurnaceModule => {
+      const mod = Object.assign(tinyModule(), { instruments: [{ macros: [{ code: 0, length: 4, loop: -1, release: 1, delay: 0, speed: 1, data: [15, 15, 8, 4] }] }] });
+      (mod.patterns.get('0_0_0') as unknown as { rows: { note: number }[] }).rows[2].note = nv;
+      return mod;
+    };
+    const released = furnaceToPt3(withRelease(102));
+    expect(released.lossy.filter((x) => x.includes('note cut'))).toEqual([]);
+    expect(Buffer.from(released.module).equals(Buffer.from(furnaceToPt3(withRelease(100)).module))).toBe(false);
+    expect(Buffer.from(furnaceToPt3(withRelease(101)).module).equals(Buffer.from(released.module))).toBe(true);
+  });
+  it('falls back to the unbent sample once bent notes fill the 31 PT3 samples', () => {
+    const mod = Object.assign(tinyModule(), { instruments: [{ macros: [{ code: 0, length: 1, loop: -1, delay: 0, speed: 1, data: [15] }, { code: 4, length: 3, loop: -1, delay: 0, speed: 1, data: [0, 40, 80] }] }] });
+    const rows = Array.from({ length: 64 }, (_, r) => ({ note: 24 + r, instrument: 0, volume: -1, effects: [] }));
+    mod.patterns.set('0_0_0', { rows } as never);
+    Object.assign(mod.subsongs[0], { patLen: 64 });
+    const r = furnaceToPt3(mod);
+    expect(r.lossy.join(' | ')).toContain('pitch macro on some notes (dropped so the module fits)');
+    expect(r.module.length).toBeGreaterThan(0);
+  });
 });
