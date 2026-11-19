@@ -20,7 +20,10 @@ const FRAMES = 1200; // 20 s at 60 Hz
 // Owner report 2026-11-19 (Metroid Brinstar: "patterns roll very fast and notes are spread out"); outside the repo, run only when present
 const METROID = '/Users/spot/Downloads/Metroid (EMU).zophar/Metroid (1986-08)(Nintendo R&D1)(Nintendo).nsf';
 
-type Case = { file: string; track: number; chip: string; chans: number[]; frames?: number; path?: string };
+// Owner report 2026-11-19 ("too high speed with spread out notes"): noise-channel triplets and flams dragged the row to 1 or 3 frames
+const BIONIC = '/Users/spot/Downloads/NSFE/bioniccommando.nsfe';
+
+type Case = { file: string; track: number; chip: string; chans: number[]; frames?: number; path?: string; speed?: number };
 
 const CASES: Case[] = [
   { file: 'dr mario.nsf', track: 0, chip: '2A03', chans: [0, 1, 2] },
@@ -32,6 +35,10 @@ const CASES: Case[] = [
   { file: 'gimmick!.nsf', track: 0, chip: 'S5B', chans: [5, 6, 7] },
 ];
 if (fs.existsSync(METROID)) CASES.push({ file: 'metroid.nsf', path: METROID, track: 2, chip: '2A03 Brinstar', chans: [0, 1, 2], frames: 5760 });
+if (fs.existsSync(BIONIC)) {
+  CASES.push({ file: 'bioniccommando.nsfe', path: BIONIC, track: 0, chip: '2A03 Bionic Commando', chans: [0, 1, 2], frames: 1800, speed: 7 });
+  CASES.push({ file: 'bioniccommando.nsfe', path: BIONIC, track: 1, chip: '2A03 Bionic Commando', chans: [0, 1, 2], frames: 1800, speed: 6 });
+}
 
 beforeAll(async () => {
   installFurnaceFileOpsWasm();
@@ -63,6 +70,7 @@ describe('NSF to editable Furnace song', { timeout: 120000 }, () => {
       console.log(`${c.chip} ${c.file}: speed ${song.initialSpeed}, orders ${song.songPositions.length}, patterns ${song.patterns.length}, channel patterns ${st.channelPatterns}, instruments ${song.instruments.length}, cells/64 rows ${per64.toFixed(1)}, grid fit ${(st.gridFit / 10).toFixed(1)}%, parity ${(st.parity / 10).toFixed(1)}% (${st.matchFrames}/${st.activeFrames}), DPCM ${st.dpcmHits}/${st.dpcmTrigs}, notes ${perChan.join('/')}`);
       expect(perChan.filter((n) => n > 0).length, `${c.chip} channels with notes`).toBeGreaterThanOrEqual(c.chip === 'N163' ? 2 : Math.min(2, c.chans.length));
       expect(song.initialSpeed).toBe(st.speed);
+      if (c.speed) expect(st.speed, `${c.chip} frames per row`).toBe(c.speed);
       expect(st.parity, `${c.chip} per-frame parity (permille)`).toBeGreaterThanOrEqual(950);
       // shortcut: a second DPCM trigger inside one row is dropped (one note per row); measured, 2 of 123 on VRC6
       expect(st.dpcmHits * 100, 'DPCM triggers kept').toBeGreaterThanOrEqual(st.dpcmTrigs * 98);

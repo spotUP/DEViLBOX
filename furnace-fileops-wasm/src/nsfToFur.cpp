@@ -7,7 +7,7 @@
  * DivSong: one channel per voice (2A03 + DPCM, then VRC6, VRC7, FDS, MMC5,
  * N163, S5B when the NSF header names them). Compaction (Phase 3): the song
  * speed S is the largest frames-per-row that divides >= 85% of the gaps
- * between note onsets in each channel (see the row grid comment); each note's per-frame volume/arpeggio/fine pitch/duty becomes
+ * between note onsets in the median channel (see the row grid comment); each note's per-frame volume/arpeggio/fine pitch/duty becomes
  * instrument macros (shared by content), off-grid onsets get EDxx, identical
  * pattern blocks share an index. fur_save then writes it, so the import goes
  * through the one .fur load path.
@@ -27,6 +27,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -417,13 +418,32 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
 
   // Row grid. Channels often sit at different phases of one tempo, so the row length comes from
   // the gaps between onsets inside each channel: S is the largest frames-per-row (2..20) that
-  // divides >= 85% of those gaps. A smaller divisor of S that also puts >= 90% of all onsets on
-  // one phase wins (fewer EDxx delays); else the dominant phase of S is used. No fit: S = 1.
-  std::vector<int> gaps;
+  // divides >= 85% of the gaps in the median voice (and >= 70% of all gaps), so one voice's
+  // triplets or drum flams cannot veto the row the other voices follow. Only when S puts < 90% of
+  // all onsets, and of the median voice's onsets, on one phase does a smaller divisor that does win (fewer EDxx delays); a divisor of
+  // an S that already fits would just double the rows. Else the dominant phase of S. No fit: S = 1.
+  std::vector<std::vector<int>> gaps(nCh);
+  size_t nGaps = 0;
   for (int ci = 0; ci < nCh; ci++) {
     int last = -1;
-    for (int f = 0; f < n; f++) if (onset[ci][f]) { if (last >= 0) gaps.push_back(f - last); last = f; }
+    for (int f = 0; f < n; f++) if (onset[ci][f]) { if (last >= 0) gaps[ci].push_back(f - last); last = f; }
+    nGaps += gaps[ci].size();
   }
+  auto gapFit = [&](int s) {
+    std::vector<int> pm;
+    long long hit = 0;
+    for (const auto& g: gaps) {
+      int h = 0;
+      for (int x: g) h += x % s == 0;
+      hit += h;
+      if (g.size() >= 4) pm.push_back((int)(1000LL * h / (long long)g.size()));
+    }
+    if (1000LL * hit < 700LL * (long long)nGaps) return false;
+    if (pm.empty()) return 1000LL * hit >= 850LL * (long long)nGaps;
+    std::sort(pm.begin(), pm.end());
+    const size_t m = pm.size();
+    return (m % 2 ? pm[m / 2] : (pm[m / 2 - 1] + pm[m / 2]) / 2) >= 850;
+  };
   auto phaseFit = [&](int s, int& bp) {
     std::vector<int> h(s, 0);
     for (int f: allOn) h[f % s]++;
@@ -431,13 +451,25 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
     for (int p = 1; p < s; p++) if (h[p] > h[bp]) bp = p;
     return (int)(1000LL * h[bp] / (long long)allOn.size());
   };
+  // median over voices of the share of onsets on phase bp: sub-row drum hits in one voice do not count against S
+  auto medPhase = [&](int s, int bp) {
+    std::vector<int> pm;
+    for (int ci = 0; ci < nCh; ci++) {
+      int on = 0, hit = 0;
+      for (int f = 0; f < n; f++) if (onset[ci][f]) { on++; hit += f % s == bp; }
+      if (on >= 4) pm.push_back((int)(1000LL * hit / on));
+    }
+    if (pm.empty()) return 0;
+    std::sort(pm.begin(), pm.end());
+    const size_t m = pm.size();
+    return m % 2 ? pm[m / 2] : (pm[m / 2 - 1] + pm[m / 2]) / 2;
+  };
   int S = 1, phase = 0, fitPm = 1000;
-  if (!gaps.empty()) {
+  if (nGaps) {
     for (int s = 20; s >= 2 && S == 1; s--) {
-      int hit = 0;
-      for (int g: gaps) hit += g % s == 0;
-      if (1000LL * hit < 850LL * (long long)gaps.size()) continue;
+      if (!gapFit(s)) continue;
       S = s; fitPm = phaseFit(s, phase);
+      if (fitPm >= 900 || medPhase(s, phase) >= 900) break;
       for (int d = s / 2; d >= 2; d--) {
         int bp;
         const int pm = s % d ? 0 : phaseFit(d, bp);
@@ -445,15 +477,59 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
       }
     }
   }
-  // Pad < S frames of silence in front so the dominant phase falls on row starts.
-  const int pad = (S - phase) % S;
-  const int R = (n + pad + S - 1) / S;
-  sub->speeds.val[0] = S; sub->speeds.len = 1;
+  // Rows as a repeating speed pattern (the .fur speeds array, up to 16 entries); integer S is {S}.
+  // Tempo-accumulator drivers step rows every P/k frames, a non-integer row length, so the onsets fit
+  // no integer >= 4 and the search above falls to 1..3 (fast rows, notes many rows apart). Then a
+  // k-row pattern over P frames - row starts floor(i*P/k), or any two-row swing - that puts
+  // >= kPatFit of all onsets on row starts wins, longest mean row first.
+  const int kPatFit = 900;
+  std::vector<int> sp(1, S);
+  if (S < 4 && allOn.size() >= 16) {
+    struct Cand { int P, k, a; }; // a > 0: two-row swing {0, a}
+    std::vector<Cand> cands;
+    for (int k = 2; k <= 16; k++)
+      for (int P = std::max(4 * k, S * k + 1); P <= 20 * k; P++)
+        if (std::gcd(P, k) == 1) cands.push_back({P, k, 0});
+    for (int P = std::max(8, 2 * S + 1); P <= 40; P++)
+      for (int a = 2; 2 * a < P; a++) if (P - a <= 20) cands.push_back({P, 2, a});
+    std::stable_sort(cands.begin(), cands.end(), [](const Cand& x, const Cand& y) { return x.P * y.k > y.P * x.k; });
+    std::vector<int> h;
+    for (const Cand& cd: cands) {
+      std::vector<int> st0;
+      if (cd.a) st0 = {0, cd.a};
+      else for (int i = 0; i < cd.k; i++) st0.push_back(i * cd.P / cd.k);
+      h.assign(cd.P, 0);
+      for (int f: allOn) h[f % cd.P]++;
+      int best = -1, bp = 0;
+      for (int p = 0; p < cd.P; p++) {
+        int hit = 0;
+        for (int x: st0) hit += h[(x + p) % cd.P];
+        if (hit > best) { best = hit; bp = p; }
+      }
+      const int pm = (int)(1000LL * best / (long long)allOn.size());
+      if (pm < kPatFit) continue;
+      sp.clear();
+      for (int i = 0; i < cd.k; i++) sp.push_back((i + 1 < cd.k ? st0[i + 1] : cd.P) - st0[i]);
+      S = sp[0]; phase = bp; fitPm = pm;
+      break;
+    }
+  }
+  const int K = (int)sp.size();
+  std::vector<int> cum(K + 1, 0);
+  for (int i = 0; i < K; i++) cum[i + 1] = cum[i] + sp[i];
+  const int P = cum[K];
+  auto rowStart = [&](int r) { return r / K * P + cum[r % K]; };
+  auto rowOf = [&](int vf) { int i = 0; while (cum[i + 1] <= vf % P) i++; return vf / P * K + i; };
+  // Pad < P frames of silence in front so the dominant phase falls on row starts.
+  const int pad = (P - phase) % P;
+  const int R = rowOf(n + pad - 1) + 1;
+  for (int i = 0; i < K; i++) sub->speeds.val[i] = (unsigned short)sp[i];
+  sub->speeds.len = (unsigned char)K;
   sub->ordersLen = (R + patLen - 1) / patLen;
 
   struct Cell { short note = -1, ins = -1, fx = -1, fxv = -1; };
   std::vector<std::vector<Cell>> cells(nCh, std::vector<Cell>(R));
-  auto place = [&](Cell& cl, int vf) { if (vf % S) { cl.fx = 0xED; cl.fxv = (short)(vf % S); } };
+  auto place = [&](Cell& cl, int vf) { const int o = vf - rowStart(rowOf(vf)); if (o) { cl.fx = 0xED; cl.fxv = (short)o; } };
 
   // Segments: one note per row start; frames until the next start fold into macros.
   struct Seg { int ci, tmpl, len; std::vector<int> vol, arp, pit, duty; Cell* cell; };
@@ -468,7 +544,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
       for (int f = 0; f < n; f++) {
         if (!a[f].trig) continue;
         dpcmTrigs++;
-        const int vf = f + pad, row = vf / S;
+        const int vf = f + pad, row = rowOf(vf);
         // shortcut: a second trigger in one row is dropped (a cell holds one note); upgrade with 0Cxx retrigger if a song needs it
         if (row == lastRow) continue;
         lastRow = row; dpcmHits++;
@@ -486,16 +562,16 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
     }
     std::vector<int> starts;
     for (int f = 0; f < n; f++)
-      if (onset[ci][f] && (starts.empty() || (f + pad) / S != (starts.back() + pad) / S)) starts.push_back(f);
+      if (onset[ci][f] && (starts.empty() || rowOf(f + pad) != rowOf(starts.back() + pad))) starts.push_back(f);
     for (size_t si = 0; si < starts.size(); si++) {
       const int s = starts[si], e = si + 1 < starts.size() ? starts[si + 1] : n;
       int lastOn = s;
       for (int f = s; f < e; f++) if (a[f].on) lastOn = f;
       int end = lastOn + 1; // macro covers [s, end)
-      const int row = (s + pad) / S;
+      const int row = rowOf(s + pad);
       if (end < e) {
-        const int offRow = (end + pad) / S;
-        const bool free = offRow != row && (si + 1 >= starts.size() || offRow != (e + pad) / S);
+        const int offRow = rowOf(end + pad);
+        const bool free = offRow != row && (si + 1 >= starts.size() || offRow != rowOf(e + pad));
         if (free) { Cell& off = cells[ci][offRow]; off.note = DIV_NOTE_OFF; place(off, end + pad); }
         else if (k != K_VRC7) end = e; // gap becomes volume 0 in the macro
       }
@@ -607,13 +683,13 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
     if (chans[ci].idx < 0 || k == K_DPCM) continue;
     bool playing = false;
     int ins = -1, base = 0, t0 = 0;
-    for (int vf = 0; vf < R * S; vf++) {
-      const int row = vf / S;
+    for (int vf = 0, row = 0; vf < rowStart(R); vf++) {
+      if (vf >= rowStart(row + 1)) row++;
       {
         DivPattern* p = sub->pat[ci].getPattern(sub->orders.ord[ci][row / patLen], false);
         const short* cl = p->newData[row % patLen];
         const int d = cl[DIV_PAT_FX(0)] == 0xED ? cl[DIV_PAT_FXVAL(0)] : 0;
-        if (vf % S == d) {
+        if (vf - rowStart(row) == d) {
           if (cl[DIV_PAT_NOTE] == DIV_NOTE_OFF) playing = false;
           else if (cl[DIV_PAT_NOTE] >= 0) {
             playing = true; base = cl[DIV_PAT_NOTE]; t0 = vf;
@@ -643,7 +719,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   int* st = g_nsfStats;
   st[0] = S; st[1] = phase; st[2] = fitPm; st[3] = active ? (int)(1000 * match / active) : 1000;
   st[4] = (int)match; st[5] = (int)active; st[6] = dpcmHits; st[7] = dpcmTrigs;
-  st[8] = chanPats; st[9] = sub->ordersLen; st[10] = (int)song.ins.size();
+  st[8] = chanPats; st[9] = sub->ordersLen; st[10] = (int)song.ins.size(); st[12] = K; st[13] = P;
   } // tracks
   if (n163Sys >= 0) song.systemFlags[n163Sys].set("channels", n163Max - 1);
   // instrument column is one byte in .fur; more than 256 cannot be saved
