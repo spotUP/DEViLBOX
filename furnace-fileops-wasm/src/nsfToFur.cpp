@@ -73,6 +73,41 @@ bool hzToNote(double f, int& note, int& fine) {
   return true;
 }
 
+// Furnace's 2A03/MMC5 period for a linear-pitch offset (note*128+fine): DivPitchTable
+// (engine/pitchTable.cpp, tuning 440, clock COLOR_NTSC/2, divider 16, max 0x800) then
+// freq-- (platform/nes.cpp). Furnace interpolates the period linearly inside a semitone
+// from rounded per-semitone roots, so a continuous log2 fine misses by one step.
+struct FurPeriodTable {
+  int pitch[13], diff[12], shift = 0;
+  FurPeriodTable() {
+    const double clock = 315000000.0 / 88.0 / 2.0, tun = 440.0 * 0.0625;
+    auto bf = [&](int nbase) { return (int)std::lround((clock / (tun * std::pow(2.0, (double)(float)(nbase + 3) / 12.0))) / 16.0); };
+    while (shift < 14 && bf((shift - 4) * 12) > 0x800) shift++;
+    for (int i = 0; i <= 12; i++) pitch[i] = bf(i + (shift - 5) * 12);
+    for (int i = 0; i < 12; i++) diff[i] = pitch[i + 1] - pitch[i];
+  }
+  static int shr(int v, int o) { const bool c = v & (1 << (o - 1)); v >>= o; return c ? v + 1 : v; }
+  int reg(int off) const {
+    const int coarse = std::max(0, off >> 7), fine = off & 127, oct = coarse / 12 - shift;
+    if (oct < 0) return 0x7ff;
+    int root = pitch[coarse % 12], d = diff[coarse % 12];
+    if (oct > 0) { root = shr(root, oct); d = shr(d, oct); }
+    return std::clamp(root + ((d * fine) >> 7) - 1, 0, 0x7ff);
+  }
+};
+
+// Note and fine whose Furnace 2A03/MMC5 period register equals p (nearest to the log2 estimate).
+bool periodToNote(int p, int& note, int& fine) {
+  static const FurPeriodTable t;
+  if (!hzToNote(kCpu / (16.0 * (p + 1)), note, fine)) return false;
+  const int est = note * 128 + fine;
+  int best = est, bestD = 1 << 30;
+  for (int off = std::max(0, est - 256); off <= est + 256; off++)
+    if (t.reg(off) == p && std::abs(off - est) < bestD) { bestD = std::abs(off - est); best = off; }
+  note = (best + 64) >> 7; fine = best - note * 128;
+  return note >= 0 && note <= 179;
+}
+
 enum Kind { K_SQ, K_TRI, K_NOISE, K_DPCM, K_VRC6_SQ, K_VRC6_SAW, K_VRC7, K_FDS, K_MMC5_SQ, K_N163, K_S5B };
 
 struct Chan { Kind kind; int idx; };
@@ -136,7 +171,7 @@ V voice(Builder& b, const Chan& ch, const uint16_t* o, const uint16_t* prev, int
       const uint16_t* s = o + (ch.kind == K_SQ ? (ch.idx ? T_SQ2 : T_SQ1) : T_MMC5 + ch.idx * 8);
       const int period = s[7], vol = s[5];
       if (!s[6] || !vol || period < 8) break;
-      if (!hzToNote(kCpu / (16.0 * (period + 1)), v.note, v.fine)) break;
+      if (!periodToNote(period, v.note, v.fine)) break;
       v.on = true; v.vol = vol;
       insOut = pulseIns(b, ch.kind == K_SQ ? "2A03" : "MMC5", DIV_INS_NES); v.duty = s[0] >> 6;
       break;
@@ -144,7 +179,7 @@ V voice(Builder& b, const Chan& ch, const uint16_t* o, const uint16_t* prev, int
     case K_TRI: {
       const uint16_t* s = o + T_TRI;
       if (!s[6] || !s[4] || !s[5] || s[7] < 2) break;
-      if (!hzToNote(kCpu / (32.0 * (s[7] + 1)), v.note, v.fine)) break;
+      if (!periodToNote(s[7], v.note, v.fine)) break; // Furnace writes the same table to $400A/B
       v.on = true; v.vol = 15; // triangle: on/off only
       insOut = b.ins("2A03 triangle", [](DivInstrument& i) { i.type = DIV_INS_NES; i.name = "2A03 triangle"; });
       break;
