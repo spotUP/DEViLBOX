@@ -600,6 +600,23 @@ def emit_file_table(companions, outdir, module_name='module', extra_files=(),
     return entries, len(blob)
 
 
+def epopt_asm(entry, label):
+    """vasm lines for one song's eagleplayer options: `dc.w byte count` then
+    the NUL-separated `epopt=` values from its eagleplayer.conf line, exactly
+    the buffer uadecore's get_info_for_ep() hands back for 'eagleoptions'.
+    PTK-Prowiz refuses every module (CHECKERROR, silence) without its
+    type:xxx option, so this is not optional for the most common format."""
+    opts = [f[len('epopt='):] for f in entry.get('flags', []) if f.startswith('epopt=')]
+    assert all('"' not in o for o in opts), opts
+    body = ''.join(f'"{o}",0,' for o in opts).rstrip(',')
+    size = sum(len(o.encode('latin-1')) + 1 for o in opts)
+    out = [f"{label}:  dc.w    {size}"]
+    if body:
+        out.append(f"        dc.b    {body}")
+    out.append("        even")
+    return out
+
+
 def _truncated(s, limit=31):
     """Truncate to LIMIT bytes plus a NUL -- an unbounded string written into a
     fixed-width table on the Amiga side is a buffer overrun waiting to happen,
@@ -825,6 +842,7 @@ def stage_songs(songs, outdir, uade_root, vendor_from=None, target_cpu=None,
         staged.append({
             'index': i, 'filename': module, 'player': player_name,
             'player_index': player_order.index(player_name),
+            'entry': entry,
             'module_offset': offset, 'module_bytes': mod_bytes,
             'reloc_bytes': reloc, 'subsong': song.get('subsong', 0),
             'title': song.get('title', ''),
@@ -907,6 +925,12 @@ def stage_songs(songs, outdir, uade_root, vendor_from=None, target_cpu=None,
             modname = os.path.basename(sng['filename']).replace('"', '')
             fh.write(f'uade_song_name_{sng["index"]}:  dc.b    "{modname}",0\n')
             fh.write("        even\n")
+        # Per-song eagleplayer options, indexed by _uade_cur_song.
+        fh.write("uade_epopt_table:\n")
+        for sng in staged:
+            fh.write(f"        dc.l    uade_epopt_{sng['index']}\n")
+        for sng in staged:
+            fh.write('\n'.join(epopt_asm(sng['entry'], f"uade_epopt_{sng['index']}")) + '\n')
     print(f"uade_stage: {len(staged)} songs, {len(player_order)} players, "
           f"arena {arena_max} chip / {any_max} any")
     return staged
@@ -1119,7 +1143,9 @@ def main():
             f"UADE_MODULE_BYTES       equ     {mod_bytes}\n"
             f"UADE_RELOC_BYTES        equ     {reloc_rounded}\n"
             f"UADE_POOL_BYTES         equ     {args.pool_bytes}\n"
-            f"UADE_ANY_BYTES          equ     {args.any_bytes}\n")
+            f"UADE_ANY_BYTES          equ     {args.any_bytes}\n"
+            "uade_epopt_table:  dc.l    uade_epopt_0\n"
+            + '\n'.join(epopt_asm(entry, 'uade_epopt_0')) + '\n')
     # Content-compare so an unchanged stage does not retrigger the link.
     if os.path.exists(inc) and open(inc).read() == open(tmp).read():
         os.unlink(tmp)

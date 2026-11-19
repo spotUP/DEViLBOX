@@ -651,6 +651,45 @@ _uade_resume:
         movem.l (sp)+,d0-d7/a0-a6
         rts
 
+; uade_answer_get_info -- answer score's AMIGAMSG_GET_INFO, as uadecore's
+; get_info_for_ep() does (uade-3.05/src/uade.c). Window: +4 query string,
+; +8 reply buffer, +12 buffer size in / reply length out (-1 = unknown or too
+; long). The only query is 'eagleoptions': the current song's epopt= values from
+; eagleplayer.conf, staged as uade_epopt_N (dc.w size, NUL-separated strings).
+; Without it PTK-Prowiz never gets type:pt30, its Chk fails, score answers
+; CHECKERROR and every ProTracker module boots to PLAY in silence.
+; Called from uade_msg_trap with all registers already saved.
+uade_answer_get_info:
+        movea.l UADE_MSG+4,a0
+        lea     .q(pc),a1
+.cmp:   move.b  (a1)+,d0
+        cmp.b   (a0)+,d0
+        bne.b   .unknown
+        tst.b   d0
+        bne.b   .cmp
+        moveq   #0,d1
+        ifd     UADE_SONG_COUNT
+        move.w  _uade_cur_song(pc),d1
+        endif
+        lsl.l   #2,d1
+        lea     uade_epopt_table,a0
+        movea.l (a0,d1.l),a0
+        moveq   #0,d0
+        move.w  (a0)+,d0
+        cmp.l   UADE_MSG+12,d0
+        bgt.b   .unknown
+        move.l  d0,UADE_MSG+12
+        movea.l UADE_MSG+8,a1
+        bra.b   .cpend
+.cp:    move.b  (a0)+,(a1)+
+.cpend: dbf     d0,.cp
+        rts
+.unknown:
+        move.l  #-1,UADE_MSG+12
+        rts
+.q:     dc.b    'eagleoptions',0
+        even
+
 ; uade_die -- score has crashed, been rejected, or failed to relocate. Upstream
 ; spins forever (flashloop / reloc_wait_forever / default_exception); here the
 ; demo is still running and must get its machine back.
@@ -2406,7 +2445,12 @@ uade_msg_trap:
         adda.l  d1,a1
         bra     .copystr
 .not_general:
-        ; Everything else -- TIME_CRITICAL (no hardware equivalent), GET_INFO,
+        cmpi.l  #AMSG_GET_INFO,d0
+        bne.b   .not_getinfo
+        bsr     uade_answer_get_info
+        bra     .done
+.not_getinfo:
+        ; Everything else -- TIME_CRITICAL (no hardware equivalent),
         ; NTSC, the STATE_DETECTION pair, TEST_LOGGING, DEBUG_U32_STRING, RESERVED_0
         ; -- is deliberately a no-op here. LOADFILE / READ / FILESIZE land here
         ; too and answer "not found" until the DTP_ExtLoad file table lands

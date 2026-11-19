@@ -32,6 +32,23 @@ def run(cmd, **kw):
     return r.stdout
 
 
+# PTK-Prowiz Chk (EP_PTK-Prowiz.s:90) does `move.w #-1,pt_chkfail`, but pt_chkfail
+# is a dc.b at an odd offset (hunk 0 +$1F7B). UADE emulates a 68020, where that is
+# legal; a 68000 takes an address error (measured: ADRE, PC $1D430, access $1EF83).
+# move.b #-1 is the same length, keeps the reloc at the same offset, and is
+# equivalent: the word store's second byte (pt_restart) is cleared on the next line.
+PTK_CHKFAIL_WORD = bytes.fromhex('33fcffff00001f7b')
+PTK_CHKFAIL_BYTE = bytes.fromhex('13fc00ff00001f7b')
+
+
+def patch_player_for_68000(path):
+    b = open(path, 'rb').read()
+    if b.count(PTK_CHKFAIL_WORD) == 1:
+        open(path, 'wb').write(b.replace(PTK_CHKFAIL_WORD, PTK_CHKFAIL_BYTE))
+    elif PTK_CHKFAIL_BYTE not in b:
+        sys.exit(f'{path}: PTK-Prowiz pt_chkfail store not found; the player changed, re-check its 68000 safety')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--module', required=True, help='module file; stage it from a directory holding only it')
@@ -44,6 +61,8 @@ def main():
     print(run([sys.executable, os.path.join(HERE, 'tools', 'uade_stage.py'), '--module', a.module,
                '--uade-root', UADE_ROOT, '--outdir', stage,
                '--pool-bytes', str(POOL_BYTES), '--any-bytes', str(ANY_BYTES)]).strip())
+
+    patch_player_for_68000(os.path.join(stage, 'current.uadeplayer'))
 
     # The slot: UADE_MODULE_BYTES sizes the arena for the largest module the slot
     # takes; _uade_module_len carries the real length and is what the browser patches.
