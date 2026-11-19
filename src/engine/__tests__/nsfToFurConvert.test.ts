@@ -102,25 +102,55 @@ function nsfToNsfe(nsf: Uint8Array): Uint8Array {
 // Owner report 2026-11-19 ("audio in channel 1 3 4 only, or it varies"): the NSFe time chunk ends
 // track 2 at 2301 frames (row 329 of 384), and the empty tail of the last pattern played for 6 s
 // before the restart, holding or dropping voices. The song must break at its last traced row.
-if (fs.existsSync(BIONIC)) describe('NSF song end', { timeout: 120000 }, () => {
-  it('bioniccommando.nsfe track 2 ends at the traced length, not at the pattern end', async () => {
-    const { nsfToFurWasm, NSF_DEFAULT_FRAMES } = await import('../../lib/import/wasm/FurnaceFileOps');
-    const { parseFurnaceFile } = await import('../../lib/import/parsers/FurnaceToSong');
-    const fur = await nsfToFurWasm(new Uint8Array(fs.readFileSync(BIONIC)), 2, NSF_DEFAULT_FRAMES);
-    const song = await parseFurnaceFile(fur, 'bioniccommando.fur');
-    let rows = 0;
-    for (const pi of song.songPositions) {
-      const p = song.patterns[pi];
-      const brk = Array.from({ length: p.length }, (_, r) => r)
-        .find((r) => p.channels.some((ch) => ch.rows[r]?.effTyp === 0x0d || ch.rows[r]?.effTyp2 === 0x0d));
-      rows += brk === undefined ? p.length : brk + 1;
-      if (brk !== undefined) break;
-    }
-    const traced = Math.round((38283 * 60.0988) / 1000); // NSFe time chunk, track 2
-    const frames = rows * song.initialSpeed;
-    expect(frames, 'played frames per loop').toBeGreaterThanOrEqual(traced);
-    expect(frames, 'played frames per loop').toBeLessThan(traced + 2 * song.initialSpeed + 8);
-  });
+// Owner report 2026-11-19: imports played a silent tail before the loop (fixed 64-row patterns, the
+// loop never on a pattern boundary). The grid now comes from the music: the trace loop (voice state
+// repeat) or the last sound sets the pattern length, the song ends with 0Bxx to the loop-start order,
+// or FF00 for a song that stops. Expected loops come from an independent GME register-trace loop
+// finder (frames at 60.0988 Hz). Files outside the repo: run only when present.
+const GONDAMIN = '/Users/spot/Downloads/Nintendo Sound Format/Gondamin/bionic commando.nsf';
+type EndCase = { name: string; path: string; track: number; loopFrames?: number; lastSound?: number };
+const END_CASES: EndCase[] = [
+  { name: 'bioniccommando.nsfe track 2', path: BIONIC, track: 2, loopFrames: 1120 },
+  { name: 'bioniccommando.nsfe track 4', path: BIONIC, track: 4, loopFrames: 3648 },
+  { name: 'Gondamin bionic commando.nsf track 2 (no time chunk)', path: GONDAMIN, track: 2, loopFrames: 1120 },
+  { name: 'metroid.nsf track 2 (Brinstar)', path: METROID, track: 2, loopFrames: 2881 },
+  { name: 'bioniccommando.nsfe track 0 (stops)', path: BIONIC, track: 0, lastSound: 893 },
+  { name: 'metroid.nsf track 1 (jingle)', path: METROID, track: 1, lastSound: 511 },
+].filter((c) => fs.existsSync(c.path));
+
+describe('NSF loop and end come from the music', { timeout: 300000 }, () => {
+  for (const c of END_CASES) {
+    it(`${c.name}: one end effect on the last played row, no silent tail`, async () => {
+      const { nsfToFurWasm, nsfLastStatsWasm, loadFurFileWasm, NSF_DEFAULT_FRAMES } = await import('../../lib/import/wasm/FurnaceFileOps');
+      const fur = await nsfToFurWasm(new Uint8Array(fs.readFileSync(c.path)), c.track, NSF_DEFAULT_FRAMES);
+      const st = await nsfLastStatsWasm();
+      const sub = (await loadFurFileWasm(fur)).nativeData.subsongs[0];
+      const sp = sub.speedPattern?.length ? sub.speedPattern : [sub.speed1];
+      const framesPerRow = sp.reduce((a, b) => a + b, 0) / sp.length;
+      const ends: { pos: number; row: number; cmd: number; val: number }[] = [];
+      for (let pos = 0; pos < sub.ordersLen; pos++) {
+        sub.channels.forEach((ch, ci) => ch.patterns.get(sub.orders[ci][pos])?.rows.forEach((r, row) =>
+          r.effects.forEach((e) => { if (e.cmd === 0x0b || e.cmd === 0x0d || e.cmd === 0xff) ends.push({ pos, row, ...e }); })));
+      }
+      expect(ends.length, 'one end effect').toBe(1);
+      const [end] = ends;
+      expect(end.pos, 'end effect in the last order').toBe(sub.ordersLen - 1);
+      expect(sub.patLen, 'stats patLen').toBe(st.patLen);
+      if (c.loopFrames) {
+        expect(end.cmd).toBe(0x0b);
+        expect(end.row, 'loop jump on the last row').toBe(sub.patLen - 1);
+        expect(end.val, 'jump target').toBe(st.loopOrder);
+        const loopRows = (sub.ordersLen - end.val) * sub.patLen;
+        expect(Math.abs(loopRows * framesPerRow - c.loopFrames), 'loop length in frames').toBeLessThanOrEqual(Math.max(...sp));
+      } else {
+        expect(end.cmd, 'a song that stops ends with FF').toBe(0xff);
+        expect(st.loopOrder).toBe(-2);
+        const played = (end.pos * sub.patLen + end.row + 1) * framesPerRow;
+        expect(played, 'ends at the last sound, no silent tail').toBeLessThanOrEqual(c.lastSound! + Math.max(...sp) + 1);
+        expect(played, 'keeps the music').toBeGreaterThan(c.lastSound! / 2);
+      }
+    });
+  }
 });
 
 describe('NSFe input', { timeout: 120000 }, () => {

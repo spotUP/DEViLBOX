@@ -278,13 +278,16 @@ V voice(Builder& b, const Chan& ch, const uint16_t* o, const uint16_t* prev, int
 
 /**
  * Build song from NSF bytes: `track` 0-based, or -1 for every track (one subsong each, sharing
- * instruments, samples and waves). `frames` = PLAY calls to record per track when the file gives
- * no length (NSFe `time` chunk wins), `patLen` rows per pattern. Returns false and sets err on failure.
+ * instruments, samples and waves). `frames` = PLAY calls to trace per track at least (twice the
+ * NSFe `time` chunk when that is longer); the song loop or end found in the trace sets the length.
+ * `prefLen` = preferred rows per pattern; the grid picks one that fits the loop. Returns false and
+ * sets err on failure.
  */
-bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int frames, int patLen, std::string& err) {
-  if (patLen < 1 || patLen > DIV_MAX_ROWS) patLen = 64;
+bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int frames, int prefLen, std::string& err) {
+  if (prefLen < 1 || prefLen > DIV_MAX_ROWS) prefLen = 64;
+  const int kMaxFrames = 64 * DIV_MAX_PATTERNS;
   if (frames < 1) frames = 1;
-  if (frames > patLen * DIV_MAX_PATTERNS) frames = patLen * DIV_MAX_PATTERNS;
+  if (frames > kMaxFrames) frames = kMaxFrames;
   // NSFe is a chunked NSF; after load both run the same Nsf_Emu core.
   const bool nsfe = len >= 4 && !memcmp(data, "NSFE", 4);
   std::unique_ptr<Nsf_Emu> emuOwn(nsfe ? new Nsfe_Emu : new Nsf_Emu);
@@ -312,9 +315,11 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   hz = Nsf_Trace::play_hz(&emu);
   track_info_t ti; // NSFe keeps names in its auth/tlbl chunks and lengths in time, not the header
   const bool info = !emu.track_info(&ti, tr);
-  int want = frames;
-  if (info && ti.length > 0) want = (int)(ti.length * (hz > 1.0 ? hz : 60.0) / 1000.0);
-  want = std::max(1, std::min(want, patLen * DIV_MAX_PATTERNS));
+  // The NSFe time chunk is a playlist length, not the song structure: trace past it (twice its
+  // length, so a loop inside it repeats once) and find the real loop or end below.
+  int timeF = 0;
+  if (info && ti.length > 0) timeF = std::max(1, (int)(ti.length * (hz > 1.0 ? hz : 60.0) / 1000.0));
+  const int want = std::max(1, std::min(std::max(frames, 2 * timeF), kMaxFrames));
   short pcm[4096];
   while ((int)(c.w.size() / kTraceWords) < want && !emu.track_ended())
     if (emu.play(4096, pcm)) break;
@@ -361,7 +366,6 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   song.subsong.push_back(sub);
   sub->name = info && ti.song[0] ? ti.song : "Track " + std::to_string(tr + 1);
   sub->hz = hz > 1.0 ? (float)hz : 60.0f;
-  sub->patLen = patLen;
 
   // DPCM samples new in this track (c.pcm is shared, so indexes hold across tracks)
   for (size_t k = song.sample.size(); k < c.pcm.size(); k++) {
@@ -414,6 +418,45 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
       }
       if (o) { onset[ci][f] = 1; allOn.push_back(f); }
     }
+  }
+
+  // Song end, from the trace itself. Looping songs: from frame loopF on, every voice state repeats
+  // loopL frames later, up to the trace end (the shortest such period, after at least one full repeat
+  // and kMinRun frames, over a loop that sounds). Songs that stop: silence from lastSound + 1 to the
+  // trace end. Neither (a period the trace cannot show twice, or a loop that never repeats exactly):
+  // the time chunk length, else the whole trace.
+  auto isOn = [&](int ci, int f) { return chans[ci].kind == K_DPCM ? fr[ci][f].trig : fr[ci][f].on; };
+  std::vector<uint64_t> fh(n);
+  std::vector<int> sndSum(n + 1, 0);
+  int lastSound = -1;
+  for (int f = 0; f < n; f++) {
+    uint64_t h = 1469598103934665603ULL;
+    bool snd = false;
+    auto mix = [&](int v) { h = (h ^ (uint64_t)(uint32_t)v) * 1099511628211ULL; };
+    for (int ci = 0; ci < nCh; ci++) {
+      if (chans[ci].idx < 0) continue;
+      const Fr& x = fr[ci][f];
+      mix(x.on | (x.trig << 1));
+      if (x.on) { mix(x.note); mix(x.fine); mix(x.vol); mix(x.duty); mix(x.tmpl); }
+      snd = snd || isOn(ci, f);
+    }
+    fh[f] = h;
+    sndSum[f + 1] = sndSum[f] + snd;
+    if (snd) lastSound = f;
+  }
+  const int kMinLoop = 64, kMinRun = 600, kSilentEnd = 120;
+  int loopF = -1, loopL = 0;
+  for (int L = kMinLoop; 2 * L <= n && loopF < 0; L++) {
+    int s = n - L;
+    while (s > 0 && fh[s - 1] == fh[s - 1 + L]) s--;
+    if (n - L - s < std::max(L, kMinRun) || sndSum[s + L] == sndSum[s]) continue;
+    loopF = s; loopL = L;
+  }
+  int endF = n;   // frames the song keeps when it does not loop
+  bool stops = false;
+  if (loopF < 0) {
+    if (lastSound + 1 + kSilentEnd <= n) { endF = std::max(1, lastSound + 1); stops = true; }
+    else if (timeF) endF = std::min(n, timeF);
   }
 
   // Row grid. Channels often sit at different phases of one tempo, so the row length comes from
@@ -522,12 +565,46 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   auto rowOf = [&](int vf) { int i = 0; while (cum[i + 1] <= vf % P) i++; return vf / P * K + i; };
   // Pad < P frames of silence in front so the dominant phase falls on row starts.
   const int pad = (P - phase) % P;
-  const int R = rowOf(n + pad - 1) + 1;
   for (int i = 0; i < K; i++) sub->speeds.val[i] = (unsigned short)sp[i];
   sub->speeds.len = (unsigned char)K;
+
+  // Pattern grid from the song: the loop start sits on an order start and the last row jumps
+  // there (0Bxx); a song that stops ends with FF00 on its last musical row. Pattern length: one
+  // that divides the loop (so the loop ends on a pattern end), a multiple of 16, near prefLen. The
+  // loop start moves forward to the next pattern start (the trace repeats, so any later frame of
+  // the loop is a loop start too).
+  auto frameOfRow = [&](int r) { return rowStart(r) - pad; };
+  const int maxRows = rowOf(n - 1 + pad) + 1;
+  int patLen = prefLen, R = 0, endFx = 0x0B, endFxv = 0;
+  if (loopF >= 0) {
+    int Ls = 0;
+    while (frameOfRow(Ls) < loopF) Ls++;
+    // shortcut: a loop that is not a whole number of speed cycles rounds to the nearest row (the
+    // repeat drifts by under a row each pass); upgrade to a per-loop speed change if a song shows it
+    const int Lr = loopL % P == 0 ? loopL / P * K : std::max(1, (int)std::lround((double)loopL * K / P));
+    int best = -1;
+    double bestScore = 1e9;
+    for (int pl = 16; pl <= DIV_MAX_ROWS; pl++) {
+      const int Ls2 = (Ls + pl - 1) / pl * pl;
+      if (Ls2 + Lr > maxRows || (Ls2 + Lr + pl - 1) / pl > DIV_MAX_PATTERNS) continue;
+      const double score = (Lr % pl ? 100.0 : 0.0) + (pl % 16 ? 10.0 : 0.0) + std::fabs(std::log2((double)pl / prefLen));
+      if (score < bestScore) { bestScore = score; best = pl; }
+    }
+    if (best > 0) {
+      patLen = best;
+      const int Ls2 = (Ls + patLen - 1) / patLen * patLen;
+      R = Ls2 + Lr; endFxv = Ls2 / patLen;
+    } else { loopF = -1; endF = timeF ? std::min(n, timeF) : n; } // no grid fits the trace: time chunk
+  }
+  if (loopF < 0) {
+    R = std::min(rowOf(endF - 1 + pad) + 1, patLen * DIV_MAX_PATTERNS);
+    if (stops) endFx = 0xFF;
+  }
+  const int nUse = std::min(n, frameOfRow(R)); // frames inside rows [0, R)
+  sub->patLen = patLen;
   sub->ordersLen = (R + patLen - 1) / patLen;
 
-  struct Cell { short note = -1, ins = -1, fx = -1, fxv = -1; };
+  struct Cell { short note = -1, ins = -1, fx = -1, fxv = -1, fx2 = -1, fxv2 = -1; };
   std::vector<std::vector<Cell>> cells(nCh, std::vector<Cell>(R));
   auto place = [&](Cell& cl, int vf) { const int o = vf - rowStart(rowOf(vf)); if (o) { cl.fx = 0xED; cl.fxv = (short)o; } };
 
@@ -541,7 +618,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
     const std::vector<Fr>& a = fr[ci];
     if (k == K_DPCM) {
       int lastRow = -1;
-      for (int f = 0; f < n; f++) {
+      for (int f = 0; f < nUse; f++) {
         if (!a[f].trig) continue;
         dpcmTrigs++;
         const int vf = f + pad, row = rowOf(vf);
@@ -561,7 +638,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
       continue;
     }
     std::vector<int> starts;
-    for (int f = 0; f < n; f++)
+    for (int f = 0; f < nUse; f++)
       if (onset[ci][f] && (starts.empty() || rowOf(f + pad) != rowOf(starts.back() + pad))) starts.push_back(f);
     for (size_t si = 0; si < starts.size(); si++) {
       const int s = starts[si], e = si + 1 < starts.size() ? starts[si + 1] : n;
@@ -571,7 +648,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
       const int row = rowOf(s + pad);
       if (end < e) {
         const int offRow = rowOf(end + pad);
-        const bool free = offRow != row && (si + 1 >= starts.size() || offRow != rowOf(e + pad));
+        const bool free = offRow < R && offRow != row && (si + 1 >= starts.size() || offRow != rowOf(e + pad));
         if (free) { Cell& off = cells[ci][offRow]; off.note = DIV_NOTE_OFF; place(off, end + pad); }
         else if (k != K_VRC7) end = e; // gap becomes volume 0 in the macro
       }
@@ -646,20 +723,12 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
     g.cell->ins = (short)found;
   }
 
-  // The trace ends at row R, mid-pattern unless R is a multiple of patLen. Break there so the empty
-  // tail of the last pattern never plays (it held notes or silence for up to patLen rows, then the
-  // song restarted). 0D00 on the last order wraps to order 0, the same loop the song had before.
-  if (R % patLen) {
-    int ci = 0;
-    while (ci < nCh && cells[ci][R - 1].fx >= 0) ci++;
-    // shortcut: every channel carrying ED on the last row leaves the tail in; add a second effect column if a song shows it
-    if (ci < nCh) { cells[ci][R - 1].fx = 0x0D; cells[ci][R - 1].fxv = 0; }
-  }
+  cells[0][R - 1].fx2 = (short)endFx; cells[0][R - 1].fxv2 = (short)endFxv;
 
   // Patterns: patLen-row blocks per channel, identical blocks share one pattern index.
   int chanPats = 0;
   for (int ci = 0; ci < nCh; ci++) {
-    sub->pat[ci].effectCols = 1;
+    sub->pat[ci].effectCols = ci ? 1 : 2; // channel 1 carries the song end (0Bxx / FF00)
     std::map<std::string, int> seen;
     for (int blk = 0; blk < sub->ordersLen; blk++) {
       std::string key;
@@ -678,6 +747,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
           short* row = p->newData[r];
           row[DIV_PAT_NOTE] = cl.note; row[DIV_PAT_INS] = cl.ins;
           row[DIV_PAT_FX(0)] = cl.fx; row[DIV_PAT_FXVAL(0)] = cl.fxv;
+          row[DIV_PAT_FX(1)] = cl.fx2; row[DIV_PAT_FXVAL(1)] = cl.fxv2;
         }
       }
       sub->orders.ord[ci][blk] = it->second;
@@ -730,6 +800,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   st[0] = S; st[1] = phase; st[2] = fitPm; st[3] = active ? (int)(1000 * match / active) : 1000;
   st[4] = (int)match; st[5] = (int)active; st[6] = dpcmHits; st[7] = dpcmTrigs;
   st[8] = chanPats; st[9] = sub->ordersLen; st[10] = (int)song.ins.size(); st[12] = K; st[13] = P;
+  st[14] = patLen; st[15] = loopF >= 0 ? endFxv : (stops ? -2 : -1); // loop order, -2 stops, -1 time/trace end
   } // tracks
   if (n163Sys >= 0) song.systemFlags[n163Sys].set("channels", n163Max - 1);
   // instrument column is one byte in .fur; more than 256 cannot be saved

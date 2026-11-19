@@ -645,6 +645,10 @@ export async function nedToFurWasm(ned: Uint8Array): Promise<ArrayBuffer> {
 export interface NsfConvertStats {
   speed: number; phase: number; gridFit: number; parity: number; matchFrames: number; activeFrames: number;
   dpcmHits: number; dpcmTrigs: number; channelPatterns: number; orders: number; instruments: number;
+  /** Rows per pattern, chosen so the song start, loop start and end fall on pattern boundaries. */
+  patLen: number;
+  /** Order the closing 0Bxx jumps to; -2 the song stops (FF00), -1 no loop found (0B00 at the trace end). */
+  loopOrder: number;
 }
 
 export async function nsfLastStatsWasm(): Promise<NsfConvertStats> {
@@ -654,6 +658,7 @@ export async function nsfLastStatsWasm(): Promise<NsfConvertStats> {
   return {
     speed: g(0), phase: g(1), gridFit: g(2), parity: g(3), matchFrames: g(4), activeFrames: g(5),
     dpcmHits: g(6), dpcmTrigs: g(7), channelPatterns: g(8), orders: g(9), instruments: g(10),
+    patLen: g(14), loopOrder: g(15),
   };
 }
 

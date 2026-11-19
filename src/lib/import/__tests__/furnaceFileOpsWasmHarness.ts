@@ -11,8 +11,10 @@ import { vi } from 'vitest';
 export const repoRoot = path.resolve(__dirname, '../../../..');
 
 export function installFurnaceFileOpsWasm(): void {
-  const js = fs.readFileSync(path.join(repoRoot, 'public/furnace-fileops/FurnaceFileOps.js'), 'utf8');
-  const wasmBinary = fs.readFileSync(path.join(repoRoot, 'public/furnace-fileops/FurnaceFileOps.wasm'));
+  // FURNACE_FILEOPS_DIR: test a scratch build without overwriting the shared public/ wasm
+  const dir = process.env.FURNACE_FILEOPS_DIR ?? path.join(repoRoot, 'public/furnace-fileops');
+  const js = fs.readFileSync(path.join(dir, 'FurnaceFileOps.js'), 'utf8');
+  const wasmBinary = fs.readFileSync(path.join(dir, 'FurnaceFileOps.wasm'));
   const realAppend = document.head.appendChild.bind(document.head);
   vi.spyOn(document.head, 'appendChild').mockImplementation(<T extends Node>(node: T): T => {
     if (node instanceof HTMLScriptElement && node.src.endsWith('/furnace-fileops/FurnaceFileOps.js')) {
