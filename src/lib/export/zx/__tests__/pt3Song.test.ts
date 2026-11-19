@@ -54,6 +54,33 @@ describe('furnaceToPt3', () => {
       expect(envPeriod(furnaceToPt3(held(0), 0, '', '', clock).module) / envPeriod(r.module)).toBeCloseTo(2 ** (19 / 12), 0); // integer periods: 159 / 52
     }
   });
+  it('bakes a 0A volume slide and a later volume re-hit into the note sample', () => {
+    // Drifting in Colour ch A: vol 15 + 0A0F on the note, vol 15 + 0A0F again two rows later without a note.
+    const mod = Object.assign(tinyModule(), { instruments: [{ macros: [{ code: 0, length: 1, loop: -1, delay: 0, speed: 1, data: [15] }] }] });
+    const rows = (mod.patterns.get('0_0_0') as unknown as { rows: { volume: number; effects: { type: number; value: number }[] }[] }).rows;
+    for (const r of [0, 2]) { rows[r].volume = 15; rows[r].effects = [{ type: 0x0a, value: 0x0f }]; }
+    (mod.subsongs[0] as unknown as { speed1: number; speed2: number }).speed1 = 3;
+    (mod.subsongs[0] as unknown as { speed1: number; speed2: number }).speed2 = 3;
+    const r = furnaceToPt3(mod);
+    expect(r.lossy.filter((x) => /0A/.test(x))).toEqual([]);
+    const m = r.module, ptr = m[105 + 2] | (m[106 + 2] << 8);
+    const vols = Array.from({ length: m[ptr + 1] }, (_, f) => m[ptr + 2 + 4 * f + 1] & 15);
+    // playback.cpp: vol 15 << 8 drops 0x3c0 per tick from the row's first tick; the cell volume on row 2 (tick 6) restarts it.
+    expect(vols.slice(0, 10)).toEqual([11, 7, 3, 0, 0, 0, 11, 7, 3, 0]);
+  });
+  it('loops a periodic 0A re-hit fade on one period instead of storing every frame', () => {
+    // Drifting in Colour ch A pattern: one note, then vol 15 + 0A0F re-hit every 2 rows to the pattern end.
+    const mod = Object.assign(tinyModule(), { instruments: [{ macros: [{ code: 0, length: 1, loop: -1, delay: 0, speed: 1, data: [15] }] }] });
+    const rows = Array.from({ length: 32 }, (_, r) => ({ note: r === 0 ? 48 : -1, instrument: r === 0 ? 0 : -1, volume: r % 2 ? -1 : 15, effects: r % 2 ? [] : [{ type: 0x0a, value: 0x0f }] }));
+    mod.patterns.set('0_0_0', { rows } as never);
+    Object.assign(mod.subsongs[0], { speed1: 3, speed2: 3, patLen: 32 });
+    const m = furnaceToPt3(mod).module, ptr = m[105 + 2] | (m[106 + 2] << 8);
+    const loop = m[ptr], len = m[ptr + 1];
+    const vols = Array.from({ length: len }, (_, f) => m[ptr + 2 + 4 * f + 1] & 15);
+    expect(len - loop).toBe(6); // one re-hit period: 2 rows of 3 ticks at 50 Hz
+    expect(len).toBeLessThan(32 * 3);
+    expect(vols.slice(loop)).toEqual([11, 7, 3, 0, 0, 0]);
+  });
   it('rejects a non-AY chip', () => {
     const mod = tinyModule();
     (mod as unknown as { systems: number[] }).systems = [0x05];

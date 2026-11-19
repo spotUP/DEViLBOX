@@ -27,11 +27,17 @@ class Lossy {
 
 const AY8910 = 0x80, AY8930 = 0x9a; // Furnace file system ids (FurnaceSongParser.ts)
 const CHANNELS = 3;
-const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_NOISE = 2, MACRO_WAVE = 3;
+const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_NOISE = 2, MACRO_WAVE = 3, MACRO_PITCH = 4, MACRO_PHASE_RESET = 14;
 /** Furnace AY envelope macros (ay.cpp): ex2 = shape (R13), ex3/alg = auto-envelope numerator/denominator, ex5 = period. */
 const MACRO_ENV_SHAPE = 6, MACRO_AUTO_NUM = 7, MACRO_AUTO_DEN = 8, MACRO_ENV_PERIOD = 16;
 const ENV_MACROS = [MACRO_ENV_SHAPE, MACRO_AUTO_NUM, MACRO_AUTO_DEN, MACRO_ENV_PERIOD];
 const MAX_SAMPLES = 31, MAX_ORNAMENTS = 15, MAX_TICKS = 64;
+/** Furnace channel volume (playback.cpp): volume << 8 plus a fraction; the AY's volMax is (15 << 8) | 0xff. */
+const VOL_TOP = (15 << 8) | 0xff;
+/** Furnace channel volume (<< 8) after each tick from the note on (0A slides, later cell volumes); the last value holds. */
+type VolSlide = number[];
+/** Furnace 0Axy speed per tick (playback.cpp): y slides down, else x up; 0A00 stops. */
+const volSlideSpeed = (v: number): number => (v <= 0 ? 0 : (v & 15) ? -(v & 15) * 64 : (v >> 4) * 64);
 const FRAME_HZ = 50;
 /** A running glissando is kept for the next row while its worst frame stays this close (the checker allows 35). */
 const GLISS_REUSE_CENTS = 30;
@@ -130,27 +136,118 @@ function frameTicks(lenTicks: number, loopTick: number, tickHz: number, lossy: L
 /** PT3 sample from Furnace AY macros. The wave macro is a bitmask (ay.cpp psgMode = wave & 7): bit 0 tone, bit 1 noise,
  * bit 2 hardware envelope. Furnace writes R6 = 31 - duty, so the noise offset is inverted. forceEnv: effect 22xy state for
  * instruments without a wave macro. */
-function sampleBytes(macros: FurnaceMacro[], lossy: Lossy, tickHz: number, toneShift: number, forceEnv = false): number[] {
+/** basePeriod: the note's PT3 period, needed for a pitch macro (code 4), which becomes per-frame tone offsets. Furnace
+ * ay.cpp: pitch2 = val (absolute) or pitch2 += val per tick (relative, mode 1); with linear pitch pitch2 is 1/128 note
+ * (period * 2^(-pitch2/1536)), else it is subtracted from the period; the period is clamped to 0..4095. */
+/** slide: the note's volume curve baked in (effect 0Axy and cell volumes); the channel volume is then 15. */
+function sampleBytes(macros: FurnaceMacro[], lossy: Lossy, tickHz: number, toneShift: number, forceEnv = false, basePeriod?: number, linear = true, slide?: VolSlide): number[] {
   const pick = (code: number): FurnaceMacro | undefined => macros.find((x) => x.code === code && x.length > 0);
-  for (const mac of macros) if (mac.length > 0 && ![MACRO_VOL, MACRO_ARP, MACRO_NOISE, MACRO_WAVE, ...ENV_MACROS].includes(mac.code)) lossy.add(`macro code ${mac.code} (pitch or other)`);
+  for (const mac of macros) if (mac.length > 0 && ![MACRO_VOL, MACRO_ARP, MACRO_NOISE, MACRO_WAVE, MACRO_PITCH, MACRO_PHASE_RESET, ...ENV_MACROS].includes(mac.code)) lossy.add(`macro code ${mac.code} (pitch or other)`);
+  const pitch = basePeriod === undefined ? undefined : pick(MACRO_PITCH);
   for (const c of ENV_MACROS) {
     const mac = pick(c);
     if (mac && new Set(mac.data.slice(0, mac.length)).size > 1) lossy.add(`envelope macro ${c} changing within a note (first value used)`);
   }
   const vol = pick(MACRO_VOL), wave = pick(MACRO_WAVE), noise = pick(MACRO_NOISE);
-  const longest = [vol, wave, noise].reduce((a, m) => (macroSpan(m) > macroSpan(a) ? m : a), undefined as FurnaceMacro | undefined);
+  const longest = [vol, wave, noise, pitch].reduce((a, m) => (macroSpan(m) > macroSpan(a) ? m : a), undefined as FurnaceMacro | undefined);
   const ticks = macroSpan(longest);
-  const { idx, loop } = frameTicks(ticks, macroLoop(longest), tickHz, lossy, 'instrument macro');
+  const ft = frameTicks(ticks, macroLoop(longest), tickHz, lossy, 'instrument macro');
+  let idx = ft.idx, loop = ft.loop;
   const v = expand(vol, ticks, 15), w = expand(wave, ticks, forceEnv ? 5 : 1), n = expand(noise, ticks, 0);
+  // Pitch macro offset per frame, from the absolute Furnace tick of that frame (a relative macro accumulates).
+  const r = tickHz / FRAME_HZ, at = (f: number): number => Math.floor(f * r + r / 2 + 1e-9);
+  let per: ((f: number) => number) | null = null;
+  if (pitch && basePeriod !== undefined) {
+    const pv = expand(pitch, Math.ceil(MAX_TICKS * r) + 2, 0), rel = pitch.mode === 1, abs = expand(pitch, ticks, 0);
+    const plen = macroSpan(pitch), ploop = macroLoop(pitch);
+    const p2 = (T: number): number => {
+      let acc = 0;
+      // Past the end of a macro without a loop the macro stops: pitch2 keeps the sum.
+      for (let t = 0; t <= (ploop < 0 ? Math.min(T, plen - 1) : T); t++) acc = Math.max(-32768, Math.min(32767, acc + pv[t]));
+      return acc;
+    };
+    // Absolute: the frame's (looped) tick. Relative: the frame's real tick, since the sum does not loop.
+    per = (f: number): number => {
+      const p = rel ? p2(at(f)) : abs[idx[Math.min(f, idx.length - 1)]];
+      const q = linear ? basePeriod * 2 ** (-p / 1536) : basePeriod - p;
+      return Math.round(Math.max(0, Math.min(4095, q)) - basePeriod);
+    };
+    // A looping relative macro keeps bending: unroll the frames (other macros wrap at their loop) until the
+    // period settles at a clamp or MAX_TICKS frames, then hold the last frame.
+    const ramps = rel && ploop >= 0 && pv.slice(ploop, plen).some((x) => x !== 0);
+    if (ramps) {
+      const ext: number[] = [];
+      for (let f = 0; f < MAX_TICKS; f++) {
+        ext.push(f < idx.length ? idx[f] : idx[loop + ((f - idx.length) % (idx.length - loop))]);
+        if (f > 0 && per(f) === per(f - 1) && per(f) === per(f + 1) && f >= idx.length) break;
+      }
+      if (ext.length >= MAX_TICKS && per(MAX_TICKS - 1) !== per(MAX_TICKS)) lossy.add(`pitch macro ramp longer than ${MAX_TICKS} frames (held)`);
+      if (ext.length > idx.length && loop !== idx.length - 1) lossy.add('pitch macro ramp over a looping macro (loop held after the ramp)');
+      idx = ext; loop = ext.length - 1;
+    }
+  }
+  // Volume slide (playback.cpp): vol += speed on every tick from the row's first, stopping at 0 or the top.
+  // A fade re-hit every P ticks (0A plus cell volumes, e.g. a 0A0F re-hit every 2 rows) loops on its period: p frames
+  // hold a whole number of periods, so the PT3 loop replays the same ticks instead of unrolling 64 frames per note.
+  // shortcut: only with held macros and no pitch macro; the loop also repeats past the look-ahead window.
+  let sp = slide && !per && idx.length - loop === 1 ? slidePeriod(slide) : null;
+  let p = 0, f0 = 0;
+  if (sp) {
+    while (f0 < MAX_TICKS && (at(f0) < sp.start || f0 < idx.length - 1)) f0++;
+    for (p = 1; f0 + p <= MAX_TICKS && Math.abs(((p * r) / sp.ticks) % 1) > 1e-6; p++);
+    if (f0 + p > MAX_TICKS) sp = null;
+  }
+  const volAt = (T: number): number => (!slide ? VOL_TOP : sp && T >= slide.length ? slide[sp.start + ((T - sp.start) % sp.ticks)] : slide[Math.min(T, slide.length - 1)]);
+  if (sp) {
+    idx = Array.from({ length: f0 + p }, (_, f) => idx[Math.min(f, idx.length - 1)]);
+    loop = f0;
+  } else if (slide) {
+    let endTick = slide.length - 1; // first tick of the final constant run
+    while (endTick > 0 && slide[endTick - 1] === slide[endTick]) endTick--;
+    let lim = 0; // first frame at the limit
+    while (lim < MAX_TICKS - 1 && at(lim) < endTick) lim++;
+    if (at(lim) < endTick) lossy.add(`volume slide longer than ${MAX_TICKS} frames (cut)`);
+    // Past the limit the macros keep looping at the final volume: unroll to the limit, then one loop cycle.
+    const cyc = idx.length - loop, frames = lim + 1;
+    if (frames > loop) {
+      const wrap = (f: number): number => (f < idx.length ? idx[f] : idx[loop + ((f - idx.length) % cyc)]);
+      const n = Math.min(MAX_TICKS, cyc === 1 ? frames : frames + cyc);
+      if (n < frames + (cyc === 1 ? 0 : cyc)) lossy.add('volume slide over a looping macro (loop cut)');
+      idx = Array.from({ length: n }, (_, f) => wrap(f));
+      loop = cyc === 1 || n < frames + cyc ? Math.min(frames, n) - 1 : frames;
+    }
+  }
+  const bend = idx.map((_, f) => (per ? per(f) : 0));
+  const reset = pick(MACRO_PHASE_RESET);
+  // Phase reset (code 14) restarts the AY envelope; PT3 restarts it on each note, so only a reset after step 0 is lost.
+  if (reset && reset.data.slice(1, reset.length).some((x) => x === 1) && w.some((x) => (x & 4) !== 0)) lossy.add('phase reset macro after the first step (envelope restart)');
   const out: number[] = [loop, idx.length];
-  const tone = toneShift & 0xffff;
-  for (const t of idx) {
+  for (const [f, t] of idx.entries()) {
+    const tone = (toneShift + bend[f]) & 0xffff;
     const toneOn = (w[t] & 1) !== 0, noiseOn = (w[t] & 2) !== 0, envOn = (w[t] & 4) !== 0;
     const b0 = (envOn ? 0 : 0x01) | (noiseOn ? ((31 - n[t]) & 31) << 1 : 0);
-    const b1 = (Math.max(0, Math.min(15, v[t])) & 15) | (toneOn ? 0 : 0x10) | (noiseOn ? 0 : 0x80);
+    // ay.cpp outVol = vol * macro / 15; with no slide the PT3 channel volume does that product.
+    const vt = slide ? Math.floor(((volAt(at(f)) >> 8) * Math.max(0, Math.min(15, v[t]))) / 15) : v[t];
+    const b1 = (Math.max(0, Math.min(15, vt)) & 15) | (toneOn ? 0 : 0x10) | (noiseOn ? 0 : 0x80);
     out.push(b0, b1, tone & 0xff, tone >> 8);
   }
+  // A silent tail that the loop stays inside plays the same as one silent looping frame (keeps the 16 KB module small).
+  let k = idx.length;
+  while (k > 0 && (out[2 + (k - 1) * 4 + 1] & 15) === 0) k--;
+  if (k < idx.length - 1 && out[0] >= k) { out.length = 2 + (k + 1) * 4; out[0] = k; out[1] = k + 1; }
   return out;
+}
+
+/** Smallest period P (ticks) and first tick s with slide[t] === slide[t + P] for every t >= s, when the curve repeats at
+ * least twice past s and is not constant there; null otherwise. */
+function slidePeriod(slide: VolSlide): { start: number; ticks: number } | null {
+  const len = slide.length;
+  for (let P = 2; 2 * P <= len; P++) {
+    let s = len - P;
+    while (s > 0 && slide[s - 1] === slide[s - 1 + P]) s--;
+    if (len - s >= 2 * P && new Set(slide.slice(s, s + P)).size > 1) return { start: s, ticks: P };
+  }
+  return null;
 }
 
 /** True when any sample step plays the hardware envelope (b0 bit 0 clear). */
@@ -175,20 +272,25 @@ function ornamentBytes(mac: FurnaceMacro, lossy: Lossy, tickHz: number): { bytes
 /** clock: the AY clock the module will play at (ZX 1773400; Vectrex 1500000 with the retuned tables of pt3Tables.ts). */
 export function furnaceToPt3(m: FurnaceModule, subsong = 0, title = '', author = '', clock = ZX_CLOCK): Pt3Song {
   // Glissando commands break the row skip runs, so a song near the cap can only fit with slides dropped on some channels.
-  const masks = [7, 3, 5, 6, 1, 2, 4, 0];
-  for (const [i, mask] of masks.entries()) {
-    try {
-      const out = buildPt3(m, subsong, title, author, mask, clock);
-      if (mask !== 7) for (let ch = 0; ch < 3; ch++) if (!((mask >> ch) & 1)) out.lossy.push(`pitch slides on channel ${ch + 1} (dropped so the module fits 16 KB)`);
-      return out;
-    } catch (e) {
-      if (i === masks.length - 1 || !(e instanceof Error) || !e.message.startsWith('The PT3 module is')) throw e;
+  // Per-note pitch-macro samples go first (fewer bent notes), then slides: a lost bend is one note, a lost slide a channel.
+  const masks = [7, 3, 5, 6, 1, 2, 4, 0], bendCaps = [MAX_SAMPLES, 24, 16, 8, 0];
+  let last: unknown;
+  for (const mask of masks) {
+    for (const bendCap of bendCaps) {
+      try {
+        const out = buildPt3(m, subsong, title, author, mask, clock, bendCap);
+        if (mask !== 7) for (let ch = 0; ch < 3; ch++) if (!((mask >> ch) & 1)) out.lossy.push(`pitch slides on channel ${ch + 1} (dropped so the module fits 16 KB)`);
+        return out;
+      } catch (e) {
+        if (!(e instanceof Error) || !e.message.startsWith('The PT3 module is')) throw e;
+        last = e;
+      }
     }
   }
-  throw new Error('unreachable');
+  throw last;
 }
 
-function buildPt3(m: FurnaceModule, subsong: number, title: string, author: string, slideMask: number, clock: number): Pt3Song {
+function buildPt3(m: FurnaceModule, subsong: number, title: string, author: string, slideMask: number, clock: number, bendCap = MAX_SAMPLES): Pt3Song {
   const lossy = new Lossy();
   const s = m.subsongs[subsong];
   if (!s) throw new Error(`subsong ${subsong} missing`);
@@ -238,11 +340,21 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
     insCache.set(i, e);
     return e;
   };
-  const sampleFor = (ins: Ins, shift: number, forceEnv: boolean): number => {
-    const b = sampleBytes(ins.macros, lossy, tickHz, shift, forceEnv && !ins.macros.some((x) => x.code === MACRO_WAVE && x.length > 0));
+  // A pitch macro bends by a fraction of the note's period, so its samples are made per note (n: PT3 note played).
+  // Past bendCap bent samples (or the sample limit) a bent note falls back to its unbent sample.
+  let bent = 0;
+  const sampleFor = (ins: Ins, shift: number, forceEnv: boolean, n: number, slide?: VolSlide, bend = true): number => {
+    const bends = bend && ins.macros.some((x) => x.code === MACRO_PITCH && x.length > 0);
+    const base = bends ? pt3Period(tune, Math.max(0, Math.min(95, n)), clock) + shift : undefined;
+    const b = sampleBytes(ins.macros, lossy, tickHz, shift, forceEnv && !ins.macros.some((x) => x.code === MACRO_WAVE && x.length > 0), base, linear, slide);
     const k = b.join(',');
     const hit = sampleKey.get(k);
     if (hit !== undefined) return hit;
+    if (bends && (bent >= bendCap || samples.length >= MAX_SAMPLES)) {
+      lossy.add('pitch macro on some notes (dropped so the module fits)');
+      return sampleFor(ins, shift, forceEnv, n, slide, false);
+    }
+    if (bends) bent++;
     if (samples.length >= MAX_SAMPLES) { lossy.add(`samples past ${MAX_SAMPLES} (sample ${MAX_SAMPLES} reused)`); return MAX_SAMPLES; }
     samples.push(b); sampleKey.set(k, samples.length);
     return samples.length;
@@ -287,7 +399,9 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
     // Furnace slide: note (nv), pitch in 1/128 note, target, speed per tick (0 = none), E1/E2 (target becomes the note).
     fnv: -1, pos: 0, slTarget: 0, slSpeed: 0, slNote: false, slTargetNote: 0,
     // PT3 glissando: CrTnSl the player holds, last emitted "d,s" ('' = stopped), counter back at d on the next row start.
-    cur: 0, gl: '', glPhase: false }));
+    cur: 0, gl: '', glPhase: false,
+    // Furnace volume (<< 8) and 0Axy speed per tick; baked: the slide in the playing sample; outVol: PT3 channel volume.
+    vol: VOL_TOP, volSpeed: 0, baked: undefined as VolSlide | undefined, bakeO: -1, bakeEnd: -1, outVol: 15 }));
   const flags = m.compatFlags ?? {};
   // linearPitch 1 before format 237 is the removed partial mode: only 04/E5 linear, slides move the AY period
   // (papers/format.md; ay.cpp NOTE_PORTA adds the speed to baseFreq, which is then the period).
@@ -369,6 +483,26 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
     st.gl = `${d},${s}`; st.glPhase = n % d === 0;
     return [d, s & 0xff, (s >> 8) & 0xff];
   };
+  /** Furnace channel volume per tick from the note at (o, r) to the next note or note off in that pattern; rows past the
+   *  pattern end keep the slide running. end: last row looked at. shortcut: speed changes during the note are not seen. */
+  const volumeCurve = (ch: number, o: number, r: number, vol: number, speed: number): { curve: number[]; end: number; slid: boolean } => {
+    const curve: number[] = [], maxT = Math.ceil((MAX_TICKS * tickHz) / FRAME_HZ) + 1;
+    let end = r, slid = false;
+    for (let rr = r, k = 0; curve.length < maxT; rr++, k++) {
+      if (rr > r && rr < orderLen[o]) {
+        const c = cellAt(ch, o, rr);
+        if (c && convertFurnaceNoteValue(c) >= 0) break;
+        if (c?.volume !== undefined && c.volume >= 0) vol = Math.min(15, c.volume) << 8;
+        for (const e of c?.effects ?? []) if (e.type === 0x0a) speed = volSlideSpeed(e.value);
+        end = rr;
+      }
+      for (let t = 0, spd = speeds[(speedIdx - 1 + k) % speeds.length]; t < spd; t++) {
+        if (speed !== 0) { slid = true; vol += speed; if (vol <= 0 || vol >= VOL_TOP) { vol = Math.max(0, Math.min(VOL_TOP, vol)); speed = 0; } }
+        curve.push(vol);
+      }
+    }
+    return { curve, end, slid };
+  };
   const channelsWithNotes = [false, false, false];
   const patternBytes: number[][][] = []; // [order][channel]
   for (let o = 0; o < endOrder; o++) {
@@ -391,8 +525,11 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
         const cell = cellAt(ch, o, r);
         const ops: number[] = [], args: number[] = [];
         let note = 0xd0;
+        const st = chan[ch];
+        // Each pattern sets its channel volume afresh: identical Furnace patterns then pack to the same PT3 bytes (shared),
+        // and the song loop jumps in from the end, where the volume is whatever the last rows left.
+        if (r === 0) st.outVol = -1;
         if (cell) {
-          const st = chan[ch];
           if (cell.instrument >= 0) st.ins = cell.instrument;
           for (const e of cell.effects) {
             if (e.type === 0x00) st.arp = e.value > 0 ? arpOrnament(e.value) : -1;
@@ -401,7 +538,8 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
             if (e.type === 0x23) envPeriod = (envPeriod & 0xff00) | e.value;
             if (e.type === 0x24) envPeriod = (envPeriod & 0xff) | (e.value << 8);
           }
-          if (cell.volume >= 0) ops.push(cell.volume === 0 ? 0xc0 : 0xc0 | Math.min(15, cell.volume));
+          if (cell.volume >= 0) st.vol = Math.min(15, cell.volume) << 8;
+          for (const e of cell.effects) if (e.type === 0x0a) st.volSpeed = volSlideSpeed(e.value);
           let nv = convertFurnaceNoteValue(cell);
           const prevPos = st.fnv >= 0 ? st.pos : -1;
           if (nv === 253 || nv === 254 || nv === 255) note = 0xc0;
@@ -418,6 +556,17 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
             // A PT3 note byte zeroes CrTnSl and the slide counter.
             st.fnv = nv; st.pos = toPos(nv); st.cur = 0; st.gl = '';
           }
+          const isNote = note >= 0x50 && note < 0xc0;
+          // A note whose volume moves before the next note (0A, or cell volumes re-hitting a fade) bakes that curve into its
+          // sample at channel volume 15. shortcut: the look-ahead stops at the pattern end; later changes are held.
+          if (isNote) {
+            const f = volumeCurve(ch, o, r, st.vol, st.volSpeed);
+            // Cell volumes alone stay PT3 channel volume ops: a bake only when 0A moves the volume.
+            st.baked = f.slid ? f.curve : undefined;
+            st.bakeO = o; st.bakeEnd = f.end;
+          } else if (st.baked && (o !== st.bakeO || r > st.bakeEnd) && (cell.volume >= 0 || cell.effects.some((e) => e.type === 0x0a))) lossy.add('volume or 0A change after the pattern end of a fading note (held)');
+          const wantVol = st.baked ? 15 : st.vol >> 8;
+          if (wantVol !== st.outVol && (isNote || (cell.volume >= 0 && !st.baked))) { ops.push(0xc0 | wantVol); st.outVol = wantVol; }
           if (note === 0xc0) st.slSpeed = 0; // shortcut: note off ends the slide (Furnace only with noteOffResetsSlides)
           if (slideOn(ch) && st.fnv >= 0) for (const e of cell.effects) {
             if (e.type === 0xe1 || e.type === 0xe2) {
@@ -441,7 +590,7 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
           }
           if (st.ins >= 0 && (note !== 0xd0 || cell.instrument >= 0)) {
             const ins = instrument(st.ins);
-            const sample = sampleFor(ins, st.shift, st.env22);
+            const sample = sampleFor(ins, st.shift, st.env22, st.n, st.baked);
             const orn = st.arp >= 0 ? st.arp : ins.orn;
             if (sampleUsesEnv(samples[sample - 1] ?? [])) {
               // shortcut: PT3 retriggers R13 on every envelope command; Furnace only when the shape value changes.
@@ -463,9 +612,14 @@ function buildPt3(m: FurnaceModule, subsong: number, title: string, author: stri
           }
           for (const e of cell.effects) {
             if (e.type < 0 || [0x00, 0x09, 0x0f, 0x0b, 0x0d, 0x22, 0x23, 0x24, 0x29].includes(e.type)) continue;
+            if (e.type === 0x0a && (isNote || e.value <= 0 || (st.baked && o === st.bakeO && r <= st.bakeEnd))) continue;
             if (slideOn(ch) && [0x01, 0x02, 0xe1, 0xe2].includes(e.type)) continue;
             lossy.add(`effect ${e.type.toString(16).toUpperCase().padStart(2, '0')}`);
           }
+        }
+        for (let k = 0; k < spd && st.volSpeed !== 0; k++) {
+          st.vol += st.volSpeed;
+          if (st.vol <= 0 || st.vol >= VOL_TOP) { st.vol = Math.max(0, Math.min(VOL_TOP, st.vol)); st.volSpeed = 0; }
         }
         const gl = slideOn(ch) ? glissando(chan[ch], spd, delay) : null;
         if (gl) { ops.push(0x01); args.push(...gl); }
