@@ -44,6 +44,7 @@ interface FurnaceFileOpsAPI {
   fur_load(dataPtr: number, len: number): number;
   fur_save(outLenPtr: number): number;
   nsf_to_fur(dataPtr: number, len: number, track: number, frames: number, patLen: number, outLenPtr: number): number;
+  nsf_get_stat(i: number): number;
   fur_save_text(outLenPtr: number, separatePatterns: number): number;
   fur_free_buffer(ptr: number): void;
   fur_get_error(): string;
@@ -112,6 +113,7 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_load: m.cwrap('fur_load', 'number', ['number', 'number']),
     fur_save: m.cwrap('fur_save', 'number', ['number']),
     nsf_to_fur: m.cwrap('nsf_to_fur', 'number', ['number', 'number', 'number', 'number', 'number', 'number']),
+    nsf_get_stat: m.cwrap('nsf_get_stat', 'number', ['number']),
     fur_save_text: m.cwrap('fur_save_text', 'number', ['number', 'number']),
     fur_free_buffer: m.cwrap('fur_free_buffer', null, ['number']),
     fur_get_error: m.cwrap('fur_get_error', 'string', []),
@@ -608,6 +610,22 @@ export async function nsfToFurWasm(nsf: Uint8Array, track: number, frames: numbe
   const result = new Uint8Array(m.HEAPU8.buffer, bufPtr, len).slice();
   api.fur_free_buffer(bufPtr);
   return result.buffer;
+}
+
+/** Compaction stats of the last nsfToFurWasm call (gridFit, parity in permille). */
+export interface NsfConvertStats {
+  speed: number; phase: number; gridFit: number; parity: number; matchFrames: number; activeFrames: number;
+  dpcmHits: number; dpcmTrigs: number; channelPatterns: number; orders: number; instruments: number;
+}
+
+export async function nsfLastStatsWasm(): Promise<NsfConvertStats> {
+  const m = await getModule();
+  if (!cachedAPI) cachedAPI = getAPI(m);
+  const g = cachedAPI.nsf_get_stat;
+  return {
+    speed: g(0), phase: g(1), gridFit: g(2), parity: g(3), matchFrames: g(4), activeFrames: g(5),
+    dpcmHits: g(6), dpcmTrigs: g(7), channelPatterns: g(8), orders: g(9), instruments: g(10),
+  };
 }
 
 /**
