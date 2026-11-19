@@ -40,20 +40,79 @@ const uint8_t kPerLo[96] = {
 const uint8_t kPerHi[96] = {
   7,7,7,7,7,7,7,7,7,7,7,7, 6,6,5,5,5,5,4,4,4,3,3,3, 3,3,2,2,2,2,2,2,2,1,1,1, 1,1,1,1,1,1,1,1,1,0,0,0 };
 
-// Furnace note (60 = C-0, 105 = A-4 at 440 Hz) for a pulse (div 16) or triangle (div 32) tone.
-int toneNote(int tone, double div) {
-  const int p = kPerHi[tone - 1] * 256 + kPerLo[tone - 1];
-  const double f = kCpu / (div * (p + 1));
+int tonePeriod(int tone) { return kPerHi[tone - 1] * 256 + kPerLo[tone - 1]; }
+
+// Furnace NES base period of a note (DivPitchTable init + getBase, period mode, divider 16);
+// local copy because pitchTable.cpp pulls the whole engine into this module
+int nesBase(int note) {
+  int shift = 0;
+  while (shift < 14 && std::lround(kCpu / (440.0 * 0.0625 * std::pow(2.0, ((shift - 4) * 12 + 3) / 12.0)) / 16.0) > 0x800) shift++;
+  const int nb = note % 12 + (shift - 5) * 12, octave = note / 12 - shift;
+  int root = (int)std::lround(kCpu / (440.0 * 0.0625 * std::pow(2.0, (nb + 3) / 12.0)) / 16.0);
+  if (octave > 0) { const bool carry = root & (1 << (octave - 1)); root >>= octave; if (carry) root++; }
+  return root;
+}
+
+// Furnace note (60 = C-0, 105 = A-4 at 440 Hz) for a tone. NT2 writes the same period to the
+// triangle as to the pulses; both NES and Furnace play the triangle an octave below, so div is 16.
+int toneNote(int tone) {
+  const double f = kCpu / (16.0 * (tonePeriod(tone) + 1));
   const int n = (int)std::lround(105.0 + 12.0 * std::log2(f / 440.0));
   return std::max(0, std::min(179, n));
 }
 
 struct NtIns { uint8_t b[8]; };
 
+// NT2 vibrato (nt2-22.asm ReadSineTab): VibAndTremTab[phase][depth], indexed through Pos2TabPos.
+const uint8_t kVibTab[16][16] = {
+  {0,0,0,1,1,1,2,2,3,3,3,4,4,4,5,5},{0,0,1,2,3,3,4,5,6,6,7,8,9,9,10,11},
+  {0,1,2,3,4,5,6,8,9,10,11,12,13,15,16,17},{0,1,3,4,6,7,9,10,12,13,15,16,18,19,21,22},
+  {0,1,3,5,7,9,11,13,15,16,18,20,22,24,26,28},{0,2,4,6,8,11,13,15,17,19,22,24,26,28,30,33},
+  {0,2,5,7,10,12,15,17,20,22,25,27,30,32,35,37},{0,2,5,8,11,14,16,19,22,25,28,30,33,36,39,42},
+  {0,3,6,9,12,15,18,21,24,27,30,33,36,40,43,46},{0,3,6,9,13,16,19,23,26,29,33,36,39,43,46,49},
+  {0,3,7,10,14,17,21,24,28,31,35,38,42,45,49,52},{0,3,7,11,14,18,22,25,29,33,36,40,44,47,51,55},
+  {0,3,7,11,15,19,22,26,30,34,38,41,45,49,53,57},{0,3,7,11,15,19,23,27,31,35,39,42,46,50,54,58},
+  {0,3,7,11,15,19,23,27,31,35,39,43,47,51,55,59},{0,3,7,11,15,19,23,27,31,35,39,43,47,51,55,59}};
+const uint8_t kPos2Phase[31] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0};
+
+// period delta at vibrato position pos (-32..31): table value halved with the sign kept
+int vibDelta(int pos, int depth) {
+  if (pos > 0) return kVibTab[kPos2Phase[pos - 1]][depth] >> 1;
+  // pos -1 reads Pos2TabPos[255] = VibAndTremTab[224] = 0 in the player (tables are adjacent)
+  if (pos < 0) { const int y = ((~pos) & 31) - 1; return -((kVibTab[y < 0 ? 0 : kPos2Phase[y]][depth] + 1) >> 1); }
+  return 0;
+}
+
 void fill(DivInstrumentMacro& m, const std::vector<int>& a, int loop) {
   m.len = (unsigned char)std::min<size_t>(255, a.size());
   for (int i = 0; i < m.len; i++) m.val[i] = a[i];
   m.loop = loop < 0 ? 255 : (unsigned char)loop;
+}
+
+  // auto vibrato b2: speed hi nibble, depth lo nibble. NT2 restarts it at 0 on a new note and steps
+  // it only on non-row ticks (pos += speed, wraps at 32 to -32); the row tick keeps the last delta.
+  // Absolute pitch macro, value = -delta (period = base - pitch in non-linear mode).
+  // shortcut: one 255-tick pass at the speed of the first row, looped to the row start whose vibrato
+  // position is closest; Fxx speed changes and 4xy overriding the auto vibrato are not followed.
+void addVibrato(DivInstrument* d, uint8_t b2, int speed) {
+  {
+    const int vs = b2 >> 4, vd = b2 & 0x0F;
+    std::vector<int> v, posAt;
+    int pos = 0, last = 0;
+    for (int t = 0; t <= 255; t++) {
+      posAt.push_back(pos);
+      if (t % speed) { last = vibDelta(pos, vd); pos += vs; if (pos >= 32) pos -= 64; }
+      v.push_back(-last);
+    }
+    const int end = (255 / speed) * speed; // end on a row boundary
+    int loop = 0, bestD = 99;
+    for (int t = 0; t < end; t += speed) {
+      const int dd = std::abs(((posAt[t] - posAt[end]) % 64 + 96) % 64 - 32);
+      if (dd < bestD) { bestD = dd; loop = t; }
+    }
+    v.resize(end);
+    fill(d->std.pitchMacro, v, loop);
+  }
 }
 
 // NES instrument for one NT2 instrument on one channel kind (0 pulse, 1 triangle, 2 noise).
@@ -138,6 +197,7 @@ bool nedBuildSong(DivSong& song, const uint8_t* data, size_t len, std::string& e
   song.systemFlags[0].clear();
   song.systemLen = 1;
   song.recalcChans();
+  song.compatFlags.linearPitch = 0; // period pitch: E5xx and pitch macros are NES period units
   {
     std::string nm(reinterpret_cast<const char*>(data) + 5, std::min<size_t>(0x1d, len - 5));
     nm = nm.substr(0, nm.find('\0'));
@@ -210,7 +270,7 @@ bool nedBuildSong(DivSong& song, const uint8_t* data, size_t len, std::string& e
 
   int lastArp[5] = {0}, lastVolSlide[5] = {0};
   for (int ch = 0; ch < 5; ch++) {
-    sub->pat[ch].effectCols = (ch == 0 && needLoop) ? 2 : 1;
+    sub->pat[ch].effectCols = (ch < 3 ? 2 : 1) + ((ch == 0 && needLoop) ? 1 : 0);
     for (int pi = 0; pi < nPat[ch]; pi++) {
       DivPattern* pat = sub->pat[ch].getPattern(pi, true);
       int q = ptr[ch][pi];
@@ -233,7 +293,14 @@ bool nedBuildSong(DivSong& song, const uint8_t* data, size_t len, std::string& e
             if (tone == 97) cell[DIV_PAT_NOTE] = DIV_NOTE_OFF;
             else if (tone >= 1 && tone <= 96) {
               if (ch == 4) { if (tone <= 60) cell[DIV_PAT_NOTE] = (short)(59 + tone); }
-              else cell[DIV_PAT_NOTE] = (short)toneNote(tone, ch == 2 ? 32.0 : 16.0);
+              else {
+                const int n = toneNote(tone);
+                cell[DIV_PAT_NOTE] = (short)n;
+                // NT2's table is not equal-tempered: E5xx so the Furnace period (getBase - pitch - 1)
+                // equals the NT2 period
+                const int fine = std::max(-128, std::min(127, nesBase(n) - 1 - tonePeriod(tone)));
+                cell[DIV_PAT_FX(1)] = 0xE5; cell[DIV_PAT_FXVAL(1)] = (short)(0x80 + fine);
+              }
             }
           }
         }
@@ -279,7 +346,7 @@ bool nedBuildSong(DivSong& song, const uint8_t* data, size_t len, std::string& e
     DivPattern* a = sub->pat[0].getPattern(src, true);
     DivPattern* bp = sub->pat[0].getPattern(dst, true);
     memcpy(bp->newData, a->newData, sizeof a->newData);
-    bp->newData[63][DIV_PAT_FX(1)] = 0x0B; bp->newData[63][DIV_PAT_FXVAL(1)] = (short)loopPos;
+    bp->newData[63][DIV_PAT_FX(2)] = 0x0B; bp->newData[63][DIV_PAT_FXVAL(2)] = (short)loopPos;
     sub->orders.ord[0][last] = (unsigned char)dst;
   }
   // NT2 clears the effect every row and reloads the instrument volume on every instrument cell.
@@ -303,6 +370,16 @@ bool nedBuildSong(DivSong& song, const uint8_t* data, size_t len, std::string& e
         if (c[DIV_PAT_FX(0)] == 0x0D) break;
       }
     }
+  }
+  // auto vibrato needs the row length; the first row often sets it with Fxx
+  int vibSpeed = speed ? speed : 6;
+  for (int ch = 0; ch < 4; ch++) {
+    const short* c = sub->pat[ch].getPattern(sub->orders.ord[ch][0], true)->newData[0];
+    if (c[DIV_PAT_FX(0)] == 0x0F && c[DIV_PAT_FXVAL(0)] > 0) vibSpeed = c[DIV_PAT_FXVAL(0)];
+  }
+  for (const auto& [key, si] : insMap) {
+    const uint8_t b2 = ins[key / 4].b[2];
+    if (key % 4 < 2 && (b2 & 0x0F) && (b2 >> 4)) addVibrato(song.ins[si], b2, vibSpeed);
   }
   song.insLen = (int)song.ins.size();
   song.waveLen = 0;

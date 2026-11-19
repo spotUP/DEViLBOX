@@ -101,6 +101,45 @@ describe.skipIf(!HAVE)('NerdTracker II to editable Furnace song', { timeout: 120
     }
   });
 
+  // NES period Furnace plays for a note in non-linear (period) pitch with E5xx fine pitch:
+  // pitchTable.cpp getBase at 1789773 Hz / 16, minus pitch, minus 1 (platform/nes.cpp).
+  function furPeriod(note: number, e5: number): number {
+    const fb = (nb: number) => 440 * 0.0625 * Math.pow(2, (nb + 3) / 12);
+    let shift = 0;
+    while (shift < 14 && Math.round(1789773 / fb((shift - 4) * 12) / 16) > 0x800) shift++;
+    let root = Math.round(1789773 / fb((note % 12) + (shift - 5) * 12) / 16);
+    const oct = Math.floor(note / 12) - shift;
+    if (oct > 0) { const carry = root & (1 << (oct - 1)); root >>= oct; if (carry) root++; }
+    return root - (e5 - 0x80) - 1;
+  }
+  const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+
+  // Periods measured from the NSF rip (Mesen, first row): triangle 0x327 with vibrato 0x323..0x32a.
+  // NT2 writes the pulse period to the triangle too, and its table is not equal-tempered, so the
+  // note must use the pulse divider and E5xx must land on the NT2 period exactly.
+  it.skipIf(!fs.existsSync(path.join(DIR, ICE)))(`${ICE}: triangle period, fine pitch and auto vibrato match NT2`, async () => {
+    const { nedToFurWasm, saveFurTextWasm } = await import('../../lib/import/wasm/FurnaceFileOps');
+    await nedToFurWasm(new Uint8Array(fs.readFileSync(path.join(DIR, ICE))));
+    const text = await saveFurTextWasm();
+    const lines = text.split('\n');
+    const row0 = lines[lines.findIndex((l) => l.startsWith('----- ORDER 00')) + 1].split('|');
+    const tri = row0[3].trim().split(/\s+/); // note, instrument, volume, effects
+    const note = 60 + 12 * Number(tri[0][2]) + NOTE_NAMES.indexOf(tri[0].slice(0, 2));
+    const e5 = tri.slice(3).find((f) => f.startsWith('E5'));
+    expect(e5, 'triangle fine pitch E5xx').toBeDefined();
+    const per = furPeriod(note, e5 ? parseInt(e5.slice(2), 16) : 0x80);
+    expect(Math.abs(per - 0x327) / 0x327, `triangle period ${per.toString(16)}`).toBeLessThan(0.03);
+    expect(per, 'triangle period equals the NT2 period').toBe(0x327);
+    // instrument 04 auto vibrato b2 = $B2 (speed 11, depth 2): pitch macro = -period delta
+    const at = lines.findIndex((l) => /^## [0-9A-F]+: NT2 04 triangle/.test(l));
+    const pitchLine = lines.slice(at, at + 8).find((l) => l.trim().startsWith('- pitch:'));
+    expect(pitchLine, 'triangle vibrato pitch macro').toBeDefined();
+    const vals = (pitchLine ?? '').replace(/.*pitch:/, '').trim().split(/\s+/).filter((v) => /^-?\d+$/.test(v)).map(Number);
+    expect(Math.min(...vals)).toBe(-3); // period 0x32a
+    expect(Math.max(...vals)).toBe(4); // period 0x323
+    expect(vals.slice(0, 6)).toEqual([0, 0, -3, -3, 1, 4]); // NSF: 327 327 32a 32a 326 323
+  });
+
   it('every .ned in the folder converts', async () => {
     const { nedToFurWasm } = await import('../../lib/import/wasm/FurnaceFileOps');
     const { parseFurnaceFile } = await import('../../lib/import/parsers/FurnaceToSong');
