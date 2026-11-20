@@ -6,7 +6,7 @@ import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
 import { furnaceToMds } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
-const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe8, 0xe9, 0xea, 0xeb, 0xf9, 0xfb]);
+const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf9, 0xfb]);
 
 async function convert(name: string) {
   const fur = readFileSync(join(ROOT, 'public/data/songs/furnace/genesis', name));
@@ -31,7 +31,7 @@ function decode(seq: Uint8Array): { ch: number; tick: number; n: number }[] {
         else if (c >= 0x82 && c < 0xe0) { out.push({ ch, tick, n: c - 0x82 + trs }); tick += sd[p++] + 1; }
         else if (c === 0xfe) { if (!walk(tbase + ((w(tbase + sd[p++] * 2) << 16) >> 16))) return false; }
         else if (c === 0xfb || c === 0xff) return c === 0xff;
-        else if (c === 0xfa) continue;
+        else if (c === 0xfa || c === 0xe0) continue;
         else if (c === 0xe4) trs = (sd[p++] << 24) >> 24;
         else if (ARG1.has(c)) p++;
         else throw new Error(`unknown command ${c.toString(16)} on track ${i}`);
@@ -74,5 +74,10 @@ describe('furnaceToMds', () => {
     // Volume 12 must be E2 $8c (attenuation 3, added to the envelope like VOL_SCALE_LOG), not the MML scale.
     const hex = Buffer.from(s.seq).toString('hex');
     expect(hex).toContain('e28c');
+  });
+  it('Fancy_Promenard: PSG 03xx tone portamento is emitted as slur + pta (E0 E7 xx), reset by E7 00', async () => {
+    const hex = Buffer.from((await convert('Fancy_Promenard.fur')).seq).toString('hex');
+    expect(hex).toMatch(/e0e7[0-9a-f]{2}/);
+    expect(hex).toContain('e700');
   });
 });

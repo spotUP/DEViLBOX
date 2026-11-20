@@ -51,6 +51,33 @@ const PSG_TAB = [1710, 1614, 1524, 1438, 1357, 1281, 1209, 1141, 1077, 1017, 960
 const psgPeriod = (k: number): number => PSG_TAB[k % 12] >> Math.floor(k / 12);
 
 /**
+ * Furnace 03xx on an SN tone channel steps the period by xx per tick until it reaches the target period (sms.cpp, linear in period).
+ * MDSDRV `E7 pta` steps the pitch by (semitone delta + 1) * pta / 2 in 1/256 semitone per tick and snaps on overshoot (mdsdrv.68k portamento update).
+ * Picks the pta whose per-tick period sequence has the same length as Furnace's and the least summed period error.
+ * shortcut: models the period as an ideal 2^(-semitone/12) curve, not the driver's table; upgrade if a song needs exact writes.
+ */
+function portaPta(fromNv: number, toNv: number, xx: number): number {
+  const per = (nv: number) => 3579545 / (27.5 * 2 ** ((nv + 3) / 12)) / 64;
+  const a = per(fromNv), b = per(toNv), fur: number[] = [];
+  for (let p = a; fur.length < 64 && p !== b;) { p = a > b ? Math.max(b, p - xx) : Math.min(b, p + xx); fur.push(p); }
+  let best = 0, bestScore = Infinity;
+  for (let pta = 1; pta <= 255; pta++) {
+    let pitch = fromNv * 256, n = 0, err = 0;
+    const tgt = toNv * 256, seq: number[] = [];
+    while (pitch !== tgt && n < 64) {
+      const d = tgt - pitch; let h = d >> 8; h += h < 0 ? -1 : 1;
+      const np = pitch + ((h * pta) >> 1);
+      pitch = (tgt - np) * d < 0 ? tgt : np;
+      seq.push(per(0) * 2 ** (-(pitch / 256) / 12)); n++;
+    }
+    for (let i = 0; i < Math.min(seq.length, fur.length); i++) err += Math.abs(seq[i] - fur[i]);
+    const score = Math.abs(seq.length - fur.length) * 1e4 + err;
+    if (score < bestScore) { bestScore = score; best = pta; }
+  }
+  return best;
+}
+
+/**
  * MDSDRV keycode for a noise note in a PSG3-rate mode (20xy, x=1). Furnace "easy noise" (sms.cpp snCalcFreq / NOTE_SN):
  * above the threshold each semitone steps the PSG3 period down by one from 16, and with snNoLowPeriods any
  * note above 153 writes period 1. Below the threshold the tone mapping applies (key = nv).
@@ -235,7 +262,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const tracks: Array<{ ch: number; chunks: Array<{ bytes: number[]; tieStart: boolean }> }> = [];
   for (let ch = 0; ch < nCh; ch++) {
     const kind = KIND[ch];
-    let trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0;
+    let trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0, prevKey = -1, pta = 0, portaXx = 0;
     const out: Array<{ bytes: number[]; tieStart: boolean }> = [];
     for (const c of chunks) {
       // PSG: E2 $80|v gives attenuation 15-v, added to the envelope attenuation 15-macro and clamped, the same sum as Furnace VOL_SCALE_LOG.
@@ -277,6 +304,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (!(noise & 2)) lossy.add('noise fixed-rate mode (20xy, x=0)');
             cmds.push(0xea, NOISE_EA[noise]); continue;
           }
+          if (e.type === 0x03 && kind === 'psg' && e.value > 0) { portaXx = e.value; continue; }
           lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}`);
         }
         const isNote = nv >= 0 && nv < 253, isOff = nv >= 253;
@@ -289,6 +317,11 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (kind === 'noise' && (n - trs < 0 || n - trs > MAX_NOTE)) { trs = n > MAX_NOTE ? n - MAX_NOTE : 0; cmds.push(0xe4, trs); }
             n -= trs;
             if (n < 0 || n > MAX_NOTE) { lossy.add(`${kind.toUpperCase()} note out of range (clamped)`); n = Math.max(0, Math.min(MAX_NOTE, n)); }
+            // 03xx: slur into the note (no key-off, envelope keeps running) and slide from the previous key; E7 00 turns it off again.
+            const slide = portaXx > 0 && prevKey >= 0 ? portaPta(prevKey, nv, portaXx) : 0;
+            if (slide) cmds.push(0xe0, 0xe7, slide);
+            else if (pta) cmds.push(0xe7, 0);
+            pta = slide; portaXx = 0; prevKey = kind === 'psg' ? nv : -1;
             tok.push({ cmd: 'note', n, t: 0, pre: cmds }); sounding = true; any = true;
             keyOns.push({ tick, ch, note: nv });
           } else if (isOff) { tok.push({ cmd: 'rest', n: 0, t: 0, pre: cmds }); sounding = false; }

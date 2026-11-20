@@ -464,3 +464,15 @@ Still open (not fixed, not lossy-slurred):
 - **FM4 03xx extra key-ons.** Not reached in this phase's budget.
 
 Test: `src/lib/export/__tests__/mdsSong.test.ts`, case "PSG1 and PSG2 keys write the period Furnace writes". It checks that every PSG1/2 key equals the Furnace note, that the MDSDRV period is within 1 of the Furnace period, and that volume 12 is `E2 $8c`. Run against the old source, it fails 2 of 3 cases (round-trip plus the new one).
+
+## Phase 1f results (PSG gaps, Fancy_Promenard, headless MAME, cmp2 = writes clustered within 2 ms, repeats deduped)
+
+Method: existing harness (conv -> run1.sh -> MAME tap.lua -> events.py), plus a clustered compare (cmp2.py) because raw event counts are inflated by latch/data byte pairs and by driver idle writes.
+
+1. PSG1/PSG2 write-count gap. Cause is NOT vibrato/arp: the song's PSG channels use only two `03xx` tone portamento effects (both PSG1) plus `E5`. PSG2 matches note-for-note and envelope-for-envelope after dedupe (ATT 196 vs 200, FREQ 24 vs 25); the raw excess is the driver itself (MDSDRV rewrites ATT 15 every tick on idle channels and writes ATT 15 one tick before a retrigger). Song data does not control that.
+   Fix: `03xx` on a PSG channel now emits `E0 E7 <pta>` before the note (slur = no key-off/envelope retrigger, `e7` = MDSDRV portamento speed) and `E7 00` on the next plain note. pta is chosen by `portaPta` in mdsSong.ts: it simulates Furnace's linear-in-period step (xx per tick) against MDSDRV's per-tick exponential glide (mdsdrv.68k ~line 1998) and picks the closest pta. Lossy `effect 03` entries 18 -> 12.
+   PSG1 clustered FREQ: Furnace 27, MAME 30 (before: slides absent). Slide 1 Furnace 776.8/873.9/981.2 vs MAME 787.8/909.4/964.3/989.9; slide 2 Furnace 585.7/703.5/880.8/1177.5/1300.7 vs MAME 588.7/880.8/1096.7/1215.9/1285.8/1331.7. Chosen pta values 255/239: the driver glide is exponential, Furnace's is linear in period, so the step count and intermediate values do NOT match 1:1 (1-2 extra steps per slide). Approximation, not 1:1.
+2. Noise ATT 552 vs 350: clustered envelope sequence matches (335 vs 337, same 3,7,10,12,13,14,15 shape, small time offset, one extra ATT 15). The raw gap is the driver's per-tick idle ATT writes. No song-data fix; nothing changed.
+3. PSG3 FREQ 120 -> 110: not reproducible on the committed source (fresh run 120 vs 120, valdiff 0). Probably a different measurement point in 1e. No change.
+
+Open: exact 1:1 slide needs a driver-matching pta/pitch-envelope (`e8`) model or per-row note-by-note emission; ATT 15 idle/key-off writes are driver behaviour; FM4 `03xx` extra key-ons not looked at; only Fancy_Promenard measured.
