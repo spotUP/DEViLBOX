@@ -11,8 +11,8 @@
  * note the event governs was edited to the same instrument and an INS1 register holds that instrument; one note of a shared
  * event cannot change without changing the others.
  *
- * Not written, and named in `warnings`, never half-applied: a note added, removed or moved to another row (each changes
- * the stream length), a note leaving 0-127, an instrument edit that does not cover its whole event or names an instrument
+ * Not written, and named in `warnings`, never half-applied: a note moved to another row, or added anywhere but the first row of a rest (a note
+ * added on a rest's first row and a note removed rewrite that event in place, rest <-> note, keeping the duration), a note leaving 0-127, an instrument edit that does not cover its whole event or names an instrument
  * with no register, and volume or effect cells (SMUS tracks carry no per-note volume or effect).
  */
 import type { Pattern, TrackerCell } from '@/types';
@@ -29,7 +29,7 @@ export interface IffSmusEditResult {
   warnings: string[];
 }
 
-interface NoteEv { row: number; at: number; insAt: number }
+interface NoteEv { row: number; at: number; insAt: number; rest?: boolean }
 
 function u32(b: Uint8Array, o: number): number { return ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0; }
 
@@ -62,7 +62,7 @@ function walkTrack(src: Uint8Array, at: number, size: number): NoteEv[] {
     if (type > EVENT_REST) continue;
     const dur = DURATION_TABLE[src[at + i + 1] & 0x0f];
     if (dur < 0) continue;
-    if (type < EVENT_REST) out.push({ row, at: at + i, insAt });
+    out.push({ row, at: at + i, insAt, rest: type === EVENT_REST });
     row += Math.max(1, dur);
   }
   return out;
@@ -89,12 +89,22 @@ export function applyIffSmusGridEdits(
       const rows = edited[p]?.channels[ch]?.rows;
       if (rows) for (let r = 0; r < edited[p].length; r++) now.push(rows[r]);
     }
-    const notes = walkTrack(source, trackAddrs[ch], trackSizes[ch]);
+    const events = walkTrack(source, trackAddrs[ch], trackSizes[ch]);
+    const notes = events.filter((n) => !n.rest);
+    const restAt = new Map(events.filter((n) => n.rest).map((n) => [n.row, n]));
     const noteRows = new Set(notes.map((n) => n.row));
     const label = `voice ${ch + 1}`;
 
     for (let r = 0; r < Math.min(base.length, now.length); r++) {
-      if (!noteRows.has(r) && (now[r]?.note ?? 0) !== 0) warnings.push(`${label} row ${r}: a note added where the track has none changes its length; not written`);
+      const add = now[r]?.note ?? 0;
+      const rest = restAt.get(r);
+      if (!noteRows.has(r) && add > 0 && add < 97 && rest) {
+        // A rest event becomes a note event of the same duration: same length, stream stays as loaded.
+        const gov = rest.insAt < 0 ? 0 : regs[source[rest.insAt + 1]] ?? 0;
+        if (now[r].instrument !== 0 && now[r].instrument !== gov) warnings.push(`${label} row ${r}: the new note's instrument differs from the track's current instrument; not written`);
+        else if (add + 11 > 127) warnings.push(`${label} row ${r}: note outside 0-127; not written`);
+        else { poke(rest.at, add + 11); poke(rest.at + 1, source[rest.at + 1] & 0x0f); }
+      } else if (!noteRows.has(r) && add !== 0) warnings.push(`${label} row ${r}: a note added where the track has none changes its length; not written`);
     }
 
     const groups = new Map<number, { notes: NoteEv[]; want: Set<number> }>();
@@ -102,7 +112,7 @@ export function applyIffSmusGridEdits(
       const was = base[n.row];
       const cell = now[n.row];
       if (!was || !cell) continue;
-      if (cell.note === 0 || cell.note === 97) { warnings.push(`${label} row ${n.row}: a note removed changes the track's length; not written`); continue; }
+      if (cell.note === 0 || cell.note === 97) { poke(n.at, EVENT_REST); poke(n.at + 1, source[n.at + 1] & 0x0f); continue; }
       const type = source[n.at] + (cell.note - was.note);
       if (cell.note !== was.note) {
         // The import clamps MIDI-11 to 1-96; a delta on a clamped cell would land on the wrong pitch.

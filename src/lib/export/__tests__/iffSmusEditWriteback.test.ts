@@ -115,4 +115,19 @@ describe('IFF SMUS edit write-back', () => {
     expect(res.warnings.some((w) => w.includes('outside the 1-96'))).toBe(true);
     expect(new Uint8Array(await res.data.arrayBuffer())).toEqual(t);
   });
+
+  it('removes a note as a rest and puts it back on a rest, same length, source bytes restored', async () => {
+    const song = await load();
+    const { p, c, r } = firstNote(song);
+    const note = song.patterns[p].channels[c].rows[r].note;
+    song.patterns[p].channels[c].rows[r].note = 0;
+    const cut = await bytesOf(song);
+    const src = new Uint8Array(readFileSync(FILE));
+    expect(cut.length).toBe(src.length);
+    expect([...cut.keys()].filter((i) => cut[i] !== src[i]).length).toBeGreaterThan(0);
+    const again = await parseIffSmusFile(cut.buffer.slice(0) as ArrayBuffer, 'Alanko1.smus');
+    expect(again.patterns[p].channels[c].rows[r].note).toBe(0);
+    again.patterns[p].channels[c].rows[r].note = note;
+    expect(await bytesOf(again)).toEqual(src);
+  });
 });
