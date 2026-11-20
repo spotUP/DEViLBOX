@@ -822,6 +822,7 @@ function parseDigitalSymphonyFileImpl(bytes: Uint8Array, filename: string): Trac
     initialBPM:      125,
     linearPeriods:   false,
     uadeVariableLayout: variableLayout,
+    digitalSymphonyFileData: bytes.slice(0),
   };
 }
 

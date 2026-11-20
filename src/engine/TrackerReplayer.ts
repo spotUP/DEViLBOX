@@ -468,6 +468,8 @@ export interface TrackerSong {
   robHubbardFileData?: ArrayBuffer;
   /** Raw Digital Mugician binary for DigMugEngine WASM playback */
   digMugFileData?: ArrayBuffer;
+  /** Raw Digital Symphony binary; the exporter writes it back and patches only edited cells. */
+  digitalSymphonyFileData?: Uint8Array;
   /** Raw David Whittaker binary for DavidWhittakerEngine WASM playback */
   davidWhittakerFileData?: ArrayBuffer;
   /** The grid's row clock (speed changes by processed tick) and the length of one pass, to map the replayer's tick count onto grid rows */

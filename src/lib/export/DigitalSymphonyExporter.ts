@@ -20,7 +20,8 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { TrackerCell } from '@/types';
-import { compressDSymLZW } from '@/lib/compression/DSymLZW';
+import { compressDSymLZW, decompressDSymLZW } from '@/lib/compression/DSymLZW';
+import { parseDigitalSymphonyFile } from '@/lib/import/formats/DigitalSymphonyParser';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -124,6 +125,84 @@ function trackHash(trackData: Uint8Array, offset: number): string {
   return h;
 }
 
+
+/**
+ * A song loaded from a .dsym keeps its source bytes. Copy them back and patch only the
+ * tracks holding an edited cell (compared with a fresh parse): such a track chunk is
+ * decompressed, patched and written raw (packing 0); every other byte is copied verbatim.
+ */
+function patchLoadedSource(song: TrackerSong): Uint8Array | null {
+  const src = song.digitalSymphonyFileData;
+  const lay = song.uadeVariableLayout;
+  if (!src || !lay?.trackMap) return null;
+  const pristine = parseDigitalSymphonyFile(src.slice(0), 'source');
+  if (!pristine) return null;
+  const nCh = src[9], numTracks = src[12] | (src[13] << 8), numOrders = src[10] | (src[11] << 8);
+  // walk the header to the sequence chunk (same order as the parser)
+  let pos = 17;
+  for (let i = 0; i < MAX_SAMPLES; i++) { const n = src[pos++]; if (!(n & 0x80)) pos += 3; }
+  pos += 1 + src[pos] + 8;
+  const skip = (at: number, size: number) => {
+    const end = src[at] === 1 ? decompressDSymLZW(src, at + 1, size).endPos : at + 1 + size;
+    return end;
+  };
+  if (numOrders > 0) pos = skip(pos, numOrders * nCh * 2);
+  const chunks: { start: number; end: number; first: number; n: number }[] = [];
+  for (let t = 0; t < numTracks; t += 2000) {
+    const n = Math.min(numTracks - t, 2000);
+    const end = skip(pos, n * BYTES_PER_TRACK);
+    chunks.push({ start: pos, end, first: t, n });
+    pos = end;
+  }
+  const decoded = new Map<number, Uint8Array>();
+  const dataOf = (ci: number): Uint8Array => {
+    let d = decoded.get(ci);
+    if (!d) {
+      const c = chunks[ci], size = c.n * BYTES_PER_TRACK;
+      d = src[c.start] === 1 ? decompressDSymLZW(src, c.start + 1, size).output.slice(0, size) : src.slice(c.start + 1, c.start + 1 + size);
+      decoded.set(ci, d);
+    }
+    return d;
+  };
+  const done = new Set<number>();
+  for (let p = 0; p < Math.min(song.patterns.length, lay.trackMap.length); p++) {
+    for (let ch = 0; ch < nCh; ch++) {
+      const t = lay.trackMap[p][ch];
+      if (t < 0 || done.has(t)) continue;
+      const rows = song.patterns[p].channels[ch]?.rows ?? [];
+      const was = pristine.patterns[p]?.channels[ch]?.rows ?? [];
+      for (let r = 0; r < Math.min(rows.length, was.length, ROWS_PER_TRACK); r++) {
+        const c = rows[r], o = was[r];
+        const noteCh = (c.note ?? 0) !== (o.note ?? 0), insCh = (c.instrument ?? 0) !== (o.instrument ?? 0);
+        const fxCh = (c.effTyp ?? 0) !== (o.effTyp ?? 0) || (c.eff ?? 0) !== (o.eff ?? 0);
+        if (!noteCh && !insCh && !fxCh) continue;
+        done.add(t);
+        const ci = Math.floor(t / 2000);
+        const d = dataOf(ci);
+        const b = (t - chunks[ci].first) * BYTES_PER_TRACK + r * BYTES_PER_ROW;
+        const e = encodeDSymCell(c);
+        if (noteCh || insCh) {
+          d[b] = (noteCh ? e[0] & 0x3F : d[b] & 0x3F) | (insCh ? e[0] & 0xC0 : d[b] & 0xC0);
+          if (insCh) d[b + 1] = (d[b + 1] & 0xC0) | (e[1] & 0x0F);
+        }
+        if (fxCh) { d[b + 1] = (d[b + 1] & 0x0F) | (e[1] & 0xC0); d[b + 2] = e[2]; d[b + 3] = e[3]; }
+      }
+    }
+  }
+  if (decoded.size === 0) return src.slice(0);
+  const parts: Uint8Array[] = [];
+  let at = 0;
+  for (const ci of [...decoded.keys()].sort((a, b) => a - b)) {
+    parts.push(src.subarray(at, chunks[ci].start), new Uint8Array([0]), decoded.get(ci)!);
+    at = chunks[ci].end;
+  }
+  parts.push(src.subarray(at));
+  const out = new Uint8Array(parts.reduce((n, x) => n + x.length, 0));
+  let o = 0;
+  for (const x of parts) { out.set(x, o); o += x.length; }
+  return out;
+}
+
 // ── Main exporter ───────────────────────────────────────────────────────────
 
 /**
@@ -131,6 +210,8 @@ function trackHash(trackData: Uint8Array, offset: number): string {
  * Returns the binary data as an ArrayBuffer.
  */
 export function exportDigitalSymphony(song: TrackerSong): ArrayBuffer {
+  const patched = patchLoadedSource(song);
+  if (patched) return patched.buffer.slice(patched.byteOffset, patched.byteOffset + patched.byteLength) as ArrayBuffer;
   const numChannels = song.numChannels;
   const numOrders = song.songLength;
 
