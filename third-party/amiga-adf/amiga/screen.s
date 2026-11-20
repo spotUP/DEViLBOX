@@ -8,6 +8,11 @@
 ; n_volume at +19), found once by scanning the relocated player for its
 ; `tst.b pt_audchan1temp+34 / bne.b / tst.b pt_audchan2temp+34` sequence.
 ; Level = n_volume*15/64 while the channel's DMACONR AUDxEN bit is set.
+; Every other player: Paula AUDxVOL is write-only, so hook_install patches each
+; `move.w Dn,d16(An)` with d16 in {8,$a8,$b8,$c8,$d8} in the relocated player
+; into `trap #15 / index`; hook_trap performs the same store and, when the
+; address is AUDxVOL, records the value (hookvol). Forms not of that shape
+; (immediate or memory source, (An) indirect, abs.l) are not seen.
 ; shortcut: channel volume, not a sample envelope; a held or one-shot sample
 ; keeps its bar up. Upgrade: read Paula AUDxDAT or the sample position.
 
@@ -22,12 +27,15 @@
         xref    _uade_sub_max
         xref    _uade_reloc_base
         xref    _uade_module_src
+        xref    _uprough_vbr
+        xref    _uade_saved_execbase
 
 CUSTOM  = $dff000
 ROWB    = 40
 PLANE   = ROWB*256
 BOT     = 216                   ; (5 + 22 bar rows) * 8
 TW      = 29                    ; title width
+HOOKMAX = 96
 C_TEXT  = 1
 C_DIM   = 2
 C_BAR   = 3
@@ -270,6 +278,8 @@ _screen_init:
 
 .bars:
         ; bar source: find the player's channel shadow (see header)
+        cmp.w   #1,chanstride           ; hooks already patched in: keep them
+        beq.b   .havevol
         clr.l   chanvol
         move.l  _uade_reloc_base,d0
         beq.b   .noscan
@@ -293,6 +303,10 @@ _screen_init:
         subq.l  #1,d7
         bne.b   .scan
 .noscan:
+        tst.l   chanvol
+        bne.b   .havevol
+        bsr     hook_install
+.havevol:
         lea     str_logo,a0
         moveq   #1,d1
         moveq   #1,d2
@@ -323,6 +337,182 @@ _screen_init:
         blo.b   .lab
         movem.l (sp)+,d0-d7/a0-a6
         rts
+
+; ---------------------------------------------------------------------------
+; hook_install: patch volume stores in the relocated player (see header).
+hook_install:
+        movem.l d0-d7/a0-a6,-(sp)
+        move.l  _uade_reloc_base,d0
+        beq.w   .hdone
+        move.l  _uprough_vbr,a0         ; vector first: the player may run from an IRQ
+        lea     hook_trap(pc),a1
+        move.l  a1,$bc(a0)
+        lea     hook_flush(pc),a1               ; trap #14: cache flush (below)
+        move.l  a1,$b8(a0)
+        move.l  _uade_reloc_base,d0
+        move.l  d0,a0
+        lea     hooktab,a1
+        moveq   #0,d6
+        move.l  #54*1024/2,d7
+.hs:    move.w  (a0),d0
+        move.w  d0,d1
+        and.w   #$f1f8,d1
+        cmp.w   #$3140,d1
+        beq.b   .hplain
+        cmp.w   #$1140,d1               ; move.b Dn,disp(An): EMS stores bytes
+        beq.b   .hplain
+        cmp.w   #$3180,d1               ; move.w Dn,8(An,Dx.w)
+        bne.b   .hn
+        move.w  2(a0),d3
+        move.w  d3,d5
+        and.w   #$8fff,d5
+        cmp.w   #8,d5
+        bne.b   .hn
+        bra.b   .hbase
+.hplain:
+        move.w  2(a0),d3
+.hbase: move.w  d0,d2
+        lsr.w   #8,d2
+        lsr.w   #1,d2
+        and.w   #7,d2
+        cmp.w   #7,d2
+        beq.b   .hn
+        btst    #7,d0
+        bne.b   .hok                    ; indexed form: disp already checked
+        cmp.w   #8,d3
+        beq.b   .hok
+        cmp.w   #$a8,d3
+        beq.b   .hok
+        cmp.w   #$a6,d3                 ; AUDxPER: note-on fallback for players that never rewrite volume
+        beq.b   .hok
+        cmp.w   #$b6,d3
+        beq.b   .hok
+        cmp.w   #$c6,d3
+        beq.b   .hok
+        cmp.w   #$d6,d3
+        beq.b   .hok
+        cmp.w   #$b8,d3
+        beq.b   .hok
+        cmp.w   #$c8,d3
+        beq.b   .hok
+        cmp.w   #$d8,d3
+        bne.b   .hn
+.hok:   cmp.w   #HOOKMAX,d6
+        bhs.b   .hfin
+        move.w  d0,(a1)+
+        move.w  d3,(a1)+
+        move.l  #$4e4f0000,d4
+        or.w    d6,d4
+        move.l  d4,(a0)
+        addq.w  #1,d6
+.hn:    addq.l  #2,a0
+        subq.l  #1,d7
+        bne.w   .hs
+.hfin:
+        tst.w   d6
+        beq.b   .hdone
+        move.l  #hookvol,chanvol
+        move.w  #1,chanstride
+        trap    #14                     ; Supervisor() is gone once the takeover has run
+.hdone: movem.l (sp)+,d0-d7/a0-a6
+        rts
+
+; trap #14: flush the caches after patching code. Same CPU choice as
+; cache_flush.i, but entered by trap: exec's Supervisor() rides the privilege
+; vector, which the takeover has replaced by then.
+hook_flush:
+        movem.l d0-d1/a0,-(sp)
+        move.l  _uade_saved_execbase,d0
+        beq.b   .fdone
+        move.l  d0,a0
+        move.w  $128(a0),d1             ; AttnFlags
+        andi.w  #$00C2,d1
+        beq.b   .fdone                  ; 68000/68010: no cache
+        andi.w  #$0088,d1
+        bne.b   .f040
+        dc.w    $4E7A,$0002             ; movec cacr,d0
+        ori.w   #$0808,d0               ; clear I and D cache
+        dc.w    $4E7B,$0002             ; movec d0,cacr
+        bra.b   .fdone
+.f040:  dc.w    $F4F8                   ; cpusha bc
+.fdone: movem.l (sp)+,d0-d1/a0
+        rte
+
+; trap #15: the patched store. Frame after movem: SR at 60(sp), PC at 62(sp).
+hook_trap:
+        movem.l d0-d7/a0-a6,-(sp)
+        move.l  62(sp),a0
+        moveq   #0,d0
+        move.w  (a0)+,d0
+        move.l  a0,62(sp)
+        lsl.w   #2,d0
+        lea     hooktab,a1
+        move.w  (a1,d0.w),d1
+        move.w  d1,d5
+        move.w  2(a1,d0.w),d2
+        ext.l   d2
+        move.w  d1,d3
+        and.w   #7,d3
+        lsl.w   #2,d3
+        move.w  2(sp,d3.w),d4           ; Dn low word
+        lsr.w   #8,d1
+        lsr.w   #1,d1
+        and.w   #7,d1
+        lsl.w   #2,d1
+        move.l  32(sp,d1.w),a1          ; An
+        btst    #7,d5                   ; opcode bit 7: indexed form
+        beq.b   .tplain
+        move.w  d2,d0
+        rol.w   #4,d0
+        and.w   #7,d0
+        lsl.w   #2,d0
+        move.w  2(sp,d0.w),d0           ; Dx low word
+        ext.l   d0
+        add.l   d0,a1
+        moveq   #8,d2
+.tplain:
+        add.l   d2,a1
+        btst    #13,d5                  ; opcode bit 13 set: word, clear: byte
+        beq.b   .tbyte
+        move.w  d4,(a1)
+        moveq   #0,d6                   ; N/Z of the store (V,C clear), X kept;
+        tst.w   d4                      ; move sr is privileged on a 68010+
+        bra.b   .tflag
+.tbyte: move.b  d4,(a1)
+        moveq   #0,d6
+        tst.b   d4
+.tflag:
+        bpl.b   .tpos
+        moveq   #8,d6
+.tpos:  bne.b   .tnz
+        moveq   #4,d6
+.tnz:
+        move.b  61(sp),d0
+        andi.b  #$10,d0
+        or.b    d0,d6
+        move.b  d6,61(sp)
+        move.l  a1,d0
+        sub.l   #$dff0a6,d0
+        cmp.l   #$32,d0
+        bhi.b   .out
+        move.w  d0,d1
+        and.w   #$f,d1
+        beq.b   .period
+        cmp.w   #2,d1
+        bne.b   .out
+        lsr.w   #4,d0
+        lea     hookvol,a2
+        move.b  d4,(a2,d0.w)
+        st      volwrites               ; a real volume store: period fallback off
+        bra.b   .out
+.period:
+        tst.b   volwrites
+        bne.b   .out
+        lsr.w   #4,d0
+        lea     hookvol,a2
+        move.b  #64,(a2,d0.w)           ; note-on level; draw_bars decays it
+.out:   movem.l (sp)+,d0-d7/a0-a6
+        rte
 
 ; ---------------------------------------------------------------------------
 _screen_frame:
@@ -441,6 +631,17 @@ change_song:
 ; Motion per the design: t = round(v*176/15); lv = t > lv ? t : max(t, lv-5);
 ; cap holds 32 frames then falls 1 px per frame.
 draw_bars:
+        tst.b   volwrites
+        bne.b   .nodecay
+        lea     hookvol,a0              ; period-only players: decay the note-on level
+        moveq   #3,d0
+.dec:   move.b  (a0),d1
+        subq.b  #3,d1
+        bpl.b   .decok
+        moveq   #0,d1
+.decok: move.b  d1,(a0)+
+        dbra    d0,.dec
+.nodecay:
         lea     CUSTOM,a5
         move.w  2(a5),d6
         move.l  chanvol,a4
@@ -455,7 +656,7 @@ draw_bars:
         btst    d7,d6
         beq.b   .v0
         move.w  d7,d1
-        mulu    #44,d1
+        mulu    chanstride,d1
         move.b  (a4,d1.w),d0
         cmp.b   #64,d0
         bls.b   .vok
@@ -760,6 +961,10 @@ scroll:         dc.w 0
 msglen:         dc.w 0
 ticks:          dc.l 0
 chanvol:        dc.l 0
+chanstride:     dc.w 44
+hookvol:        dc.b 0,0,0,0
+volwrites:      dc.b 0,0
+hooktab:        ds.b 4*HOOKMAX
 lv:             dc.w 0,0,0,0
 cap:            dc.w 0,0,0,0
 hold:           dc.w 0,0,0,0

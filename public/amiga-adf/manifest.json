@@ -2,24 +2,24 @@
   "templates": {
     "AbyssHighestExperience": {
       "adf": "AbyssHighestExperience.adf",
-      "adfSha256": "9c3123c24560673ae76471218a153a75ecd98829cfc27f36abd71e604431d0e5",
+      "adfSha256": "fda9a25aaef64dbefe85f4b98842706be4035199e84f1275e0ec98655cef0e0c",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 48088,
+        "diskOffset": 48644,
         "maxBytes": 65536
       },
       "moduleLengthWord": {
-        "diskOffset": 48084,
+        "diskOffset": 48640,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 157460,
       "memory": {
         "IMG_BASE": "0x100000",
-        "IMG_LEN": "0x80400",
+        "IMG_LEN": "0x80800",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0x180400",
+        "BSS_BASE": "0x180800",
         "BSS_LEN": "0x75B40",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x26714",
@@ -30,30 +30,30 @@
         "bytes": 26327
       },
       "sources": {
-        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
         "player": "ce55646788639b86811063178613a5b31f783a325dbc60919cfc9596143d3db0"
       }
     },
     "Anders_0land": {
       "adf": "Anders_0land.adf",
-      "adfSha256": "8bb57d08f66da68a703f444c45ff3c36bf59d2653aef6e147eabaff08ba8ecc6",
+      "adfSha256": "3f508b418192d9f2043a65eba9e0c7dd28a250f4f6c9e1a50caddb01791b0af9",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 39172,
+        "diskOffset": 39728,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 39168,
+        "diskOffset": 39724,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 359684,
       "memory": {
         "IMG_BASE": "0xC18000",
-        "IMG_LEN": "0x41C00",
+        "IMG_LEN": "0x42000",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC59C00",
+        "BSS_BASE": "0xC5A000",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x57D04",
@@ -64,30 +64,30 @@
         "bytes": 3036
       },
       "sources": {
-        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
         "player": "3e58a705b80e61ceb42c2e17e7c4a1f95ae829125267b041fcd434877b416b0a"
       }
     },
     "CustomMade": {
       "adf": "CustomMade.adf",
-      "adfSha256": "01feb6fa74fb3f63d777349ae0e9ba615f48e6375c5266a526b2be14b0daa430",
+      "adfSha256": "ed0d399c522f547e7b00d59487d2c639a3dc54f952a55714d9a6012be0509c2e",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 39560,
+        "diskOffset": 40116,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 39556,
+        "diskOffset": 40112,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 310532,
       "memory": {
         "IMG_BASE": "0xC18000",
-        "IMG_LEN": "0x41E00",
+        "IMG_LEN": "0x42200",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC59E00",
+        "BSS_BASE": "0xC5A200",
         "BSS_LEN": "0x8808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x4BD04",
@@ -98,30 +98,30 @@
         "bytes": 9759
       },
       "sources": {
-        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
         "player": "170b379f48461877ddcee732338668f3a6c900eadfe08bee119f8fd2af161e49"
       }
     },
     "DIGI-Booster": {
       "adf": "DIGI-Booster.adf",
-      "adfSha256": "556842b88bb2f0abd2e854e8013d0c7e6bd0fcc52b9b271f657529e0132f7c4e",
+      "adfSha256": "4a25444da18ddfd19be554557170780383fdb7a35b87f1f84cacee97b5a96748",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 47424,
+        "diskOffset": 47980,
         "maxBytes": 524288
       },
       "moduleLengthWord": {
-        "diskOffset": 47420,
+        "diskOffset": 47976,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 845060,
       "memory": {
         "IMG_BASE": "0x100000",
-        "IMG_LEN": "0x8BC00",
+        "IMG_LEN": "0x8C000",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0x18BC00",
+        "BSS_BASE": "0x18C000",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0xCE504",
@@ -132,30 +132,30 @@
         "bytes": 521656
       },
       "sources": {
-        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
         "player": "485b77266dba0b59f5f71de1beabde89c6396dc0e203f50ee38e068b9683f133"
       }
     },
     "EMS-6": {
       "adf": "EMS-6.adf",
-      "adfSha256": "525d23c57bfde036def844dfb2de57c77f8a85607487c568d79e754b852a525b",
+      "adfSha256": "39dd64f2abead1e1ee801103b0b5c3a0ea048ae284916c9dce471d241568f010",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 54272,
+        "diskOffset": 54828,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 54268,
+        "diskOffset": 54824,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 375044,
       "memory": {
         "IMG_BASE": "0x100000",
-        "IMG_LEN": "0x45600",
+        "IMG_LEN": "0x45A00",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0x145600",
+        "BSS_BASE": "0x145A00",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x5B904",
@@ -166,30 +166,30 @@
         "bytes": 4094
       },
       "sources": {
-        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
         "player": "40b48f7d514976d9e84585fd9a47b5075384caa0e27fe56ef537c4ee55710658"
       }
     },
     "FutureComposer1.4": {
       "adf": "FutureComposer1.4.adf",
-      "adfSha256": "457ba6a8243fb11420035cfe046e9911f2c877b636258564e62c51c2b10ab38a",
+      "adfSha256": "dc8d09935aca2c61851519365ac57bd32b54c4bd264a75b28c4db4247c0c2c94",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 40580,
+        "diskOffset": 41136,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 40576,
+        "diskOffset": 41132,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 311556,
       "memory": {
         "IMG_BASE": "0xC18000",
-        "IMG_LEN": "0x42200",
+        "IMG_LEN": "0x42600",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC5A200",
+        "BSS_BASE": "0xC5A600",
         "BSS_LEN": "0x8808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x4C104",
@@ -200,30 +200,30 @@
         "bytes": 13724
       },
       "sources": {
-        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
         "player": "507e430c3cf08c3e324820111ba49ef25125ce80fd5bd7d787ebb3d83a9552e3"
       }
     },
     "JamCracker": {
       "adf": "JamCracker.adf",
-      "adfSha256": "4b8e1171861c45621d3ca306ffd5d5428db10d926e6e66978f094c52cda4b771",
+      "adfSha256": "8f07546a58b62d9841fba7c6a7b2dc6ba6b64b9a8e861937062662cf1a348429",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 39828,
+        "diskOffset": 40384,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 39824,
+        "diskOffset": 40380,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 310532,
       "memory": {
         "IMG_BASE": "0xC18000",
-        "IMG_LEN": "0x41E00",
+        "IMG_LEN": "0x42200",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC59E00",
+        "BSS_BASE": "0xC5A200",
         "BSS_LEN": "0x8808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x4BD04",
@@ -234,30 +234,30 @@
         "bytes": 48577
       },
       "sources": {
-        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
         "player": "1686b55a62f7469096b84dc7769c4d71b73530d8e15b5b032a1d1a08795d4f5d"
       }
     },
     "MED": {
       "adf": "MED.adf",
-      "adfSha256": "0c0adfd703a23552f1ce0b01bb711285092604677de5c94a7b4b3f91228dd6cb",
+      "adfSha256": "61566659777dc264c9423062d09e14c1b333734fc72c21cace44bed6dc5b02fb",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 50440,
+        "diskOffset": 50996,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 50436,
+        "diskOffset": 50992,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 376068,
       "memory": {
         "IMG_BASE": "0xC18000",
-        "IMG_LEN": "0x44800",
+        "IMG_LEN": "0x44C00",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC5C800",
+        "BSS_BASE": "0xC5CC00",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x5BD04",
@@ -268,31 +268,31 @@
         "bytes": 30474
       },
       "sources": {
-        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
         "player": "fcaa3c81076b4814e90548fa474d11c36031a270560818c9b7ddfa3985a65199"
       }
     },
     "MED-A1200": {
       "player": "MED",
       "adf": "MED-A1200.adf",
-      "adfSha256": "98912602fd3fdecce46fd65e326a743fbdacfade60f809c594c22c6b7a57c358",
+      "adfSha256": "3157e6877fcdf18b8609dc76bdd1c29705a39e4d95ce7935bced7d19b359092f",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 50440,
+        "diskOffset": 50996,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 50436,
+        "diskOffset": 50992,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 376068,
       "memory": {
         "IMG_BASE": "0x100000",
-        "IMG_LEN": "0x44800",
+        "IMG_LEN": "0x44C00",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0x144800",
+        "BSS_BASE": "0x144C00",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x5BD04",
@@ -303,30 +303,30 @@
         "bytes": 136168
       },
       "sources": {
-        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
         "player": "fcaa3c81076b4814e90548fa474d11c36031a270560818c9b7ddfa3985a65199"
       }
     },
     "Mugician": {
       "adf": "Mugician.adf",
-      "adfSha256": "310caa0db358a3174540e707e2aee3dc69b5433f01f05d64b39be19062d6e520",
+      "adfSha256": "a9ae36e21a16bd83530c4c76ecdba3a9ca483391ba6f1758563216500b1e3f74",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 43604,
+        "diskOffset": 44160,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 43600,
+        "diskOffset": 44156,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 314628,
       "memory": {
         "IMG_BASE": "0xC18000",
-        "IMG_LEN": "0x42E00",
+        "IMG_LEN": "0x43000",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC5AE00",
+        "BSS_BASE": "0xC5B000",
         "BSS_LEN": "0x8808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x4CD04",
@@ -337,30 +337,30 @@
         "bytes": 10332
       },
       "sources": {
-        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
         "player": "0f0da6015c69602f0b2eef3dc9e155c7a021b26194455bc0195c6e6c80ee1a04"
       }
     },
     "PTK-Prowiz": {
       "adf": "PTK-Prowiz.adf",
-      "adfSha256": "5be4b2221cbabea350403c8e148cd02258f9a4fced82a861a3d4c770d80e2a5d",
+      "adfSha256": "2f4673f42c4e2e4dfe32e97def8f026253a0afbf5b28284f4188bcc373568122",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 90124,
+        "diskOffset": 90680,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 90120,
+        "diskOffset": 90676,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 405764,
       "memory": {
         "IMG_BASE": "0xC18000",
-        "IMG_LEN": "0x4E200",
+        "IMG_LEN": "0x4E600",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC66200",
+        "BSS_BASE": "0xC66600",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x63104",
@@ -371,30 +371,30 @@
         "bytes": 114154
       },
       "sources": {
-        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
         "player": "cea8f553a382654d56d8d7e27ec26cf9374db54e3e9dcab5be9b4f092e57e9ca"
       }
     },
     "SUN-Tronic": {
       "adf": "SUN-Tronic.adf",
-      "adfSha256": "350cad113c1339ea15c660669c0481d63d5ec0806194e2f398c5e340399bd90b",
+      "adfSha256": "a9e7eb53f146119f9527795735f27657c16f8a32e6ec3412b2836e83e85650b7",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 37228,
+        "diskOffset": 37784,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 37224,
+        "diskOffset": 37780,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 309508,
       "memory": {
         "IMG_BASE": "0xC18000",
-        "IMG_LEN": "0x41400",
+        "IMG_LEN": "0x41800",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC59400",
+        "BSS_BASE": "0xC59800",
         "BSS_LEN": "0x8808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x4B904",
@@ -405,7 +405,7 @@
         "bytes": 4186
       },
       "sources": {
-        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
         "player": "2ab53b0fc75461d73518752864a64efce8266ef19b6015497d7b2bc546e3f1bd"
       }
     }

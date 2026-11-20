@@ -2668,6 +2668,7 @@ _uade_reloc_base:       dc.l 0
 _uade_mod_base:         dc.l 0
 _uade_host_sp:          dc.l 0
 _uade_score_sp:         dc.l 0
+        xdef    _uade_saved_execbase
 _uade_saved_execbase:   dc.l 0
 ; The vectors score can take. $64/$68/$6c/$70/$74 come from score.s's `vectab`
 ; (4125-4130), which exec_set_int_vector indexes by interrupt number; $78 is
