@@ -130,4 +130,101 @@ describe('David Whittaker effect resize', { timeout: 120000 }, () => {
       expectOthersEqual(before, after, shared);
     }
   });
+
+  // Slide and vibrato: three bytes, shown as two consecutive slots (first and second argument).
+  const SONGS = ['david-whittaker/garfield2+.dw', 'formats/apb.dw'];
+  const PAIRS: Array<[string, number]> = [['slide', DW_WALK.slide], ['vibrato', DW_WALK.vibrato]];
+  const keyOf = (walk: DwWalk, e: DwWalkEvent): string => { const { row } = dwRowClock(walk).tickToRow(e.ptick); return `${Math.floor(row / 64)}:${e.channel}:${row % 64}`; };
+  const sharing = (walk: DwWalk, e: DwWalkEvent): Set<string> => new Set(walk.events.filter((o) => o.block === e.block && o.pos === e.pos).map((o) => keyOf(walk, o)));
+  const loadSong = async (rel: string): Promise<{ src: ArrayBuffer; walk: DwWalk }> => {
+    const f = readFileSync(resolve(process.cwd(), 'public/data/songs', rel));
+    const src = f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
+    return { src, walk: await walkDavidWhittaker(src) };
+  };
+  const reimport = async (d: Uint8Array): Promise<{ walk: DwWalk; snap: Map<string, string> }> => {
+    const walk = await walkDavidWhittaker(d.buffer.slice(0) as ArrayBuffer);
+    return { walk, snap: snapshot(buildDWGridFromWalk(walk).patterns) };
+  };
+  const slots = (snap: Map<string, string>, key: string, s: number): number[] => { const c = JSON.parse(snap.get(key)!); return [c[SLOT_KEYS[s][0]], c[SLOT_KEYS[s][1]], c[SLOT_KEYS[s + 1][0]], c[SLOT_KEYS[s + 1][1]]]; };
+  const trackLen = (w: DwWalk, off: number): number => w.layout.tracks.find((t) => t.offset === off)!.length;
+
+  for (const rel of SONGS) {
+    for (const [name, kind] of PAIRS) {
+      it(`${rel}: ${name} typed on an empty slot, cleared, and swapped to and from 1/2-byte effects`, async () => {
+        const { src, walk } = await loadSong(rel);
+        const pair = walk.events.find((x) => x.kind === kind && x.block !== NO_BLOCK && x.channel < walk.channels);
+        if (!pair) return;   // this module never runs one: nothing to take the command byte from
+        const [t1, t2] = [dwEventEffects(pair)[0][0], dwEventEffects(pair)[1][0]];
+        const base = buildDWGridFromWalk(walk).patterns;
+        expect(applyDwGridEdits(new Uint8Array(src), walk, base).data).toEqual(new Uint8Array(src));
+
+        // 1. typed on an empty slot, in front of a note whose cell has no effects
+        const note = walk.events.find((e) => e.kind === DW_WALK.note && e.block !== NO_BLOCK && e.channel < walk.channels
+          && !walk.events.some((o) => o.channel === e.channel && o.ptick === e.ptick && o !== e)
+          && (() => { const c = base[Math.floor(dwRowClock(walk).tickToRow(e.ptick).row / 64)].channels[e.channel].rows[dwRowClock(walk).tickToRow(e.ptick).row % 64] as unknown as Cell; return !(c[SLOT_KEYS[0][0]] ?? 0) && !(c[SLOT_KEYS[1][0]] ?? 0); })())!;
+        expect(note).toBeDefined();
+        {
+          const pats = buildDWGridFromWalk(walk).patterns;
+          const before = snapshot(pats);
+          const key = keyOf(walk, note);
+          const cell = pats[Number(key.split(':')[0])].channels[note.channel].rows[Number(key.split(':')[2])] as unknown as Cell;
+          [cell[SLOT_KEYS[0][0]], cell[SLOT_KEYS[0][1]], cell[SLOT_KEYS[1][0]], cell[SLOT_KEYS[1][1]]] = [t1, 3, t2, 9];
+          const out = applyDwGridEdits(new Uint8Array(src), walk, pats);
+          expect(out.warnings).toEqual([]);
+          const { walk: w2, snap } = await reimport(out.data);
+          expect(slots(snap, key, 0)).toEqual([t1, 3, t2, 9]);
+          expectOthersEqual(before, snap, sharing(walk, note));
+          expectPointersResolve(new Uint8Array(src), walk, out.data, w2, note.block, 3);
+        }
+        // 2. cleared (a command that runs once, so only its own cell changes)
+        const once = walk.events.find((x) => x.kind === kind && x.block !== NO_BLOCK && x.channel < walk.channels
+          && walk.events.filter((o) => o.block === x.block && o.pos === x.pos).length === 1) ?? pair;   // a shared one changes every cell that runs it
+        {
+          const pats = buildDWGridFromWalk(walk).patterns;
+          const before = snapshot(pats);
+          const { cell, s, key } = slotOf(walk, pats, once);
+          [cell[SLOT_KEYS[s][0]], cell[SLOT_KEYS[s][1]], cell[SLOT_KEYS[s + 1][0]], cell[SLOT_KEYS[s + 1][1]]] = [0, 0, 0, 0];
+          const out = applyDwGridEdits(new Uint8Array(src), walk, pats);
+          expect(out.warnings).toEqual([]);
+          const { walk: w2, snap } = await reimport(out.data);
+          expect(trackLen(w2, once.block)).toBe(trackLen(walk, once.block) - 3);
+          expect(out.data.length).toBe(src.byteLength);
+          expect(Object.values(JSON.parse(snap.get(key)!))).not.toContain(t1);   // the cleared pair is gone from its cell
+          expectOthersEqual(before, snap, sharing(walk, once));
+          expectPointersResolve(new Uint8Array(src), walk, out.data, w2, once.block, -3);
+        }
+        // 3. swapped with a 2-byte effect and a 1-byte effect, both ways
+        const two = walk.events.find((x) => x.kind === DW_WALK.globalFade && x.block !== NO_BLOCK && x.channel < walk.channels
+          && walk.events.filter((o) => o.block === x.block && o.pos === x.pos).length === 1);
+        const one = walk.events.find((x) => x.kind === DW_WALK.vibratoOff && x.block !== NO_BLOCK && x.channel < walk.channels);
+        for (const [small, len] of [[two, 2], [one, 1]] as Array<[DwWalkEvent | undefined, number]>) {
+          if (!small) continue;
+          const [st, sv] = dwEventEffects(small)[0];
+          // small -> pair (grows by 3 - len); the second slot must be empty, so only where the cell has the one effect
+          const pats = buildDWGridFromWalk(walk).patterns;
+          const before = snapshot(pats);
+          const { cell, s, key } = slotOf(walk, pats, small);
+          if (!(cell[SLOT_KEYS[s + 1]?.[0]] ?? 0) && SLOT_KEYS[s + 1]) {
+            [cell[SLOT_KEYS[s][0]], cell[SLOT_KEYS[s][1]], cell[SLOT_KEYS[s + 1][0]], cell[SLOT_KEYS[s + 1][1]]] = [t1, 4, t2, 7];
+            const out = applyDwGridEdits(new Uint8Array(src), walk, pats);
+            expect(out.warnings).toEqual([]);
+            const { snap } = await reimport(out.data);
+            expect(slots(snap, key, s)).toEqual([t1, 4, t2, 7]);
+            expectOthersEqual(before, snap, sharing(walk, small));
+          }
+          // pair -> small (shrinks by 3 - len)
+          const pats2 = buildDWGridFromWalk(walk).patterns;
+          const before2 = snapshot(pats2);
+          const o = slotOf(walk, pats2, once);
+          [o.cell[SLOT_KEYS[o.s][0]], o.cell[SLOT_KEYS[o.s][1]], o.cell[SLOT_KEYS[o.s + 1][0]], o.cell[SLOT_KEYS[o.s + 1][1]]] = [st, sv === 0 ? 0 : 6, 0, 0];
+          const out2 = applyDwGridEdits(new Uint8Array(src), walk, pats2);
+          expect(out2.warnings).toEqual([]);
+          const { walk: w3, snap: snap2 } = await reimport(out2.data);
+          expect(trackLen(w3, once.block)).toBe(trackLen(walk, once.block) - (3 - len));
+          expect(JSON.parse(snap2.get(o.key)!)[SLOT_KEYS[o.s][0]]).toBe(st);
+          expectOthersEqual(before2, snap2, sharing(walk, once));
+        }
+      });
+    }
+  }
 });

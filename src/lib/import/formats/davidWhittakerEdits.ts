@@ -59,8 +59,12 @@ const ONE_ARG_KIND: ReadonlyArray<[number, number]> = [
 const ZERO_ARG_KIND: ReadonlyArray<[number, number]> = [
   [DW_FX.vibratoOff, DW_WALK.vibratoOff], [DW_FX.halfVolumeOn, DW_WALK.halfVolumeOn], [DW_FX.halfVolumeOff, DW_WALK.halfVolumeOff],
 ];
-const CMD_KIND: ReadonlyArray<[number, number]> = [...ONE_ARG_KIND, ...ZERO_ARG_KIND];
-const cmdLength = (kind: number): number => (ONE_ARG_KIND.some(([, k]) => k === kind) ? 2 : 1);
+/** Slide and vibrato: three bytes (command, speed, delay or depth). The grid shows them as two consecutive effect slots, the first and second argument. */
+const PAIR_KIND: ReadonlyArray<[first: number, second: number, kind: number]> = [
+  [DW_FX.slideSpeed, DW_FX.slideDelay, DW_WALK.slide], [DW_FX.vibratoSpeed, DW_FX.vibratoDepth, DW_WALK.vibrato],
+];
+const CMD_KIND: ReadonlyArray<[number, number]> = [...ONE_ARG_KIND, ...ZERO_ARG_KIND, ...PAIR_KIND.map(([t, , k]): [number, number] => [t, k])];
+const cmdLength = (kind: number): number => (ONE_ARG_KIND.some(([, k]) => k === kind) ? 2 : PAIR_KIND.some(([, , k]) => k === kind) ? 3 : 1);
 
 /** The commands that end a read run and time themselves with the wait in force: a note, a mute (0x82) and a hold (0x83). */
 function isNoteSlot(e: DwWalkEvent): boolean {
@@ -170,7 +174,7 @@ function growBlocks(
     }
     // A block that got shorter stays where it is: the bytes behind it belong to tables whose pointers the layout does not list.
     // Its end-of-track command moves up and the freed tail is padding nothing reads, so no pointer changes.
-    if (bytes.length < track.length) {
+    if (bytes.length <= track.length) {
       const pad = track.length - bytes.length;
       data.set(bytes, block);
       data.fill(0, block + bytes.length, block + track.length);
@@ -293,11 +297,39 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
         // the row offset leads the list when the cell's commands ran past the row's first tick (as the grid draws it)
         if (events.length > 0 && clock.tickToRow(events[0].ptick).offset > 0) fxEvents.push({ e: events[0], typ: DW_FX.rowOffset });
         for (const e of events) for (const [typ] of dwEventEffects(e)) fxEvents.push({ e, typ });
+        const done = new Set<number>();
         for (let s = 0; s < SLOTS.length; s++) {
+          if (done.has(s)) continue;
           const [kt, kv] = SLOTS[s];
           const bt = b[kt] ?? 0, bv = b[kv] ?? 0, ct = c[kt] ?? 0, cv = c[kv] ?? 0;
           if (bt === ct && bv === cv) continue;
           const src = fxEvents[s];
+          const oldPair = src ? PAIR_KIND.find(([t, , k]) => t === bt && k === src.e.kind) : undefined;
+          const newPair = PAIR_KIND.find(([t]) => t === ct);
+          if (bt !== ct && (oldPair || newPair)) {
+            // slide / vibrato: three bytes over two slots. Inserted, cleared or swapped through the same block resize as the shorter commands.
+            const [k2t, k2v] = SLOTS[s + 1] ?? [];
+            const nt = k2t ? c[k2t] ?? 0 : 0, nv = k2v ? c[k2v] ?? 0 : 0;
+            const bt2 = k2t ? b[k2t] ?? 0 : 0, bv2 = k2v ? b[k2v] ?? 0 : 0;
+            done.add(s + 1);
+            if (oldPair && (bt2 !== oldPair[1] || fxEvents[s + 1]?.e !== src!.e)) { warnings.push(`${where}: effect column ${s + 1} is not a whole ${oldPair[2] === DW_WALK.slide ? 'slide' : 'vibrato'}; not written`); continue; }
+            if (!oldPair && (bt2 !== 0 || bv2 !== 0)) { warnings.push(`${where}: a slide or vibrato needs two empty neighbouring effect columns; not written`); continue; }
+            if (newPair && (nt !== newPair[1] || !cmdByteOf.has(ct))) { warnings.push(`${where}: a slide or vibrato needs both its values in neighbouring columns (and this module must run one); not written`); continue; }
+            const clear = ct === 0 && cv === 0;
+            if (!newPair && !clear && (!CMD_KIND.some(([t]) => t === ct) || !cmdByteOf.has(ct) || ((ct === FX_SPEED) && (cv < 1 || cv > 31)))) { warnings.push(`${where}: effect column ${s + 1} changed to a command this module never runs; not written`); continue; }
+            if (!newPair && (nt !== 0 || nv !== 0)) { warnings.push(`${where}: the second column of a slide or vibrato must be cleared with the first; not written`); continue; }
+            const bytes = newPair ? [cmdByteOf.get(ct)!, cv & 0xff, nv & 0xff] : clear ? [] : ONE_ARG_KIND.some(([t]) => t === ct) ? [cmdByteOf.get(ct)!, cv & 0xff] : [cmdByteOf.get(ct)!];
+            if (!src) {
+              const anchor = noteEv ?? events.find((e) => e.block !== NO_BLOCK);
+              if (!anchor || anchor.block === NO_BLOCK) warnings.push(`${where}: no command runs on this row to put the effect in front of; not written`);
+              else cmdInserts.push({ block: anchor.block, pos: anchor.pos, bytes });
+              continue;
+            }
+            const sole = oldPair || (bt !== 0 && src.typ !== DW_FX.rowOffset && dwEventEffects(src.e).length === 1 && CMD_KIND.some(([, k]) => k === src.e.kind));
+            if (!sole || src.e.block === NO_BLOCK) { warnings.push(`${where}: effect column ${s + 1} changed to another command; not written`); continue; }
+            if (!cmdInserts.some((x) => x.block === src.e.block && x.pos === src.e.pos)) cmdInserts.push({ block: src.e.block, pos: src.e.pos, bytes, del: cmdLength(src.e.kind) });
+            continue;
+          }
           if (src && bt !== ct && argOffset(bt) === 1 && cmdByteOf.has(bt) && cmdByteOf.has(ct) && ONE_ARG_KIND.some(([t]) => t === bt) && ONE_ARG_KIND.some(([t]) => t === ct)) {
             // a different one-argument command in the same two bytes: new command byte, the cell's value as its argument
             if (ct === FX_SPEED && (cv < 1 || cv > 31)) warnings.push(`${where}: speed ${cv} is outside 1..31; not written`);
