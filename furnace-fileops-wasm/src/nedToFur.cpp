@@ -262,7 +262,7 @@ bool nedBuildSong(DivSong& song, const uint8_t* data, size_t len, std::string& e
 
   DivSubSong* sub = new DivSubSong;
   song.subsong.push_back(sub);
-  sub->hz = 60.0f;
+  sub->hz = 50.0f; // NT2 NSF_Play skips every 6th NTSC frame (nt2-22.asm), so songs tick at 50 Hz
   sub->patLen = 64;
   sub->speeds.val[0] = speed ? speed : 6; sub->speeds.len = 1;
   sub->ordersLen = songLen;
