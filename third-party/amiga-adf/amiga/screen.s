@@ -90,6 +90,51 @@ _screen_init:
 .ts:    move.b  #' ',(a1,d0.w)
         dbf     d0,.ts
         lea     _uade_module_src,a0
+        ; AHX/THX: bytes 0-19 are a header, not a title. Name list at BE16(4):
+        ; song name, then one name per instrument (byte 12), all NUL-terminated.
+        move.l  (a0),d0
+        and.l   #$ffffff00,d0
+        cmp.l   #$54485800,d0
+        bne.b   .notthx
+        moveq   #0,d0
+        move.w  4(a0),d0
+        lea     (a0,d0.l),a2
+        moveq   #0,d7
+        move.b  12(a0),d7
+        moveq   #TW-1,d0
+.hn:    move.b  (a2)+,d1
+        beq.b   .hnd
+        cmp.b   #$20,d1
+        blo.b   .hnc
+        move.b  d1,(a1)+
+.hnc:   dbf     d0,.hn
+.hns:   tst.b   (a2)+                   ; skip the rest of an over-long name
+        bne.b   .hns
+.hnd:   lea     msg,a1
+        subq.w  #1,d7
+        bmi.b   .hmend
+        cmp.w   #30,d7
+        bls.b   .hl
+        moveq   #30,d7                  ; msg holds 31 names of 22 + space
+.hl:    move.l  a1,a4
+        moveq   #21,d0
+.hc:    move.b  (a2)+,d1
+        beq.b   .hcd
+        cmp.b   #$20,d1
+        blo.b   .hcn
+        move.b  d1,(a1)+
+.hcn:   dbf     d0,.hc
+.hcs:   tst.b   (a2)+
+        bne.b   .hcs
+.hcd:   cmp.l   a4,a1
+        beq.b   .hnx
+        move.b  #' ',(a1)+
+.hnx:   dbf     d7,.hl
+.hmend: move.l  a1,d0
+        sub.l   #msg,d0
+        move.w  d0,msglen
+        bra.b   .bars
+.notthx:
         moveq   #19,d0
 .tc:    move.b  (a0)+,d1
         beq.b   .td
@@ -132,6 +177,7 @@ _screen_init:
         sub.l   #msg,d0
         move.w  d0,msglen
 
+.bars:
         ; bar source: find the player's channel shadow (see header)
         clr.l   chanvol
         move.l  _uade_reloc_base,d0

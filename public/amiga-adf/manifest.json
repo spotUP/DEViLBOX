@@ -1,5 +1,39 @@
 {
   "templates": {
+    "AbyssHighestExperience": {
+      "adf": "AbyssHighestExperience.adf",
+      "adfSha256": "87b75ad9eaeac8c9f44ceba983c9b1fa948a10ee0ba2844bc8bc83e3978d1eaa",
+      "target": "a1200",
+      "cpu": "68020",
+      "moduleSlot": {
+        "diskOffset": 47812,
+        "maxBytes": 65536
+      },
+      "moduleLengthWord": {
+        "diskOffset": 47808,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "chipArenaBytes": 157460,
+      "memory": {
+        "IMG_BASE": "0x100000",
+        "IMG_LEN": "0x80200",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0x180200",
+        "BSS_LEN": "0x75B40",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x26714",
+        "ENTRY": "0x100000"
+      },
+      "provenWith": {
+        "name": "aces_high.ahx",
+        "bytes": 26327
+      },
+      "sources": {
+        "tool": "7d7445b6065eec3b2099101242e7c94600d0ea3e9ed761be6cf6d5a15480ee7b",
+        "player": "ce55646788639b86811063178613a5b31f783a325dbc60919cfc9596143d3db0"
+      }
+    },
     "DIGI-Booster": {
       "adf": "DIGI-Booster.adf",
       "adfSha256": "92e8f26addc0f55d919a171bd2dfe90d202e0dfe290e53b30c12e2557185b653",
