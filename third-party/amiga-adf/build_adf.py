@@ -129,7 +129,10 @@ def main():
     ap.add_argument('--target', choices=sorted(TARGETS),
                     help='default: a1200 for players in uade_player_min_cpu.tsv, else a500')
     a = ap.parse_args()
-    player = uade_lookup.lookup(a.module, UADE_ROOT, a.player)['player']
+    entry = uade_lookup.lookup(a.module, UADE_ROOT, a.player)
+    player = entry['player']
+    # UADE ignores the end report of these players (SONG_END_NOT_POSSIBLE -> $12C = 0); match it.
+    asm = ASM + (['-DUADE_NO_SONG_END=1'] if {'broken_song_end', 'no_ep_end_detect'} & set(entry.get('flags', [])) else [])
     needs_020 = {l.split('\t')[0] for l in open(MIN_CPU_TSV) if l.strip() and not l.startswith('#')}
     target = a.target or ('a1200' if player in needs_020 else 'a500')
     t = TARGETS[target]
@@ -167,7 +170,7 @@ def main():
     objs = []
     for src in ('amiga/uade_probe.s', 'amiga/uade_glue.s', 'amiga/input_sdk.s', 'amiga/screen.s'):
         o = os.path.join(stage, os.path.basename(src) + '.o')
-        run(ASM + inc + ['-o', o, os.path.join(HERE, src)], cwd=HERE)
+        run(asm + inc + ['-o', o, os.path.join(HERE, src)], cwd=HERE)
         objs.append(o)
 
     ld = os.path.join(stage, 'adf.ld')

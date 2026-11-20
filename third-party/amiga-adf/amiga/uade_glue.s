@@ -490,7 +490,13 @@ _uade_init_super:
 ;     for ever instead of stepping to the next one.
 ;     MEASURED on the host: eco.gray subsong 0 is 2337 frames of rms 0.0 and
 ;     then reports an end; subsong 1 is 264192 frames at rms 3142.
+        ifd     UADE_NO_SONG_END
+;     conf flag broken_song_end / no_ep_end_detect: uadecore sends
+;     SONG_END_NOT_POSSIBLE and writes 0 here, so the player plays on (Fred).
+        clr.l   $12c.w                                  ; song end bit: OFF
+        else
         move.l  #1,$12c.w                               ; song end bit: ON
+        endif
         clr.l   $180.w
         clr.l   $184.w
         clr.l   $188.w                                  ; not delimon
