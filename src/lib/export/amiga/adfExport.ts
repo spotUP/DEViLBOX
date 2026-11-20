@@ -4,6 +4,8 @@
  * patched. No toolchain at runtime. The template is chosen from the module's own magic bytes.
  */
 
+import { isEMSFormat } from '../../import/formats/EMSParser';
+
 export interface AdfTemplateEntry {
   adf: string;
   target: 'a500' | 'a1200';
@@ -40,8 +42,10 @@ export function adfTemplateFor(m: Uint8Array): string | null {
   // address-errors on a 68000 (measured 2026-11-20), so it gets the A1200 build; MMD2 belongs to Octa-MED, MMD3/MMDC are unproven.
   if (ascii(m, 0, 'MMD0')) return 'MED';
   if (ascii(m, 0, 'MMD1')) return 'MED-A1200';
-  // EMS v6 only (A1200/020); older EMS modules start differently and are not proven on this template.
+  // EMS v6 is the A1200/020 build. The older EMS player (68000, A500 template) has no magic string; the importer's
+  // isEMSFormat is the same header check the player runs. Built with --target a1200 it does not boot (measured 2026-11-20).
   if (ascii(m, 0, 'E.M.S. V6')) return 'EMS-6';
+  if (isEMSFormat(m)) return 'EMS';
   return null;
 }
 

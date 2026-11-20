@@ -136,6 +136,40 @@
         "player": "485b77266dba0b59f5f71de1beabde89c6396dc0e203f50ee38e068b9683f133"
       }
     },
+    "EMS": {
+      "adf": "EMS.adf",
+      "adfSha256": "fc153aa887d8aff0504cf91a2bcf6a0dbd285d3dcd0d2535406661b93013769a",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 39420,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 39416,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "chipArenaBytes": 358660,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x41E00",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC59E00",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x57904",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "je taime.ems",
+        "bytes": 46060
+      },
+      "sources": {
+        "tool": "e50dc5f2f2966453de52e2fdb8a44a002eb7d67f79835d8782d185ce6867c078",
+        "player": "7803230a31cb7eca7525f741aba05ebd413166ab9f4398106eceaefe7c017472"
+      }
+    },
     "EMS-6": {
       "adf": "EMS-6.adf",
       "adfSha256": "39dd64f2abead1e1ee801103b0b5c3a0ea048ae284916c9dce471d241568f010",
