@@ -375,8 +375,13 @@ initDatabase();
  * `path` is the request path without the query.
  */
 export const SHADOW_PASSWORD_HASH = '!hippoplayer.se';
+// Passkey sign-in and passkey signup reply with the same {token, user} shape.
+const SHADOW_USER_PATHS = new Set([
+  '/api/auth/login', '/api/auth/signup',
+  '/api/auth/passkey/login/verify', '/api/auth/passkey/register/verify',
+]);
 export function upsertShadowUser(path: string, status: number, body: unknown, database: Database.Database = db): void {
-  if (path !== '/api/auth/login' && path !== '/api/auth/signup') return;
+  if (!SHADOW_USER_PATHS.has(path)) return;
   const user = (body as { user?: { id?: unknown; username?: unknown; createdAt?: unknown } } | null)?.user;
   if (!user || typeof user.id !== 'string' || typeof user.username !== 'string') return;
   const now = Date.now();
