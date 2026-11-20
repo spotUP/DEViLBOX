@@ -88,7 +88,12 @@ describe('klystrack Play loads the edited song', () => {
   it('loads the engine serialisation after an instrument edit', async () => {
     const song = makeSong();
     const { useFormatStore } = await import('@stores/useFormatStore');
-    const { useInstrumentStore } = await import('@stores/useInstrumentStore');
+    // useInstrumentStore sits in a cycle (-> TrackerReplayer -> engines -> back). While an unawaited import elsewhere is
+    // still evaluating that chain, import() hands back the half-built namespace (exports present, values undefined);
+    // it fills in when evaluation ends, so wait for it instead of destructuring at once (flaky in the pre-commit gate).
+    const instrumentStoreModule = await import('@stores/useInstrumentStore');
+    await vi.waitFor(() => expect(instrumentStoreModule.useInstrumentStore).toBeDefined(), { timeout: 30_000 });
+    const { useInstrumentStore } = instrumentStoreModule;
     const inst = { name: 'Lead', adsr: { a: 1, d: 2, s: 3, r: 4 }, fm: { adsr: { a: 0, d: 0, s: 0, r: 0 } }, program: [], cutoff: 100 };
     useFormatStore.setState({ klysFileData: song.klysFileData as ArrayBuffer, klysNative: { instruments: [inst] } as never });
     useInstrumentStore.setState({ instruments: [{ id: 1, name: 'Lead', synthType: 'KlysSynth' }] as never });

@@ -318,6 +318,18 @@ export function engineSubscriptionCount(): number {
   return _positionUnsubscribers.length;
 }
 
+/**
+ * The registry engines playing the current song, split by whether they can start at a song position (descriptor startAt).
+ * A position change while they play restarts them there (TrackerReplayer.seekTo); `withoutStartAt` cannot follow one.
+ */
+export function runningEngineStartSeams(): { running: boolean; withoutStartAt: string[] } {
+  const withoutStartAt: string[] = [];
+  for (const key of _runningEngineKeys) {
+    if (!WASM_ENGINES.find((d) => d.key === key)?.startAt) withoutStartAt.push(key);
+  }
+  return { running: _runningEngineKeys.size > 0, withoutStartAt };
+}
+
 /** Clear running engine tracking (call on stop/dispose) */
 export function clearRunningEngineKeys(): void {
   _runningEngineKeys.clear();

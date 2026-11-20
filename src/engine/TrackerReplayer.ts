@@ -90,6 +90,7 @@ import {
   previewNativeRow,
   registerLoadedSongEngine,
   releaseLoadedSongEngine,
+  runningEngineStartSeams,
 } from './replayer/NativeEngineRouting';
 // ============================================================================
 // CONSTANTS (imported from replayer/PeriodTables.ts)
@@ -4174,6 +4175,17 @@ export class TrackerReplayer {
     // This prevents the audible pause that would occur from releasing all
     // active notes and restarting the scheduler.
     if (this.playing) {
+      // A native engine owns the clock: it plays on where it is unless told, and its next position report
+      // (PlaybackCoordinator.dispatchEnginePosition) undoes a pointer-only seek. One that cannot be told stays put.
+      const nativeEngines = runningEngineStartSeams();
+      const cannotSeek = [...nativeEngines.withoutStartAt];
+      if (this.useAdPlugStreaming) cannotSeek.push('AdPlug');
+      if (this.c64SidEngine || this.sf2Engine) cannotSeek.push('C64SID');
+      if (cannotSeek.length > 0) {
+        notify.warning(`Position change while playing is not supported by ${cannotSeek.join(', ')}`);
+        return;
+      }
+
       this.songPos = Math.max(0, Math.min(songPos, this.song.songLength - 1));
       this.pattPos = Math.max(0, pattPos);
       this.currentTick = 0;
@@ -4185,6 +4197,21 @@ export class TrackerReplayer {
             LibopenmptEngine.getInstance().seekTo(this.songPos, this.pattPos);
           }
         }).catch(() => {});
+        return;
+      }
+
+      // Furnace WASM sequencer: furnace_seq_seek jumps it in place, it plays on from the new row.
+      if (this.useWasmSequencer) {
+        const order = this.songPos;
+        const row = this.pattPos;
+        import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
+          FurnaceDispatchEngine.getInstance().seqSeek(order, row);
+        }).catch(() => {});
+      } else if (nativeEngines.running) {
+        // Registry engines seek only through their start seam (startAt, run by play() before the engine plays):
+        // restart the transport at the new position, as Play from the position does.
+        this.stop(false);
+        void this.play();
         return;
       }
 
