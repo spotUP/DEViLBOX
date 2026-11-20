@@ -33,9 +33,12 @@ export interface MdsSong {
 type Kind = 'fm' | 'psg' | 'noise';
 const MDS_CHAN: number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 const KIND: Kind[] = ['fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'psg', 'psg', 'psg', 'noise'];
-/** With voice transpose $30 the FM note equals the Furnace note value; PSG note 0 is Furnace C-2 (value 24). */
+/**
+ * With voice transpose $30 the FM note equals the Furnace note value. PSG key k writes period PSG_TAB[k%12] >> (k/12)
+ * (key 0 = 1710), which is the period Furnace 0.6.8.3 writes for note value k (sms.cpp, toneDivider 64), so the PSG
+ * key is the note value with no offset.
+ */
 const FM_TRANSPOSE = 0x30;
-const PSG_OFFSET = 24;
 const MAX_NOTE = 0xdf - 0x82;
 const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_PITCH = 4;
 const FX_FLOW = new Set([0x0b, 0x0d, 0x09, 0x0f, 0xff]);
@@ -50,7 +53,7 @@ const psgPeriod = (k: number): number => PSG_TAB[k % 12] >> Math.floor(k / 12);
 /**
  * MDSDRV keycode for a noise note in a PSG3-rate mode (20xy, x=1). Furnace "easy noise" (sms.cpp snCalcFreq / NOTE_SN):
  * above the threshold each semitone steps the PSG3 period down by one from 16, and with snNoLowPeriods any
- * note above 153 writes period 1. Below the threshold the tone mapping applies (nv - PSG_OFFSET).
+ * note above 153 writes period 1. Below the threshold the tone mapping applies (key = nv).
  * shortcut: assumes noiseDivider 64 (Sega PSG chipType 0) and no pitch/arp offset; upgrade when a song uses chipType 1/2.
  */
 function noiseKey(m: FurnaceModule, nv: number, lossy: { add(s: string): void }): number {
@@ -59,11 +62,11 @@ function noiseKey(m: FurnaceModule, nv: number, lossy: { add(s: string): void })
   let p: number;
   if (m.compatFlags.linearPitch) { // snCalcFreq, 1/128-semitone units
     const thr = Math.round(128 * 12 * oct) - 384 + 64 + 60 * 128;
-    if ((N << 7) <= thr) return nv - PSG_OFFSET;
+    if ((N << 7) <= thr) return nv;
     p = Math.max(0, (2048 - ((N << 7) - thr)) >> 7);
   } else { // NOTE_SN, whole notes
     const thr = Math.round(12 * oct) - 3 + 60;
-    if (N <= thr) return nv - PSG_OFFSET;
+    if (N <= thr) return nv;
     p = Math.max(0, 16 - (N - thr));
   }
   if (m.compatFlags.snNoLowPeriods && N > 153) p = 1;
@@ -235,7 +238,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     let trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0;
     const out: Array<{ bytes: number[]; tieStart: boolean }> = [];
     for (const c of chunks) {
-      const volCmd = (v: number) => [0xe2, kind === 'fm' ? 127 - v : v <= 0 ? 0x7f : Math.round((15 - v) * 8 / 3)];
+      // PSG: E2 $80|v gives attenuation 15-v, added to the envelope attenuation 15-macro and clamped, the same sum as Furnace VOL_SCALE_LOG.
+      const volCmd = (v: number) => [0xe2, kind === 'fm' ? 127 - v : 0x80 | Math.max(0, Math.min(15, v))];
       const insCmd = () => { const r = insRef(kind, ins); return [0xe1, r.ins, 0xe8, r.peg + 1, 0xeb, r.mtab + 1]; };
       const bytes: number[] = [...insCmd(), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(dtn ? [0xe6, dtn & 0xff] : [])];
       let curIns = ins;
@@ -280,7 +284,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (isNote || isOff || cmds.length || i === 0) {
           if (tok.length) emit(tok.pop()!);
           if (isNote) {
-            let n = kind === 'fm' ? nv : kind === 'noise' && noise & 2 ? noiseKey(m, nv, lossy) : nv - PSG_OFFSET;
+            let n = kind === 'fm' ? nv : kind === 'noise' && noise & 2 ? noiseKey(m, nv, lossy) : nv;
             // Keys above the note-byte range go through track transpose (E4). shortcut: trs state is linear, not re-set at the loop point.
             if (kind === 'noise' && (n - trs < 0 || n - trs > MAX_NOTE)) { trs = n > MAX_NOTE ? n - MAX_NOTE : 0; cmds.push(0xe4, trs); }
             n -= trs;

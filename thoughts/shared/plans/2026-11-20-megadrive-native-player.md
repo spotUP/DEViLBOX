@@ -437,3 +437,30 @@ Matched channels have key-on times within 14 ms. Side effect: PSG3 FREQ now matc
 **FM4 residual (3 extra key-ons, not fixed).** First split is at 3.937 s. Source ch3 row o2 r1 is a note with `03 70` (tone portamento). Furnace slides there without a key-on; the exporter emits a plain note. Candidate fix: emit `e0` (slr) before a note on a 03xx row, so the driver skips key-off/key-on, and log the slide as lossy (pitch jumps). A real slide needs PEG-per-slide (Phase 1b item 1).
 
 **Gap 3 (PSG1/PSG2 frequency drift from 3.862 s): not started.** Known facts only: Furnace writes PSG1 111860.8 Hz and PSG2 18643.5 Hz, MDSDRV writes 7990.1 Hz on both; PSG2 ATT writes 328 vs 466.
+
+## Phase 1e results (gap 3: PSG drift in Fancy_Promenard)
+
+Root cause, two parts, both in `src/lib/export/md/mdsSong.ts`:
+
+1. **PSG octave.** The exporter mapped a PSG note as key `nv - 24`. MDSDRV key k writes period `mds_psg_freq_tab[k % 12] >> (k / 12)` (key 0 = 1710). Furnace 0.6.8.3 (sms.cpp, toneDivider 64) writes `round(3579545 / (27.5 * 2^((nv + 3) / 12)) / 64)`. For C-3 (nv 36) that is 214 (522.7 Hz). The old key 12 wrote 855 (130.8 Hz), two octaves low. Key = nv writes 213. The Phase 1 claim "A-4 = period 254 with nv-24" was computed, not measured against the Furnace VGM, and was wrong. Fix: `PSG_OFFSET` removed. The tone key is nv, and noiseKey's tone fallback uses the same key.
+   - Invariant: the period MDSDRV writes for a PSG note equals the period Furnace writes for that note.
+2. **PSG volume.** The volume column was sent as `E2 round((15 - v) * 8 / 3)` through the MML volume table, which is lossy (v 12 gave attenuation 1 instead of 3). MDSDRV `@write_vol` adds `15 - (E2 & 15)` for E2 `$80..$8f` to the envelope attenuation and clamps at 15. Furnace `VOL_SCALE_LOG(macro, vol, 15)` gives attenuation `clamp((15 - macro) + (15 - vol), 0, 15)`, which is the same sum. Fix: `E2 $80 | v`.
+
+Measured (headless MAME vs Furnace VGM, 9.5 s, md1d/cmp.py), before -> after:
+
+| Channel | Furnace | Before | After |
+|---------|---------|--------|-------|
+| PSG1 FREQ | 68 | 62 | 54 |
+| PSG2 FREQ | 60 | 62 | 56 |
+| PSG1 ATT | 310 | 303 | 299 |
+| PSG2 ATT | 328 | 466 | 442 |
+| PSG3 FREQ | 120 | 120 | 110 |
+
+Raw counts are not the measure of success. The frequency values are what changed: PSG2 now plays 525/787 Hz against Furnace 522/782, and PSG1 plays 787/989/1177 against 776/981/1165, so the notes match where before they were two octaves low. The PSG2 attenuation run after a note is 4, 8, 7, 11, 15, 14, which matches Furnace. Before, it was 3, 7, 6, 10.
+
+Still open (not fixed, not lossy-slurred):
+- **Period rounding.** The fixed MDSDRV table is up to 1 period off Furnace's exact equal temperament (C-3: 213 vs 214, about 8 cents). E6 detune applies per track, so it cannot correct each note. A 1:1 match needs a per-note period table, which MDSDRV does not have.
+- **Count gaps.** The remaining count gaps are Furnace per-tick pitch writes (vibrato and slides: the 440.4/391.1 and 860.5/998.8 pairs) that the export does not emit yet. PSG3 FREQ dropped from 120 to 110 and needs checking. PSG3 carries the noise rate at period 1, so check whether the noiseKey path still writes period 1 on every retrigger.
+- **FM4 03xx extra key-ons.** Not reached in this phase's budget.
+
+Test: `src/lib/export/__tests__/mdsSong.test.ts`, case "PSG1 and PSG2 keys write the period Furnace writes". It checks that every PSG1/2 key equals the Furnace note, that the MDSDRV period is within 1 of the Furnace period, and that volume 12 is `E2 $8c`. Run against the old source, it fails 2 of 3 cases (round-trip plus the new one).

@@ -51,11 +51,28 @@ describe('furnaceToMds', () => {
       expect([...s.seq.subarray(0, 8)]).toEqual([0x10, 0x01, 0x1f, 0x00, 0x00, 0x03, 0x00, 0x02]);
       expect([...s.seq.subarray(8, 12)]).toEqual([0, 0, 0, 8]); // pcm_tab at sdtop+8
       expect(s.seq.length % 2).toBe(0);
-      const want = s.keyOns.map((k) => ({ ...k, note: k.ch === 9 && k.note + 60 > 153 ? 119 : Math.max(0, Math.min(0xdf - 0x82, k.ch < 6 ? k.note : k.note - 24)) })) // noise above 153: snNoLowPeriods period 1 = key 119 via E4 transpose
+      const want = s.keyOns.map((k) => ({ ...k, note: k.ch === 9 && k.note + 60 > 153 ? 119 : Math.max(0, Math.min(0xdf - 0x82, k.note)) })) // noise above 153: snNoLowPeriods period 1 = key 119 via E4 transpose
         .map((k) => key({ ch: k.ch, tick: k.tick, n: k.note })).sort();
       const got = decode(s.seq).map(key).sort();
       expect(want.length).toBeGreaterThan(50);
       expect(got).toEqual(want);
     });
   }
+
+  it('Fancy_Promenard: PSG1 and PSG2 keys write the period Furnace writes, PSG volume is the raw attenuation', async () => {
+    const s = await convert('Fancy_Promenard.fur');
+    // PSG3 carries the noise rate here (period 1), so only PSG1 and PSG2 are tone channels. MDSDRV mds_psg_freq_tab; Furnace 0.6.8.3 sms.cpp: period = clock / (27.5 Hz * 2^((note+3)/12)) / toneDivider 64, note = Furnace note value.
+    const TAB = [1710, 1614, 1524, 1438, 1357, 1281, 1209, 1141, 1077, 1017, 960, 906];
+    const tones = decode(s.seq).filter((k) => (k.ch === 6 || k.ch === 7) && k.n >= 12);
+    expect(tones.length).toBeGreaterThan(50);
+    // The key is the Furnace note value itself, so the period check below is against Furnace's note.
+    expect(new Set(tones.map((k) => k.n))).toEqual(new Set(s.keyOns.filter((k) => (k.ch === 6 || k.ch === 7) && k.note >= 12).map((k) => k.note)));
+    for (const { n } of tones) {
+      const fur = Math.round(3579545 / (27.5 * 2 ** ((n + 3) / 12)) / 64);
+      expect(Math.abs((TAB[n % 12] >> Math.floor(n / 12)) - fur)).toBeLessThanOrEqual(1);
+    }
+    // Volume 12 must be E2 $8c (attenuation 3, added to the envelope like VOL_SCALE_LOG), not the MML scale.
+    const hex = Buffer.from(s.seq).toString('hex');
+    expect(hex).toContain('e28c');
+  });
 });
