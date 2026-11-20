@@ -196,7 +196,9 @@ SECTIONS {{
         sys.exit(f'map lacks {miss}; see {mapf}')
     image = open(img + '.image', 'rb').read()   # rawbin2: first section to <out>, the rest to <out>.<section>
     img_len = sym['_img_end'] - IMG_BASE
-    image = image + bytes(img_len - len(image))
+    # vlink merges the (zero) bss into .image when _img_end lands exactly on a 512 boundary
+    assert not any(image[img_len:]), 'non-zero bytes past _img_end'
+    image = image[:img_len] + bytes(max(0, img_len - len(image)))
     assert len(image) == img_len, (len(image), img_len)
     if sym['_bss_end'] > IMG_END or sym['_chip_end'] > CHIP_END:
         sys.exit(f"memory overflow ({target}): bss_end {sym['_bss_end']:#x} chip_end {sym['_chip_end']:#x}"

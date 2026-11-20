@@ -90,12 +90,29 @@ _screen_init:
 .ts:    move.b  #' ',(a1,d0.w)
         dbf     d0,.ts
         lea     _uade_module_src,a0
+        ; Per-format text fields (the MOD layout below only fits MOD-family files).
+        ; title and msg stay blank for a format without text fields (FC).
+        move.l  (a0),d0
+        moveq   #0,d7
+        moveq   #21,d5                  ; name length - 1 (msg holds 31 names of 22 + space)
+        cmp.l   #'DIGI',d0
+        beq.w   .digi
+        cmp.l   #'BeEp',d0
+        beq.w   .jam
+        cmp.l   #' MUG',d0
+        beq.w   .dmu
+        cmp.l   #'FC14',d0
+        beq.w   .nomsg
+        cmp.l   #'SMOD',d0
+        beq.w   .nomsg
+        cmp.l   #'FC13',d0
+        beq.w   .nomsg
         ; AHX/THX: bytes 0-19 are a header, not a title. Name list at BE16(4):
         ; song name, then one name per instrument (byte 12), all NUL-terminated.
         move.l  (a0),d0
         and.l   #$ffffff00,d0
         cmp.l   #$54485800,d0
-        bne.b   .notthx
+        bne.w   .notthx
         moveq   #0,d0
         move.w  4(a0),d0
         lea     (a0,d0.l),a2
@@ -133,7 +150,68 @@ _screen_init:
 .hmend: move.l  a1,d0
         sub.l   #msg,d0
         move.w  d0,msglen
-        bra.b   .bars
+        bra.w   .bars
+        ; DigiBooster 1.x: song name at 610 (32), 31 sample names at 642 (30 each)
+.digi:  lea     title,a1
+        lea     610(a0),a2
+        moveq   #TW-1,d0
+        bsr.b   .fld
+        lea     642(a0),a2
+        moveq   #30,d6
+        moveq   #30,d7
+        bra.b   .names
+        ; JamCracker: no song name; NOI at 4, then NOI x 40 bytes starting with a 31 byte name
+.jam:   lea     6(a0),a2
+        moveq   #40,d6
+        move.w  4(a0),d7
+        cmp.w   #31,d7
+        bls.b   .jn
+        moveq   #31,d7
+.jn:    subq.w  #1,d7
+        bra.b   .names
+        ; Digital Mugician: 8 song headers of 16 bytes at 76, title (12) at +4.
+        ; Song 0 is the title, songs 1-7 are the message.
+.dmu:   lea     title,a1
+        lea     80(a0),a2
+        moveq   #11,d0
+        bsr.b   .fld
+        lea     96(a0),a2
+        moveq   #16,d6
+        moveq   #6,d7
+        bra.b   .names
+.nomsg: moveq   #-1,d7
+.names: lea     msg,a1
+        tst.w   d7
+        bmi.b   .nend
+.nl:    move.w  d5,d0
+        bsr.b   .fld
+        cmp.l   a4,a1
+        beq.b   .nx
+        move.b  #' ',(a1)+
+.nx:    add.l   d6,a2
+        dbf     d7,.nl
+.nend:  move.l  a1,d0
+        sub.l   #msg,d0
+        move.w  d0,msglen
+        bra.w   .bars
+        ; copy printable bytes of the field at a2 (d0+1 max, NUL ends) to a1, trim trailing blanks; a4 = start
+.fld:   move.l  a2,a3
+        move.l  a1,a4
+.f1:    move.b  (a3)+,d1
+        beq.b   .f2
+        cmp.b   #$20,d1
+        blo.b   .f3
+        cmp.b   #$7f,d1
+        bhs.b   .f3
+        move.b  d1,(a1)+
+.f3:    dbf     d0,.f1
+.f2:    cmp.l   a4,a1
+        beq.b   .f5
+        cmp.b   #' ',-1(a1)
+        bne.b   .f5
+        subq.l  #1,a1
+        bra.b   .f2
+.f5:    rts
 .notthx:
         moveq   #19,d0
 .tc:    move.b  (a0)+,d1
