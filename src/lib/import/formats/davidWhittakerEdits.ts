@@ -49,6 +49,12 @@ function argOffset(typ: number): number | null {
   }
 }
 
+/** One-argument commands (two bytes: 0x80 | id, argument) that can swap for each other without changing the block's length. */
+const ONE_ARG_KIND: ReadonlyArray<[number, number]> = [
+  [DW_FX.globalTranspose, DW_WALK.globalTranspose], [DW_FX.channelTranspose, DW_WALK.channelTranspose], [DW_FX.volumeFade, DW_WALK.volumeFade],
+  [DW_FX.globalVolumeFade, DW_WALK.globalFade], [DW_FX.globalVolume, DW_WALK.globalVolume], [FX_SPEED, DW_WALK.speed], [DW_FX.delaySpeed, DW_WALK.delaySpeed],
+];
+
 /** The commands that end a read run and time themselves with the wait in force: a note, a mute (0x82) and a hold (0x83). */
 function isNoteSlot(e: DwWalkEvent): boolean {
   return e.kind === DW_WALK.note || e.kind === DW_WALK.mute || e.kind === DW_WALK.waitRow;
@@ -192,6 +198,14 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
     else if (isNoteSlot(e)) noteSample.set(e, lastSample[e.channel]);
   }
   const adds: DwAdd[] = [];
+  // The command byte this module uses for each one-argument command (its flags decide what id 8, 10, 12 mean, so only a byte the module already runs is safe to write).
+  const cmdByteOf = new Map<number, number>();
+  if (!walk.layout.oldPlayer) {
+    for (const e of walk.events) {
+      const t = ONE_ARG_KIND.find(([, k]) => k === e.kind)?.[0];
+      if (t !== undefined && e.block !== NO_BLOCK && !cmdByteOf.has(t)) cmdByteOf.set(t, source[e.block + e.pos] ?? 0);
+    }
+  }
   const restedCells = new Set<string>();   // cells whose note became a mute: the sample no longer plays, its instrument is moot
   const transposes = dwWalkTransposes(walk);
   const cmdOffset = (e: DwWalkEvent): number => (e.block === NO_BLOCK ? -1 : e.block + e.pos);
@@ -257,6 +271,12 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
           const bt = b[kt] ?? 0, bv = b[kv] ?? 0, ct = c[kt] ?? 0, cv = c[kv] ?? 0;
           if (bt === ct && bv === cv) continue;
           const src = fxEvents[s];
+          if (src && bt !== ct && argOffset(bt) === 1 && cmdByteOf.has(bt) && cmdByteOf.has(ct) && ONE_ARG_KIND.some(([t]) => t === bt)) {
+            // a different one-argument command in the same two bytes: new command byte, the cell's value as its argument
+            if (ct === FX_SPEED && (cv < 1 || cv > 31)) warnings.push(`${where}: speed ${cv} is outside 1..31; not written`);
+            else { want(cmdOffset(src.e), cmdByteOf.get(ct)!, `${where} effect ${s + 1} command`); want(cmdOffset(src.e) + 1, cv, `${where} effect ${s + 1}`); }
+            continue;
+          }
           if (!src || bt !== ct) { warnings.push(`${where}: effect column ${s + 1} changed to another command; not written`); continue; }
           const off = cmdOffset(src.e);
           if (src.typ === DW_FX.envelope || src.typ === DW_FX.arpeggio) {
