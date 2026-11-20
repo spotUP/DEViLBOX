@@ -121,7 +121,7 @@ function rawNoteFor(note: number, shift: number, prev: number): number {
   return best < 0 ? prev : best;
 }
 
-async function patchLoadedSource(song: TrackerSong): Promise<Uint8Array | null> {
+async function patchLoadedSource(song: TrackerSong): Promise<Uint8Array<ArrayBuffer> | null> {
   const src = song.digMugFileData;
   const layout = song.uadePatternLayout;
   if (!src || !layout?.getCellFileOffset) return null;
