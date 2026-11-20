@@ -1,0 +1,4 @@
+https://github.com/superctr/MDSDRV
+commit fefc7178579c59505f860e292e76af4a1857c6eb (2025-03-09, "Merge pull request #23 from htv04/makefile")
+Vendored source only, nested .git removed. Removed from tools/: asm68k.exe (non-free), mdslink.exe (GPL, see plan D8),
+salvador.exe, sjasmplus.exe (prebuilt Windows binaries). Build with tools/build-mdsdrv.sh (vasm + sjasmplus, PACK_Z80=0).
