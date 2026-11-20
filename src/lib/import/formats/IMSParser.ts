@@ -380,5 +380,8 @@ export async function parseIMSFile(
     initialBPM:      125,
     linearPeriods:   false,
     uadePatternLayout,
+    // The exporter keeps the bytes the grid does not model (order-table slots past numOrders) from here.
+    uadeEditableFileData: buffer.slice(0),
+    uadeEditableFileName: filename,
   };
 }

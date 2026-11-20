@@ -120,7 +120,8 @@ export async function exportIMS(
         const loopLenWords = loopEnd > loopStart
           ? Math.ceil((loopEnd - loopStart) / 2)
           : 1; // IMS: loopLen <= 1 means no loop
-        if (loopEnd > loopStart) {
+        // loopEnd defaults to the sample length when unlooped (createSamplerInstrument), so the loop flag decides.
+        if (inst.sample?.loop && loopEnd > loopStart) {
           sampleLoopStarts.push(loopStartWords);
           sampleLoopLens.push(loopLenWords);
         } else {
@@ -210,8 +211,11 @@ export async function exportIMS(
   output[951] = Math.min(song.restartPosition ?? 0, songLen);
 
   // +952: order list (128 bytes)
+  const src = song.uadeEditableFileData;
+  const srcOrders = src && src.byteLength >= 1080 ? new Uint8Array(src, 952, 128) : undefined;
   for (let i = 0; i < 128; i++) {
-    output[952 + i] = i < songLen ? (song.songPositions[i] ?? 0) : 0;
+    // Slots past numOrders are unused but not always zero in real files; keep the source bytes.
+    output[952 + i] = i < songLen ? (song.songPositions[i] ?? 0) : (srcOrders?.[i] ?? 0);
   }
 
   // +1080: sampleDataOffset (u32BE)
