@@ -42,6 +42,7 @@ export interface HivelyConfig {
   waveLength: number;          // 0-5 (maps to 4,8,16,32,64,128 samples)
   filterLowerLimit: number;    // 0-127
   filterUpperLimit: number;    // 0-63
+  filterUpperPad?: number;     // unused top 2 bits of byte 19 (0xC0 mask), round-tripped
   filterSpeed: number;         // 0-63
   squareLowerLimit: number;    // 0-255
   squareUpperLimit: number;    // 0-255

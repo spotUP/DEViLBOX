@@ -477,7 +477,7 @@ export function exportAsHively(
     buf[offset++] = squareUpper & 0xff;
     buf[offset++] = squareSpeed & 0xff;
     // Byte 19: filterUpperLimit (bits 5-0)
-    buf[offset++] = filterUpper & 0x3f;
+    buf[offset++] = (filterUpper & 0x3f) | (cfg?.filterUpperPad ?? 0);
     // Byte 20: plist speed
     buf[offset++] = plist.speed & 0xff;
     // Byte 21: plist length

@@ -46,6 +46,7 @@ export interface HivelyInstrument {
   waveLength: number;
   filterLowerLimit: number;
   filterUpperLimit: number;
+  filterUpperPad?: number; // unused top 2 bits of byte 19, kept for byte-exact export
   filterSpeed: number;
   squareLowerLimit: number;
   squareUpperLimit: number;
@@ -230,6 +231,7 @@ function parseAHX(buf: Uint8Array): HivelyModule {
     const squareUpperLimit = buf[bptr + 17];
     const squareSpeed = buf[bptr + 18];
     const filterUpperLimit = buf[bptr + 19] & 0x3f;
+    const filterUpperPad = buf[bptr + 19] & 0xc0;
     const plistSpeed = buf[bptr + 20];
     const plistLength = buf[bptr + 21];
 
@@ -273,6 +275,7 @@ function parseAHX(buf: Uint8Array): HivelyModule {
       waveLength,
       filterLowerLimit,
       filterUpperLimit,
+      filterUpperPad,
       filterSpeed,
       squareLowerLimit,
       squareUpperLimit,
@@ -429,6 +432,7 @@ function parseHVL(buf: Uint8Array): HivelyModule {
     const squareUpperLimit = buf[bptr + 17];
     const squareSpeed = buf[bptr + 18];
     const filterUpperLimit = buf[bptr + 19] & 0x3f;
+    const filterUpperPad = buf[bptr + 19] & 0xc0;
     const plistSpeed = buf[bptr + 20];
     const plistLength = buf[bptr + 21];
 
@@ -461,6 +465,7 @@ function parseHVL(buf: Uint8Array): HivelyModule {
       waveLength,
       filterLowerLimit,
       filterUpperLimit,
+      filterUpperPad,
       filterSpeed,
       squareLowerLimit,
       squareUpperLimit,
@@ -672,6 +677,7 @@ export function convertHivelyToTrackerSong(mod: HivelyModule, fileName: string):
       waveLength: ins.waveLength,
       filterLowerLimit: ins.filterLowerLimit,
       filterUpperLimit: ins.filterUpperLimit,
+      filterUpperPad: ins.filterUpperPad,
       filterSpeed: ins.filterSpeed,
       squareLowerLimit: ins.squareLowerLimit,
       squareUpperLimit: ins.squareUpperLimit,
