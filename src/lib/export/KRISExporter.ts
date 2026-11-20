@@ -194,10 +194,67 @@ function trackKey(data: Uint8Array): string {
 
 // ── Main exporter ─────────────────────────────────────────────────────────────
 
+/** The grid note a KRIS note byte shows (KRISParser: note byte plus the order's transpose). */
+function krisShownNote(noteByte: number, transpose: number): number {
+  if (noteByte === 0xA8 || (noteByte & 1) || noteByte < 0x18 || noteByte > 0x9E) return 0;
+  return Math.max(1, Math.min(96, 25 + (noteByte - 0x18) / 2 + transpose));
+}
+
+/**
+ * A song loaded from a KRIS module: the module itself, with only the cells the grid changed rewritten. Header, sample
+ * headers, synth waveforms, track table and PCM stay as loaded. A track shared by several orders is one set of bytes, so
+ * the first edit to it wins and a conflicting later edit is refused with a warning.
+ */
+function patchKRIS(song: TrackerSong, src: ArrayBuffer): { data: Uint8Array<ArrayBuffer>; warnings: string[] } {
+  const out = new Uint8Array(new Uint8Array(src));
+  const layout = song.uadePatternLayout!;
+  const warnings: string[] = [];
+  const written = new Set<number>();
+  song.patterns.forEach((pattern, o) => {
+    pattern.channels.forEach((channel, ch) => {
+      const transpose = (out[TRACK_REF_OFFSET + (o * NUM_CHANNELS + ch) * 2 + 1] << 24) >> 24;
+      for (let row = 0; row < ROWS_PER_TRACK; row++) {
+        const cell = channel.rows[row];
+        const off = layout.getCellFileOffset?.(o, row, ch) ?? 0;
+        if (!cell || off === 0) continue;
+        const note = cell.note ?? 0;
+        if (note === krisShownNote(out[off], transpose) && (cell.instrument ?? 0) === out[off + 1]
+          && (cell.effTyp ?? 0) === (out[off + 2] & 0x0F) && (cell.eff ?? 0) === out[off + 3]) continue;
+        const raw = note - 25 - transpose;
+        const noteByte = note === 0 || note > 96 ? 0xA8 : raw * 2 + 0x18;
+        if (noteByte !== 0xA8 && (raw < 0 || noteByte > 0x9E)) {
+          warnings.push(`Pattern ${o} row ${row} channel ${ch + 1}: note is outside the track's range and was not saved.`);
+          continue;
+        }
+        if (written.has(off)) {
+          warnings.push(`Pattern ${o} row ${row} channel ${ch + 1}: shares its track with an earlier edit and was not saved.`);
+          continue;
+        }
+        written.add(off);
+        out[off] = noteByte;
+        out[off + 1] = (cell.instrument ?? 0) & 0xFF;
+        out[off + 2] = (out[off + 2] & 0xF0) | ((cell.effTyp ?? 0) & 0x0F);
+        out[off + 3] = (cell.eff ?? 0) & 0xFF;
+      }
+    });
+  });
+  return { data: out, warnings };
+}
+
 export async function exportKRIS(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];
+
+  const loaded = song.uadeEditableFileData;
+  if (loaded && song.uadePatternLayout?.formatId === 'kris') {
+    const patched = patchKRIS(song, loaded);
+    return {
+      data: new Blob([patched.data], { type: 'application/octet-stream' }),
+      filename: (song.uadeEditableFileName ?? 'untitled.kris').split('/').pop() ?? 'untitled.kris',
+      warnings: patched.warnings,
+    };
+  }
 
   // ── Collect samples ─────────────────────────────────────────────────────
   const samples: (SampleInfo | null)[] = [];
