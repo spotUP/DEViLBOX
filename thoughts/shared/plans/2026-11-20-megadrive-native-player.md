@@ -1,6 +1,6 @@
 ---
 date: 2026-11-20
-status: draft - planning and local survey only; OWNER DECISION lines open; downloads need owner approval
+status: approved 2026-11-20 - owner answers recorded under OWNER DECISIONS; Phase 0 next
 topic: Mega Drive / Genesis native ROM player - Furnace Genesis songs (YM2612 + SN76489) converted to MDSDRV song data, played by MDSDRV in a DEViLBOX player ROM
 related: thoughts/shared/plans/2026-11-15-hardware-replayer-survey.md (Mega Drive rows, lines 19-20, 31-66), thoughts/shared/plans/2026-11-15-hardware-rom-export.md (section "Mega Drive XGM: phases", superseded here), thoughts/shared/plans/2026-11-17-gameboy-native-player.md and 2026-11-17-nes-native-player.md (structure, hUGEDriver / FamiStudio route pattern), thoughts/shared/design/player-ui/player-screens.html (platform `md`)
 ---
@@ -68,6 +68,15 @@ already in tree: `src/engine/__tests__/fixtures/furnace-registers/mm5_boss.fur.j
 - B3 Builds through `~/.claude/bin/buildq --purpose "<session>: <task>" -- <build command>`; test runs nice 19, 2 workers.
 
 ## OWNER DECISIONS (recommended default first)
+
+**Owner answers 2026-11-20:**
+- Downloads: ONLY MDSDRV source (pinned commit) approved. Prebuilt `mdsdrv.bin`, salvador and wine NOT approved.
+- D1: "prebuilt bin, else vasm". The prebuilt bin download is not approved, so build path = port the 68k source to
+  `vasmm68k_mot`. If a prebuilt bin turns out to be inside the approved source checkout, use it. If the Z80 blob build
+  needs salvador, stop and ask the owner (do not download; check first whether the source ships the blob or allows an
+  uncompressed build).
+- D4: keep the XGM route until MDSDRV passes 1:1, then delete it in one commit.
+- D2, D3, D5-D9: recommended defaults (a), not vetoed by the owner.
 
 - **D1 MDSDRV 68k assembly.** (a) Recommended: use the official prebuilt `mdsdrv.bin` from a GitHub release of
   superctr/MDSDRV (zlib) if one exists for the pinned commit, plus a byte-hash staleness guard; (b) port the 68k source
