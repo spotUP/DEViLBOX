@@ -122,7 +122,8 @@ export async function exportSoundFX(
 
         const loopStart = inst.sample.loopStart ?? 0;
         const loopEnd = inst.sample.loopEnd ?? 0;
-        const loopLength = loopEnd > loopStart ? (loopEnd - loopStart) : 0;
+        // loopEnd defaults to the sample length when unlooped (createSamplerInstrument), so the loop flag decides.
+        const loopLength = inst.sample.loop && loopEnd > loopStart ? (loopEnd - loopStart) : 0;
 
         // Volume: instrument volume is in dB (-60 to 0), convert to 0-64
         let vol = 64;
@@ -133,10 +134,12 @@ export async function exportSoundFX(
           vol = Math.round(Math.min(64, Math.max(0, ((inst.volume + 60) / 60) * 64)));
         }
 
+        // The parser stores the 0-64 volume as defaultVolume; the dB value rounds (63 -> 64).
+        const defVol = inst.metadata?.modPlayback?.defaultVolume;
         sampleSlots.push({
           name: (inst.name || '').slice(0, 22),
           pcm,
-          volume: vol,
+          volume: defVol !== undefined ? defVol : vol,
           loopStart,
           loopLength: loopLength > 2 ? loopLength : 0,
           finetune: 0,
@@ -178,7 +181,12 @@ export async function exportSoundFX(
   // ── Calculate tempo ──────────────────────────────────────────────────────
   // Reverse of parser: BPM = (14565 * 122) / speed → speed = (14565 * 122) / BPM
   const bpm = song.initialBPM || 125;
-  const tempo = Math.round((14565.0 * 122.0) / bpm);
+  // BPM is a lossy view of the raw timer value, so keep the source value while the BPM still matches it.
+  let tempo = Math.round((14565.0 * 122.0) / bpm);
+  if (song.soundFxFileData && song.soundFxFileData.byteLength >= 66) {
+    const srcTempo = new DataView(song.soundFxFileData).getUint16(64, false);
+    if (srcTempo > 0 && Math.max(32, Math.min(255, Math.round((14565.0 * 122.0) / srcTempo))) === bpm) tempo = srcTempo;
+  }
 
   // ── Calculate file size ──────────────────────────────────────────────────
   // Header:
@@ -256,24 +264,30 @@ export async function exportSoundFX(
   // -- 18 bytes padding (offset 66..83) — already zeroed --
 
   // -- Sample metadata (offset 84, slots 1-15, 30 bytes each) --
-  let metaPos = 84;
+  // Schism/XMP: 15 metadata blocks start at 80 (tag 4 + tempo 2 + 14 reserved after the size table), as the parser reads them.
+  let metaPos = 80;
+  const srcFile = song.soundFxFileData ? new Uint8Array(song.soundFxFileData) : null;
   for (let i = 0; i < MAX_SAMPLES; i++) {
     const slot = sampleSlots[i];
+    // Start from the source block: empty slots and the oneshot word / finetune are not modelled by instruments.
+    const src = srcFile && srcFile.length >= metaPos + 30 ? srcFile.subarray(metaPos, metaPos + 30) : null;
+    if (src) output.set(src, metaPos);
     if (slot) {
       // Name (22 bytes, null-padded)
       for (let j = 0; j < 22; j++) {
         output[metaPos + j] = j < slot.name.length ? slot.name.charCodeAt(j) & 0xFF : 0;
       }
       // Oneshot length in words (u16 BE) — sample length / 2
-      view.setUint16(metaPos + 22, Math.floor(slot.pcm.length / 2), false);
+      if (!src) view.setUint16(metaPos + 22, Math.floor(slot.pcm.length / 2), false);
       // Finetune (u8)
-      output[metaPos + 24] = slot.finetune & 0xFF;
+      if (!src) output[metaPos + 24] = slot.finetune & 0xFF;
       // Volume (u8)
       output[metaPos + 25] = slot.volume & 0xFF;
       // Loop start (u16 BE) — in bytes
-      view.setUint16(metaPos + 26, slot.loopStart, false);
+      // No loop is the format's idiom: start 0, length word 1.
+      view.setUint16(metaPos + 26, slot.loopLength > 0 ? slot.loopStart : 0, false);
       // Loop length in words (u16 BE) — loop length / 2
-      view.setUint16(metaPos + 28, Math.floor(slot.loopLength / 2), false);
+      view.setUint16(metaPos + 28, slot.loopLength > 0 ? Math.floor(slot.loopLength / 2) : 1, false);
     }
     // Empty slots are already zeroed
     metaPos += 30;
