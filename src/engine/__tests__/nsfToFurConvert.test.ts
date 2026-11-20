@@ -149,12 +149,12 @@ describe('NSF loop and end come from the music', { timeout: 300000 }, () => {
         expect(end.val, 'jump target').toBe(st.loopOrder);
         const loopRows = (sub.ordersLen - end.val) * sub.patLen;
         if (sp.length === 1) {
-          // one speed: walk the rows with channel 0's 0Fxx speed changes, the loop is exact in frames
+          // one speed: walk the rows with the 0Fxx speed changes (any channel; the converter puts them on the
+          // noise channel), the loop is exact in frames
           let speed = sp[0], frames = 0;
           for (let pos = 0; pos < sub.ordersLen; pos++) {
-            const rows = sub.channels[0].patterns.get(sub.orders[0][pos])?.rows ?? [];
             for (let row = 0; row < sub.patLen; row++) {
-              rows[row]?.effects.forEach((e) => { if (e.cmd === 0x0f) speed = e.val; });
+              sub.channels.forEach((ch, ci) => ch.patterns.get(sub.orders[ci][pos])?.rows[row]?.effects.forEach((e) => { if (e.cmd === 0x0f) speed = e.val; }));
               if (pos >= end.val) frames += speed;
             }
           }

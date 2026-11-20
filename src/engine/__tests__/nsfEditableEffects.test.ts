@@ -6,8 +6,10 @@
  * fitted per note and written as 01xx/02xx and 04xy, with only the residual left in the macro. On 2A03 pulse and noise
  * the note's level is the volume column and a held duty is 12xx, so one instrument is one envelope shape at any level and
  * duty (Bionic Commando t7 64 -> 57). The driver has 5 envelope sets (thoughts/spot/2026-11-20-bionic-envelope-count.md);
- * the rest of the 57 are period-unit vibrato pitch macros, which need Furnace's non-linear pitch mode to share. Real songs outside the repo: run
- * only when present.
+ * the rest of the 57 were period-unit vibrato pitch macros; non-linear pitch mode got them to 21, and a delayed vibrato
+ * written as effects (note row 04 + E4 00 + E3 03 triangle, start row 04xy + E4 04) to 19. The remaining one-sided
+ * 4-frame vibrato needs rate 16 and stays in macros (thoughts/spot/2026-11-19-nsf-bionic-audit.md). Real songs outside
+ * the repo: run only when present.
  */
 import fs from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -18,7 +20,7 @@ const METROID = '/Users/spot/Downloads/Metroid (EMU).zophar/Metroid (1986-08)(Ni
 
 type Case = { name: string; path: string; track: number; gridFit: number; maxIns: number; pitchFx: boolean };
 const CASES: Case[] = [
-  { name: 'Bionic Commando t7', path: BIONIC, track: 7, gridFit: 955, maxIns: 21, pitchFx: true },
+  { name: 'Bionic Commando t7', path: BIONIC, track: 7, gridFit: 955, maxIns: 19, pitchFx: true },
   { name: 'Metroid t2', path: METROID, track: 2, gridFit: 950, maxIns: 11, pitchFx: true },
   { name: 'Metroid t3', path: METROID, track: 3, gridFit: 950, maxIns: 6, pitchFx: false },
 ].filter((c) => fs.existsSync(c.path));
