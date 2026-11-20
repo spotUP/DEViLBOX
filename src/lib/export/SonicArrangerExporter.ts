@@ -17,6 +17,8 @@
  */
 
 import { patchModuleByLayout } from './layoutPatch';
+import { editedCells } from '@/lib/song/gridBaseline';
+import { parseSonicArrangerFile } from '@/lib/import/formats/SonicArrangerParser';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { SonicArrangerConfig } from '@/types/instrument';
 
@@ -152,6 +154,17 @@ export async function exportSonicArranger(
   if (song.sonicArrangerFileData && layout?.formatId === 'sonicArranger') {
     const { bytes, unplaced } = patchModuleByLayout(new Uint8Array(song.sonicArrangerFileData), layout, song.patterns);
     if (unplaced.length) warnings.push(`${unplaced.length} edited note(s) have no place in the module and were not written.`);
+    // An instrument or effect the track line cannot carry is skipped by the layout; read the result back and name what did not land.
+    const edits = editedCells(song.patterns);
+    if (edits.length) {
+      const back = await parseSonicArrangerFile(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, 'check.sa');
+      let lost = 0;
+      for (const { pattern, row, channel, cell } of edits) {
+        const got = back.patterns[pattern]?.channels[channel]?.rows[row];
+        if (!got || got.note !== cell.note || got.instrument !== cell.instrument || got.effTyp !== cell.effTyp || got.eff !== cell.eff || got.volume !== cell.volume) lost++;
+      }
+      if (lost > unplaced.length) warnings.push(`${lost - unplaced.length} edited cell(s) hold an instrument, effect or volume the Sonic Arranger track line cannot store; not written.`);
+    }
     const name = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '_');
     return { data: new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer], { type: 'application/octet-stream' }), filename: `${name}.sa`, warnings };
   }
