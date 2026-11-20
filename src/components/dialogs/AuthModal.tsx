@@ -3,9 +3,11 @@
  */
 
 import React, { useState } from 'react';
-import { X, User, Lock, AlertCircle } from 'lucide-react';
+import { X, User, Lock, AlertCircle, Fingerprint } from 'lucide-react';
 import { useAuthStore } from '@stores/useAuthStore';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import { Button } from '@components/ui/Button';
+import { passkeySupported } from '@lib/auth/passkey';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -20,7 +22,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const { signup, login, isLoading, error, clearError } = useAuthStore();
+  const { signup, login, signInWithPasskey, signUpWithPasskey, isLoading, error, clearError } = useAuthStore();
+  const canUsePasskey = passkeySupported();
+  const usernameValid = username.length >= 3 && username.length <= 20;
+
+  const handlePasskey = async () => {
+    clearError();
+    try {
+      if (mode === 'signup') {
+        await signUpWithPasskey(username);
+      } else {
+        await signInWithPasskey();
+      }
+      onSuccess?.();
+      onClose();
+    } catch (_err) {
+      // Error is already set in store
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,6 +182,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           >
             {isLoading ? 'Please wait...' : mode === 'login' ? 'Login' : 'Create Account'}
           </button>
+
+          {canUsePasskey && (
+            <>
+              <div className="flex items-center gap-2 text-xs text-text-muted">
+                <div className="flex-1 border-t border-dark-border" />
+                or
+                <div className="flex-1 border-t border-dark-border" />
+              </div>
+              <Button
+                type="button"
+                variant="default"
+                fullWidth
+                icon={<Fingerprint size={16} />}
+                iconPosition="left"
+                disabled={isLoading || (mode === 'signup' && !usernameValid)}
+                onClick={handlePasskey}
+                title={mode === 'signup' ? 'Enter a username, then create the account with Touch ID, Face ID or a security key' : 'Sign in with Touch ID, Face ID or a security key'}
+              >
+                {mode === 'login' ? 'Sign In with Passkey' : 'Create Account with Passkey'}
+              </Button>
+              {mode === 'signup' && (
+                <p className="text-xs text-text-muted">No password needed: enter a username above and use Touch ID or Face ID.</p>
+              )}
+            </>
+          )}
 
           {/* Toggle mode */}
           <div className="text-center pt-2">

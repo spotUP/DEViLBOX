@@ -4,10 +4,12 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap, FolderOpen, Save, FilePlus, Trash2, List, Music, Grid3x3, Clock, Smartphone, LogIn, LogOut, User, LayoutGrid, Radio, Disc3, Monitor, Columns, Grid2x2, Music4 } from 'lucide-react';
+import { Menu, X, Settings, Download, HelpCircle, Sliders, Zap, FolderOpen, Save, FilePlus, Trash2, List, Music, Grid3x3, Clock, Smartphone, LogIn, LogOut, User, LayoutGrid, Radio, Disc3, Monitor, Columns, Grid2x2, Music4, Fingerprint } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { MIDIToolbarDropdown } from '@components/midi/MIDIToolbarDropdown';
 import { AddToHomeScreenModal } from '@components/dialogs/AddToHomeScreenModal';
+import { PasskeysModal } from '@components/dialogs/PasskeysModal';
+import { passkeySupported } from '@lib/auth/passkey';
 import { useAuthStore } from '@stores/useAuthStore';
 import { useUIStore } from '@stores/useUIStore';
 import { MOBILE_MENU_VIEWS } from '@/constants/viewOptions';
@@ -102,6 +104,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showInstallModal, setShowInstallModal] = useState(false);
+  const [showPasskeys, setShowPasskeys] = useState(false);
   const { user, logout, isServerAvailable } = useAuthStore();
 
   // Swipe-to-dismiss: track touch start X, close on rightward swipe
@@ -354,6 +357,18 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                           <div className="text-xs text-text-muted">Signed in</div>
                         </div>
                       </div>
+                      {passkeySupported() && (
+                        <button
+                          onClick={() => {
+                            setShowPasskeys(true);
+                            setIsOpen(false);
+                          }}
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2 mb-2 rounded bg-dark-bgTertiary hover:bg-dark-bgHover transition-colors text-text-secondary hover:text-text-primary text-sm"
+                        >
+                          <Fingerprint size={14} />
+                          Passkeys
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           logout();
@@ -389,6 +404,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
         isOpen={showInstallModal}
         onClose={() => setShowInstallModal(false)}
       />
+      <PasskeysModal isOpen={showPasskeys} onClose={() => setShowPasskeys(false)} />
     </>
   );
 };

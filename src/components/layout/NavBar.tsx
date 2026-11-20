@@ -4,11 +4,13 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BUILD_HASH, BUILD_DATE, BUILD_NUMBER } from '@constants/version';
-import { Plus, X, Download, LogOut, User, Users, Settings, Lightbulb, Play } from 'lucide-react';
+import { Plus, X, Download, LogOut, User, Users, Settings, Lightbulb, Play, Fingerprint } from 'lucide-react';
 import { DJSetBrowser } from '@components/dj/DJSetBrowser';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
 import { AuthModal } from '@components/dialogs/AuthModal';
+import { PasskeysModal } from '@components/dialogs/PasskeysModal';
+import { passkeySupported } from '@lib/auth/passkey';
 import { closeStartDialog } from '@lib/startup/startupSequence';
 import { CollaborationModal } from '@components/collaboration/CollaborationModal';
 import { Button } from '@components/ui/Button';
@@ -71,6 +73,7 @@ const NavBarComponent: React.FC = () => {
 
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showPasskeys, setShowPasskeys] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -271,6 +274,18 @@ const NavBarComponent: React.FC = () => {
                         <p className="text-xs text-text-muted">Signed in as</p>
                         <p className="text-sm font-medium text-text-primary truncate">{n.authUser.username}</p>
                       </div>
+                      {passkeySupported() && (
+                        <button
+                          onClick={() => {
+                            setShowPasskeys(true);
+                            setShowUserMenu(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-text-secondary hover:bg-dark-bgHover hover:text-text-primary transition-colors flex items-center gap-2"
+                        >
+                          <Fingerprint size={14} />
+                          Passkeys
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           n.logout();
@@ -381,6 +396,8 @@ const NavBarComponent: React.FC = () => {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
       />
+
+      <PasskeysModal isOpen={showPasskeys} onClose={() => setShowPasskeys(false)} />
 
       {/* Collaboration Modal */}
       {modalOpen === 'collab' && (

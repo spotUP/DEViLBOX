@@ -7,6 +7,7 @@ import { persist } from 'zustand/middleware';
 import { hasElectronFS } from '@utils/electron';
 
 import { API_URL } from '@lib/apiBase';
+import { passkeySignIn, passkeySignUp } from '@lib/auth/passkey';
 
 interface User {
   id: string;
@@ -28,6 +29,8 @@ interface AuthStore {
   // Actions
   signup: (username: string, password: string) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
+  signInWithPasskey: () => Promise<void>;
+  signUpWithPasskey: (username: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
   checkServerAvailability: () => Promise<boolean>;
@@ -102,6 +105,29 @@ export const useAuthStore = create<AuthStore>()(
             isLoading: false,
             error: error instanceof Error ? error.message : 'Login failed'
           });
+          throw error;
+        }
+      },
+
+      // Passkey sign-in / passkey-only signup: same session shape as login.
+      signInWithPasskey: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const { user, token } = await passkeySignIn();
+          set({ user, token, isLoading: false, error: null });
+        } catch (error) {
+          set({ isLoading: false, error: error instanceof Error ? error.message : 'Passkey sign-in failed' });
+          throw error;
+        }
+      },
+
+      signUpWithPasskey: async (username: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { user, token } = await passkeySignUp(username);
+          set({ user, token, isLoading: false, error: null });
+        } catch (error) {
+          set({ isLoading: false, error: error instanceof Error ? error.message : 'Passkey signup failed' });
           throw error;
         }
       },
