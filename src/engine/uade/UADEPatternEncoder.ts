@@ -76,6 +76,9 @@ export interface UADEPatternLayout {
    */
   getCellFileOffset?: (pattern: number, row: number, channel: number) => number;
 
+  /** Digital Mugician: transpose + finetune the replayer adds to the cell's note byte; an edited grid note minus this is the byte to store. */
+  getCellNoteShift?: (pattern: number, row: number, channel: number) => number;
+
   /**
    * Set by a format whose grid expands one stored pattern into several grid patterns (song positions): two grid cells
    * with the same getCellFileOffset are one stored cell, so an edit of one is carried to the others in the same undo step

@@ -23,7 +23,9 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import { noteToDMIndex } from '@/lib/import/formats/DigitalMugicianNotes';
+import { parseDigitalMugicianFile } from '@/lib/import/formats/DigitalMugicianParser';
+import { encodeDigitalMugicianCell } from '@/engine/uade/encoders/DigitalMugicianEncoder';
+import { dmIndexToNote, noteToDMIndex } from '@/lib/import/formats/DigitalMugicianNotes';
 
 const MAGIC_V1 = ' MUGICIAN/SOFTEYES 1990 ';
 
@@ -102,10 +104,64 @@ function writeS8(buf: Uint8Array, off: number, val: number): void {
   buf[off] = val & 0xFF;
 }
 
+/**
+ * A song loaded from a file keeps its source bytes (V1 or V2, whichever it was). Write
+ * those back and patch only the fields of pattern cells that differ from a fresh parse
+ * of the source. The grid note is the stored byte plus transpose and finetune, so an
+ * edited note is stored minus that shift. A shared pool block edited through one
+ * position is patched once: unedited positions pointing at it match the fresh parse
+ * and write nothing.
+ */
+/** The note byte that plays `note` once the replayer adds `shift` (transpose + finetune group); the closest to `prev` wins. */
+function rawNoteFor(note: number, shift: number, prev: number): number {
+  let best = -1;
+  for (let raw = 1; raw < 256; raw++) {
+    if (dmIndexToNote(raw + shift) === note && (best < 0 || Math.abs(raw - prev) < Math.abs(best - prev))) best = raw;
+  }
+  return best < 0 ? prev : best;
+}
+
+async function patchLoadedSource(song: TrackerSong): Promise<Uint8Array | null> {
+  const src = song.digMugFileData;
+  const layout = song.uadePatternLayout;
+  if (!src || !layout?.getCellFileOffset) return null;
+  const pristine = await parseDigitalMugicianFile(src.slice(0), 'source');
+  const out = new Uint8Array(src.slice(0));
+  const sampleOf = (id: number): number => {
+    const i = song.instruments.findIndex((x) => x.id === id);
+    return i < 0 ? 0 : i + 1;
+  };
+  for (let p = 0; p < song.patterns.length; p++) {
+    for (let ch = 0; ch < layout.numChannels; ch++) {
+      const rows = song.patterns[p].channels[ch]?.rows ?? [];
+      for (let r = 0; r < Math.min(rows.length, layout.rowsPerPattern); r++) {
+        const cell = rows[r];
+        const was = pristine.patterns[p]?.channels[ch]?.rows[r];
+        if (!was) continue;
+        const off = layout.getCellFileOffset(p, r, ch);
+        if (off < 0 || off + 4 > out.length) continue;
+        if (cell.note !== was.note) {
+          const shift = layout.getCellNoteShift?.(p, r, ch) ?? 0;
+          out[off] = cell.note > 0 ? rawNoteFor(cell.note, shift, out[off]) : 0;
+        }
+        if (cell.instrument !== was.instrument) out[off + 1] = (out[off + 1] & 0xC0) | (sampleOf(cell.instrument) & 0x3F);
+        if (cell.effTyp !== was.effTyp || cell.eff !== was.eff) {
+          const enc = encodeDigitalMugicianCell(cell);
+          out[off + 2] = enc[2];
+          out[off + 3] = enc[3];
+        }
+      }
+    }
+  }
+  return out;
+}
+
 export async function exportDigitalMugician(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];
+  const patched = await patchLoadedSource(song);
+  if (patched) return { data: new Blob([patched], { type: 'application/octet-stream' }), filename: `${(song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_')}.dmu`, warnings };
   const numChannels = 4;
 
   // -- Collect instrument data -----------------------------------------------

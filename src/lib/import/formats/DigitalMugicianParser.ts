@@ -594,6 +594,8 @@ export async function parseDigitalMugicianFile(
   // DM base row (pool offset) per channel for each TrackerSong pattern, for
   // getCellFileOffset: (pattern, row, channel) -> file offset.
   const patternChannelBaseRows: number[][] = [];
+  // transpose + finetune per [pattern][channel][row], for writing an edited grid note back.
+  const patternNoteShifts: number[][][] = [];
 
   const poolRow = (rowOffset: number): DMPatternRow | null =>
     rowOffset >= 0 && rowOffset < patternRows.length ? patternRows[rowOffset] : null;
@@ -649,11 +651,16 @@ export async function parseDigitalMugicianFile(
     songPositions.push(patIdx);
     patternChannelBaseRows.push(steps.map((s) => s.pattern));
 
+    const shiftRows: number[][] = [];
+    patternNoteShifts.push(shiftRows);
     const channelRows: TrackerCell[][] = steps.map((step, ch) => {
       const rows: TrackerCell[] = [];
+      const shifts: number[] = [];
+      shiftRows.push(shifts);
       let lastSample = startSamples[ch];
       for (let row = 0; row < rowCount; row++) {
         const cell = poolRow(step.pattern + row);
+        shifts.push(step.transpose + (lastSample > 0 && lastSample < samples.length ? samples[lastSample].finetune : 0));
         if (!cell || cell.note === 0) {
           rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
           continue;
@@ -662,6 +669,7 @@ export async function parseDigitalMugicianFile(
         // non-zero sample byte selects a new one.
         if (cell.effect !== 0x4A && cell.sample > 0) lastSample = cell.sample;
         const finetune = lastSample > 0 && lastSample < samples.length ? samples[lastSample].finetune : 0;
+        shifts[row] = step.transpose + finetune;
         rows.push(dmCellToTracker(cell, step.transpose, finetune, cell.sample > 0 ? getOrCreateInstrument(cell.sample) : 0));
       }
       return rows;
@@ -758,6 +766,8 @@ export async function parseDigitalMugicianFile(
         period: (raw[0] << 8) | raw[1], pan: raw[2], cutoff: raw[3],
       };
     },
+    getCellNoteShift: (pattern: number, row: number, channel: number): number =>
+      patternNoteShifts[pattern]?.[channel]?.[row] ?? 0,
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       if (pattern < 0 || pattern >= patternChannelBaseRows.length) return patternDataStart;
       if (channel < 0 || channel >= numChannels) return patternDataStart;
