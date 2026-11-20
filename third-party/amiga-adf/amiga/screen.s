@@ -103,6 +103,14 @@ _screen_init:
         beq.w   .dmu
         cmp.l   #'FC14',d0
         beq.w   .nomsg
+        ; SUN-Tronic (movem.l d0-d7/a0-a6 prologue) and CustomMade (jmp abs.l table): compiled 68k
+        ; modules with no text fields.
+        cmp.l   #$48e7fffe,d0
+        beq.w   .nomsg
+        swap    d0
+        cmp.w   #$4ef9,d0
+        beq.w   .nomsg
+        swap    d0
         cmp.l   #'SMOD',d0
         beq.w   .nomsg
         cmp.l   #'FC13',d0
