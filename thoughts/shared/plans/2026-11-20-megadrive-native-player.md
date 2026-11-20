@@ -308,3 +308,39 @@ Reproduce: `tools/md-phase0/run.sh <scratch-dir>` (driver build + 3 shell ROMs +
 
 ### Next step
 - Phase 1: pitch mapping per chip (FM transpose vs PSG octave), pta direction, PAL tempo, then the exporter.
+
+## Phase 1 results
+
+Converter core: `src/lib/export/md/mdsSong.ts` (`furnaceToMds`). Unit test: `src/lib/export/__tests__/mdsSong.test.ts`.
+Reuse: `arpIsFixed` and `expandProcMacro` from `nes/famistudioSong.ts`; the lossy collector and macro pattern follow `gb/hugeSong.ts`.
+
+### What converts
+- Systems `[0x02]`, `[0x83, 0x03]` (6 FM + 3 PSG tone + noise) and `[0x83]` (FM only). Other systems throw.
+- Order flow is simulated with 0B / 0D / 09 / 0F / FF and speed alternation (speedPattern or speed1/speed2). Each (order, start row) pair becomes one chunk. The first repeated pair is the `FA` loop target, closed by `FB 00`.
+- Chunks that repeat become `FE` subroutines, except where this chunk or the next starts with a tie.
+- Per chunk the converter writes an instrument prefix (`E1` voice, `E8` PEG, `EB` macro table), `E2` volume and `E9` pan on FM. Notes, ties and rests are split at 128 ticks.
+- FM voices come from the Furnace FM data (DT table remapped, operator order 1-3-2-4, transpose byte $30).
+- PSG volume macros become PSG envelopes. Arp macros become macro tables (`16 tt` transpose, `81 nn` wait). Absolute pitch macros become PEG nodes (Furnace 1/128 semitone, x2 to MDSDRV $100 = semitone).
+- Effect 08 maps to FM pan. Volume column: FM `E2 127-v`, PSG `E2 round((15-v)*8/3)`.
+- `F9 7F` (1 tick per frame) goes on the first track.
+
+### Measured in MAME (tools/md-phase0 shell, headless)
+- Note mapping. FM with voice transpose $30 and note = Furnace note value: A-4 gives block 4 fnum 1083 = 440.1 Hz, and C-4 gives fnum 644 = 261.7 Hz. PSG note = Furnace value - 24: A-4 gives period 254 = 440.4 Hz, and C-4 gives period 427 = 262.0 Hz. Furnace plays 440.0 and 261.6 Hz.
+- Timing. Length byte = ticks - 1. With `F9 7F` and 24-tick rows, key-ons fall at frames 5, 29 and 53, so one tick is one NTSC frame.
+- pta (`E7`): a larger value gives a faster slide. With `E7 04` the FM1 fnum climbs about 18 per frame (block 0, 661 to 1266 over 28 frames). With `E7 20` it climbs about 170 per frame at block 0, then about 50 per frame at block 3. On a key-on with no previous note, the slide starts from the bottom of the range. The glide curve has not yet been mapped to the Furnace 03xx speed.
+- Real song, Fancy_Promenard.fur (systems 83+03, 58 Hz, speeds 4/3). On the first rows, every FM key-on in MAME matches the converter's note and order: F-1 43.6 Hz, E-5 659.2, G-2 98.0, G-5 784.3, D-5 587.6 and B-4 493.8 at row 0; E-5 and G-3 196.1 at row 1 (+7 frames, 4+3 ticks); A-4 440.1 at row 2. The noise channel runs its PSG envelope (attenuation 3, 7, 10, 12, 13, 14). FM1 (the first track, which carries `F9`) keys on one frame before the other tracks.
+
+### Unverified / lossy
+- In Fancy_Promenard, effects 03 (18 uses) and E5 (5 uses) are dropped. The song plays at 60 Hz instead of 58 Hz.
+- Noise-channel notes are written as PSG pitch, without setting the noise mode (452 notes in Fancy_Promenard).
+- Not converted: FM volume macro, FMS/AMS, fixed arp, relative pitch macro, macro delay and release, tuning other than 440, and virtual tempo other than 1:1.
+- Arp macro wait `81 nn` = nn+1 ticks comes from reading the code. The PEG scale is not measured in MAME.
+- The FM1 one-frame lead is not explained.
+- A loop that ends inside a tied note is not checked for legato.
+
+### Next step
+- Map 03xx to an `E7` value by fitting the measured curve.
+- Map E5 to fine tune.
+- Set the noise mode for PSG channel 4.
+- Find tempo handling for songs that are not 60 Hz.
+- Then Phase 2 (ROM build and UI wiring).
