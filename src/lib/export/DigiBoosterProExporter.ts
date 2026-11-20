@@ -21,6 +21,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { parseDigiBoosterProFile } from '@/lib/import/formats/DigiBoosterProParser';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -248,10 +249,69 @@ function extractSampleData(
 
 // ── Main exporter ────────────────────────────────────────────────────────────
 
+/**
+ * Loaded song: copy the source bytes verbatim; only patterns whose cells differ
+ * from a fresh parse of the source are re-packed (PATT chunk size patched).
+ */
+function patchSourceBytes(song: TrackerSong, src: Uint8Array): Uint8Array | null {
+  const orig = parseDigiBoosterProFile(src.slice(0), 'x');
+  if (!orig || orig.patterns.length !== song.patterns.length || orig.numChannels !== song.numChannels) return null;
+  const edited = new Set<number>();
+  song.patterns.forEach((pat, p) => {
+    if (JSON.stringify(pat.channels.map((c) => c.rows)) !== JSON.stringify(orig.patterns[p].channels.map((c) => c.rows))) edited.add(p);
+  });
+  if (edited.size === 0) return src.slice(0);
+
+  const sv = new DataView(src.buffer, src.byteOffset, src.byteLength);
+  let pos = 8;
+  while (pos + 8 <= src.length) {
+    const id = String.fromCharCode(src[pos], src[pos + 1], src[pos + 2], src[pos + 3]);
+    const len = sv.getUint32(pos + 4, false);
+    if (id === 'PATT') {
+      const parts: Uint8Array[] = [];
+      let q = pos + 8;
+      const end = q + len;
+      for (let p = 0; q + 6 <= end; p++) {
+        const rows = sv.getUint16(q, false);
+        const size = sv.getUint32(q + 2, false);
+        if (edited.has(p)) {
+          const packed = packPattern(song.patterns[p].channels, rows, song.numChannels);
+          const part = new Uint8Array(6 + packed.length);
+          new DataView(part.buffer).setUint16(0, rows, false);
+          new DataView(part.buffer).setUint32(2, packed.length, false);
+          part.set(packed, 6);
+          parts.push(part);
+        } else {
+          parts.push(src.subarray(q, q + 6 + size));
+        }
+        q += 6 + size;
+      }
+      const patt = new Uint8Array(parts.reduce((n, a) => n + a.length, 0));
+      let o = 0;
+      for (const a of parts) { patt.set(a, o); o += a.length; }
+      const chunk = iffChunk('PATT', patt);
+      const out = new Uint8Array(pos + chunk.length + (src.length - end));
+      out.set(src.subarray(0, pos), 0);
+      out.set(chunk, pos);
+      out.set(src.subarray(end), pos + chunk.length);
+      return out;
+    }
+    pos += 8 + len;
+  }
+  return null;
+}
+
 export async function exportDigiBoosterPro(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];
+  if (song.digiBoosterProFileData) {
+    const patched = patchSourceBytes(song, song.digiBoosterProFileData);
+    if (patched) {
+      const baseName = (song.name ?? 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '').trim() || 'untitled';
+      return { data: new Blob([patched.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' }), filename: `${baseName}.dbm`, warnings };
+    }
+  }
   const numChannels = song.numChannels;
   const numPatterns = song.patterns.length;
   const numInstruments = Math.min(255, song.instruments.length);

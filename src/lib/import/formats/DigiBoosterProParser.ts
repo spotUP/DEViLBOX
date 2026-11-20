@@ -916,5 +916,6 @@ function _parseDigiBoosterProFile(bytes: Uint8Array, filename: string): TrackerS
     initialBPM:      125,
     linearPeriods:   false,
     uadeVariableLayout,
+    digiBoosterProFileData: bytes.slice(0),
   };
 }
