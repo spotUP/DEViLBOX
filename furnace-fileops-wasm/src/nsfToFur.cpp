@@ -668,25 +668,32 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   sub->patLen = patLen;
   sub->ordersLen = (R + patLen - 1) / patLen;
 
-  // effect columns: 0 EDxx delay, 1 pitch (E5xx), 2 song end (ch0), 3 loop-stall speed (ch0)
-  struct Cell { short note = -1, ins = -1, fx[4] = {-1, -1, -1, -1}, fxv[4] = {-1, -1, -1, -1}; };
+  // effect columns: 0 EDxx delay, 1 pitch (E5xx), 2 pitch slide (01xx/02xx), 3 vibrato (04xy),
+  // 4 song end (ch0), 5 loop-stall speed (ch0)
+  enum { kFxCols = 6 };
+  struct Cell { short note = -1, ins = -1, fx[kFxCols] = {-1, -1, -1, -1, -1, -1}, fxv[kFxCols] = {-1, -1, -1, -1, -1, -1}; };
   std::vector<std::vector<Cell>> cells(nCh, std::vector<Cell>(R));
   auto place = [&](Cell& cl, int vf) { const int o = vf - rowStart(rowOf(vf)); if (o) { cl.fx[0] = 0xED; cl.fxv[0] = (short)o; } };
 
   // Segments: one note per row start; frames until the next start fold into macros.
-  struct Seg { int ci, tmpl, len; std::vector<int> vol, arp, pit, duty; Cell* cell; };
+  struct Seg { int ci, tmpl, len; std::vector<int> vol, arp, pit, duty; Cell* cell; bool pfx = false, atLoop = false; int sl = 0, vib = 0; };
   std::vector<Seg> segs;
   int dpcmHits = 0, dpcmTrigs = 0;
   // E5xx state per channel follows row order; the loop target row's first note sets it again so the
   // second pass does not inherit the song end's value
   const int loopRow = loopF >= 0 ? endFxv * patLen : -1;
-  std::vector<char> usesE5(nCh, 0);
+  // Furnace vibrato offset (playback.cpp 04xy, vibratoFine 15) in 1/128 semitone at table position pos
+  auto vibOff = [](int depth, int pos) {
+    return ((depth * (int)(short)(127 * std::sin(pos / 64.0 * (2 * M_PI))) * 15) >> 4) / 15;
+  };
   for (int ci = 0; ci < nCh; ci++) {
     if (chans[ci].idx < 0) continue;
     const Kind k = chans[ci].kind;
     const std::vector<Fr>& a = fr[ci];
     int curE5 = 0;
     bool loopSet = loopRow < 0;
+    // 01/02/04 only where the Furnace pitch is register-exact (2A03/MMC5 period table); expansion chips keep macros
+    const bool pitchFx = k == K_SQ || k == K_MMC5_SQ || k == K_TRI;
     if (k == K_DPCM) {
       int lastRow = -1;
       for (int f = 0; f < nUse; f++) {
@@ -730,8 +737,9 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
       // The note's own fine goes to E5xx (pitch, persists per channel); the macros hold the change from the
       // note start (semitones in arpeggio, fine in pitch), so a held note shares one flat instrument.
       const int f0 = a[s].fine;
-      if (k != K_NOISE && (f0 != curE5 || (!loopSet && row >= loopRow))) {
-        cl.fx[1] = 0xE5; cl.fxv[1] = (short)(f0 + 0x80); curE5 = f0; usesE5[ci] = 1;
+      const bool atLoop = !loopSet && row >= loopRow;
+      if (k != K_NOISE && (f0 != curE5 || atLoop)) {
+        cl.fx[1] = 0xE5; cl.fxv[1] = (short)(f0 + 0x80); curE5 = f0;
       }
       if (row >= loopRow) loopSet = true;
       int ar = 0, pi = 0, du = a[s].duty;
@@ -739,8 +747,82 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
         if (a[f].on) { ar = a[f].note - a[s].note; pi = a[f].fine - f0; if (a[f].duty >= 0) du = a[f].duty; }
         g.vol.push_back(a[f].on ? a[f].vol : 0); g.arp.push_back(ar); g.pit.push_back(pi); g.duty.push_back(du);
       }
+      g.pfx = pitchFx; g.atLoop = atLoop;
       segs.push_back(std::move(g));
     }
+  }
+
+  // Pitch effects: a linear slide (01xx up / 02xx down, xx * pitchSlideSpeed 4 per tick) or a vibrato (04xy)
+  // that halves the pitch error over the sounding frames. Both step on the note's own tick (t + 1); the
+  // residual (NES slides are linear in period, not in pitch) stays in the pitch macro, arpeggio flat.
+  // Decided longest note first; a note whose arp/pitch curve is a prefix of an already decided same-template
+  // note takes that decision, so twins keep sharing one instrument (exact-prefix match below).
+  {
+    std::vector<int> order;
+    for (int i = 0; i < (int)segs.size(); i++) if (segs[i].pfx) order.push_back(i);
+    std::stable_sort(order.begin(), order.end(), [&](int x, int y) { return segs[x].len > segs[y].len; });
+    for (size_t oi = 0; oi < order.size(); oi++) {
+      Seg& g = segs[order[oi]];
+      bool reused = false;
+      for (size_t oj = 0; oj < oi && !reused; oj++) {
+        const Seg& h = segs[order[oj]];
+        if (h.tmpl != g.tmpl) continue;
+        reused = std::equal(g.arp.begin(), g.arp.end(), h.arp.begin()) && std::equal(g.pit.begin(), g.pit.end(), h.pit.begin());
+        if (reused) { g.sl = h.sl; g.vib = h.vib; }
+      }
+      if (reused) continue;
+      std::vector<int> D(g.len);
+      for (int t = 0; t < g.len; t++) D[t] = g.arp[t] * 128 + g.pit[t];
+      auto err = [&](auto model) {
+        long e = 0;
+        for (int t = 0; t < g.len; t++) if (g.vol[t] > 0) e += std::abs(D[t] - model(t));
+        return e;
+      };
+      const long e0 = err([](int) { return 0; });
+      long best = e0;
+      if (e0 > 0 && g.len >= 3) {
+        double num = 0, den = 0;
+        for (int t = 0; t < g.len; t++) { num += D[t] * (t + 1.0); den += (t + 1.0) * (t + 1.0); }
+        const int x0 = (int)std::lround(num / den / 4);
+        for (int x = x0 - 1; x <= x0 + 1; x++) {
+          if (!x || std::abs(x) > 255) continue;
+          const long e = err([&](int t) { return (t + 1) * 4 * x; });
+          if (2 * e <= e0 && e < best) { best = e; g.sl = x; }
+        }
+        for (int r = 1; r < 16; r++)
+          for (int d = 1; d < 16; d++) {
+            const long e = err([&](int t) { return vibOff(d, r * (t + 1) & 63); });
+            if (2 * e <= e0 && e < best) { best = e; g.sl = 0; g.vib = r << 4 | d; }
+          }
+      }
+    }
+    // cells in row order per channel: 01/02 and 04 persist, so write only on change; the loop target's first
+    // note forces a set, dropped again when the song end carries the same value into the second pass
+    int ci = -1, curSl = 0, curVib = 0, loopSl = 0, loopVib = 0;
+    Cell* loopCell = nullptr;
+    bool loopSlChg = false, loopVibChg = false;
+    auto closeLoop = [&]() {
+      if (!loopCell) return;
+      if (!loopSlChg && curSl == loopSl) loopCell->fx[2] = loopCell->fxv[2] = -1;
+      if (!loopVibChg && curVib == loopVib) loopCell->fx[3] = loopCell->fxv[3] = -1;
+      loopCell = nullptr;
+    };
+    for (Seg& g: segs) {
+      if (!g.pfx) continue;
+      if (g.ci != ci) { closeLoop(); ci = g.ci; curSl = curVib = 0; }
+      Cell& cl = *g.cell;
+      const int sl = g.sl, vib = g.vib;
+      if (g.atLoop) { loopCell = &cl; loopSl = sl; loopVib = vib; loopSlChg = sl != curSl; loopVibChg = vib != curVib; }
+      if (sl != curSl || g.atLoop) { cl.fx[2] = (short)(sl < 0 ? 0x02 : 0x01); cl.fxv[2] = (short)std::abs(sl); curSl = sl; }
+      if (vib != curVib || g.atLoop) { cl.fx[3] = 0x04; cl.fxv[3] = (short)vib; curVib = vib; }
+      if (sl || vib) {
+        for (int t = 0; t < g.len; t++) {
+          g.pit[t] = g.arp[t] * 128 + g.pit[t] - (sl ? (t + 1) * 4 * sl : vibOff(vib & 15, (vib >> 4) * (t + 1) & 63));
+          g.arp[t] = 0;
+        }
+      }
+    }
+    closeLoop();
   }
 
   // Instruments: copy the template, fold the segment into vol/arp/pitch/duty macros, share by content.
@@ -801,18 +883,20 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
     g.cell->ins = (short)found;
   }
 
-  cells[0][R - 1].fx[2] = (short)endFx; cells[0][R - 1].fxv[2] = (short)endFxv;
+  cells[0][R - 1].fx[4] = (short)endFx; cells[0][R - 1].fxv[4] = (short)endFxv;
   for (int r = longRow; longRow >= 0 && r < R; r += longLr) {
-    cells[0][r].fx[3] = 0x0F; cells[0][r].fxv[3] = (short)(S + longRem);
+    cells[0][r].fx[5] = 0x0F; cells[0][r].fxv[5] = (short)(S + longRem);
     const int back = r + 1 < R ? r + 1 : loopF >= 0 ? endFxv * patLen : -1; // the loop target row restores S
-    if (back >= 0) { cells[0][back].fx[3] = 0x0F; cells[0][back].fxv[3] = (short)S; }
+    if (back >= 0) { cells[0][back].fx[5] = 0x0F; cells[0][back].fxv[5] = (short)S; }
   }
 
   // Patterns: patLen-row blocks per channel, identical blocks share one pattern index.
   int chanPats = 0;
   for (int ci = 0; ci < nCh; ci++) {
-    // channel 1 carries the song end (0Bxx / FF00) and loop-stall speeds; columns stay in Cell order
-    sub->pat[ci].effectCols = ci ? (usesE5[ci] ? 2 : 1) : longRow >= 0 ? 4 : 3;
+    // channel 1 carries the song end (0Bxx / FF00) and loop-stall speeds; columns stay in Cell order, up to the last used
+    int cols = 1;
+    for (const Cell& cl: cells[ci]) for (int x = cols; x < kFxCols; x++) if (cl.fx[x] >= 0) cols = x + 1;
+    sub->pat[ci].effectCols = cols;
     std::map<std::string, int> seen;
     for (int blk = 0; blk < sub->ordersLen; blk++) {
       std::string key;
@@ -830,7 +914,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
           const Cell& cl = cells[ci][blk * patLen + r];
           short* row = p->newData[r];
           row[DIV_PAT_NOTE] = cl.note; row[DIV_PAT_INS] = cl.ins;
-          for (int x = 0; x < 4; x++) { row[DIV_PAT_FX(x)] = cl.fx[x]; row[DIV_PAT_FXVAL(x)] = cl.fxv[x]; }
+          for (int x = 0; x < kFxCols; x++) { row[DIV_PAT_FX(x)] = cl.fx[x]; row[DIV_PAT_FXVAL(x)] = cl.fxv[x]; }
         }
       }
       sub->orders.ord[ci][blk] = it->second;
@@ -845,7 +929,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
     const Kind k = chans[ci].kind;
     if (chans[ci].idx < 0 || k == K_DPCM) continue;
     bool playing = false;
-    int ins = -1, base = 0, t0 = 0, e5 = 0;
+    int ins = -1, base = 0, t0 = 0, e5 = 0, sl = 0, slAcc = 0, vr = 0, vd = 0, vPos = 0;
     for (int vf = 0, row = 0; vf < rowStart(R); vf++) {
       if (vf >= rowStart(row + 1)) row++;
       {
@@ -854,13 +938,17 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
         const int d = cl[DIV_PAT_FX(0)] == 0xED ? cl[DIV_PAT_FXVAL(0)] : 0;
         if (vf - rowStart(row) == d) {
           if (cl[DIV_PAT_FX(1)] == 0xE5) e5 = cl[DIV_PAT_FXVAL(1)] - 0x80;
+          if (cl[DIV_PAT_FX(2)] == 0x01 || cl[DIV_PAT_FX(2)] == 0x02) sl = (cl[DIV_PAT_FX(2)] == 0x01 ? 4 : -4) * cl[DIV_PAT_FXVAL(2)];
+          if (cl[DIV_PAT_FX(3)] == 0x04) { vr = cl[DIV_PAT_FXVAL(3)] >> 4; vd = cl[DIV_PAT_FXVAL(3)] & 15; }
           if (cl[DIV_PAT_NOTE] == DIV_NOTE_OFF) playing = false;
           else if (cl[DIV_PAT_NOTE] >= 0) {
-            playing = true; base = cl[DIV_PAT_NOTE]; t0 = vf;
+            playing = true; base = cl[DIV_PAT_NOTE]; t0 = vf; slAcc = 0; vPos = 0;
             if (cl[DIV_PAT_INS] >= 0) ins = cl[DIV_PAT_INS];
           }
         }
       }
+      slAcc += sl; // slides and vibrato step every tick, the note's own included
+      if (vd) vPos = (vPos + vr) & 63;
       const int f = vf - pad;
       if (f < 0 || f >= n) continue;
       const Fr& tr = fr[ci][f];
@@ -870,7 +958,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
         const DivInstrumentSTD& m = song.ins[ins]->std;
         const int t = vf - t0;
         mVol = macroAt(m.volMacro, t);
-        mP = (base + macroAt(m.arpMacro, t)) * 128 + e5 + macroAt(m.pitchMacro, t);
+        mP = (base + macroAt(m.arpMacro, t)) * 128 + e5 + slAcc + (vd ? vibOff(vd, vPos) : 0) + macroAt(m.pitchMacro, t);
         mDuty = m.dutyMacro.len ? macroAt(m.dutyMacro, t) : -1;
         mOn = k == K_VRC7 || mVol > 0;
       }
