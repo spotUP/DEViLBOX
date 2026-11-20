@@ -63,6 +63,9 @@ function isNoteSlot(e: DwWalkEvent): boolean {
 /** A note put on a row the replayer runs no note on (G5). */
 interface DwAdd { ch: number; row: number; note: number; instrument: number; where: string }
 
+/** A one-argument command typed on a slot the replayer ran none on: its two bytes go in front of the command that anchors the row. */
+interface DwCmdInsert { block: number; pos: number; bytes: number[] }
+
 /** The mute track command: 0x80 | effect 2 (DW_EFFECT_MUTE). Silences the voice and, like a note, ends the read run. */
 const DW_MUTE_BYTE = 0x82;
 
@@ -80,10 +83,10 @@ const WAIT_BASE = 0xdf;
  */
 function growBlocks(
   source: Uint8Array, walk: DwWalk, clock: RowClock, adds: DwAdd[], noteSample: Map<DwWalkEvent, DwWalkEvent | null>, warnings: string[],
-  transposes: Map<DwWalkEvent, DwTransposes>,
+  transposes: Map<DwWalkEvent, DwTransposes>, cmdInserts: DwCmdInsert[],
 ): { data: Uint8Array; patched: number } {
   const { layout } = walk;
-  if (layout.oldPlayer) { for (const a of adds) warnings.push(`${a.where}: this player's notes carry their sample; not written`); return { data: source, patched: 0 }; }
+  if (layout.oldPlayer) { for (const a of adds) warnings.push(`${a.where}: this player's notes carry their sample; not written`); adds = []; }
   const byBlock = new Map<number, Array<{ pos: number; before: number[]; after: number[] }>>();
   const taken = new Set<DwWalkEvent>();
   // The speed in force at a tick: the last speed command at or before it, else the subsong's.
@@ -138,6 +141,13 @@ function growBlocks(
       after: [WAIT_BASE + rest, ...middle, noteByte, ...afterZ, WAIT_BASE + durationUnits],
     });
     byBlock.set(cover.block, list);
+  }
+
+  // A command is no note: it takes no time, so it goes in front of the anchor and runs on the same tick.
+  for (const c of cmdInserts) {
+    const list = byBlock.get(c.block) ?? [];
+    list.push({ pos: c.pos, before: c.bytes, after: [] });
+    byBlock.set(c.block, list);
   }
 
   let data = source;
@@ -198,6 +208,7 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
     else if (isNoteSlot(e)) noteSample.set(e, lastSample[e.channel]);
   }
   const adds: DwAdd[] = [];
+  const cmdInserts: DwCmdInsert[] = [];
   // The command byte this module uses for each one-argument command (its flags decide what id 8, 10, 12 mean, so only a byte the module already runs is safe to write).
   const cmdByteOf = new Map<number, number>();
   if (!walk.layout.oldPlayer) {
@@ -277,6 +288,14 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
             else { want(cmdOffset(src.e), cmdByteOf.get(ct)!, `${where} effect ${s + 1} command`); want(cmdOffset(src.e) + 1, cv, `${where} effect ${s + 1}`); }
             continue;
           }
+          if (!src && bt === 0 && cmdByteOf.has(ct)) {
+            // a one-argument command on a slot with none: insert its two bytes before the command that anchors the row
+            const anchor = noteEv ?? events.find((e) => e.block !== NO_BLOCK);
+            if (!anchor || anchor.block === NO_BLOCK) warnings.push(`${where}: no command runs on this row to put the effect in front of; not written`);
+            else if (ct === FX_SPEED && (cv < 1 || cv > 31)) warnings.push(`${where}: speed ${cv} is outside 1..31; not written`);
+            else cmdInserts.push({ block: anchor.block, pos: anchor.pos, bytes: [cmdByteOf.get(ct)!, cv & 0xff] });
+            continue;
+          }
           if (!src || bt !== ct) { warnings.push(`${where}: effect column ${s + 1} changed to another command; not written`); continue; }
           const off = cmdOffset(src.e);
           if (src.typ === DW_FX.envelope || src.typ === DW_FX.arpeggio) {
@@ -299,8 +318,8 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
   for (const [off, { value }] of wanted) {
     if (out[off] !== value) { out[off] = value; patched++; }
   }
-  if (adds.length > 0) {
-    const grown = growBlocks(out, walk, clock, adds, noteSample, warnings, transposes);
+  if (adds.length > 0 || cmdInserts.length > 0) {
+    const grown = growBlocks(out, walk, clock, adds, noteSample, warnings, transposes, cmdInserts);
     return { data: grown.data, patched: patched + grown.patched, warnings };
   }
   return { data: out, patched, warnings };
