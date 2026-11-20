@@ -52,9 +52,9 @@ function pitches(n: HivelyNativeData): Map<string, number> {
   return out;
 }
 
-/** Bytes the format stores but no player reads, which the model cannot hold: aces_high.ahx instrument 7 byte 19 has bit 7 set
- *  (the player reads filterUpperLimit = byte & 0x3f). Listed by file offset so any other unedited difference fails. */
-const UNUSED_BITS: Record<string, number[]> = { 'public/data/songs/formats/aces_high.ahx': [24695] };
+/** Bytes the format stores but no player reads and the model cannot hold, listed by file offset so any other unedited
+ *  difference fails. Empty since the exporter writes AHX instrument byte 19 padding bits back (aces_high.ahx instrument 7, e70c69519). */
+const UNUSED_BITS: Record<string, number[]> = {};
 
 describe.each(FILES)('%s', (f) => {
   beforeEach(() => { useFormatStore.setState({ hivelyNative: null as never }); });

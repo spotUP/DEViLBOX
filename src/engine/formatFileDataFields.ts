@@ -53,6 +53,8 @@ export const FILE_DATA_FIELDS = [
   'sidmon1WasmFileData',
   'artOfNoiseFileData',
   'cinter4FileData',
+  'digitalSymphonyFileData',
+  'digiBoosterProFileData',
   'cinter4RawData',           // companion raw-sample PCM buffer for Cinter4
   'fmplayerFileData',
   'qsfFileData',

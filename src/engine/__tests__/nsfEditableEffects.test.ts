@@ -27,7 +27,7 @@ const CASES: Case[] = [
 
 beforeAll(() => { installFurnaceFileOpsWasm(); });
 
-describe('NSF import writes pitch as effects', { timeout: 300000 }, () => {
+describe.skipIf(CASES.length === 0)('NSF import writes pitch as effects', { timeout: 300000 }, () => {
   for (const c of CASES) {
     it(`${c.name}: shared instruments, slides and vibrato as effects, grid and parity hold`, async () => {
       const { nsfToFurWasm, nsfLastStatsWasm, loadFurFileWasm, NSF_DEFAULT_FRAMES } = await import('../../lib/import/wasm/FurnaceFileOps');

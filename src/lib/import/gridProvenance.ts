@@ -577,7 +577,7 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
 
 /** Direct decodes of a stored pattern format (or libopenmpt). */
 export const DIRECT_GRIDS: readonly string[] = [
-  'fur', 'dmf', 'hvl', 'okt', 'med', 'digi', 'deltaMusic2', 'fc', 'soundmon', 'sidmon2', 'soundfx',
+  'fur', 'ned', 'dmf', 'hvl', 'okt', 'med', 'digi', 'deltaMusic2', 'fc', 'soundmon', 'sidmon2', 'soundfx',
   'jamcracker', 'quadraComposer', 'amosMusicBank', 'sonicArranger', 'inStereo2', 'inStereo1',
   'inStereoAmbiguous', 'hippelCoso', 'tfmx', 'artOfNoise', 'digitalSymphony', 'graoumfTracker2',
   'symphoniePro', 'digiBoosterPro', 'pumaTracker', 'synthesis', 'digitalSoundStudio',

@@ -390,6 +390,8 @@ function patchLoadedSource(song: TrackerSong): Uint8Array | null {
   if (!src || !lay) return null;
   const pristine = parseMusicLineFile(src.slice(0));
   if (!pristine) return null;
+  // An instrument added or removed (merge/remove unused wavesamples) renumbers the INST/SMPL chunks: only the rebuild writes that.
+  if (pristine.instruments.length !== song.instruments.length) return null;
   const edits: { addr: number; size: number; bytes: Uint8Array }[] = [];
   for (let i = 0; i < Math.min(song.patterns.length, lay.filePatternAddrs.length); i++) {
     const addr = lay.filePatternAddrs[i];

@@ -125,7 +125,7 @@ const END_CASES: EndCase[] = [
   { name: 'metroid.nsf track 1 (jingle)', path: METROID, track: 1, lastSound: 511 },
 ].filter((c) => fs.existsSync(c.path));
 
-describe('NSF loop and end come from the music', { timeout: 300000 }, () => {
+describe.skipIf(END_CASES.length === 0)('NSF loop and end come from the music', { timeout: 300000 }, () => {
   for (const c of END_CASES) {
     it(`${c.name}: one end effect on the last played row, no silent tail`, async () => {
       const { nsfToFurWasm, nsfLastStatsWasm, loadFurFileWasm, NSF_DEFAULT_FRAMES } = await import('../../lib/import/wasm/FurnaceFileOps');

@@ -109,6 +109,8 @@ export interface FormatStore {
   sidmon1WasmFileData: ArrayBuffer | null;
   artOfNoiseFileData: ArrayBuffer | null;
   cinter4FileData: ArrayBuffer | null;
+  digitalSymphonyFileData: Uint8Array | null;
+  digiBoosterProFileData: Uint8Array | null;
   cinter4RawData: ArrayBuffer | null;
   fmplayerFileData: ArrayBuffer | null;
   qsfFileData: ArrayBuffer | null;
@@ -689,6 +691,8 @@ export const useFormatStore = create<FormatStore>()(
     sidmon1WasmFileData: null,
     artOfNoiseFileData: null,
     cinter4FileData: null,
+    digitalSymphonyFileData: null,
+    digiBoosterProFileData: null,
     cinter4RawData: null,
     fmplayerFileData: null,
     qsfFileData: null,
@@ -1414,6 +1418,8 @@ export const useFormatStore = create<FormatStore>()(
         state.sidmon1WasmFileData = (song as any).sidmon1WasmFileData ?? null;
         state.artOfNoiseFileData = (song as any).artOfNoiseFileData ?? null;
         state.cinter4FileData = (song as any).cinter4FileData ?? null;
+        state.digitalSymphonyFileData = (song as any).digitalSymphonyFileData ?? null;
+        state.digiBoosterProFileData = (song as any).digiBoosterProFileData ?? null;
         state.cinter4RawData = (song as any).cinter4RawData ?? null;
         state.fmplayerFileData = (song as any).fmplayerFileData ?? null;
         state.qsfFileData = (song as any).qsfFileData ?? null;
@@ -1803,6 +1809,8 @@ export const useFormatStore = create<FormatStore>()(
       state.sidmon1WasmFileData = null;
       state.artOfNoiseFileData = null;
       state.cinter4FileData = null;
+      state.digitalSymphonyFileData = null;
+      state.digiBoosterProFileData = null;
       state.cinter4RawData = null;
       state.fmplayerFileData = null;
       state.qsfFileData = null;
