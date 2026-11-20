@@ -13,10 +13,17 @@
  * delay change of d ticks adds d to the duration byte of the timing command just before the note and takes d from the
  * note's own duration byte: the note moves, every later onset on the voice stays where it was and no byte is added.
  *
+ * An instrument is the sample a note plays with. The note byte holds none: the sample is set by the last sample-map
+ * command (byte 0x80+index, or index & 7) the voice ran, which picks entry `index` of the voice's mapping (identity at
+ * the start, changed by position-list map-set commands). So an instrument edit is written as a new index byte in that
+ * one command, when every note it governs was edited to the same instrument and some mapping index holds that sample on
+ * every run of the command; a lone note of a shared command cannot be changed without changing the others.
+ *
  * Not written, and named in `warnings`, never half-applied: a note where the replayer ran none, a note removed
  * (both change the track's length), a note outside 0x00-0x7e, a delay the duration bytes cannot hold (outside the
- * row, or a duration that would leave 1..255), and instrument / effect-column changes (the command arguments have
- * no cell-to-byte map yet).
+ * row, or a duration that would leave 1..255), an instrument edit that does not cover every note its sample-map
+ * command governs (or names a sample no mapping index reaches), and effect-column changes (the command arguments
+ * have no cell-to-byte map yet).
  */
 import type { Pattern } from '@/types';
 import { periodToNote } from '@/lib/amiga/periodNotes';
@@ -145,12 +152,13 @@ export function applyBdGridEdits(
           else if (d < 0 || d >= step) warnings.push(`${where}: a delay of ${d} is outside the row (0-${step - 1} ticks); not written`);
           else moveOnset(pl, d - pl.offset, where);
         }
-        if (c.instrument !== b.instrument) warnings.push(`${where}: an instrument change has no command byte mapped yet; not written`);
+        if (c.instrument !== b.instrument && !noteAt.has(`${ch}:${p * ROWS_PER_PATTERN + row}:0`)) warnings.push(`${where}: an instrument on a cell with no note has no command byte; not written`);
         const fx = (x: typeof c) => [x.effTyp, x.eff, x.effTyp2, x.eff2, x.effTyp3, x.eff3, x.effTyp4, x.eff4, x.effTyp5, x.eff5].join();
         if (fx(c) !== fx(b)) warnings.push(`${where}: an effect column change has no command byte mapped yet; not written`);
       }
     }
   }
+  planInstrumentEdits(walk, trackFileOffsets, source, edited, bdNotePlacements(walk, baseGrid.clock).placed, wanted, warnings);
   let patched = 0;
   for (const [off, v] of wanted) if (out[off] !== v) { out[off] = v; patched++; }
   return growTracks(out, splits, trackFileOffsets, grow, patched, warnings);
@@ -190,4 +198,42 @@ function growTracks(
     patched += list.length * 2;
   }
   return { data, patched, warnings };
+}
+
+/** Plan the sample-map command bytes an instrument edit needs (see the file header); one byte per command, all runs of it agreeing. */
+function planInstrumentEdits(
+  walk: BdWalk, trackFileOffsets: readonly number[], source: Uint8Array, edited: Pattern[],
+  placed: BdNotePlacement[], wanted: Map<number, number>, warnings: string[],
+): void {
+  const placeOf = new Map(placed.map((pl) => [pl.event, pl]));
+  const mapping = Array.from({ length: 4 }, () => Array.from({ length: 10 }, (_, j) => j));
+  type Group = { s: BdWalkEvent; runs: number[][]; notes: BdNotePlacement[] };
+  const groups = new Map<string, Group>();
+  const current: Array<Group | undefined> = [undefined, undefined, undefined, undefined];
+  for (const e of walk.events) {
+    if (e.voice >= 4) continue;
+    if (e.kind === BD_WALK.mapSet && e.a >= 0 && e.a < 10) mapping[e.voice][e.a] = e.b;
+    else if (e.kind === BD_WALK.sampleMap && e.track >= 0) {
+      const key = `${e.track}:${e.pos}`;
+      const g = groups.get(key) ?? { s: e, runs: [], notes: [] };
+      groups.set(key, g);
+      g.runs.push(mapping[e.voice].slice());
+      current[e.voice] = g;
+    } else if (placeOf.has(e)) current[e.voice]?.notes.push(placeOf.get(e)!);
+  }
+  for (const g of groups.values()) {
+    const asked = g.notes.map((pl) => {
+      const cell = edited[Math.floor(pl.row / ROWS_PER_PATTERN)]?.channels[pl.voice]?.rows[pl.row % ROWS_PER_PATTERN];
+      return cell ? getColumnField(cell, pl.col, 'instrument') ?? 0 : undefined;
+    });
+    if (g.notes.every((pl, i) => asked[i] === pl.event.a + 1)) continue;
+    const where = `voice ${g.s.voice + 1} sample-map command at track ${g.s.track} byte ${g.s.pos}`;
+    const sample = (asked[0] ?? 0) - 1;
+    if (asked.some((a) => a !== asked[0])) { warnings.push(`${where}: it sets the sample of ${g.notes.length} notes; change them all to the same instrument; not written`); continue; }
+    if (sample < 0 || sample >= walk.samples) { warnings.push(`${where}: instrument ${sample + 1} is not a sample of the module; not written`); continue; }
+    const j = Array.from({ length: 10 }, (_, k) => k).find((k) => g.runs.every((m) => m[k] === sample));
+    if (j === undefined) { warnings.push(`${where}: no sample-mapping index holds sample ${sample + 1}; not written`); continue; }
+    const off = trackFileOffsets[g.s.track] + g.s.pos;
+    wanted.set(off, source[off] + (j - g.s.a));
+  }
 }

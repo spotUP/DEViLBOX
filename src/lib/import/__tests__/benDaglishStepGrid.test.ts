@@ -13,7 +13,7 @@ vi.mock('@/engine/ToneEngine', () => {
 
 import { mainStepFromOnsets } from '../formats/stepRowClock';
 import { parseBenDaglishFile } from '../formats/BenDaglishParser';
-import { walkBenDaglish } from '../formats/BenDaglishWasmExtractor';
+import { walkBenDaglish, BD_WALK } from '../formats/BenDaglishWasmExtractor';
 import { applyBdGridEdits } from '../formats/benDaglishEdits';
 import { exportBenDaglish } from '@/lib/export/BenDaglishExporter';
 import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
@@ -90,5 +90,60 @@ describe('Ben Daglish edits (the wiring is proved in stepGridReachability.test.t
     expect(deltas.length, 'the edited note moved on every play').toBeGreaterThan(0);
     expect(new Set(deltas), 'each moved one tick earlier, nothing else moved').toEqual(new Set([1]));
     expect(walk2.processedTicks, 'song length unchanged').toBe(walk.processedTicks);
+  });
+
+  it('motorhead: an instrument change on every note of one sample is written byte-exact, re-imports the same and re-walks with the new sample', async () => {
+    const path = 'ben-daglish/motorhead-titleandingame.bd';
+    const ab = bytesOf(path);
+    const song = await parseBenDaglishFile(ab.slice(0), 'motorhead-titleandingame.bd') as unknown as TrackerSong;
+    const walk = await walkBenDaglish(ab.slice(0), 0);
+    const used = [...new Set(walk.events.filter((e) => e.kind === BD_WALK.note && e.a >= 0).map((e) => e.a + 1))];
+    expect(used.length, 'the song uses more than one sample').toBeGreaterThan(1);
+    const layout = song.uadeVariableLayout!.filePatternAddrs!;
+    const clone = () => song.patterns.map((p) => ({ ...p, channels: p.channels.map((c) => ({ ...c, rows: c.rows.map((r) => ({ ...r, extraNotes: r.extraNotes?.map((x) => ({ ...x })) })) })) }));
+    let done: { from: number; to: number; res: ReturnType<typeof applyBdGridEdits>; edited: ReturnType<typeof clone> } | undefined;
+    for (const from of used) for (const to of used) {
+      if (done || from === to) continue;
+      const edited = clone();
+      for (const p of edited) for (const c of p.channels) for (const r of c.rows) {
+        if (r.note && r.instrument === from) r.instrument = to;
+        for (const x of r.extraNotes ?? []) if (x.note && x.instrument === from) x.instrument = to;
+      }
+      const res = applyBdGridEdits(new Uint8Array(ab), walk, layout, edited);
+      if (res.warnings.length === 0 && res.patched > 0) done = { from, to, res, edited };
+    }
+    expect(done, 'some sample can be swapped for another').toBeTruthy();
+    const { from, to, res, edited } = done!;
+    // byte-exact: only sample-map command bytes changed, same length
+    expect(res.data.length).toBe(ab.byteLength);
+    const src = new Uint8Array(ab);
+    const changed = res.data.reduce((n, b, i) => n + (b !== src[i] ? 1 : 0), 0);
+    expect(changed).toBe(res.patched);
+    // the re-walk: every note that played sample `from` now plays `to`, nothing else moved
+    const out = res.data.buffer.slice(res.data.byteOffset, res.data.byteOffset + res.data.byteLength) as ArrayBuffer;
+    const walk2 = await walkBenDaglish(out.slice(0), 0);
+    const notes = (w: typeof walk) => w.events.filter((e) => e.kind === BD_WALK.note);
+    expect(notes(walk2).length).toBe(notes(walk).length);
+    notes(walk).forEach((e, i) => {
+      const f = notes(walk2)[i];
+      expect([f.voice, f.ptick, f.track, f.pos]).toEqual([e.voice, e.ptick, e.track, e.pos]);
+      expect(f.a, 'sample').toBe(e.a === from - 1 ? to - 1 : e.a);
+    });
+    // the re-import draws the edited instruments (a note's pitch follows the new sample's own transpose, as the replayer plays it)
+    const song2 = await parseBenDaglishFile(out.slice(0), 'motorhead-titleandingame.bd') as unknown as TrackerSong;
+    const cols = (ps: TrackerSong['patterns']) => ps.map((p) => p.channels.map((c) => c.rows.map((r) => [r.note ? r.instrument : 0, ...(r.extraNotes ?? []).map((x) => (x.note ? x.instrument : 0))].join())));
+    expect(cols(song2.patterns)).toEqual(cols(edited));
+  });
+
+  it('motorhead: an instrument change on one note of a shared sample-map command is refused with a warning', async () => {
+    const ab = bytesOf('ben-daglish/motorhead-titleandingame.bd');
+    const song = await parseBenDaglishFile(ab.slice(0), 'motorhead-titleandingame.bd') as unknown as TrackerSong;
+    const walk = await walkBenDaglish(ab.slice(0), 0);
+    const edited = song.patterns.map((p) => ({ ...p, channels: p.channels.map((c) => ({ ...c, rows: c.rows.map((r) => ({ ...r })) })) }));
+    const cell = edited[0].channels.flatMap((c) => c.rows).find((r) => r.note && r.instrument)!;
+    cell.instrument = cell.instrument === 1 ? 2 : 1;
+    const res = applyBdGridEdits(new Uint8Array(ab), walk, song.uadeVariableLayout!.filePatternAddrs!, edited);
+    expect(res.patched).toBe(0);
+    expect(res.warnings.join('\n')).toMatch(/sample-map command/);
   });
 });
