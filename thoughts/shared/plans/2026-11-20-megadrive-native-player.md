@@ -414,3 +414,26 @@ Measured on Fancy_Promenard.fur, 9.5 s, MAME tap (`tools/md-phase0`) against the
 ### Gaps 3-6: not started (budget)
 
 PSG1/PSG2 frequency from 3.86 s, 03xx PEG per slide, arp wait nn+1 and PEG scale, FM volume macro, FMS/AMS, fixed arp, relative pitch, and macro delay/release are all still open.
+
+## Phase 1d results (2026-11-20)
+
+Measured with MAME 0.286 headless (tools/md-phase0 tap.lua + events.py) against Furnace on Fancy_Promenard, first 9.5 s.
+
+**Gap 2 (extra FM key-ons): root cause fixed.** `src/lib/export/md/mdsSong.ts:335` wrote every song-table entry relative to sdtop. MDSDRV reads `pat` subroutine entries (`fe dd`, `@cmd_pat`) and macro-table entries (`eb`, `@cmd_mtab`) relative to tbase, as signed words. Every subroutine call therefore jumped into the wrong bytes. Fix: subroutines and mtabs are registered through `tbItem` (line 214) and written as `offset - tbase`. FM voice, PSG envelope and PEG entries stay sdtop-relative. The test decoder in `mdsSong.test.ts` follows `fe` from tbase too.
+
+FM key-on counts, MAME vs Furnace:
+
+| Channel | Before | After | Furnace |
+|---------|--------|-------|---------|
+| FM1 | 40 | 31 | 31 |
+| FM2 | 39 | 39 | 39 |
+| FM3 | 34 | 37 | 37 |
+| FM4 | 32 | 39 | 36 |
+| FM5 | 32 | 25 | 25 |
+| FM6 | 30 | 25 | 25 |
+
+Matched channels have key-on times within 14 ms. Side effect: PSG3 FREQ now matches 120/120 writes with 0 value differences (Phase 1c residual; was 76 vs 120).
+
+**FM4 residual (3 extra key-ons, not fixed).** First split is at 3.937 s. Source ch3 row o2 r1 is a note with `03 70` (tone portamento). Furnace slides there without a key-on; the exporter emits a plain note. Candidate fix: emit `e0` (slr) before a note on a 03xx row, so the driver skips key-off/key-on, and log the slide as lossy (pitch jumps). A real slide needs PEG-per-slide (Phase 1b item 1).
+
+**Gap 3 (PSG1/PSG2 frequency drift from 3.862 s): not started.** Known facts only: Furnace writes PSG1 111860.8 Hz and PSG2 18643.5 Hz, MDSDRV writes 7990.1 Hz on both; PSG2 ATT writes 328 vs 466.

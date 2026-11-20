@@ -209,6 +209,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   // 2. Song table items.
   const items: number[][] = [];
   const item = (bytes: number[]): number => { items.push(bytes); return items.length - 1; };
+  // Song table entries for `pat` subroutines and macro tables are offsets from tbase, all others from sdtop (mdsseq.md, mdsdrv.68k @cmd_pat / @cmd_mtab).
+  const tbaseRel = new Set<number>();
+  const tbItem = (bytes: number[]): number => { const i = item(bytes); tbaseRel.add(i); return i; };
   const insCache = new Map<string, { ins: number; peg: number; mtab: number }>();
   const insRef = (kind: Kind, idx: number) => {
     const key = `${kind === 'fm' ? 'fm' : 'psg'}:${idx}`;
@@ -218,7 +221,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       const pm = macro(ins, MACRO_PITCH, m.version), am = macro(ins, MACRO_ARP, m.version);
       const peg = pm && pitchEnvelope(pm, lossy), mt = am && arpTable(am, lossy);
       if (kind === 'fm' && macro(ins, MACRO_VOL, m.version)) lossy.add('FM volume macro (ignored)');
-      v = { ins: item(kind === 'fm' ? fmVoice(ins, lossy) : psgEnvelope(ins, m.version, lossy)), peg: peg ? item(peg) : -1, mtab: mt ? item(mt) : -1 };
+      v = { ins: item(kind === 'fm' ? fmVoice(ins, lossy) : psgEnvelope(ins, m.version, lossy)), peg: peg ? item(peg) : -1, mtab: mt ? tbItem(mt) : -1 };
       insCache.set(key, v);
     }
     return v;
@@ -309,7 +312,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       const k = key(c.bytes);
       const nextTie = t.chunks[(i + 1) % t.chunks.length]?.tieStart ?? false;
       if (c.bytes.length > 2 && (uses.get(k) ?? 0) > 1 && !c.tieStart && !nextTie && items.length < 255) {
-        if (!subs.has(k)) subs.set(k, item([...c.bytes, 0xff]));
+        if (!subs.has(k)) subs.set(k, tbItem([...c.bytes, 0xff]));
         b.push(0xfe, subs.get(k)!);
       } else b.push(...c.bytes);
     });
@@ -329,7 +332,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const trackHdr = sd.length;
   tracks.forEach(() => sd.push(0, 0, 0, 0));
   const tbase = sd.length;
-  itemOff.forEach((a) => sd.push(...be16(a)));
+  itemOff.forEach((a, i) => sd.push(...be16(tbaseRel.has(i) ? a - tbase : a)));
   tracks.forEach((t, i) => {
     const pos = sd.length - tbase;
     sd.splice(trackHdr + i * 4, 4, MDS_CHAN[t.ch], 0, ...be16(pos));

@@ -29,7 +29,7 @@ function decode(seq: Uint8Array): { ch: number; tick: number; n: number }[] {
         if (c < 0x80) tick += c + 1;
         else if (c === 0x81) tick += sd[p++] + 1;
         else if (c >= 0x82 && c < 0xe0) { out.push({ ch, tick, n: c - 0x82 + trs }); tick += sd[p++] + 1; }
-        else if (c === 0xfe) { if (!walk(w(tbase + sd[p++] * 2))) return false; }
+        else if (c === 0xfe) { if (!walk(tbase + ((w(tbase + sd[p++] * 2) << 16) >> 16))) return false; }
         else if (c === 0xfb || c === 0xff) return c === 0xff;
         else if (c === 0xfa) continue;
         else if (c === 0xe4) trs = (sd[p++] << 24) >> 24;
