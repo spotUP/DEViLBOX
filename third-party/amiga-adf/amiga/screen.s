@@ -111,7 +111,12 @@ _screen_init:
         cmp.w   #$4ef9,d0
         beq.w   .nomsg
         swap    d0
-        cmp.l   #'SMOD',d0
+        ; Anders 0land ("mpl1"/"mpl2" + compiled player): only a credit string, no song fields.
+        cmp.w   #'mp',(a0)
+        bne.b   .nhot
+        cmp.b   #'l',2(a0)
+        beq.w   .nomsg
+.nhot:  cmp.l   #'SMOD',d0
         beq.w   .nomsg
         cmp.l   #'FC13',d0
         beq.w   .nomsg

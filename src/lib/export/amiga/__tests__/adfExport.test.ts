@@ -16,6 +16,7 @@ const CASES: Array<[string, string]> = [
   ['digibooster/the day after.digi', 'DIGI-Booster'],
   ['formats/msx-cracktro 2.sun', 'SUN-Tronic'],
   ['custommade/the viking child crack.cm', 'CustomMade'],
+  ['formats/primemover_01.hot', 'Anders_0land'],
 ];
 
 describe('adf slot patcher', () => {

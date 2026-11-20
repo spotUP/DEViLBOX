@@ -2,15 +2,15 @@
   "templates": {
     "AbyssHighestExperience": {
       "adf": "AbyssHighestExperience.adf",
-      "adfSha256": "9194de8e1998b31677d1ce4e1bb3b651e8d89c36de9347929e900905d48b2821",
+      "adfSha256": "7364311ba15e195ed190119f7e177c45212835975741410650526f11f94e0cbb",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 48064,
+        "diskOffset": 48080,
         "maxBytes": 65536
       },
       "moduleLengthWord": {
-        "diskOffset": 48060,
+        "diskOffset": 48076,
         "bytes": 4,
         "endian": "big"
       },
@@ -30,21 +30,55 @@
         "bytes": 26327
       },
       "sources": {
-        "tool": "16929a1e91b726d66977b3749bcab6989a14242db0290e8f715692c00d585eec",
+        "tool": "92ab1d8104a287006efc620e3357399bf16eafcfeacaae0b21dc989261da1e9d",
         "player": "ce55646788639b86811063178613a5b31f783a325dbc60919cfc9596143d3db0"
+      }
+    },
+    "Anders_0land": {
+      "adf": "Anders_0land.adf",
+      "adfSha256": "48183dac16b5c3133565e8b9f16856967c6ca6acf4d166a2c299d92e1edf37d0",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 39164,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 39160,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "chipArenaBytes": 359684,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x41C00",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC59C00",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x57D04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "primemover_09.hot",
+        "bytes": 3036
+      },
+      "sources": {
+        "tool": "92ab1d8104a287006efc620e3357399bf16eafcfeacaae0b21dc989261da1e9d",
+        "player": "3e58a705b80e61ceb42c2e17e7c4a1f95ae829125267b041fcd434877b416b0a"
       }
     },
     "CustomMade": {
       "adf": "CustomMade.adf",
-      "adfSha256": "84895218989f0c9ff79aed60e72954665467d1aa163cbd3e9e8592228d108de0",
+      "adfSha256": "d194002d3db287ec3b40b4ca5838069137ae456547cafad30780b6a63540da81",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 39536,
+        "diskOffset": 39552,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 39532,
+        "diskOffset": 39548,
         "bytes": 4,
         "endian": "big"
       },
@@ -64,21 +98,21 @@
         "bytes": 9759
       },
       "sources": {
-        "tool": "16929a1e91b726d66977b3749bcab6989a14242db0290e8f715692c00d585eec",
+        "tool": "92ab1d8104a287006efc620e3357399bf16eafcfeacaae0b21dc989261da1e9d",
         "player": "170b379f48461877ddcee732338668f3a6c900eadfe08bee119f8fd2af161e49"
       }
     },
     "DIGI-Booster": {
       "adf": "DIGI-Booster.adf",
-      "adfSha256": "1f07d115e8560aa82cd9492d489d461ad125164349088a7fc5f9e1f2c8ca1b71",
+      "adfSha256": "536135b65f97d36dd9926591be0423d1ad83e78c0f526deeffccc9477a7149cc",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 47400,
+        "diskOffset": 47416,
         "maxBytes": 524288
       },
       "moduleLengthWord": {
-        "diskOffset": 47396,
+        "diskOffset": 47412,
         "bytes": 4,
         "endian": "big"
       },
@@ -98,21 +132,21 @@
         "bytes": 521656
       },
       "sources": {
-        "tool": "16929a1e91b726d66977b3749bcab6989a14242db0290e8f715692c00d585eec",
+        "tool": "92ab1d8104a287006efc620e3357399bf16eafcfeacaae0b21dc989261da1e9d",
         "player": "485b77266dba0b59f5f71de1beabde89c6396dc0e203f50ee38e068b9683f133"
       }
     },
     "FutureComposer1.4": {
       "adf": "FutureComposer1.4.adf",
-      "adfSha256": "b2f7942a4f7c6a5810b2ce3d3ebe39c9aa6159c6031574634a7abf7b83245895",
+      "adfSha256": "3e7218366ea58867953078bd91844bc533fd02cc8318a8f3580f036eaad0b1a2",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 40556,
+        "diskOffset": 40572,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 40552,
+        "diskOffset": 40568,
         "bytes": 4,
         "endian": "big"
       },
@@ -132,21 +166,21 @@
         "bytes": 13724
       },
       "sources": {
-        "tool": "16929a1e91b726d66977b3749bcab6989a14242db0290e8f715692c00d585eec",
+        "tool": "92ab1d8104a287006efc620e3357399bf16eafcfeacaae0b21dc989261da1e9d",
         "player": "507e430c3cf08c3e324820111ba49ef25125ce80fd5bd7d787ebb3d83a9552e3"
       }
     },
     "JamCracker": {
       "adf": "JamCracker.adf",
-      "adfSha256": "20bcd2673d162f48516b255162cc445da03097cfc946dad927b7b4c13f314c5b",
+      "adfSha256": "1efe2b5bd9705c37404f45d1820e10592053759d392139ef45000ac37e05f7da",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 39804,
+        "diskOffset": 39820,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 39800,
+        "diskOffset": 39816,
         "bytes": 4,
         "endian": "big"
       },
@@ -166,21 +200,21 @@
         "bytes": 48577
       },
       "sources": {
-        "tool": "16929a1e91b726d66977b3749bcab6989a14242db0290e8f715692c00d585eec",
+        "tool": "92ab1d8104a287006efc620e3357399bf16eafcfeacaae0b21dc989261da1e9d",
         "player": "1686b55a62f7469096b84dc7769c4d71b73530d8e15b5b032a1d1a08795d4f5d"
       }
     },
     "Mugician": {
       "adf": "Mugician.adf",
-      "adfSha256": "0fa6e82bd963341bff4db3e4a1c3ec9289d3f4dbeca52fff9190e7963ba2e282",
+      "adfSha256": "ddfcdacb53cbb6e6d98298fc521ae6e95bb401959c151fcc2d91322dd495a26f",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 43580,
+        "diskOffset": 43596,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 43576,
+        "diskOffset": 43592,
         "bytes": 4,
         "endian": "big"
       },
@@ -200,21 +234,21 @@
         "bytes": 10332
       },
       "sources": {
-        "tool": "16929a1e91b726d66977b3749bcab6989a14242db0290e8f715692c00d585eec",
+        "tool": "92ab1d8104a287006efc620e3357399bf16eafcfeacaae0b21dc989261da1e9d",
         "player": "0f0da6015c69602f0b2eef3dc9e155c7a021b26194455bc0195c6e6c80ee1a04"
       }
     },
     "PTK-Prowiz": {
       "adf": "PTK-Prowiz.adf",
-      "adfSha256": "8be7f44f0c1a3443bf4de577a18d64610b5a2d57f20c79bca0398ce46d7b00d3",
+      "adfSha256": "732d425d8fb512b84e6f585e58cea7909347be8d70c61ec5027ff723695bf480",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 90100,
+        "diskOffset": 90116,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 90096,
+        "diskOffset": 90112,
         "bytes": 4,
         "endian": "big"
       },
@@ -234,21 +268,21 @@
         "bytes": 114154
       },
       "sources": {
-        "tool": "16929a1e91b726d66977b3749bcab6989a14242db0290e8f715692c00d585eec",
+        "tool": "92ab1d8104a287006efc620e3357399bf16eafcfeacaae0b21dc989261da1e9d",
         "player": "cea8f553a382654d56d8d7e27ec26cf9374db54e3e9dcab5be9b4f092e57e9ca"
       }
     },
     "SUN-Tronic": {
       "adf": "SUN-Tronic.adf",
-      "adfSha256": "4fa50f51e48517da42372e50fa58b4f4d3865732ade1537c0e1bf0a274c73e52",
+      "adfSha256": "27b3f1bfbd34d8a3df3d8444776bdf899bcc5cdcc3bb80fd7ef765005d981e30",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 37204,
+        "diskOffset": 37220,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 37200,
+        "diskOffset": 37216,
         "bytes": 4,
         "endian": "big"
       },
@@ -268,7 +302,7 @@
         "bytes": 4186
       },
       "sources": {
-        "tool": "16929a1e91b726d66977b3749bcab6989a14242db0290e8f715692c00d585eec",
+        "tool": "92ab1d8104a287006efc620e3357399bf16eafcfeacaae0b21dc989261da1e9d",
         "player": "2ab53b0fc75461d73518752864a64efce8266ef19b6015497d7b2bc546e3f1bd"
       }
     }
