@@ -19,6 +19,7 @@ const CASES: Array<[string, string]> = [
   ['formats/primemover_01.hot', 'Anders_0land'],
   ['formats/perception.ems', 'EMS-6'],
   ['formats/universal monsters - dracula.mmd0', 'MED'],
+  ['formats/funky nightmare.mmd1', 'MED-A1200'],
 ];
 
 describe('adf slot patcher', () => {
@@ -54,10 +55,6 @@ describe('adf slot patcher', () => {
   it('refuses a player whose chip memory need exceeds the machine', () => {
     const e = { ...manifest.templates['PTK-Prowiz'], chipArenaBytes: 600000 };
     expect(() => patchAdfSlot(tpl(e.adf), e, song('amigaklang/Virgill-mothership.mod'))).toThrow(/chip memory/);
-  });
-
-  it('gives MMD1 no template (the MED player address-errors on a 68000)', () => {
-    expect(adfTemplateFor(song('formats/funky nightmare.mmd1'))).toBeNull();
   });
 
   it('refuses a format with no disk player', async () => {

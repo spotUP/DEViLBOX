@@ -92,15 +92,18 @@ def source_hashes(player):
     return {'tool': h.hexdigest(), 'player': ply}
 
 
-def publish(adf_path, layout, pub_dir):
-    """Copy the ADF to <pub_dir>/<player>.adf and upsert its manifest.json entry."""
+def publish(adf_path, layout, pub_dir, name=None):
+    """Copy the ADF to <pub_dir>/<name or player>.adf and upsert its manifest.json entry.
+    A second build of one player (another target) needs a name; the entry then records its `player`."""
     os.makedirs(pub_dir, exist_ok=True)
-    name = layout['player'] + '.adf'
+    key = name or layout['player']
+    name = key + '.adf'
     shutil.copyfile(adf_path, os.path.join(pub_dir, name))
     man_path = os.path.join(pub_dir, 'manifest.json')
     man = json.load(open(man_path)) if os.path.exists(man_path) else {'templates': {}}
     mem = layout['memory']
-    man['templates'][layout['player']] = {
+    man['templates'][key] = {
+        **({'player': layout['player']} if key != layout['player'] else {}),
         'adf': name,
         'adfSha256': hashlib.sha256(open(adf_path, 'rb').read()).hexdigest(),
         'target': layout['target'],
@@ -126,6 +129,7 @@ def main():
     ap.add_argument('--slot-bytes', type=int, default=SLOT_BYTES)
     ap.add_argument('--publish', metavar='DIR', help='also copy the ADF to DIR/<player>.adf and update DIR/manifest.json '
                     '(only for templates proven on the target)')
+    ap.add_argument('--publish-name', help='manifest key and file stem when it is not the player name (MED-A1200)')
     ap.add_argument('--target', choices=sorted(TARGETS),
                     help='default: a1200 for players in uade_player_min_cpu.tsv, else a500')
     a = ap.parse_args()
@@ -245,7 +249,7 @@ SECTIONS {{
     json.dump(layout, open(os.path.join(out, 'layout.json'), 'w'), indent=2)
     print(json.dumps(layout, indent=2))
     if a.publish:
-        publish(os.path.join(out, 'devilbox.adf'), layout, a.publish)
+        publish(os.path.join(out, 'devilbox.adf'), layout, a.publish, a.publish_name)
 
 
 if __name__ == '__main__':

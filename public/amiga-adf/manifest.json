@@ -30,7 +30,7 @@
         "bytes": 26327
       },
       "sources": {
-        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
+        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
         "player": "ce55646788639b86811063178613a5b31f783a325dbc60919cfc9596143d3db0"
       }
     },
@@ -64,7 +64,7 @@
         "bytes": 3036
       },
       "sources": {
-        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
+        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
         "player": "3e58a705b80e61ceb42c2e17e7c4a1f95ae829125267b041fcd434877b416b0a"
       }
     },
@@ -98,7 +98,7 @@
         "bytes": 9759
       },
       "sources": {
-        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
+        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
         "player": "170b379f48461877ddcee732338668f3a6c900eadfe08bee119f8fd2af161e49"
       }
     },
@@ -132,7 +132,7 @@
         "bytes": 521656
       },
       "sources": {
-        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
+        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
         "player": "485b77266dba0b59f5f71de1beabde89c6396dc0e203f50ee38e068b9683f133"
       }
     },
@@ -166,7 +166,7 @@
         "bytes": 4094
       },
       "sources": {
-        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
+        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
         "player": "40b48f7d514976d9e84585fd9a47b5075384caa0e27fe56ef537c4ee55710658"
       }
     },
@@ -200,7 +200,7 @@
         "bytes": 13724
       },
       "sources": {
-        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
+        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
         "player": "507e430c3cf08c3e324820111ba49ef25125ce80fd5bd7d787ebb3d83a9552e3"
       }
     },
@@ -234,7 +234,7 @@
         "bytes": 48577
       },
       "sources": {
-        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
+        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
         "player": "1686b55a62f7469096b84dc7769c4d71b73530d8e15b5b032a1d1a08795d4f5d"
       }
     },
@@ -268,7 +268,42 @@
         "bytes": 30474
       },
       "sources": {
-        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
+        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
+        "player": "fcaa3c81076b4814e90548fa474d11c36031a270560818c9b7ddfa3985a65199"
+      }
+    },
+    "MED-A1200": {
+      "player": "MED",
+      "adf": "MED-A1200.adf",
+      "adfSha256": "98912602fd3fdecce46fd65e326a743fbdacfade60f809c594c22c6b7a57c358",
+      "target": "a1200",
+      "cpu": "68020",
+      "moduleSlot": {
+        "diskOffset": 50440,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 50436,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "chipArenaBytes": 376068,
+      "memory": {
+        "IMG_BASE": "0x100000",
+        "IMG_LEN": "0x44800",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0x144800",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x5BD04",
+        "ENTRY": "0x100000"
+      },
+      "provenWith": {
+        "name": "funky nightmare.mmd1",
+        "bytes": 136168
+      },
+      "sources": {
+        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
         "player": "fcaa3c81076b4814e90548fa474d11c36031a270560818c9b7ddfa3985a65199"
       }
     },
@@ -302,7 +337,7 @@
         "bytes": 10332
       },
       "sources": {
-        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
+        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
         "player": "0f0da6015c69602f0b2eef3dc9e155c7a021b26194455bc0195c6e6c80ee1a04"
       }
     },
@@ -336,7 +371,7 @@
         "bytes": 114154
       },
       "sources": {
-        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
+        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
         "player": "cea8f553a382654d56d8d7e27ec26cf9374db54e3e9dcab5be9b4f092e57e9ca"
       }
     },
@@ -370,7 +405,7 @@
         "bytes": 4186
       },
       "sources": {
-        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
+        "tool": "4bd3fcfb2f243040ca59f57e84904c6f456a34daa88d8964c79681351d8276bd",
         "player": "2ab53b0fc75461d73518752864a64efce8266ef19b6015497d7b2bc546e3f1bd"
       }
     }

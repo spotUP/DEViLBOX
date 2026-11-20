@@ -26,7 +26,7 @@ def main():
         adf = PUB / t['adf']
         if not adf.exists() or hashlib.sha256(adf.read_bytes()).hexdigest() != t['adfSha256']:
             stale.append(f'{player}: {t["adf"]} missing or differs from manifest adfSha256')
-        now = build_adf.source_hashes(player)
+        now = build_adf.source_hashes(t.get('player', player))
         for k, v in now.items():
             if t['sources'].get(k) != v:
                 stale.append(f'{player}: {k} sources changed since the template was built')
