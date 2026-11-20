@@ -4,7 +4,8 @@
 Run through the build queue:
   ~/.claude/bin/buildq --purpose "<who>: <task>" -- python3 build_adf.py --module x.mod --out dir
 
-Output: <out>/devilbox.adf and <out>/layout.json. The layout names the module
+The player is the one eagleplayer.conf names for the module (prefix, then
+content via uade123), or --player NAME. Output: <out>/devilbox.adf and <out>/layout.json. The layout names the module
 slot's disk offset and maximum size and the disk offset of the big-endian
 length word the browser patches together with the slot.
 """
@@ -12,14 +13,16 @@ import argparse, json, os, re, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UADE_ROOT = os.path.join(HERE, '..', 'uade-3.05')
+sys.path.insert(0, os.path.join(HERE, 'tools'))
+import uade_lookup, uade_arena_table  # noqa: E402
 ADF_SIZE = 80 * 2 * 11 * 512
 IMG_DISK = 1024
 IMG_BASE = 0xC18000           # A500 trapdoor slow RAM; Exec owns the bottom of it at boot
 SLOW_END = 0xC80000
 CHIP_BASE = 0x1C000           # chip arena; low chip below holds Exec/graphics/trackdisk buffers
 CHIP_END = 0x80000
-SLOT_BYTES = 224 * 1024       # max module size; the chip arena is sized for it
-POOL_BYTES = 65536
+SLOT_BYTES = 224 * 1024       # default max module size; the chip arena is sized for it
+POOL_BYTES = 65536            # for players uade_arena_sizes.tsv has not measured (PTK-Prowiz)
 ANY_BYTES = 65536
 ASM = ['vasmm68k_mot', '-Fvobj', '-nowarn=62', '-quiet', '-no-opt', '-m68000',
        '-DAMIGA=1', '-DUADE_NATIVE=1', '-DUADE_PROBE=1']
@@ -69,26 +72,35 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--module', required=True, help='module file; stage it from a directory holding only it')
     ap.add_argument('--out', required=True)
+    ap.add_argument('--player', help='eagleplayer.conf player name; default: what the module matches')
+    ap.add_argument('--slot-bytes', type=int, default=SLOT_BYTES)
     a = ap.parse_args()
+    player = uade_lookup.lookup(a.module, UADE_ROOT, a.player)['player']
+    slot_bytes = a.slot_bytes
+    # A measured player gets the stager's per-player sizes (high-water + margin);
+    # an unmeasured one keeps the phase-1 64K/64K, which PTK-Prowiz was proven with.
+    sizes_args = [] if player in uade_arena_table.load() else [
+        '--pool-bytes', str(POOL_BYTES), '--any-bytes', str(ANY_BYTES)]
     out = os.path.abspath(a.out)
     stage = os.path.join(out, 'stage')
     shutil.rmtree(stage, ignore_errors=True)
     os.makedirs(stage)
     print(run([sys.executable, os.path.join(HERE, 'tools', 'uade_stage.py'), '--module', a.module,
-               '--uade-root', UADE_ROOT, '--outdir', stage,
-               '--pool-bytes', str(POOL_BYTES), '--any-bytes', str(ANY_BYTES)]).strip())
+               '--uade-root', UADE_ROOT, '--outdir', stage]
+              + (['--player', a.player] if a.player else []) + sizes_args).strip())
 
-    patch_player_for_68000(os.path.join(stage, 'current.uadeplayer'))
+    if player == 'PTK-Prowiz':
+        patch_player_for_68000(os.path.join(stage, 'current.uadeplayer'))
 
     # The slot: UADE_MODULE_BYTES sizes the arena for the largest module the slot
     # takes; _uade_module_len carries the real length and is what the browser patches.
     mod = open(os.path.join(stage, 'current.uademod'), 'rb').read()
-    if len(mod) > SLOT_BYTES:
-        sys.exit(f'module is {len(mod)} B, slot holds {SLOT_BYTES} B')
-    open(os.path.join(stage, 'current.uademod'), 'wb').write(mod + bytes(SLOT_BYTES - len(mod)))
+    if len(mod) > slot_bytes:
+        sys.exit(f'module is {len(mod)} B, slot holds {slot_bytes} B')
+    open(os.path.join(stage, 'current.uademod'), 'wb').write(mod + bytes(slot_bytes - len(mod)))
     sizes = os.path.join(stage, 'uade_sizes.i')
     s = open(sizes).read()
-    s, n = re.subn(r'^UADE_MODULE_BYTES\s+equ\s+\d+', f'UADE_MODULE_BYTES       equ     {SLOT_BYTES}', s, flags=re.M)
+    s, n = re.subn(r'^UADE_MODULE_BYTES\s+equ\s+\d+', f'UADE_MODULE_BYTES       equ     {slot_bytes}', s, flags=re.M)
     assert n == 1, 'uade_sizes.i: no UADE_MODULE_BYTES line'
     open(sizes, 'w').write(s + f'UADE_MODULE_LEN         equ     {len(mod)}\n')
 
@@ -157,8 +169,8 @@ SECTIONS {{
     assert int.from_bytes(adf[len_off:len_off + 4], 'big') == len(mod)
     layout = {
         'adfBytes': ADF_SIZE,
-        'player': 'PTK-Prowiz',
-        'moduleSlot': {'diskOffset': slot_off, 'maxBytes': SLOT_BYTES},
+        'player': player,
+        'moduleSlot': {'diskOffset': slot_off, 'maxBytes': slot_bytes},
         'moduleLengthWord': {'diskOffset': len_off, 'bytes': 4, 'endian': 'big'},
         'bootblock': {'diskOffset': 0, 'bytes': 1024, 'checksumOffset': 4,
                       'note': 'the slot is outside the bootblock, so patching it keeps the checksum valid'},
