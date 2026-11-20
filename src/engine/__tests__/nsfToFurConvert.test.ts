@@ -27,6 +27,7 @@ type Case = { file: string; track: number; chip: string; chans: number[]; frames
 
 const CASES: Case[] = [
   { file: 'dr mario.nsf', track: 0, chip: '2A03', chans: [0, 1, 2] },
+  { file: 'dr mario.nsf', track: 2, chip: '2A03 Dr. Mario t2', chans: [0, 1, 2] },
   { file: 'akumajou densetsu.nsf', track: 0, chip: 'VRC6', chans: [5, 6, 7] },
   { file: 'lagrange point.nsf', track: 2, chip: 'VRC7', chans: [5, 6, 7, 8, 9, 10] },
   { file: 'metroid (famicom disk system).nsf', track: 3, chip: 'FDS', chans: [5] },
