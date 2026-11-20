@@ -39,6 +39,9 @@ const PSG_OFFSET = 24;
 const MAX_NOTE = 0xdf - 0x82;
 const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_PITCH = 4;
 const FX_FLOW = new Set([0x0b, 0x0d, 0x09, 0x0f, 0xff]);
+const NTSC_HZ = 59.922743;
+/** Furnace SN noise mode bits (sms.cpp snNoiseMode: bit 0 white, bit 1 PSG3 period) -> MDSDRV `EA` (mdsseq.md). Reset value 3. */
+const NOISE_EA = [0, 0, 0xe3, 0xe7];
 
 class Lossy {
   private counts = new Map<string, number>();
@@ -138,7 +141,10 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   }
   const s = m.subsongs[subsong];
   const nCh = fmOnly ? 6 : KIND.length;
-  if (s.hz < 59 || s.hz > 61 || s.virtualTempo !== s.virtualTempoD) lossy.add(`tick rate ${s.hz} Hz, virtual tempo ${s.virtualTempo}/${s.virtualTempoD}: played at 60 Hz`);
+  // Driver: each NTSC VINT adds tempo+1 to a counter and steps one tick per 128 (Phase 0), so ticks/s = (dd+1)*NTSC/128.
+  const rate = s.hz * (s.virtualTempo || 1) / (s.virtualTempoD || 1);
+  const tempo = Math.max(0, Math.min(255, Math.round(rate * 128 / NTSC_HZ) - 1));
+  if (Math.abs(rate - NTSC_HZ) > 0.5) lossy.add(`tick rate ${rate.toFixed(2)} Hz: F9 ${tempo.toString(16)} = ${((tempo + 1) * NTSC_HZ / 128).toFixed(2)} Hz, ticks land on NTSC frames (up to 1 frame early or late)`);
   if (Math.abs((m.tuning || 440) - 440) > 0.5) lossy.add(`tuning ${m.tuning} Hz: played at 440 Hz`);
   const cellAt = (ch: number, o: number, r: number) => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o]}`)?.rows[r];
 
@@ -194,12 +200,12 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const tracks: Array<{ ch: number; chunks: Array<{ bytes: number[]; tieStart: boolean }> }> = [];
   for (let ch = 0; ch < nCh; ch++) {
     const kind = KIND[ch];
-    let ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, sounding = false, any = false, tick = 0;
+    let ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0;
     const out: Array<{ bytes: number[]; tieStart: boolean }> = [];
     for (const c of chunks) {
       const volCmd = (v: number) => [0xe2, kind === 'fm' ? 127 - v : v <= 0 ? 0x7f : Math.round((15 - v) * 8 / 3)];
       const insCmd = () => { const r = insRef(kind, ins); return [0xe1, r.ins, 0xe8, r.peg + 1, 0xeb, r.mtab + 1]; };
-      const bytes: number[] = [...insCmd(), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : [])];
+      const bytes: number[] = [...insCmd(), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(dtn ? [0xe6, dtn & 0xff] : [])];
       let curIns = ins;
       type Tok = { cmd: 'note' | 'tie' | 'rest'; n: number; t: number; pre: number[] };
       const tok: Tok[] = [];
@@ -224,6 +230,17 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         for (const e of cell?.effects ?? []) {
           if (e.type < 0 || FX_FLOW.has(e.type)) continue;
           if (e.type === 0x08 && kind === 'fm') { const l = e.value >> 4, rr = e.value & 15; pan = l && rr ? 0xc0 : l ? 0x80 : rr ? 0x40 : 0xc0; cmds.push(0xe9, pan); continue; }
+          // E5xx: Furnace linear pitch offset xx-80 in 1/128 semitone (playback.cpp); MDSDRV dtn is 1/256 semitone, signed byte.
+          if (e.type === 0xe5) {
+            const d = (e.value - 0x80) * 2;
+            if (d < -128 || d > 127) lossy.add('E5xx beyond 1/2 semitone (clamped)');
+            dtn = Math.max(-128, Math.min(127, d)); cmds.push(0xe6, dtn & 0xff); continue;
+          }
+          if (e.type === 0x20 && kind === 'noise') {
+            noise = ((e.value >> 4) & 1) << 1 | (e.value & 1);
+            if (!(noise & 2)) lossy.add('noise fixed-rate mode (20xy, x=0)');
+            cmds.push(0xea, NOISE_EA[noise]); continue;
+          }
           lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}`);
         }
         const isNote = nv >= 0 && nv < 253, isOff = nv >= 253;
@@ -232,7 +249,6 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           if (tok.length) emit(tok.pop()!);
           if (isNote) {
             let n = kind === 'fm' ? nv : nv - PSG_OFFSET;
-            if (kind === 'noise') lossy.add('noise channel note (PSG pitch, noise mode not set)');
             if (n < 0 || n > MAX_NOTE) { lossy.add(`${kind.toUpperCase()} note out of range (clamped)`); n = Math.max(0, Math.min(MAX_NOTE, n)); }
             tok.push({ cmd: 'note', n, t: 0, pre: cmds }); sounding = true; any = true;
             keyOns.push({ tick, ch, note: nv });
@@ -255,7 +271,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   for (const t of tracks) for (const c of t.chunks) uses.set(key(c.bytes), (uses.get(key(c.bytes)) ?? 0) + 1);
   const subs = new Map<string, number>();
   const streams = tracks.map((t) => {
-    const b: number[] = t.ch === tracks[0].ch ? [0xf9, 0x7f] : [];
+    const b: number[] = t.ch === tracks[0].ch ? [0xf9, tempo] : [];
     t.chunks.forEach((c, i) => {
       if (i === loopChunk) b.push(0xfa);
       const k = key(c.bytes);

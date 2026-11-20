@@ -344,3 +344,51 @@ Reuse: `arpIsFixed` and `expandProcMacro` from `nes/famistudioSong.ts`; the loss
 - Set the noise mode for PSG channel 4.
 - Find tempo handling for songs that are not 60 Hz.
 - Then Phase 2 (ROM build and UI wiring).
+
+## Phase 1b results
+
+Measured 2026-11-20 on `Fancy_Promenard.fur` (58 Hz, Genesis). Furnace side: `furnace -vgmout` decoded by
+`tools/md-phase0/events.py`; MDSDRV side: headless MAME 0.286 with `tools/md-phase0/tap.lua`, same decoder.
+Times in seconds from the first FM key-on.
+
+Tool fixes found on the way (Phase 0 harness):
+- `tap.lua` kept its write taps in a `local` table. Lua collected it after the autoboot chunk returned and the taps
+  vanished about 0.5 s in, so every earlier MAME log ended at ~0.58 s. Taps are now global, and the log is
+  line-buffered (MAME `-seconds_to_run` exit does not close Lua files). Phase 1 conclusions that used only the
+  first rows still hold; longer comparisons before this fix were not possible.
+- `events.py` (new) decodes both a MAME tap and a VGM into the same event lines, in seconds.
+
+Gaps closed:
+- **FM1 keys on 1 frame early (item 5): not a driver bug.** All six FM key-ons land in one VINT (0.000-0.005 s,
+  voice writes in between); the old frame decoder floored at a VINT phase of ~0.93 and split them across frames.
+  With events.py FM1-FM6 key at 0.0-0.005 s, Furnace at 0.0.
+- **Tempo (item 4).** The converter now writes `F9 dd`, dd = round(128 * hz * vt / vtd / 59.922743) - 1
+  (58 Hz: `7B` = 58.05 Hz). Before: row 1 at 0.1152 s (60 Hz) vs Furnace 0.1207 s. After: FM2 has 39/39 key-ons
+  matching Furnace over 9.5 s, max error 13.6 ms (under one NTSC frame). The remaining error is frame quantization:
+  MDSDRV ticks only on VINT, so a non-60 Hz rate always jitters up to 1 frame. Lossy note says so.
+  Max rate is `FF` = 119.8 Hz; above that the byte clamps.
+- **Noise mode (item 3).** Furnace writes noise latch mode 7 (white, PSG3 period, `snNoiseMode` reset 3,
+  sms.cpp:558). The converter now emits `EA e7` at the noise track start, and `20xy` maps to
+  `EA 00/e3/e7` (x=0 fixed-rate mode is flagged lossy). MAME now writes NOISE MODE 7, and the attenuation envelope
+  of the first note matches (3,7,10,12,13).
+- **E5xx fine pitch (item 2).** Furnace: pitch = xx-80 in 1/128 semitone (linear, playback.cpp:1458,
+  engine calcFreq nbase = base+pitch). Mapped to `E6 dd` with dd = 2*(xx-80) (MDSDRV dtn is 1/256 semitone).
+  Range: dtn is a signed byte, so xx < 40 or xx > BF (beyond 1/2 semitone) clamps and is flagged lossy.
+  Fancy_Promenard has no E5, so this is not yet measured in MAME (unverified).
+
+Still open (measured, not fixed):
+- **Noise pitch.** In noise mode the noise note drives PSG3. Furnace puts PSG3 at period 1 (111860.8 Hz) for this
+  song's noise note; MDSDRV writes 15980.1 Hz then 4863.5 Hz. The noise note to PSG3 period mapping is wrong.
+- **Extra key-ons.** FM1, FM3, FM5, FM6 get more key-ons in MDSDRV than in Furnace (FM1: 41 vs 31 in 9.5 s;
+  first split FM1 at 2.05 s, FM5 at 3.89 s, FM3 at 6.46 s). Likely notes under 03xx (tone porta: Furnace slides
+  without a new key-on) and other unmapped effects (EC note cut, 0A, 02, 04, 19 in the lossy list). Unverified:
+  check the rows at those times first.
+- **PSG1/PSG2.** Frequencies differ from 3.86 s on (Furnace 111860.8 / 18643.5 Hz vs MDSDRV 7457.4 Hz) and
+  MDSDRV writes PSG1/2 FREQ 7457/2380 Hz at 0.005 s where Furnace writes nothing. Not yet traced.
+- **03xx porta (item 1).** Furnace porta is linear: baseFreq += portaSpeed*pitchSlideSpeed (1/128 semitone)
+  per tick, clamped at the target (genesis.cpp:1213, playback.cpp:1781). MDSDRV `E7` is exponential
+  (step = ((delta>>8)+1)*pta/2), so no single E7 value matches a Furnace slide. Candidate 1:1 route: one PEG per
+  slide (initial = (src-dst)*$100, delta = 2*speed per tick, then hold) on a slurred note; whether PEG restarts on
+  a slurred note is unverified. Not implemented.
+- Item 6 (arp wait nn+1, PEG scale) and item 7 (FM volume macro, FMS/AMS, fixed arp, relative pitch, macro
+  delay/release): not started.

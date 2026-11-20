@@ -6,7 +6,7 @@ import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
 import { furnaceToMds } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
-const ARG1 = new Set([0xe1, 0xe2, 0xe8, 0xe9, 0xeb, 0xf9, 0xfb]);
+const ARG1 = new Set([0xe1, 0xe2, 0xe6, 0xe8, 0xe9, 0xea, 0xeb, 0xf9, 0xfb]);
 
 async function convert(name: string) {
   const fur = readFileSync(join(ROOT, 'public/data/songs/furnace/genesis', name));

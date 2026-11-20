@@ -1,6 +1,7 @@
 -- MAME genesis write tap: YM2612 + SN76489 writes from both CPUs, one line per byte: "<time> <cpu> <addr> <val>".
 local out = assert(io.open(os.getenv("TAPOUT"), "w"))
-local taps = {}
+out:setvbuf("line")  -- -seconds_to_run exits without closing Lua files; unflushed tail was lost
+taps = {}  -- global: a local table is collected after the autoboot chunk returns and the taps vanish (~0.5 s in)
 local function now() return manager.machine.time:as_double() end
 local m = manager.machine.devices[":maincpu"].spaces["program"]
 local function w16(tag) return function(o, d, mk)
