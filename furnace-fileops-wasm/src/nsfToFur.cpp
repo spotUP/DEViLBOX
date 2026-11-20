@@ -96,9 +96,14 @@ struct FurPeriodTable {
   }
 };
 
+const FurPeriodTable& furPeriods() { static const FurPeriodTable t; return t; }
+// Non-linear pitch (compatFlags.linearPitch 0): register = getBase(note) - pitch - pitch2, then freq--
+// (pitchTable.cpp DivPitchTable::get/getBase, platform/nes.cpp), so the semitone root is reg(note*128).
+int noteReg(int note) { return furPeriods().reg(std::max(0, note) * 128); }
+
 // Note and fine whose Furnace 2A03/MMC5 period register equals p (nearest to the log2 estimate).
 bool periodToNote(int p, int& note, int& fine) {
-  static const FurPeriodTable t;
+  const FurPeriodTable& t = furPeriods();
   if (!hzToNote(kCpu / (16.0 * (p + 1)), note, fine)) return false;
   const int est = note * 128 + fine;
   int best = est, bestD = 1 << 30;
@@ -113,7 +118,7 @@ enum Kind { K_SQ, K_TRI, K_NOISE, K_DPCM, K_VRC6_SQ, K_VRC6_SAW, K_VRC7, K_FDS, 
 struct Chan { Kind kind; int idx; };
 
 // One voice in one frame.
-struct V { bool on = false; int note = 0, fine = 0, vol = -1, duty = -1; bool trig = false; };
+struct V { bool on = false; int note = 0, fine = 0, vol = -1, duty = -1, per = -1; bool trig = false; }; // per: 2A03/MMC5 period register
 
 struct Builder {
   DivSong& song;
@@ -172,7 +177,7 @@ V voice(Builder& b, const Chan& ch, const uint16_t* o, const uint16_t* prev, int
       const int period = s[7], vol = s[5];
       if (!s[6] || !vol || period < 8) break;
       if (!periodToNote(period, v.note, v.fine)) break;
-      v.on = true; v.vol = vol;
+      v.on = true; v.vol = vol; v.per = period;
       insOut = pulseIns(b, ch.kind == K_SQ ? "2A03" : "MMC5", DIV_INS_NES); v.duty = s[0] >> 6;
       break;
     }
@@ -180,7 +185,7 @@ V voice(Builder& b, const Chan& ch, const uint16_t* o, const uint16_t* prev, int
       const uint16_t* s = o + T_TRI;
       if (!s[6] || !s[4] || !s[5] || s[7] < 2) break;
       if (!periodToNote(s[7], v.note, v.fine)) break; // Furnace writes the same table to $400A/B
-      v.on = true; v.vol = 15; // triangle: on/off only
+      v.per = s[7]; v.on = true; v.vol = 15; // triangle: on/off only
       insOut = b.ins("2A03 triangle", [](DivInstrument& i) { i.type = DIV_INS_NES; i.name = "2A03 triangle"; });
       break;
     }
@@ -391,6 +396,9 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
     for (int i = 0; i < 3; i++) chans.push_back({K_S5B, i});
   }
   song.systemLen = sysN;
+  // 2A03/MMC5 only: Furnace non-linear pitch, so E5xx, pitch macros, 01/02 and 04 are period offsets as in the
+  // drivers (one vibrato or slide shape fits every note). Expansion chips keep linear pitch.
+  song.compatFlags.linearPitch = (chips & ~8) ? 1 : 0;
   song.recalcChans();
   if (info) { song.name = ti.game; song.author = ti.author; }
   }
@@ -418,7 +426,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
 
   const int nCh = (int)chans.size();
   // Per-frame voice state per channel; templates are created as voices appear.
-  struct Fr { bool on, trig; int note, fine, vol, duty, tmpl; };
+  struct Fr { bool on, trig; int note, fine, vol, duty, tmpl, per; };
   std::vector<std::vector<Fr>> fr(nCh, std::vector<Fr>(n));
   for (int ci = 0; ci < nCh; ci++) {
     if (chans[ci].idx < 0) continue; // MMC5 PCM: not traced as notes
@@ -426,7 +434,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
       const uint16_t* o = &c.w[(size_t)f * kTraceWords];
       int t = -1;
       V v = voice(b, chans[ci], o, f ? o - kTraceWords : nullptr, c.dpcmTrig[f], t, c);
-      fr[ci][f] = {v.on, v.trig, v.note, v.fine, v.vol, v.duty, t};
+      fr[ci][f] = {v.on, v.trig, v.note, v.fine, v.vol, v.duty, t, v.per};
     }
   }
 
@@ -676,15 +684,23 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   auto place = [&](Cell& cl, int vf) { const int o = vf - rowStart(rowOf(vf)); if (o) { cl.fx[cED] = 0xED; cl.fxv[cED] = (short)o; } };
 
   // Segments: one note per row start; frames until the next start fold into macros.
-  struct Seg { int ci, tmpl, len, lv = 15; std::vector<int> vol, arp, pit, duty; Cell* cell; bool pfx = false, atLoop = false, dutyFx = false; int sl = 0, vib = 0; };
+  struct Seg { int ci, tmpl, len, lv = 15, n0 = 0; std::vector<int> vol, arp, pit, duty; Cell* cell; bool pfx = false, atLoop = false, dutyFx = false; int sl = 0, vib = 0; };
   std::vector<Seg> segs;
   int dpcmHits = 0, dpcmTrigs = 0;
   // E5xx state per channel follows row order; the loop target row's first note sets it again so the
   // second pass does not inherit the song end's value
   const int loopRow = loopF >= 0 ? endFxv * patLen : -1;
-  // Furnace vibrato offset (playback.cpp 04xy, vibratoFine 15) in 1/128 semitone at table position pos
-  auto vibOff = [](int depth, int pos) {
-    return ((depth * (int)(short)(127 * std::sin(pos / 64.0 * (2 * M_PI))) * 15) >> 4) / 15;
+  // Period mode (non-linear, set with the song skeleton): pitch units are period steps, 01/02 step xx per
+  // tick (no pitchSlideSpeed), vibratoFine resets to 4 (engine.cpp reset). Linear: 1/128 semitone, x4, 15.
+  const bool perMode = !song.compatFlags.linearPitch;
+  const int slMul = perMode ? 1 : 4, vibFine = perMode ? 4 : 15;
+  // Furnace vibrato offset (playback.cpp 04xy) in pitch units at table position pos
+  auto vibOff = [vibFine](int depth, int pos) {
+    return ((depth * (int)(short)(127 * std::sin(pos / 64.0 * (2 * M_PI))) * vibFine) >> 4) / 15;
+  };
+  // A segment's pitch at tick t relative to its start (E5xx excluded), in pitch units
+  auto tot = [&](const Seg& g, int t) {
+    return perMode && g.pfx ? g.pit[t] + noteReg(g.n0) - noteReg(g.n0 + g.arp[t]) : g.arp[t] * 128 + g.pit[t];
   };
   for (int ci = 0; ci < nCh; ci++) {
     if (chans[ci].idx < 0) continue;
@@ -736,7 +752,9 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
       g.cell = &cl;
       // The note's own fine goes to E5xx (pitch, persists per channel); the macros hold the change from the
       // note start (semitones in arpeggio, fine in pitch), so a held note shares one flat instrument.
-      const int f0 = a[s].fine;
+      // period mode: E5xx and the pitch macro are period offsets from the note's root register
+      const bool pm = perMode && pitchFx;
+      const int f0 = pm ? noteReg(a[s].note) - a[s].per : a[s].fine;
       const bool atLoop = !loopSet && row >= loopRow;
       if (k != K_NOISE && (f0 != curE5 || atLoop)) {
         cl.fx[cE5] = 0xE5; cl.fxv[cE5] = (short)(f0 + 0x80); curE5 = f0;
@@ -744,10 +762,19 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
       if (row >= loopRow) loopSet = true;
       int ar = 0, pi = 0, du = a[s].duty;
       for (int f = s; f < end; f++) {
-        if (a[f].on) { ar = a[f].note - a[s].note; pi = a[f].fine - f0; if (a[f].duty >= 0) du = a[f].duty; }
+        if (a[f].on) {
+          ar = a[f].note - a[s].note; pi = a[f].fine - f0;
+          if (pm) {
+            // a change under 3/4 of the semitone distance is pitch (vibrato), not an arpeggio step
+            const int D = noteReg(a[s].note) - a[f].per - f0;
+            if (ar && 4 * std::abs(D) < 3 * std::abs(noteReg(a[s].note) - noteReg(a[f].note))) ar = 0;
+            pi = noteReg(a[s].note + ar) - a[f].per - f0;
+          }
+          if (a[f].duty >= 0) du = a[f].duty;
+        }
         g.vol.push_back(a[f].on ? a[f].vol : 0); g.arp.push_back(ar); g.pit.push_back(pi); g.duty.push_back(du);
       }
-      g.pfx = pitchFx; g.atLoop = atLoop;
+      g.pfx = pitchFx; g.atLoop = atLoop; g.n0 = a[s].note;
       // 2A03/MMC5 pulse and noise: the note's peak level goes to the volume column (Furnace scales the volume
       // macro by it, vol * macro / 15) and a duty that holds for the whole note to 12xx, so one instrument is one
       // envelope shape at any level and duty. Both persist per channel: write on change and at the loop target.
@@ -785,7 +812,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
       }
       if (reused) continue;
       std::vector<int> D(g.len);
-      for (int t = 0; t < g.len; t++) D[t] = g.arp[t] * 128 + g.pit[t];
+      for (int t = 0; t < g.len; t++) D[t] = tot(g, t);
       auto err = [&](auto model) {
         long e = 0;
         for (int t = 0; t < g.len; t++) if (g.vol[t] > 0) e += std::abs(D[t] - model(t));
@@ -796,10 +823,10 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
       if (e0 > 0 && g.len >= 3) {
         double num = 0, den = 0;
         for (int t = 0; t < g.len; t++) { num += D[t] * (t + 1.0); den += (t + 1.0) * (t + 1.0); }
-        const int x0 = (int)std::lround(num / den / 4);
+        const int x0 = (int)std::lround(num / den / slMul);
         for (int x = x0 - 1; x <= x0 + 1; x++) {
           if (!x || std::abs(x) > 255) continue;
-          const long e = err([&](int t) { return (t + 1) * 4 * x; });
+          const long e = err([&](int t) { return (t + 1) * slMul * x; });
           if (2 * e <= e0 && e < best) { best = e; g.sl = x; }
         }
         for (int r = 1; r < 16; r++)
@@ -830,7 +857,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
       if (vib != curVib || g.atLoop) { cl.fx[cVib] = 0x04; cl.fxv[cVib] = (short)vib; curVib = vib; }
       if (sl || vib) {
         for (int t = 0; t < g.len; t++) {
-          g.pit[t] = g.arp[t] * 128 + g.pit[t] - (sl ? (t + 1) * 4 * sl : vibOff(vib & 15, (vib >> 4) * (t + 1) & 63));
+          g.pit[t] = tot(g, t) - (sl ? (t + 1) * slMul * sl : vibOff(vib & 15, (vib >> 4) * (t + 1) & 63));
           g.arp[t] = 0;
         }
       }
@@ -945,6 +972,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
   for (int ci = 0; ci < nCh; ci++) {
     const Kind k = chans[ci].kind;
     if (chans[ci].idx < 0 || k == K_DPCM) continue;
+    const bool pmc = perMode && (k == K_SQ || k == K_MMC5_SQ || k == K_TRI);
     bool playing = false;
     int ins = -1, base = 0, t0 = 0, e5 = 0, sl = 0, slAcc = 0, vr = 0, vd = 0, vPos = 0, chVol = 15, chDuty = -1;
     for (int vf = 0, row = 0; vf < rowStart(R); vf++) {
@@ -957,7 +985,7 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
           if (cl[DIV_PAT_VOL] >= 0) chVol = cl[DIV_PAT_VOL];
           if (cl[DIV_PAT_FX(cE5)] == 0xE5) e5 = cl[DIV_PAT_FXVAL(cE5)] - 0x80;
           if (cl[DIV_PAT_FX(cDuty)] == 0x12) chDuty = cl[DIV_PAT_FXVAL(cDuty)];
-          if (cl[DIV_PAT_FX(cSl)] == 0x01 || cl[DIV_PAT_FX(cSl)] == 0x02) sl = (cl[DIV_PAT_FX(cSl)] == 0x01 ? 4 : -4) * cl[DIV_PAT_FXVAL(cSl)];
+          if (cl[DIV_PAT_FX(cSl)] == 0x01 || cl[DIV_PAT_FX(cSl)] == 0x02) sl = (cl[DIV_PAT_FX(cSl)] == 0x01 ? slMul : -slMul) * cl[DIV_PAT_FXVAL(cSl)];
           if (cl[DIV_PAT_FX(cVib)] == 0x04) { vr = cl[DIV_PAT_FXVAL(cVib)] >> 4; vd = cl[DIV_PAT_FXVAL(cVib)] & 15; }
           if (cl[DIV_PAT_NOTE] == DIV_NOTE_OFF) playing = false;
           else if (cl[DIV_PAT_NOTE] >= 0) {
@@ -977,14 +1005,16 @@ bool nsfBuildSong(DivSong& song, const uint8_t* data, size_t len, int track, int
         const DivInstrumentSTD& m = song.ins[ins]->std;
         const int t = vf - t0;
         mVol = chVol * macroAt(m.volMacro, t) / 15;
-        mP = (base + macroAt(m.arpMacro, t)) * 128 + e5 + slAcc + (vd ? vibOff(vd, vPos) : 0) + macroAt(m.pitchMacro, t);
+        const int off = e5 + slAcc + (vd ? vibOff(vd, vPos) : 0) + macroAt(m.pitchMacro, t);
+        // period mode compares the register: root of (note + arp) minus the offsets (clamped as nes.cpp does)
+        mP = pmc ? std::clamp(noteReg(base + macroAt(m.arpMacro, t)) - off, 0, 0x7ff) : (base + macroAt(m.arpMacro, t)) * 128 + off;
         if (m.dutyMacro.len) chDuty = macroAt(m.dutyMacro, t);
         mDuty = chDuty;
         mOn = k == K_VRC7 || mVol > 0;
       }
       if (!tr.on && !mOn) continue;
       active++;
-      if (tr.on && mOn && mP == tr.note * 128 + tr.fine && (k == K_TRI || mVol == tr.vol) && (tr.duty < 0 || mDuty == tr.duty)) match++;
+      if (tr.on && mOn && mP == (pmc ? tr.per : tr.note * 128 + tr.fine) && (k == K_TRI || mVol == tr.vol) && (tr.duty < 0 || mDuty == tr.duty)) match++;
     }
   }
 

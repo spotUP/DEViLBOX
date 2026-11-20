@@ -18,7 +18,7 @@ const METROID = '/Users/spot/Downloads/Metroid (EMU).zophar/Metroid (1986-08)(Ni
 
 type Case = { name: string; path: string; track: number; gridFit: number; maxIns: number; pitchFx: boolean };
 const CASES: Case[] = [
-  { name: 'Bionic Commando t7', path: BIONIC, track: 7, gridFit: 955, maxIns: 57, pitchFx: true },
+  { name: 'Bionic Commando t7', path: BIONIC, track: 7, gridFit: 955, maxIns: 21, pitchFx: true },
   { name: 'Metroid t2', path: METROID, track: 2, gridFit: 950, maxIns: 11, pitchFx: true },
   { name: 'Metroid t3', path: METROID, track: 3, gridFit: 950, maxIns: 6, pitchFx: false },
 ].filter((c) => fs.existsSync(c.path));
