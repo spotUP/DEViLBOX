@@ -255,7 +255,7 @@ export async function exportIffSmus(
     const companions = await buildSonixCompanionsFromStores(song);
     const name = song.uadeEditableFileName ?? 'untitled.smus';
     return {
-      data: new Blob([edit.data], { type: 'application/octet-stream' }),
+      data: new Blob([new Uint8Array(edit.data)], { type: 'application/octet-stream' }),
       filename: name,
       warnings,
       ...(companions.length > 0 ? { companions } : {}),
