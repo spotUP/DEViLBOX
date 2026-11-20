@@ -31,6 +31,7 @@ read-only from here: fixes go into these copies, never back into it.
 | `amiga/uade.mk` | `amiga/uade.mk` | Up Rough | none; reference only, `build_adf.py` replaces it |
 | `amiga/uade_arena_sizes.tsv`, `uade_player_min_cpu.tsv`, `uade_formats.txt` | `amiga/` | Up Rough | none |
 | `score/score.s`, `score/config.i`, `score/relocator.s` | `amiga/vendor/uade-3.05/amigasrc/score/` | UADE, GPL v2 (`third-party/uade-3.05/COPYING.GPL`) | none here; these are the demo system's bare-metal patches of UADE 3.05 score |
+| `amiga/uade_ahx_waves.bin` | `amiga/uade_ahx_waves.bin` (sha256 `bb414901...8be10`) | Up Rough (captured off a device run of the AHX player) | none; AHX v2 waveform/filter table the stager feeds through ENV:EaglePlayer/ahx |
 | `tools/uade_stage.py`, `uade_lookup.py`, `hunkdump.py`, `uade_arena_table.py` | `tools/` | Up Rough | none |
 | `players/SIDMon1.0.PATCHED`, `players/custom` | `amiga/vendor/uade-3.05/players/` | UADE player distribution (GPL v2 package; individual player authors) | none |
 

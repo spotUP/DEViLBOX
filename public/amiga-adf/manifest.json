@@ -1,0 +1,174 @@
+{
+  "templates": {
+    "DIGI-Booster": {
+      "adf": "DIGI-Booster.adf",
+      "adfSha256": "92e8f26addc0f55d919a171bd2dfe90d202e0dfe290e53b30c12e2557185b653",
+      "target": "a1200",
+      "cpu": "68020",
+      "moduleSlot": {
+        "diskOffset": 47024,
+        "maxBytes": 524288
+      },
+      "moduleLengthWord": {
+        "diskOffset": 47020,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "chipArenaBytes": 845060,
+      "memory": {
+        "IMG_BASE": "0x100000",
+        "IMG_LEN": "0x8BA00",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0x18BA00",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0xCE504",
+        "ENTRY": "0x100000"
+      },
+      "provenWith": {
+        "name": "the_day_after.digi",
+        "bytes": 521656
+      },
+      "sources": {
+        "tool": "ee4a5a9db0dda258c89f6704f4b10a9a4140a87bd61d6f9e43ec84ab0095130e",
+        "player": "485b77266dba0b59f5f71de1beabde89c6396dc0e203f50ee38e068b9683f133"
+      }
+    },
+    "FutureComposer1.4": {
+      "adf": "FutureComposer1.4.adf",
+      "adfSha256": "c41afa4a79f70c4c790b11e80be3cc3dfcfa13e1032deca7a5479d8453812073",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 40180,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 40176,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "chipArenaBytes": 311556,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42000",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5A000",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4C104",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "anthrox.fc",
+        "bytes": 13724
+      },
+      "sources": {
+        "tool": "ee4a5a9db0dda258c89f6704f4b10a9a4140a87bd61d6f9e43ec84ab0095130e",
+        "player": "507e430c3cf08c3e324820111ba49ef25125ce80fd5bd7d787ebb3d83a9552e3"
+      }
+    },
+    "JamCracker": {
+      "adf": "JamCracker.adf",
+      "adfSha256": "d78ce69c509281cbefbb589c2998b51b71f9a3f80b0dccd5fa6b683795747530",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 39428,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 39424,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "chipArenaBytes": 310532,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x41C00",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC59C00",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4BD04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "analogue_vibes.jam",
+        "bytes": 48577
+      },
+      "sources": {
+        "tool": "ee4a5a9db0dda258c89f6704f4b10a9a4140a87bd61d6f9e43ec84ab0095130e",
+        "player": "1686b55a62f7469096b84dc7769c4d71b73530d8e15b5b032a1d1a08795d4f5d"
+      }
+    },
+    "Mugician": {
+      "adf": "Mugician.adf",
+      "adfSha256": "225218e34a5e31f4f9089c1e53dd23aef005247aad8ddc4d7de6de418536c9d2",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 43204,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 43200,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "chipArenaBytes": 314628,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42C00",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5AC00",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4CD04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "flight.dmu",
+        "bytes": 10332
+      },
+      "sources": {
+        "tool": "ee4a5a9db0dda258c89f6704f4b10a9a4140a87bd61d6f9e43ec84ab0095130e",
+        "player": "0f0da6015c69602f0b2eef3dc9e155c7a021b26194455bc0195c6e6c80ee1a04"
+      }
+    },
+    "PTK-Prowiz": {
+      "adf": "PTK-Prowiz.adf",
+      "adfSha256": "60dc3f94f9ad40bc10e6f8c1c331d11fe86467c72a18fe05407db2d36f1075d2",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 89724,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 89720,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "chipArenaBytes": 405764,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x4E200",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC66200",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x63104",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "Virgill-mothership.mod",
+        "bytes": 114154
+      },
+      "sources": {
+        "tool": "ee4a5a9db0dda258c89f6704f4b10a9a4140a87bd61d6f9e43ec84ab0095130e",
+        "player": "cea8f553a382654d56d8d7e27ec26cf9374db54e3e9dcab5be9b4f092e57e9ca"
+      }
+    }
+  }
+}

@@ -9,7 +9,7 @@ content via uade123), or --player NAME. Output: <out>/devilbox.adf and <out>/lay
 slot's disk offset and maximum size and the disk offset of the big-endian
 length word the browser patches together with the slot.
 """
-import argparse, json, os, re, shutil, subprocess, sys
+import argparse, hashlib, json, os, re, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UADE_ROOT = os.path.join(HERE, '..', 'uade-3.05')
@@ -17,10 +17,16 @@ sys.path.insert(0, os.path.join(HERE, 'tools'))
 import uade_lookup, uade_arena_table  # noqa: E402
 ADF_SIZE = 80 * 2 * 11 * 512
 IMG_DISK = 1024
-IMG_BASE = 0xC18000           # A500 trapdoor slow RAM; Exec owns the bottom of it at boot
-SLOW_END = 0xC80000
-CHIP_BASE = 0x1C000           # chip arena; low chip below holds Exec/graphics/trackdisk buffers
-CHIP_END = 0x80000
+# Per-target memory map: the image (code + data + slot) and its BSS go in IMG_BASE..IMG_END,
+# the zeroed chip arena in CHIP_BASE..CHIP_END. Low chip below CHIP_BASE holds
+# Exec/graphics/trackdisk buffers.
+TARGETS = {
+    # A500: 512K chip + 512K trapdoor slow RAM; Exec owns the bottom of the slow RAM at boot.
+    'a500': dict(IMG_BASE=0xC18000, IMG_END=0xC80000, CHIP_BASE=0x1C000, CHIP_END=0x80000),
+    # A1200: 2 MB chip, no slow RAM at $C00000; image in the upper chip megabyte.
+    'a1200': dict(IMG_BASE=0x100000, IMG_END=0x200000, CHIP_BASE=0x1C000, CHIP_END=0x100000),
+}
+MIN_CPU_TSV = os.path.join(HERE, 'amiga', 'uade_player_min_cpu.tsv')
 SLOT_BYTES = 224 * 1024       # default max module size; the chip arena is sized for it
 POOL_BYTES = 65536            # for players uade_arena_sizes.tsv has not measured (PTK-Prowiz)
 ANY_BYTES = 65536
@@ -68,14 +74,66 @@ def patch_player_for_68000(path):
     open(path, 'wb').write(b)
 
 
+def source_hashes(player):
+    """sha256 of everything a template is built from: this tool tree (glue, score,
+    boot, stager, tables) plus UADE's score includes, and the player binary.
+    tools/amiga-adf-staleness.py recomputes these against public/amiga-adf/manifest.json."""
+    h = hashlib.sha256()
+    for top in (HERE, os.path.join(UADE_ROOT, 'amigasrc', 'score')):
+        for d, dirs, files in sorted(os.walk(top)):
+            dirs[:] = sorted(x for x in dirs if x != '__pycache__')
+            for f in sorted(files):
+                if f == 'README.md' or f.endswith('.pyc'):
+                    continue
+                path = os.path.join(d, f)
+                h.update(os.path.relpath(path, top).encode() + b'\0')
+                h.update(hashlib.sha256(open(path, 'rb').read()).digest())
+    ply = hashlib.sha256(open(os.path.join(UADE_ROOT, 'players', player), 'rb').read()).hexdigest()
+    return {'tool': h.hexdigest(), 'player': ply}
+
+
+def publish(adf_path, layout, pub_dir):
+    """Copy the ADF to <pub_dir>/<player>.adf and upsert its manifest.json entry."""
+    os.makedirs(pub_dir, exist_ok=True)
+    name = layout['player'] + '.adf'
+    shutil.copyfile(adf_path, os.path.join(pub_dir, name))
+    man_path = os.path.join(pub_dir, 'manifest.json')
+    man = json.load(open(man_path)) if os.path.exists(man_path) else {'templates': {}}
+    mem = layout['memory']
+    man['templates'][layout['player']] = {
+        'adf': name,
+        'adfSha256': hashlib.sha256(open(adf_path, 'rb').read()).hexdigest(),
+        'target': layout['target'],
+        'cpu': '68020' if layout['target'] == 'a1200' else '68000',
+        'moduleSlot': layout['moduleSlot'],
+        'moduleLengthWord': layout['moduleLengthWord'],
+        'chipArenaBytes': int(mem['CHIP_LEN'], 16),
+        'memory': mem,
+        'provenWith': layout['stagedModule'],
+        'sources': source_hashes(layout['player']),
+    }
+    man['templates'] = dict(sorted(man['templates'].items()))
+    with open(man_path, 'w') as fh:
+        json.dump(man, fh, indent=2)
+        fh.write('\n')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--module', required=True, help='module file; stage it from a directory holding only it')
     ap.add_argument('--out', required=True)
     ap.add_argument('--player', help='eagleplayer.conf player name; default: what the module matches')
     ap.add_argument('--slot-bytes', type=int, default=SLOT_BYTES)
+    ap.add_argument('--publish', metavar='DIR', help='also copy the ADF to DIR/<player>.adf and update DIR/manifest.json '
+                    '(only for templates proven on the target)')
+    ap.add_argument('--target', choices=sorted(TARGETS),
+                    help='default: a1200 for players in uade_player_min_cpu.tsv, else a500')
     a = ap.parse_args()
     player = uade_lookup.lookup(a.module, UADE_ROOT, a.player)['player']
+    needs_020 = {l.split('\t')[0] for l in open(MIN_CPU_TSV) if l.strip() and not l.startswith('#')}
+    target = a.target or ('a1200' if player in needs_020 else 'a500')
+    t = TARGETS[target]
+    IMG_BASE, IMG_END, CHIP_BASE, CHIP_END = t['IMG_BASE'], t['IMG_END'], t['CHIP_BASE'], t['CHIP_END']
     slot_bytes = a.slot_bytes
     # A measured player gets the stager's per-player sizes (high-water + margin);
     # an unmeasured one keeps the phase-1 64K/64K, which PTK-Prowiz was proven with.
@@ -115,12 +173,12 @@ def main():
     ld = os.path.join(stage, 'adf.ld')
     open(ld, 'w').write(f"""MEMORY {{
   chipram : org = 0x{CHIP_BASE:X}, len = 0x{CHIP_END - CHIP_BASE:X}
-  slowram : org = 0x{IMG_BASE:X}, len = 0x{SLOW_END - IMG_BASE:X}
+  imgram : org = 0x{IMG_BASE:X}, len = 0x{IMG_END - IMG_BASE:X}
 }}
 SECTIONS {{
   chip : {{ *(uadechip) . = ALIGN(4); _chip_end = .; }} > chipram
-  image : {{ *(code) *(text) *(uadesoundcore) *(data) *(uadedata) . = ALIGN(512); _img_end = .; }} > slowram
-  bss : {{ *(uadelowbss) *(uadeany) *(uadestack) . = ALIGN(4); _bss_end = .; }} > slowram
+  image : {{ *(code) *(text) *(uadesoundcore) *(data) *(uadedata) . = ALIGN(512); _img_end = .; }} > imgram
+  bss : {{ *(uadelowbss) *(uadeany) *(uadestack) . = ALIGN(4); _bss_end = .; }} > imgram
 }}
 """)
     img = os.path.join(stage, 'image.bin')
@@ -137,8 +195,9 @@ SECTIONS {{
     img_len = sym['_img_end'] - IMG_BASE
     image = image + bytes(img_len - len(image))
     assert len(image) == img_len, (len(image), img_len)
-    if sym['_bss_end'] > SLOW_END or sym['_chip_end'] > CHIP_END:
-        sys.exit(f"memory overflow: bss_end {sym['_bss_end']:#x} chip_end {sym['_chip_end']:#x}")
+    if sym['_bss_end'] > IMG_END or sym['_chip_end'] > CHIP_END:
+        sys.exit(f"memory overflow ({target}): bss_end {sym['_bss_end']:#x} chip_end {sym['_chip_end']:#x}"
+                 + ('; try --target a1200' if target == 'a500' else ''))
     if IMG_DISK + img_len > ADF_SIZE:
         sys.exit('image does not fit the disk')
 
@@ -170,6 +229,7 @@ SECTIONS {{
     layout = {
         'adfBytes': ADF_SIZE,
         'player': player,
+        'target': target,
         'moduleSlot': {'diskOffset': slot_off, 'maxBytes': slot_bytes},
         'moduleLengthWord': {'diskOffset': len_off, 'bytes': 4, 'endian': 'big'},
         'bootblock': {'diskOffset': 0, 'bytes': 1024, 'checksumOffset': 4,
@@ -179,6 +239,8 @@ SECTIONS {{
     }
     json.dump(layout, open(os.path.join(out, 'layout.json'), 'w'), indent=2)
     print(json.dumps(layout, indent=2))
+    if a.publish:
+        publish(os.path.join(out, 'devilbox.adf'), layout, a.publish)
 
 
 if __name__ == '__main__':
