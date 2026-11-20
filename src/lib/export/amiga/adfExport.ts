@@ -36,6 +36,8 @@ export function adfTemplateFor(m: Uint8Array): string | null {
   if (m.length >= 2 && m[0] === 0x4e && m[1] === 0xf9) return 'CustomMade';
   // Anders 0land: "mpl" + version digit, then a bra.w into the embedded player.
   if (ascii(m, 0, 'mpl') && m[3] >= 0x30 && m[3] <= 0x39 && m[10] === 0x60 && m[11] === 0x00) return 'Anders_0land';
+  // EMS v6 only (A1200/020); older EMS modules start differently and are not proven on this template.
+  if (ascii(m, 0, 'E.M.S. V6')) return 'EMS-6';
   return null;
 }
 

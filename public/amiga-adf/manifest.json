@@ -136,6 +136,40 @@
         "player": "485b77266dba0b59f5f71de1beabde89c6396dc0e203f50ee38e068b9683f133"
       }
     },
+    "EMS-6": {
+      "adf": "EMS-6.adf",
+      "adfSha256": "c33676bb8758a9a17f60118d8742e494fd6acba53313ce28a9d09197d5f367e9",
+      "target": "a1200",
+      "cpu": "68020",
+      "moduleSlot": {
+        "diskOffset": 54264,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 54260,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "chipArenaBytes": 375044,
+      "memory": {
+        "IMG_BASE": "0x100000",
+        "IMG_LEN": "0x45600",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0x145600",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x5B904",
+        "ENTRY": "0x100000"
+      },
+      "provenWith": {
+        "name": "perception.ems",
+        "bytes": 4094
+      },
+      "sources": {
+        "tool": "92ab1d8104a287006efc620e3357399bf16eafcfeacaae0b21dc989261da1e9d",
+        "player": "40b48f7d514976d9e84585fd9a47b5075384caa0e27fe56ef537c4ee55710658"
+      }
+    },
     "FutureComposer1.4": {
       "adf": "FutureComposer1.4.adf",
       "adfSha256": "3e7218366ea58867953078bd91844bc533fd02cc8318a8f3580f036eaad0b1a2",
