@@ -476,3 +476,13 @@ Method: existing harness (conv -> run1.sh -> MAME tap.lua -> events.py), plus a 
 3. PSG3 FREQ 120 -> 110: not reproducible on the committed source (fresh run 120 vs 120, valdiff 0). Probably a different measurement point in 1e. No change.
 
 Open: exact 1:1 slide needs a driver-matching pta/pitch-envelope (`e8`) model or per-row note-by-note emission; ATT 15 idle/key-off writes are driver behaviour; FM4 `03xx` extra key-ons not looked at; only Fancy_Promenard measured.
+
+## Phase 1g results (PSG 03xx 1:1, Fancy_Promenard, headless MAME, cmp2)
+
+Mechanism: per-slide pitch envelope (`E8`, song-table item, sdtop-relative) instead of `E7 pta`. `portaEnvelope(from, to, xx)` in mdsSong.ts writes one 4-byte node per Furnace tick (initial modulation = 256*12*log2(target period / step period), delta 0, length 0 = one tick; mdsdrv.68k @do_peg: a node lasts length+1 ticks), then a held 0 node (length 255) and the `7f` jump. The note is slurred (`E0`), so no key-off/key-on. The next plain note re-sends the instrument's `E8` (pegDirty). `E8` itself clears mod/pos, so the envelope starts on the slide row. `pta` could not be tuned to this: its glide is exponential in pitch, Furnace's is linear in period.
+Measured (clustered FREQ, Hz), step count: slide 1 Furnace 3, MAME 3 (before 3 vs 4); slide 2 Furnace 5, MAME 5 (before 5 vs 6).
+Slide 1 Furnace 776.8/873.9/981.2, MAME 787.8/887.8/989.9 (before 787.8/909.4/964.3/989.9).
+Slide 2 Furnace 585.7/703.5/880.8/1177.5/1300.7, MAME 588.7/708.0/887.8/1190.0/1331.7 (before 6 steps).
+Remaining value offset is the driver's period table vs Furnace's integer period for the same notes (the held base notes differ identically: 776.8 vs 787.8, 1300.7 vs 1331.7), so it is not a slide error. PSG1 FREQ cluster count Furnace 27, MAME 28 (extra is the driver's startup write at 0.005 s).
+FM4: `03xx` on FM now emits `E0` (slur) when the channel is sounding, so no extra key-on. FM key-ons Furnace vs MAME over 9.5 s: FM1 31/31, FM2 39/39, FM3 37/37, FM4 36/36, FM5 25/25, FM6 25/25. The FM pitch still jumps (no slide model measured); recorded as lossy `FM 03xx slide`.
+Open: FM 03xx real slide (fnum model); a slide crossing a chunk start is cut (insCmd resets E8); existing `pitchEnvelope` writes node length n for n ticks but the driver holds a node length+1 ticks (not checked against a song); only Fancy_Promenard measured.

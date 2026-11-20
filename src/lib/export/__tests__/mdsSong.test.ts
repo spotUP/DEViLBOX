@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { furnaceToMds } from '../md/mdsSong';
+import { furnaceToMds, portaEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf9, 0xfb]);
@@ -75,9 +75,13 @@ describe('furnaceToMds', () => {
     const hex = Buffer.from(s.seq).toString('hex');
     expect(hex).toContain('e28c');
   });
-  it('Fancy_Promenard: PSG 03xx tone portamento is emitted as slur + pta (E0 E7 xx), reset by E7 00', async () => {
+  it('portaEnvelope: Furnace linear-period 03xx step as one pitch-envelope node per tick, relative to the target (exact bytes)', () => {
+    // nv 48 -> 50, xx 3: four ticks of -386, -256, -122, 0 (1/256 semitone), a held 0 node (len 255), jump to it.
+    expect(Buffer.from(portaEnvelope(48, 50, 3)).toString('hex')).toBe('fe7e0000ff000000ff860000000000000000' + '00ff7f04');
+  });
+  it('Fancy_Promenard: PSG 03xx tone portamento is emitted as slur + per-slide pitch envelope (E0 E8 xx), not the E7 glide', async () => {
     const hex = Buffer.from((await convert('Fancy_Promenard.fur')).seq).toString('hex');
-    expect(hex).toMatch(/e0e7[0-9a-f]{2}/);
-    expect(hex).toContain('e700');
+    expect(hex).toMatch(/e0e8[0-9a-f]{2}/);
+    expect(hex).not.toMatch(/e0e7/);
   });
 });
