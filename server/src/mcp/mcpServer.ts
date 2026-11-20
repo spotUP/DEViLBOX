@@ -2408,6 +2408,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
           { tool: 'export_midi', description: 'Export pattern/song to MIDI (base64)' },
           { tool: 'export_mod', description: 'Export loaded song to ProTracker MOD (base64); bakes OctaMED synths to PCM' },
           { tool: 'export_native', description: 'Export loaded song to its native format (55+ formats) with edits preserved' },
+          { tool: 'export_adf', description: 'Export loaded song to a bootable Amiga disk (.adf, base64) that plays it' },
           { tool: 'share_song', description: 'Make a share link for the song as edited (uploads it)' },
           { tool: 'open_share', description: 'Open a share link like a visitor: no autoplay, Play prompt' },
         ],
@@ -2565,6 +2566,28 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
       format: z.enum(['mod', 'xm', 'it', 's3m']).optional().describe('Output format (default: mod)'),
     },
     (p) => call('export_mod', p),
+  );
+
+  server.tool(
+    'export_adf',
+    'Export the loaded song as a bootable Amiga disk image (.adf): its native module written onto a prebuilt disk with the matching player (Amiga 500 or 1200). Refuses formats without a disk player and modules that do not fit. Returns base64. Optionally saves to disk via outputPath.',
+    {
+      outputPath: z.string().optional().describe('Absolute path to save the .adf to (optional; if omitted only base64 is returned)'),
+    },
+    async (p) => {
+      const result = await call('export_adf', {});
+      if (p.outputPath && result?.content?.[0]?.type === 'text') {
+        const parsed = JSON.parse(result.content[0].text);
+        if (parsed.adfBase64) {
+          const fs = await import('fs');
+          fs.writeFileSync(p.outputPath, Buffer.from(parsed.adfBase64, 'base64'));
+          parsed.savedTo = p.outputPath;
+          delete parsed.adfBase64;
+          return { content: [{ type: 'text' as const, text: JSON.stringify(parsed) }] };
+        }
+      }
+      return result;
+    },
   );
 
   server.tool(

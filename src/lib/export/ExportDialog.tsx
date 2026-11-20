@@ -115,6 +115,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
 
         case 'native':
           return await ex.handleExportNative((b, n) => saveAs(b, n), onClose);
+        case 'adf':
+          return await ex.handleExportAdf((b, n) => saveAs(b, n), onClose);
       }
 
       // Only close if no warnings (warnings will show in dialog)
@@ -504,6 +506,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Native</div>
                     </button>
                   )}
+                  {ex.nativeAvailable && (
+                    <button
+                      onClick={() => ex.setExportMode('adf')}
+                      className={`
+                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        ${ex.exportMode === 'adf'
+                          ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                          : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                        }
+                      `}
+                    >
+                      <FileMusic size={24} className="mx-auto mb-2" />
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">Amiga Disk (.adf)</div>
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       onClose();
@@ -846,6 +863,15 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
+              {ex.exportMode === 'adf' && (
+                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">Amiga Disk (.adf)</h3>
+                  <div className="text-sm font-mono text-text-secondary">
+                    A bootable disk image that plays the song on an Amiga 500 or Amiga 1200, or in an emulator. The native module is written onto a disk that holds its player. Formats without a disk player, and modules too large for the disk, are refused with a message.
+                  </div>
+                </div>
+              )}
+
               {ex.exportMode === 'nano' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
@@ -986,6 +1012,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : ex.exportMode === 'nesRom' ? '.nes'
                   : ex.exportMode === 'nsfe' ? '.nsfe'
                   : ex.exportMode === 'tad' ? '.zip'
+                  : ex.exportMode === 'adf' ? '.adf'
                   : `.${ex.exportMode}.json`
                 }`
               : 'Select a file to import'}

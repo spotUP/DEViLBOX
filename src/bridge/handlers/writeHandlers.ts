@@ -3238,6 +3238,21 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
   }
 }
 
+/** The live song as a bootable Amiga disk (base64), through the same code as the Export dialog. */
+export async function exportAdf(_params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    if (useTrackerStore.getState().patterns.length === 0) return { error: 'No song loaded' };
+    const { exportLiveSongAdf } = await import('../../lib/export/amiga/adfExport');
+    const r = await exportLiveSongAdf();
+    if (!r) return { error: 'No native exporter available for this format' };
+    let binary = '';
+    for (let i = 0; i < r.data.length; i += 8192) binary += String.fromCharCode(...Array.from(r.data.subarray(i, i + 8192)));
+    return { ok: true, filename: r.filename, sizeBytes: r.data.byteLength, template: r.template, machine: r.machine, warnings: r.warnings, adfBase64: btoa(binary) };
+  } catch (e) {
+    return { error: `exportAdf failed: ${(e as Error).message}` };
+  }
+}
+
 /** Run synth tests and return results — used by the format-status test report page */
 export async function runSynthTests(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   const suite = (params.suite as string) ?? 'all';

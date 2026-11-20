@@ -199,6 +199,7 @@ import {
   exportMidi,
   exportMod,
   exportNative,
+  exportAdf,
   clearConsoleErrors,
   evaluateScript,
 } from './handlers/writeHandlers';
@@ -485,6 +486,7 @@ const handlers: Record<string, Handler> = {
   export_midi: exportMidi,
   export_mod: exportMod,
   export_native: exportNative,
+  export_adf: exportAdf,
   share_song: shareSong,
   open_share: openShare,
 

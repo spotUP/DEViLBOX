@@ -40,7 +40,7 @@ import { saveFurFileWasm, saveFurTextWasm, loadFurFileWasm } from '@lib/import/w
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'nsfe' | 'tad';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'nsfe' | 'tad' | 'adf';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -88,6 +88,7 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   zxQuadToneTap: '.tap',
   vectrexCart: '.bin',
   nesRom: '.nes',
+  adf: '.adf',
   nsfe: '.nsfe',
   tad: '.zip',
 };
@@ -515,6 +516,21 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     onClose();
   }, [runNativeExport]);
 
+  // ── Shared handler: Amiga disk ──────────────────────────────────────────────
+
+  const handleExportAdf = useCallback(async (downloadFn: (blob: Blob, filename: string) => void, onClose: () => void) => {
+    try {
+      const { exportLiveSongAdf } = await import('@lib/export/amiga/adfExport');
+      const r = await exportLiveSongAdf();
+      if (!r) { notify.error('No native exporter available for this format'); return; }
+      downloadFn(new Blob([r.data as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }), r.filename);
+      notify.success(`Amiga disk exported (${r.machine}, ${r.data.byteLength} bytes).`);
+      onClose();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Amiga disk export failed.');
+    }
+  }, []);
+
   // ── Shared handler: import file ─────────────────────────────────────────────
 
   const handleImportFile = useCallback(async (file: File, onClose: () => void) => {
@@ -658,6 +674,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     ayTarget, setAyTarget,
     handleExportNano,
     handleExportNative,
+    handleExportAdf,
     nativeAvailable,
     handleImportFile,
   };
