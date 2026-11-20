@@ -104,3 +104,31 @@ describe('DigiBooster Pro export keeps every effect in an edited pattern', () =>
     expect(diffs).toEqual([]);
   });
 });
+
+describe('DigiBooster Pro export keeps lossy-mapped effect values in an edited pattern', () => {
+  // Same-length rewrite of Set Volume cells to (cmd, param), one note edit, whole export must equal the source but that byte.
+  const cases: [string, [number, number][]][] = [
+    ['volume slide with both nibbles (cmds 10, 5, 6)', [[10, 0x35], [5, 0x24], [6, 0x13]]],
+    ['global volume above 64 (cmd 16)', [[16, 65], [16, 100], [16, 255]]],
+    ['explicit cmd 0 / param 0', [[0, 0]]],
+  ];
+  for (const [name, rewrites] of cases) {
+    it(name, async () => {
+      const src = raw.slice();
+      const { cells } = walkCells(src);
+      const fx = cells.flatMap((c) => (c.c1 !== undefined && (c.mask & 0x30) === 0x30 && src[c.c1] === 12 ? [{ pat: c.pat, at: c.c1 }] : c.c2 !== undefined && (c.mask & 0x0C) === 0x0C && src[c.c2] === 12 ? [{ pat: c.pat, at: c.c2 }] : []));
+      const pat = fx[0].pat;
+      const inPat = fx.filter((c) => c.pat === pat);
+      expect(inPat.length).toBeGreaterThanOrEqual(rewrites.length);
+      rewrites.forEach(([cmd, param], k) => { src[inPat[k].at] = cmd; src[inPat[k].at + 1] = param; });
+      const target = walkCells(src).cells.find((c) => c.pat === pat && c.note !== undefined && (src[c.note] & 0x0F) > 0 && src[c.note] < 0x7F)!;
+      const song = parseDigiBoosterProFile(src.slice(0), 'x')!;
+      song.patterns[pat].channels[target.ch].rows[target.row].note -= 1;
+      const out = await exp(song);
+      const want = src.slice();
+      want[target.note!] -= 1;
+      expect(out.length).toBe(want.length);
+      expect(Array.from(out.keys()).filter((i) => out[i] !== want[i])).toEqual([]);
+    });
+  }
+});

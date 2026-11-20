@@ -221,7 +221,9 @@ const DBM_EFFECT_MAP: readonly number[] = [
 /** effTyp >= this carries a DBM command with no XM equivalent (echo 31-35 etc.) as DBM_RAW_EFFECT_BASE + cmd, param unchanged. */
 export const DBM_RAW_EFFECT_BASE = 0x40;
 
-function convertDBMEffect(cmd: number, param: number): { effTyp: number; eff: number } {
+function convertDBMEffect(cmd: number, param: number, present = false): { effTyp: number; eff: number } {
+  // An explicit 0/0 in the packed cell: keep it so the cell re-packs with its effect fields.
+  if (present && cmd === 0 && param === 0) return { effTyp: DBM_RAW_EFFECT_BASE, eff: 0 };
   let effTyp = (cmd < DBM_EFFECT_MAP.length) ? DBM_EFFECT_MAP[cmd] : 0;
   let eff    = param;
 
@@ -242,15 +244,12 @@ function convertDBMEffect(cmd: number, param: number): { effTyp: number; eff: nu
     case 10: // Volume slide
     case 5:  // Tone porta + vol slide
     case 6:  // Vibrato + vol slide
-      // DBM: up nibble has priority.
-      // If both nibbles set and up nibble is not 0xF and down nibble is not 0xF:
-      if ((param & 0xF0) !== 0x00 && (param & 0xF0) !== 0xF0 && (param & 0x0F) !== 0x0F) {
-        eff = param & 0xF0;
-      }
+      // Keep both nibbles: the replayer slides by the up nibble when set, so the down nibble is dead but must round-trip.
       break;
 
     case 16: // Global volume: DBM 0-64 → XM 0-128
-      eff = param <= 64 ? param * 2 : 128;
+      // >64 plays as 64 (XMHandler clamps) but is kept as param + 64 (>128) so it round-trips.
+      eff = param <= 64 ? param * 2 : param + 64;
       break;
 
     case 15: // Tempo/Speed: <= 0x1F → speed; > 0x1F → BPM (Fxx handles both in XM)
@@ -598,8 +597,8 @@ function parsePattern(
       if (mask & 0x20) { if (!r.canRead(1)) break; p1 = r.u8(); }
 
       if (cell) {
-        const fx1 = convertDBMEffect(c1, p1);
-        const fx2 = convertDBMEffect(c2, p2);
+        const fx1 = convertDBMEffect(c1, p1, (mask & 0x30) !== 0);
+        const fx2 = convertDBMEffect(c2, p2, (mask & 0x0C) !== 0);
         cell.effTyp  = fx1.effTyp;
         cell.eff     = fx1.eff;
         cell.effTyp2 = fx2.effTyp;

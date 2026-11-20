@@ -66,7 +66,7 @@ function reverseDBMEffect(effTyp: number, eff: number): { cmd: number; param: nu
       param = ((Math.floor(eff / 10) & 0x0F) << 4) | (eff % 10);
       break;
     case 16: // Global volume: XM 0-128 → DBM 0-64
-      param = Math.min(64, Math.floor(eff / 2));
+      param = eff > 128 ? Math.min(255, eff - 64) : Math.floor(eff / 2);
       break;
     default:
       break;
@@ -123,8 +123,9 @@ export const digiBoosterProEncoder: VariableLengthEncoder = {
       const hasInstr = instr !== 0;
       const fx1 = reverseDBMEffect(effTyp, eff);
       const fx2 = reverseDBMEffect(effTyp2, eff2);
-      const hasFx1Cmd = fx1.cmd !== 0 || fx1.param !== 0;
-      const hasFx2Cmd = fx2.cmd !== 0 || fx2.param !== 0;
+      const raw1 = effTyp >= DBM_RAW_EFFECT_BASE, raw2 = effTyp2 >= DBM_RAW_EFFECT_BASE;
+      const hasFx1Cmd = fx1.cmd !== 0 || fx1.param !== 0 || raw1;
+      const hasFx2Cmd = fx2.cmd !== 0 || fx2.param !== 0 || raw2;
 
       // Skip completely empty cells
       if (!hasNote && !hasInstr && !hasFx1Cmd && !hasFx2Cmd) {
@@ -141,12 +142,12 @@ export const digiBoosterProEncoder: VariableLengthEncoder = {
       if (hasNote) mask |= 0x01;
       if (hasInstr) mask |= 0x02;
       if (hasFx2Cmd) {
-        if (fx2.cmd !== 0) mask |= 0x04; // c2
-        if (fx2.param !== 0 || fx2.cmd !== 0) mask |= 0x08; // p2
+        if (fx2.cmd !== 0 || raw2) mask |= 0x04; // c2
+        if (fx2.param !== 0 || fx2.cmd !== 0 || raw2) mask |= 0x08; // p2
       }
       if (hasFx1Cmd) {
-        if (fx1.cmd !== 0) mask |= 0x10; // c1
-        if (fx1.param !== 0 || fx1.cmd !== 0) mask |= 0x20; // p1
+        if (fx1.cmd !== 0 || raw1) mask |= 0x10; // c1
+        if (fx1.param !== 0 || fx1.cmd !== 0 || raw1) mask |= 0x20; // p1
       }
 
       buf.push(mask);
