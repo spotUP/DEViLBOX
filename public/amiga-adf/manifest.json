@@ -2,15 +2,15 @@
   "templates": {
     "AbyssHighestExperience": {
       "adf": "AbyssHighestExperience.adf",
-      "adfSha256": "7364311ba15e195ed190119f7e177c45212835975741410650526f11f94e0cbb",
+      "adfSha256": "9c3123c24560673ae76471218a153a75ecd98829cfc27f36abd71e604431d0e5",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 48080,
+        "diskOffset": 48088,
         "maxBytes": 65536
       },
       "moduleLengthWord": {
-        "diskOffset": 48076,
+        "diskOffset": 48084,
         "bytes": 4,
         "endian": "big"
       },
@@ -30,21 +30,21 @@
         "bytes": 26327
       },
       "sources": {
-        "tool": "f0a5d6fe9b8307cc989d7c360de8fcba761e7af1a2933458be7dd9a9088d58dd",
+        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
         "player": "ce55646788639b86811063178613a5b31f783a325dbc60919cfc9596143d3db0"
       }
     },
     "Anders_0land": {
       "adf": "Anders_0land.adf",
-      "adfSha256": "48183dac16b5c3133565e8b9f16856967c6ca6acf4d166a2c299d92e1edf37d0",
+      "adfSha256": "8bb57d08f66da68a703f444c45ff3c36bf59d2653aef6e147eabaff08ba8ecc6",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 39164,
+        "diskOffset": 39172,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 39160,
+        "diskOffset": 39168,
         "bytes": 4,
         "endian": "big"
       },
@@ -64,21 +64,21 @@
         "bytes": 3036
       },
       "sources": {
-        "tool": "f0a5d6fe9b8307cc989d7c360de8fcba761e7af1a2933458be7dd9a9088d58dd",
+        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
         "player": "3e58a705b80e61ceb42c2e17e7c4a1f95ae829125267b041fcd434877b416b0a"
       }
     },
     "CustomMade": {
       "adf": "CustomMade.adf",
-      "adfSha256": "d194002d3db287ec3b40b4ca5838069137ae456547cafad30780b6a63540da81",
+      "adfSha256": "01feb6fa74fb3f63d777349ae0e9ba615f48e6375c5266a526b2be14b0daa430",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 39552,
+        "diskOffset": 39560,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 39548,
+        "diskOffset": 39556,
         "bytes": 4,
         "endian": "big"
       },
@@ -98,21 +98,21 @@
         "bytes": 9759
       },
       "sources": {
-        "tool": "f0a5d6fe9b8307cc989d7c360de8fcba761e7af1a2933458be7dd9a9088d58dd",
+        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
         "player": "170b379f48461877ddcee732338668f3a6c900eadfe08bee119f8fd2af161e49"
       }
     },
     "DIGI-Booster": {
       "adf": "DIGI-Booster.adf",
-      "adfSha256": "536135b65f97d36dd9926591be0423d1ad83e78c0f526deeffccc9477a7149cc",
+      "adfSha256": "556842b88bb2f0abd2e854e8013d0c7e6bd0fcc52b9b271f657529e0132f7c4e",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 47416,
+        "diskOffset": 47424,
         "maxBytes": 524288
       },
       "moduleLengthWord": {
-        "diskOffset": 47412,
+        "diskOffset": 47420,
         "bytes": 4,
         "endian": "big"
       },
@@ -132,21 +132,21 @@
         "bytes": 521656
       },
       "sources": {
-        "tool": "f0a5d6fe9b8307cc989d7c360de8fcba761e7af1a2933458be7dd9a9088d58dd",
+        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
         "player": "485b77266dba0b59f5f71de1beabde89c6396dc0e203f50ee38e068b9683f133"
       }
     },
     "EMS-6": {
       "adf": "EMS-6.adf",
-      "adfSha256": "c33676bb8758a9a17f60118d8742e494fd6acba53313ce28a9d09197d5f367e9",
+      "adfSha256": "525d23c57bfde036def844dfb2de57c77f8a85607487c568d79e754b852a525b",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 54264,
+        "diskOffset": 54272,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 54260,
+        "diskOffset": 54268,
         "bytes": 4,
         "endian": "big"
       },
@@ -166,21 +166,21 @@
         "bytes": 4094
       },
       "sources": {
-        "tool": "f0a5d6fe9b8307cc989d7c360de8fcba761e7af1a2933458be7dd9a9088d58dd",
+        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
         "player": "40b48f7d514976d9e84585fd9a47b5075384caa0e27fe56ef537c4ee55710658"
       }
     },
     "FutureComposer1.4": {
       "adf": "FutureComposer1.4.adf",
-      "adfSha256": "3e7218366ea58867953078bd91844bc533fd02cc8318a8f3580f036eaad0b1a2",
+      "adfSha256": "457ba6a8243fb11420035cfe046e9911f2c877b636258564e62c51c2b10ab38a",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 40572,
+        "diskOffset": 40580,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 40568,
+        "diskOffset": 40576,
         "bytes": 4,
         "endian": "big"
       },
@@ -200,21 +200,21 @@
         "bytes": 13724
       },
       "sources": {
-        "tool": "f0a5d6fe9b8307cc989d7c360de8fcba761e7af1a2933458be7dd9a9088d58dd",
+        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
         "player": "507e430c3cf08c3e324820111ba49ef25125ce80fd5bd7d787ebb3d83a9552e3"
       }
     },
     "JamCracker": {
       "adf": "JamCracker.adf",
-      "adfSha256": "1efe2b5bd9705c37404f45d1820e10592053759d392139ef45000ac37e05f7da",
+      "adfSha256": "4b8e1171861c45621d3ca306ffd5d5428db10d926e6e66978f094c52cda4b771",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 39820,
+        "diskOffset": 39828,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 39816,
+        "diskOffset": 39824,
         "bytes": 4,
         "endian": "big"
       },
@@ -234,55 +234,55 @@
         "bytes": 48577
       },
       "sources": {
-        "tool": "f0a5d6fe9b8307cc989d7c360de8fcba761e7af1a2933458be7dd9a9088d58dd",
+        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
         "player": "1686b55a62f7469096b84dc7769c4d71b73530d8e15b5b032a1d1a08795d4f5d"
       }
     },
     "MED": {
       "adf": "MED.adf",
-      "adfSha256": "955a1a02a8ce93175da3ed3ebaeec7cf8ee8c7199922fd6c40b7306b082dc08f",
-      "target": "a1200",
-      "cpu": "68020",
+      "adfSha256": "0c0adfd703a23552f1ce0b01bb711285092604677de5c94a7b4b3f91228dd6cb",
+      "target": "a500",
+      "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 50432,
+        "diskOffset": 50440,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 50428,
+        "diskOffset": 50436,
         "bytes": 4,
         "endian": "big"
       },
       "chipArenaBytes": 376068,
       "memory": {
-        "IMG_BASE": "0x100000",
+        "IMG_BASE": "0xC18000",
         "IMG_LEN": "0x44800",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0x144800",
+        "BSS_BASE": "0xC5C800",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x5BD04",
-        "ENTRY": "0x100000"
+        "ENTRY": "0xC18000"
       },
       "provenWith": {
-        "name": "dracula.mmd0",
+        "name": "universal monsters - dracula.mmd0",
         "bytes": 30474
       },
       "sources": {
-        "tool": "f0a5d6fe9b8307cc989d7c360de8fcba761e7af1a2933458be7dd9a9088d58dd",
+        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
         "player": "fcaa3c81076b4814e90548fa474d11c36031a270560818c9b7ddfa3985a65199"
       }
     },
     "Mugician": {
       "adf": "Mugician.adf",
-      "adfSha256": "ddfcdacb53cbb6e6d98298fc521ae6e95bb401959c151fcc2d91322dd495a26f",
+      "adfSha256": "310caa0db358a3174540e707e2aee3dc69b5433f01f05d64b39be19062d6e520",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 43596,
+        "diskOffset": 43604,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 43592,
+        "diskOffset": 43600,
         "bytes": 4,
         "endian": "big"
       },
@@ -302,21 +302,21 @@
         "bytes": 10332
       },
       "sources": {
-        "tool": "f0a5d6fe9b8307cc989d7c360de8fcba761e7af1a2933458be7dd9a9088d58dd",
+        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
         "player": "0f0da6015c69602f0b2eef3dc9e155c7a021b26194455bc0195c6e6c80ee1a04"
       }
     },
     "PTK-Prowiz": {
       "adf": "PTK-Prowiz.adf",
-      "adfSha256": "732d425d8fb512b84e6f585e58cea7909347be8d70c61ec5027ff723695bf480",
+      "adfSha256": "5be4b2221cbabea350403c8e148cd02258f9a4fced82a861a3d4c770d80e2a5d",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 90116,
+        "diskOffset": 90124,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 90112,
+        "diskOffset": 90120,
         "bytes": 4,
         "endian": "big"
       },
@@ -336,21 +336,21 @@
         "bytes": 114154
       },
       "sources": {
-        "tool": "f0a5d6fe9b8307cc989d7c360de8fcba761e7af1a2933458be7dd9a9088d58dd",
+        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
         "player": "cea8f553a382654d56d8d7e27ec26cf9374db54e3e9dcab5be9b4f092e57e9ca"
       }
     },
     "SUN-Tronic": {
       "adf": "SUN-Tronic.adf",
-      "adfSha256": "27b3f1bfbd34d8a3df3d8444776bdf899bcc5cdcc3bb80fd7ef765005d981e30",
+      "adfSha256": "350cad113c1339ea15c660669c0481d63d5ec0806194e2f398c5e340399bd90b",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 37220,
+        "diskOffset": 37228,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 37216,
+        "diskOffset": 37224,
         "bytes": 4,
         "endian": "big"
       },
@@ -370,7 +370,7 @@
         "bytes": 4186
       },
       "sources": {
-        "tool": "f0a5d6fe9b8307cc989d7c360de8fcba761e7af1a2933458be7dd9a9088d58dd",
+        "tool": "6b6b1e76f468fd41451c563ba6ce116aae9a9a2d1c5a41c3120ade67227ded18",
         "player": "2ab53b0fc75461d73518752864a64efce8266ef19b6015497d7b2bc546e3f1bd"
       }
     }

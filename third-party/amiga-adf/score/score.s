@@ -1632,7 +1632,7 @@ dsbl	subq.l	#6,a0
 	move	d0,EPG_Voice3Vol(a5)
 	move	d0,EPG_Voice4Vol(a5)
 
-	lea	okprog(pc),a0
+	lea	audioallocprog(pc),a0
 	move.l	a0,dtg_AudioAlloc(a5)
 	move.l	a0,dtg_AudioFree(a5)
 	lea	enpp_alloc_audio(pc),a1
@@ -2125,6 +2125,12 @@ enpp_song_end
 
 
 okprog	moveq	#0,d0
+	rts
+
+* DEVIATION from UADE: AudioAlloc returns a0=0. MED.s InitPly calls fastmemrecomended
+* with the stale a0 (= okprog) and reads odd pointers: legal on a 020, address error on a 68000.
+audioallocprog	moveq	#0,d0
+	sub.l	a0,a0
 	rts
 
 
