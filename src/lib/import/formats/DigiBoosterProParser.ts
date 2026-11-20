@@ -218,14 +218,16 @@ const DBM_EFFECT_MAP: readonly number[] = [
   0x00, // 35 Echo Cross (Zxx)      — no XM equivalent
 ];
 
+/** effTyp >= this carries a DBM command with no XM equivalent (echo 31-35 etc.) as DBM_RAW_EFFECT_BASE + cmd, param unchanged. */
+export const DBM_RAW_EFFECT_BASE = 0x40;
+
 function convertDBMEffect(cmd: number, param: number): { effTyp: number; eff: number } {
   let effTyp = (cmd < DBM_EFFECT_MAP.length) ? DBM_EFFECT_MAP[cmd] : 0;
   let eff    = param;
 
-  // If cmd is in the map but maps to 0x00, only keep if it's cmd 0 (arpeggio)
-  // and param != 0. Otherwise discard.
+  // No XM equivalent: keep the DBM command so an edited pattern re-packs it unchanged.
   if (effTyp === 0x00 && cmd !== 0) {
-    return { effTyp: 0, eff: 0 };
+    return cmd < 0xC0 ? { effTyp: DBM_RAW_EFFECT_BASE + cmd, eff: param } : { effTyp: 0, eff: 0 };
   }
 
   switch (cmd) {

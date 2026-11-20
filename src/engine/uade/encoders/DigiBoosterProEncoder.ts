@@ -22,6 +22,7 @@
  */
 
 import type { TrackerCell } from '@/types';
+import { DBM_RAW_EFFECT_BASE } from '@/lib/import/formats/DigiBoosterProParser';
 import type { VariableLengthEncoder } from '../UADEPatternEncoder';
 import { registerVariableEncoder } from '../UADEPatternEncoder';
 
@@ -54,6 +55,7 @@ const XM_TO_DBM: Map<number, number> = new Map([
 function reverseDBMEffect(effTyp: number, eff: number): { cmd: number; param: number } {
   if (effTyp === 0 && eff === 0) return { cmd: 0, param: 0 };
 
+  if (effTyp >= DBM_RAW_EFFECT_BASE) return { cmd: effTyp - DBM_RAW_EFFECT_BASE, param: eff };
   const dbmCmd = XM_TO_DBM.get(effTyp);
   if (dbmCmd === undefined) return { cmd: 0, param: 0 };
 
