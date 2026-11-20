@@ -229,12 +229,18 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
 
   const instruments: InstrumentConfig[] = [];
 
+  // The header offsets are Amiga load addresses, not file positions (and can disagree with the
+  // lengths by a word): the PCM follows the pattern data back to back in slot order.
+  let pcmCursor = pos;
+
   for (let s = 0; s < NUM_SAMPLES; s++) {
     const hdr  = sampleHeaders[s];
     const id   = s + 1;
     const name = '';
 
-    if (hdr.lengthBytes === 0 || hdr.offset === 0 || hdr.offset >= bytes.byteLength) {
+    const pcmStart = pcmCursor;
+    pcmCursor += hdr.lengthBytes;
+    if (hdr.lengthBytes === 0 || hdr.offset === 0 || pcmStart >= bytes.byteLength) {
       // Empty/silent placeholder — header slot still exists in chip RAM
       const emptyChipRam: UADEChipRamInfo = {
         moduleBase: 0,
@@ -256,8 +262,8 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
       continue;
     }
 
-    const available = Math.min(hdr.lengthBytes, bytes.byteLength - hdr.offset);
-    const pcm = bytes.slice(hdr.offset, hdr.offset + available);
+    const available = Math.min(hdr.lengthBytes, bytes.byteLength - pcmStart);
+    const pcm = bytes.slice(pcmStart, pcmStart + available);
 
     // Loop: GMC loop is at the END of the sample.
     // nLoopStart = nLength - loopLength * 2,  nLoopEnd = nLength

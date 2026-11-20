@@ -70,15 +70,16 @@ export async function exportGameMusicCreator(
         pcm[j] = (s16 >> 8) & 0xFF;
       }
 
-      // Volume: use instrument volume (0-64 range), default 64
-      const volume = Math.min(64, Math.max(0, inst.volume ?? 64));
+      // Volume: the parser keeps the 0-64 value in defaultVolume (inst.volume is dB).
+      const volume = Math.min(64, Math.max(0, inst.metadata?.modPlayback?.defaultVolume ?? 64));
 
       // Loop: GMC loop is at the END of the sample
       // loopLength in words (1 word = 2 bytes)
       const loopStart = inst.sample.loopStart ?? 0;
       const loopEnd = inst.sample.loopEnd ?? 0;
       let loopLengthWords = 0;
-      if (loopEnd > loopStart) {
+      // loopEnd defaults to the sample length when unlooped (createSamplerInstrument), so the loop flag decides.
+      if (inst.sample.loop && loopEnd > loopStart) {
         loopLengthWords = Math.ceil((loopEnd - loopStart) / 2);
       }
 
@@ -115,6 +116,13 @@ export async function exportGameMusicCreator(
     );
   }
 
+  // The header offset/address fields are Amiga load addresses (see the parser); the source file's
+  // are kept, with the PCM block laid out back to back after the patterns so offset - first offset = file position.
+  const src = song.gmcFileData ? new Uint8Array(song.gmcFileData) : null;
+  let srcView = src && src.length >= HEADER_SIZE ? new DataView(src.buffer, src.byteOffset, src.byteLength) : null;
+  // Edited sample lengths move the PCM block, so the source addresses no longer fit.
+  if (srcView && samples.some((smp, i) => smp.lengthWords !== srcView!.getUint16(i * SAMPLE_HDR_SIZE + 4, false))) srcView = null;
+
   // ── Calculate sample data offsets ──────────────────────────────────────────
   // Sample data follows immediately after all pattern data.
   const sampleDataStart = HEADER_SIZE + numPatterns * PATTERN_SIZE;
@@ -149,20 +157,22 @@ export async function exportGameMusicCreator(
     const s = samples[i];
     const offset = sampleOffsets[i];
 
-    // offset (u32BE) — absolute file offset to sample data
-    view.setUint32(pos, offset, false); pos += 4;
+    // offset (u32BE) — load address of the sample; kept from the source when present
+    const srcOffset = srcView ? srcView.getUint32(i * SAMPLE_HDR_SIZE, false) : 0;
+    view.setUint32(pos, srcView ? srcOffset : offset, false); pos += 4;
     // length (u16BE, in words)
     view.setUint16(pos, s.lengthWords & 0x7FFF, false); pos += 2;
     // zero byte
-    view.setUint8(pos, 0); pos += 1;
+    view.setUint8(pos, srcView ? srcView.getUint8(i * SAMPLE_HDR_SIZE + 6) : 0); pos += 1;
     // volume (u8, 0-64)
     view.setUint8(pos, s.volume & 0x7F); pos += 1;
-    // address (u32BE) — set to same as offset for simplicity
-    view.setUint32(pos, offset, false); pos += 4;
-    // loopLength (u16BE, in words)
-    view.setUint16(pos, s.loopLengthWords & 0xFFFF, false); pos += 2;
+    // address (u32BE) — kept from the source, else the same as offset
+    view.setUint32(pos, srcView ? srcView.getUint32(i * SAMPLE_HDR_SIZE + 8, false) : offset, false); pos += 4;
+    // loopLength (u16BE, in words); an unlooped source slot keeps its own value (2 = no loop)
+    const loopWords = s.loopLengthWords > 0 || !srcView ? s.loopLengthWords : srcView.getUint16(i * SAMPLE_HDR_SIZE + 12, false);
+    view.setUint16(pos, loopWords & 0xFFFF, false); pos += 2;
     // dataStart (u16BE, in words) — 0 means start from beginning
-    view.setUint16(pos, 0, false); pos += 2;
+    view.setUint16(pos, srcView ? srcView.getUint16(i * SAMPLE_HDR_SIZE + 14, false) : 0, false); pos += 2;
   }
 
   // ── Write 3 zero bytes ─────────────────────────────────────────────────────
