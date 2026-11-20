@@ -55,6 +55,13 @@ const ONE_ARG_KIND: ReadonlyArray<[number, number]> = [
   [DW_FX.globalVolumeFade, DW_WALK.globalFade], [DW_FX.globalVolume, DW_WALK.globalVolume], [FX_SPEED, DW_WALK.speed], [DW_FX.delaySpeed, DW_WALK.delaySpeed],
 ];
 
+/** Commands of one byte (0x80 | id): the module's own byte for each is taken from one it already runs. */
+const ZERO_ARG_KIND: ReadonlyArray<[number, number]> = [
+  [DW_FX.vibratoOff, DW_WALK.vibratoOff], [DW_FX.halfVolumeOn, DW_WALK.halfVolumeOn], [DW_FX.halfVolumeOff, DW_WALK.halfVolumeOff],
+];
+const CMD_KIND: ReadonlyArray<[number, number]> = [...ONE_ARG_KIND, ...ZERO_ARG_KIND];
+const cmdLength = (kind: number): number => (ONE_ARG_KIND.some(([, k]) => k === kind) ? 2 : 1);
+
 /** The commands that end a read run and time themselves with the wait in force: a note, a mute (0x82) and a hold (0x83). */
 function isNoteSlot(e: DwWalkEvent): boolean {
   return e.kind === DW_WALK.note || e.kind === DW_WALK.mute || e.kind === DW_WALK.waitRow;
@@ -64,7 +71,7 @@ function isNoteSlot(e: DwWalkEvent): boolean {
 interface DwAdd { ch: number; row: number; note: number; instrument: number; where: string }
 
 /** A one-argument command typed on a slot the replayer ran none on: its two bytes go in front of the command that anchors the row. */
-interface DwCmdInsert { block: number; pos: number; bytes: number[] }
+interface DwCmdInsert { block: number; pos: number; bytes: number[]; /** Bytes of the command at `pos` this one replaces (an effect cleared or swapped for one of another length). */ del?: number }
 
 /** The mute track command: 0x80 | effect 2 (DW_EFFECT_MUTE). Silences the voice and, like a note, ends the read run. */
 const DW_MUTE_BYTE = 0x82;
@@ -87,7 +94,7 @@ function growBlocks(
 ): { data: Uint8Array; patched: number } {
   const { layout } = walk;
   if (layout.oldPlayer) { for (const a of adds) warnings.push(`${a.where}: this player's notes carry their sample; not written`); adds = []; }
-  const byBlock = new Map<number, Array<{ pos: number; before: number[]; after: number[] }>>();
+  const byBlock = new Map<number, Array<{ pos: number; del?: number; before: number[]; after: number[] }>>();
   const taken = new Set<DwWalkEvent>();
   // The speed in force at a tick: the last speed command at or before it, else the subsong's.
   const speedAt = (tick: number): number => {
@@ -146,7 +153,7 @@ function growBlocks(
   // A command is no note: it takes no time, so it goes in front of the anchor and runs on the same tick.
   for (const c of cmdInserts) {
     const list = byBlock.get(c.block) ?? [];
-    list.push({ pos: c.pos, before: c.bytes, after: [] });
+    list.push({ pos: c.pos, del: c.del, before: c.bytes, after: [] });
     byBlock.set(c.block, list);
   }
 
@@ -159,7 +166,16 @@ function growBlocks(
     // Insert behind later positions first, so the earlier positions stay valid.
     for (const ins of inserts.sort((x, y) => y.pos - x.pos)) {
       bytes.splice(ins.pos + 1, 0, ...ins.after);
-      bytes.splice(ins.pos, 0, ...ins.before);
+      bytes.splice(ins.pos, ins.del ?? 0, ...ins.before);
+    }
+    // A block that got shorter stays where it is: the bytes behind it belong to tables whose pointers the layout does not list.
+    // Its end-of-track command moves up and the freed tail is padding nothing reads, so no pointer changes.
+    if (bytes.length < track.length) {
+      const pad = track.length - bytes.length;
+      data.set(bytes, block);
+      data.fill(0, block + bytes.length, block + track.length);
+      patched += pad;
+      continue;
     }
     const at = data.length;
     const pointer = at - layout.startOffset;
@@ -213,7 +229,7 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
   const cmdByteOf = new Map<number, number>();
   if (!walk.layout.oldPlayer) {
     for (const e of walk.events) {
-      const t = ONE_ARG_KIND.find(([, k]) => k === e.kind)?.[0];
+      const t = CMD_KIND.find(([, k]) => k === e.kind)?.[0];
       if (t !== undefined && e.block !== NO_BLOCK && !cmdByteOf.has(t)) cmdByteOf.set(t, source[e.block + e.pos] ?? 0);
     }
   }
@@ -282,7 +298,7 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
           const bt = b[kt] ?? 0, bv = b[kv] ?? 0, ct = c[kt] ?? 0, cv = c[kv] ?? 0;
           if (bt === ct && bv === cv) continue;
           const src = fxEvents[s];
-          if (src && bt !== ct && argOffset(bt) === 1 && cmdByteOf.has(bt) && cmdByteOf.has(ct) && ONE_ARG_KIND.some(([t]) => t === bt)) {
+          if (src && bt !== ct && argOffset(bt) === 1 && cmdByteOf.has(bt) && cmdByteOf.has(ct) && ONE_ARG_KIND.some(([t]) => t === bt) && ONE_ARG_KIND.some(([t]) => t === ct)) {
             // a different one-argument command in the same two bytes: new command byte, the cell's value as its argument
             if (ct === FX_SPEED && (cv < 1 || cv > 31)) warnings.push(`${where}: speed ${cv} is outside 1..31; not written`);
             else { want(cmdOffset(src.e), cmdByteOf.get(ct)!, `${where} effect ${s + 1} command`); want(cmdOffset(src.e) + 1, cv, `${where} effect ${s + 1}`); }
@@ -294,6 +310,16 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
             if (!anchor || anchor.block === NO_BLOCK) warnings.push(`${where}: no command runs on this row to put the effect in front of; not written`);
             else if (ct === FX_SPEED && (cv < 1 || cv > 31)) warnings.push(`${where}: speed ${cv} is outside 1..31; not written`);
             else cmdInserts.push({ block: anchor.block, pos: anchor.pos, bytes: [cmdByteOf.get(ct)!, cv & 0xff] });
+            continue;
+          }
+          if (src && bt !== 0 && src.typ !== DW_FX.rowOffset && dwEventEffects(src.e).length === 1 && src.e.block !== NO_BLOCK && CMD_KIND.some(([, k]) => k === src.e.kind)) {
+            // the command is cleared, or swapped for one of another length: its bytes are replaced, the block is resized
+            const del = cmdLength(src.e.kind);
+            const clear = ct === 0 && cv === 0;
+            if (!clear && !cmdByteOf.has(ct)) { warnings.push(`${where}: effect column ${s + 1} changed to a command this module never runs; not written`); continue; }
+            if (!clear && ct === FX_SPEED && (cv < 1 || cv > 31)) { warnings.push(`${where}: speed ${cv} is outside 1..31; not written`); continue; }
+            const bytes = clear ? [] : ONE_ARG_KIND.some(([t]) => t === ct) ? [cmdByteOf.get(ct)!, cv & 0xff] : [cmdByteOf.get(ct)!];
+            if (!cmdInserts.some((c) => c.block === src.e.block && c.pos === src.e.pos)) cmdInserts.push({ block: src.e.block, pos: src.e.pos, bytes, del });
             continue;
           }
           if (!src || bt !== ct) { warnings.push(`${where}: effect column ${s + 1} changed to another command; not written`); continue; }
