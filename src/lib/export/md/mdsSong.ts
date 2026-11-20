@@ -43,6 +43,35 @@ const NTSC_HZ = 59.922743;
 /** Furnace SN noise mode bits (sms.cpp snNoiseMode: bit 0 white, bit 1 PSG3 period) -> MDSDRV `EA` (mdsseq.md). Reset value 3. */
 const NOISE_EA = [0, 0, 0xe3, 0xe7];
 
+/** MDSDRV PSG period at keycode k with fine pitch 0: mds_psg_freq_tab >> octave (mdsdrv.68k mds_get_psg_pitch). */
+const PSG_TAB = [1710, 1614, 1524, 1438, 1357, 1281, 1209, 1141, 1077, 1017, 960, 906];
+const psgPeriod = (k: number): number => PSG_TAB[k % 12] >> Math.floor(k / 12);
+
+/**
+ * MDSDRV keycode for a noise note in a PSG3-rate mode (20xy, x=1). Furnace "easy noise" (sms.cpp snCalcFreq / NOTE_SN):
+ * above the threshold each semitone steps the PSG3 period down by one from 16, and with snNoLowPeriods any
+ * note above 153 writes period 1. Below the threshold the tone mapping applies (nv - PSG_OFFSET).
+ * shortcut: assumes noiseDivider 64 (Sega PSG chipType 0) and no pitch/arp offset; upgrade when a song uses chipType 1/2.
+ */
+function noiseKey(m: FurnaceModule, nv: number, lossy: { add(s: string): void }): number {
+  const N = nv + 60; // FurnacePatternParser drops the +60 of splitNoteToNote; actualNote is the full note.
+  const oct = Math.log2(3579545 / (16 * 64) / (0.0625 * (m.tuning || 440)));
+  let p: number;
+  if (m.compatFlags.linearPitch) { // snCalcFreq, 1/128-semitone units
+    const thr = Math.round(128 * 12 * oct) - 384 + 64 + 60 * 128;
+    if ((N << 7) <= thr) return nv - PSG_OFFSET;
+    p = Math.max(0, (2048 - ((N << 7) - thr)) >> 7);
+  } else { // NOTE_SN, whole notes
+    const thr = Math.round(12 * oct) - 3 + 60;
+    if (N <= thr) return nv - PSG_OFFSET;
+    p = Math.max(0, 16 - (N - thr));
+  }
+  if (m.compatFlags.snNoLowPeriods && N > 153) p = 1;
+  if (p < 1) { lossy.add('noise PSG3 period 0 (MDSDRV minimum 1)'); p = 1; }
+  for (let k = 119; k >= 0; k--) if (psgPeriod(k) >= p) return k; // highest key at or above the period: exact for 1..16
+  return 0;
+}
+
 class Lossy {
   private counts = new Map<string, number>();
   add(item: string, n = 1): void { this.counts.set(item, (this.counts.get(item) ?? 0) + n); }
@@ -200,7 +229,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const tracks: Array<{ ch: number; chunks: Array<{ bytes: number[]; tieStart: boolean }> }> = [];
   for (let ch = 0; ch < nCh; ch++) {
     const kind = KIND[ch];
-    let ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0;
+    let trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0;
     const out: Array<{ bytes: number[]; tieStart: boolean }> = [];
     for (const c of chunks) {
       const volCmd = (v: number) => [0xe2, kind === 'fm' ? 127 - v : v <= 0 ? 0x7f : Math.round((15 - v) * 8 / 3)];
@@ -248,7 +277,10 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (isNote || isOff || cmds.length || i === 0) {
           if (tok.length) emit(tok.pop()!);
           if (isNote) {
-            let n = kind === 'fm' ? nv : nv - PSG_OFFSET;
+            let n = kind === 'fm' ? nv : kind === 'noise' && noise & 2 ? noiseKey(m, nv, lossy) : nv - PSG_OFFSET;
+            // Keys above the note-byte range go through track transpose (E4). shortcut: trs state is linear, not re-set at the loop point.
+            if (kind === 'noise' && (n - trs < 0 || n - trs > MAX_NOTE)) { trs = n > MAX_NOTE ? n - MAX_NOTE : 0; cmds.push(0xe4, trs); }
+            n -= trs;
             if (n < 0 || n > MAX_NOTE) { lossy.add(`${kind.toUpperCase()} note out of range (clamped)`); n = Math.max(0, Math.min(MAX_NOTE, n)); }
             tok.push({ cmd: 'note', n, t: 0, pre: cmds }); sounding = true; any = true;
             keyOns.push({ tick, ch, note: nv });

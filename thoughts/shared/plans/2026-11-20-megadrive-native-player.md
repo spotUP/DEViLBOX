@@ -392,3 +392,25 @@ Still open (measured, not fixed):
   a slurred note is unverified. Not implemented.
 - Item 6 (arp wait nn+1, PEG scale) and item 7 (FM volume macro, FMS/AMS, fixed arp, relative pitch, macro
   delay/release): not started.
+
+## Phase 1c results
+
+Measured on Fancy_Promenard.fur, 9.5 s, MAME tap (`tools/md-phase0`) against the Furnace VGM events from Phase 1b.
+
+### Gap 1: noise pitch (fixed in part)
+
+- Cause: the converter sent noise-channel notes through the PSG tone mapping (`nv - 24`). In a PSG3-rate noise mode (20xy, x=1), Furnace uses "easy noise" (sms.cpp `NOTE_SN` without linear pitch, `snCalcFreq` with linear pitch). Above the threshold (note 141, noiseDivider 64), each semitone steps the PSG3 period down by one from 16. With `snNoLowPeriods`, a note above 153 writes period 1.
+- Fancy_Promenard is not linear-pitch. Its noise note D-8 (Furnace note 158) writes PSG3 period 1 in all 453 Furnace writes (raw VGM bytes checked). MDSDRV wrote period 23 (key 74 = D-6 tone).
+- Fix: `noiseKey()` in mdsSong.ts computes the Furnace period. It then selects the MDSDRV keycode whose `mds_psg_freq_tab >> octave` gives that period; period 1 is key 119. Keys above the note-byte range go out through `E4` track transpose. Period 0 cannot be reached (MDSDRV minimum is 1) and is reported as lossy.
+- Measured: PSG3 FREQ now matches Furnace (111860.8 Hz, period 1) up to 5.79 s; it was wrong from 0.0 s before. After 5.79 s MDSDRV writes periods 2, 3 and others (10 writes at 55930 Hz), and there is one 15980 Hz write at start-up. Cause not yet traced. Suspects: a noise-channel pitch effect or pitch macro (the easy-noise path adds pitch and arpeggio offsets, which `noiseKey` ignores), or `E4` state at the pattern loop.
+- Limits recorded in code: noiseDivider 60 (chipType 1/2) is not handled. Transpose state is not re-set at the loop point.
+
+### Gap 2: extra FM key-ons (traced, not fixed)
+
+- FM1 (ch0) in MDSDRV keys on every row (about 0.12 s apart) from 2.05 s to 5.07 s. Furnace keys on only at 2.29 / 2.53 / 2.90 / 3.86 s and later. The ch0 note before this is F-1 ins 4 with `E2 49` (note slide down: speed 4, 9 semitones) and `19 17` (attack rate for all operators), at 1.57 s and 1.93 s. Rows 1-31 of order 1 are empty. Next step: dump the FM1 track bytes from o1 r2 on, to see what the driver reads as notes.
+- FM5 (ch4): MDSDRV keys on at 3.89 s; Furnace has a note off (o2 r0) at 3.86 s and its next key-on at 4.10 s. FM3 (ch2): extra key-on at 6.46 s, on an empty row between the B-2 notes at o3 r8 and o3 r14 (ins 6).
+- No mapping is done yet for E2 / 19 / EC / 0A / 02 / 04 / 03. The splits line up with E2 slides and EC note cuts. This is unverified: the track bytes have not been read.
+
+### Gaps 3-6: not started (budget)
+
+PSG1/PSG2 frequency from 3.86 s, 03xx PEG per slide, arp wait nn+1 and PEG scale, FM volume macro, FMS/AMS, fixed arp, relative pitch, and macro delay/release are all still open.
