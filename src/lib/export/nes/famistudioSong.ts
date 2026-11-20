@@ -538,7 +538,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     let lastIns = -1, lastVol = -1, empty = 0, hasNotes = false, loopAt = 0, first = -1, firstFrame = -1;
     let curIns: FurnaceInstrument | undefined;
     let vibPos = 0, vibFrame = 0; // Furnace's vibratoPos (64-step sine) at the row start
-    let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, arpXY = 0, arpOn = -1, noteArp: number[] | null = null, fineRaw = 128, fineSent = 0;
+    let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, arpXY = 0, arpOn = -1, keyOff = false, noteArp: number[] | null = null, fineRaw = 128, fineSent = 0;
     // Furnace 01xx/02xx is channel state (playback.cpp portaSpeed): it keeps sliding every new note until x00, another
     // slide effect, or the slide reaching its target (note 0 / 179, targetResetsSlides).
     let heldSlide: [number, number] | null = null;
@@ -601,6 +601,13 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           }
           const nv = convertFurnaceNoteValue(cell);
           let n = 0;
+          // Furnace clears a running 00xy arp when a note follows a note off or release (playback.cpp: keyOffAffectsArp is
+          // true for NES and VRC6); a 00xy on the note's own row is applied after that and wins.
+          if (nv === 253 || nv === 254) keyOff = true;
+          else if (nv >= 0 && ch !== DPCM_CH) {
+            if (keyOff && arpXY !== 0 && !cell.effects.some((e) => e.type === 0x00)) { arpXY = 0; fxChanged = true; }
+            keyOff = false;
+          }
           if (nv === 253) rowByte = [0x00];
           else if (nv === 254 || nv === 255) rowByte = ch === DPCM_CH ? [0x00] : [0x45];
           else if (nv >= 0) {

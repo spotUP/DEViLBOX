@@ -183,6 +183,13 @@ describe('furnaceToFamistudio', () => {
     expect(song.music.includes(0x4b)).toBe(true);
     expect(song.music.includes(0x4c)).toBe(true);
   });
+  it('drops a running 00 arpeggio at the first note after a note off (Furnace keyOffAffectsArp on NES; christmas-fever pulse 2)', () => {
+    const OFF = { note: 180, octave: 0 };
+    const kept = music({ 0: { 0: { ...A4, ...fx(0x00, 0x38) }, 4: OFF, 8: { ...A4, ...fx(0x00, 0x38) } } });
+    expect(kept.music.includes(0x4c)).toBe(false);
+    const dropped = music({ 0: { 0: { ...A4, ...fx(0x00, 0x38) }, 4: OFF, 8: A4 } });
+    expect(dropped.music.includes(0x4c)).toBe(true);
+  });
   it('maps 03 portamento to a slide that replaces the note byte (0x43 then 0x50 step from to)', () => {
     const song = music({ 0: { 0: A4, 4: { note: 9, octave: 5, ...fx(0x03, 0x20) } } });
     expect(song.music.includes(0x50)).toBe(true);
