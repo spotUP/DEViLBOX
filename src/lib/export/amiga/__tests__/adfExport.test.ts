@@ -18,6 +18,8 @@ const CASES: Array<[string, string]> = [
   ['custommade/the viking child crack.cm', 'CustomMade'],
   ['formats/primemover_01.hot', 'Anders_0land'],
   ['formats/perception.ems', 'EMS-6'],
+  ['formats/universal monsters - dracula.mmd0', 'MED'],
+  ['formats/funky nightmare.mmd1', 'MED'],
 ];
 
 describe('adf slot patcher', () => {

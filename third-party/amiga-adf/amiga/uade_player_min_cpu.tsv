@@ -13,6 +13,7 @@
 #
 # player	min_cpu	source	why
 DIGI-Booster	68020	owner	owner: not an A500-compatible format. Matches the measurement -- ADRE (address error, misaligned longword) at 0x000161A0 in call_check_module on a 68000, plays under uade123, which emulates an 020.
+MED	68020	measured	ADRE (address error, misaligned longword at the odd pointer 0x25a22211) in the player's own routine at hunk +0x306 on a 68000, 2026-11-20 universal monsters - dracula.mmd0. Its InitPlayer jsr's a5@(76) (dtg_AudioAlloc = score okprog) and walks a0@(24) on whatever a0 holds; harmless on an 020. Not a glue bug.
 # --- formats the REFERENCE implementation cannot play with the modules we have.
 # Not a port limitation: uade123 itself refuses these, so there is nothing on
 # the Amiga side to fix. Listed for the record, not enforced.
