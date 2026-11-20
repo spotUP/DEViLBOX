@@ -73,7 +73,7 @@ export async function exportCDFM67(
 
   // PCM sample buffers (raw 8-bit unsigned)
   const samplePCMs: Uint8Array[] = [];
-  const sampleHeaders: Array<{ length: number; loopStart: number; loopEnd: number }> = [];
+  const sampleHeaders: Array<{ length: number; loopStart: number; loopEnd: number; raw?: number[] }> = [];
   const sampleNames: string[] = [];
 
   for (let i = 0; i < NUM_PCM_INSTRS; i++) {
@@ -113,7 +113,8 @@ export async function exportCDFM67(
       sampleNames.push((inst.name ?? '').slice(0, 12));
     } else {
       samplePCMs.push(new Uint8Array(0));
-      sampleHeaders.push({ length: 0, loopStart: 0, loopEnd: NO_LOOP });
+      const raw = (inst?.parameters as Record<string, unknown> | undefined)?.c67SampleHeader;
+      sampleHeaders.push({ length: 0, loopStart: 0, loopEnd: NO_LOOP, raw: Array.isArray(raw) ? raw as number[] : undefined });
       sampleNames.push(inst?.name?.slice(0, 12) ?? '');
     }
   }
@@ -124,7 +125,8 @@ export async function exportCDFM67(
 
   for (let i = 0; i < NUM_FM_INSTRS; i++) {
     const inst = song.instruments[NUM_PCM_INSTRS + i];
-    fmNames.push((inst?.name ?? '').slice(0, 12));
+    // The parser names an unnamed slot "FM n"; that placeholder is not file content.
+    fmNames.push(/^FM \d+$/.test(inst?.name ?? '') ? '' : (inst?.name ?? '').slice(0, 12));
     // Restore the raw 11-byte OPL2 register dump captured on import (parameters.c67FmRegs).
     // Without it an FM-only .c67 re-exports all-silent and fails the parser's validator.
     const regs = (inst?.parameters as Record<string, unknown> | undefined)?.c67FmRegs;
@@ -210,6 +212,7 @@ export async function exportCDFM67(
   // Sample headers: 32 x 16 bytes at offset 418
   for (let i = 0; i < NUM_PCM_INSTRS; i++) {
     const base = 418 + i * 16;
+    if (sampleHeaders[i].raw) { output.set(sampleHeaders[i].raw!.slice(0, 16), base); continue; }
     writeU32LE(output, base, 0); // unknown field = 0
     writeU32LE(output, base + 4, sampleHeaders[i].length);
     writeU32LE(output, base + 8, sampleHeaders[i].loopStart);

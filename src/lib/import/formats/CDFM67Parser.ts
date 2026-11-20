@@ -339,7 +339,8 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     const loopEnd     = u32le(bytes, smpHdrBase + 12);
 
     if (length === 0 || sampleCursor + length > bytes.length) {
-      instruments.push(silentInstrument(smp + 1, smpName));
+      // Keep the raw 16-byte slot header: empty slots carry non-zero words the exporter must write back.
+      instruments.push(silentInstrument(smp + 1, smpName, undefined, Array.from(bytes.subarray(smpHdrBase, smpHdrBase + 16))));
       sampleCursor += length;
       continue;
     }
@@ -440,7 +441,7 @@ function makeEmptyPattern(idx: number, filename: string): Pattern {
   };
 }
 
-function silentInstrument(id: number, name: string, c67FmRegs?: number[]): InstrumentConfig {
+function silentInstrument(id: number, name: string, c67FmRegs?: number[], c67SampleHeader?: number[]): InstrumentConfig {
   return {
     id,
     name,
@@ -449,6 +450,6 @@ function silentInstrument(id: number, name: string, c67FmRegs?: number[]): Instr
     effects:   [],
     volume:    0,
     pan:       0,
-    ...(c67FmRegs ? { parameters: { c67FmRegs } } : {}),
+    ...(c67FmRegs || c67SampleHeader ? { parameters: { ...(c67FmRegs ? { c67FmRegs } : {}), ...(c67SampleHeader ? { c67SampleHeader } : {}) } } : {}),
   } as InstrumentConfig;
 }

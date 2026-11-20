@@ -51,11 +51,10 @@ function reverseVolume(vol: number, isFM: boolean): number {
  */
 function encodeC67Pattern(allChannelRows: TrackerCell[][], numRows: number): Uint8Array {
   const parts: number[] = [];
-  let skipCount = 0;
+  // The parser advances rows only through 0x40 delays, so a delay is the row distance from the previous command row.
+  let curRow = 0;
 
   for (let row = 0; row < numRows; row++) {
-    let hasData = false;
-
     for (let ch = 0; ch < allChannelRows.length; ch++) {
       const cell = allChannelRows[ch][row];
       if (!cell) continue;
@@ -66,10 +65,10 @@ function encodeC67Pattern(allChannelRows: TrackerCell[][], numRows: number): Uin
 
       if (hasNote) {
         // Flush any pending delay
-        if (skipCount > 0) {
+        if (row > curRow) {
           parts.push(0x40);
-          parts.push(skipCount);
-          skipCount = 0;
+          parts.push(row - curRow);
+          curRow = row;
         }
 
         const xmNote = cell.note ?? 0;
@@ -94,27 +93,21 @@ function encodeC67Pattern(allChannelRows: TrackerCell[][], numRows: number): Uin
         parts.push(ch); // channel command
         parts.push(noteByte);
         parts.push(instrVolByte);
-        hasData = true;
       } else if (hasVol) {
         // Volume-only command
-        if (skipCount > 0) {
+        if (row > curRow) {
           parts.push(0x40);
-          parts.push(skipCount);
-          skipCount = 0;
+          parts.push(row - curRow);
+          curRow = row;
         }
         const volNibble = reverseVolume(cell.volume ?? 0, isFM);
         parts.push(0x20 + ch);
         parts.push(volNibble & 0x0F);
-        hasData = true;
       }
     }
-
-    if (!hasData) {
-      skipCount++;
-    } else {
-      skipCount = 0;
-    }
   }
+
+  if (numRows > curRow) parts.push(0x40, numRows - curRow);
 
   // End of pattern
   parts.push(0x60);
