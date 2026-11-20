@@ -19,6 +19,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { parseMusicLineFile } from '@/lib/import/formats/MusicLineParser';
 import type { Pattern } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
 
@@ -363,6 +364,79 @@ function getPartNum(pattern: Pattern): number {
   return m ? parseInt(m[1], 10) : 0;
 }
 
+
+/** Inverse of the parser's decompressPart: the source PART's 1536 raw bytes. */
+function decompressSourcePart(data: Uint8Array, start: number, end: number): Uint8Array {
+  const out = new Uint8Array(128 * 12);
+  let src = start, dst = 0;
+  while (src < end && dst < out.length) {
+    const ctrl = data[src++];
+    if (ctrl & 0x80) break;
+    for (let col = 0; col < 6; col++, dst += 2) {
+      if ((ctrl >> col) & 1 && src + 1 < end) { out[dst] = data[src++]; out[dst + 1] = data[src++]; }
+    }
+  }
+  return out;
+}
+
+/**
+ * A song loaded from a .ml keeps its source bytes. Every chunk is copied verbatim except
+ * PARTs holding an edited cell: those are decompressed, the changed fields patched, and
+ * recompressed in place (chunk size updated). Returns null for songs without source bytes.
+ */
+function patchLoadedSource(song: TrackerSong): Uint8Array | null {
+  const src = song.musiclineFileData;
+  const lay = song.uadeVariableLayout;
+  if (!src || !lay) return null;
+  const pristine = parseMusicLineFile(src.slice(0));
+  if (!pristine) return null;
+  const edits: { addr: number; size: number; bytes: Uint8Array }[] = [];
+  for (let i = 0; i < Math.min(song.patterns.length, lay.filePatternAddrs.length); i++) {
+    const addr = lay.filePatternAddrs[i];
+    const rows = song.patterns[i].channels[0]?.rows ?? [];
+    const was = pristine.patterns[i]?.channels[0]?.rows ?? [];
+    if (!addr) continue;
+    const size = lay.filePatternSizes[i];
+    let raw: Uint8Array | null = null;
+    for (let r = 0; r < Math.min(rows.length, was.length); r++) {
+      const c = rows[r] as unknown as Record<string, number | undefined>;
+      const o = was[r] as unknown as Record<string, number | undefined>;
+      const same = (k: string) => (c[k] ?? 0) === (o[k] ?? 0);
+      const fx = ['', '2', '3', '4', '5'].map((n) => !(same('effTyp' + n) && same('eff' + n)));
+      if (same('note') && same('instrument') && !fx.some(Boolean)) continue;
+      raw ??= decompressSourcePart(src, addr + 2, addr + size);
+      const base = r * 12;
+      if (!same('note')) raw[base] = c.note! > 0 ? Math.min(255, c.note! + 12) : 0;
+      if (!same('instrument')) raw[base + 1] = (c.instrument ?? 0) & 0xFF;
+      fx.forEach((changed, n) => {
+        if (!changed) return;
+        const e = unmapMLEffect(c['effTyp' + (n ? n + 1 : '')] ?? 0, c['eff' + (n ? n + 1 : '')] ?? 0);
+        raw![base + 2 + n * 2] = e.effectNum;
+        raw![base + 3 + n * 2] = e.effectPar;
+      });
+    }
+    if (!raw) continue;
+    const rle = compressPart(raw);
+    const bytes = new Uint8Array(2 + rle.length);
+    bytes.set(src.subarray(addr, addr + 2));
+    bytes.set(rle, 2);
+    edits.push({ addr, size, bytes });
+  }
+  edits.sort((a, b) => a.addr - b.addr);
+  const parts: Uint8Array[] = [];
+  let pos = 0;
+  for (const e of edits) {
+    const head = src.slice(pos, e.addr);
+    const dv = new DataView(head.buffer);
+    // chunk size field sits 4 bytes before the data; update only when it was correct
+    if (dv.getUint32(head.length - 4) === e.size) dv.setUint32(head.length - 4, e.bytes.length);
+    parts.push(head, e.bytes);
+    pos = e.addr + e.size;
+  }
+  parts.push(src.slice(pos));
+  return new Uint8Array(parts.flatMap((x) => Array.from(x)));
+}
+
 // ── Public export functions ────────────────────────────────────────────────
 
 /**
@@ -376,6 +450,8 @@ function getPartNum(pattern: Pattern): number {
  * @returns Uint8Array of the complete binary .ml file
  */
 export function exportMusicLineFile(song: TrackerSong): Uint8Array {
+  const patched = patchLoadedSource(song);
+  if (patched) return patched;
   const w = new ByteWriter();
   const numChannels = Math.max(1, Math.min(8, song.numChannels));
 
