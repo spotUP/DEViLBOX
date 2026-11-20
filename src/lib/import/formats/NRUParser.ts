@@ -573,5 +573,7 @@ export async function parseNRUFile(
     initialBPM:      125,
     linearPeriods:   false,
     uadePatternLayout,
+    uadeEditableFileData: buffer.slice(0),
+    uadeEditableFileName: filename,
   };
 }

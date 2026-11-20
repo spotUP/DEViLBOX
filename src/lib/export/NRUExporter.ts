@@ -29,6 +29,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { encodeNRUCell } from '@/engine/uade/encoders/NRUEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -151,6 +152,31 @@ export async function exportNRU(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];
+
+  // Edits patch the pattern cells of the module the song was loaded from: headers, order list and
+  // sample PCM stay verbatim (the rebuild below cannot reproduce them byte for byte).
+  const src = song.uadeEditableFileData;
+  const layout = song.uadePatternLayout;
+  if (src && layout && song.numChannels === NUM_CHANNELS) {
+    const out = new Uint8Array(src.slice(0));
+    const nPat = Math.min(song.patterns.length, Math.floor((out.length - HEADER_SIZE) / BYTES_PER_PATTERN));
+    for (let p = 0; p < nPat; p++) {
+      for (let row = 0; row < ROWS_PER_PATTERN; row++) {
+        for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+          const cell = song.patterns[p]?.channels[ch]?.rows[row];
+          if (!cell) continue;
+          const at = HEADER_SIZE + p * BYTES_PER_PATTERN + (row * NUM_CHANNELS + ch) * BYTES_PER_CELL;
+          // the 4 source bytes are lossy in the grid view: rewrite only a cell whose grid view changed
+          const was = layout.decodeCell?.(out.subarray(at, at + BYTES_PER_CELL));
+          if (was && was.note === cell.note && was.instrument === cell.instrument
+            && was.effTyp === cell.effTyp && was.eff === cell.eff) continue;
+          out.set(encodeNRUCell(cell), at);
+        }
+      }
+    }
+    const name = (song.uadeEditableFileName ?? 'module.nru').split('/').pop() ?? 'module.nru';
+    return { data: new Blob([out], { type: 'application/octet-stream' }), filename: name, warnings };
+  }
 
   // ── Validate channel count ──────────────────────────────────────────────
   if (song.numChannels !== NUM_CHANNELS) {
