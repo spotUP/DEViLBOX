@@ -123,7 +123,7 @@ function growBlocks(
     if (taken.has(cover)) { warnings.push(`${a.where}: the note covering this row is already split by another edit; not written`); continue; }
     const speed = speedAt(cover.ptick);
     const durationUnits = wait.a;                     // the wait in force is the one last read at or before the covering note
-    if (speedAt(aTick) !== speed || speedAt(wait.ptick) !== speed) { warnings.push(`${a.where}: the speed changes inside the note covering this row; not written`); continue; }
+    if (speedAt(aTick) !== speed || speedAt(wait.ptick) !== speed) { warnings.push(`${a.where}: a speed change lies between the wait this note was timed with and this row; a wait is stored in ticks at the speed it was read, so splitting it here would change the notes behind it; not written`); continue; }
     const k = aTick - cover.ptick;
     if (k % speed !== 0) { warnings.push(`${a.where}: the note covering this row lasts in speed units of ${speed} ticks; this row is between them; not written`); continue; }
     const ku = k / speed;
@@ -133,7 +133,7 @@ function growBlocks(
     const inForce = noteSample.get(cover) ?? null;
     const zSample = a.instrument > 0 ? a.instrument - 1 : cover.kind === DW_WALK.note ? cover.a : (inForce?.a ?? -1);
     const noteByte = dwNoteToByte(layout.pitch, a.note, zSample, transposes.get(cover));
-    if (noteByte === null) { warnings.push(`${a.where}: no note byte plays ${a.note} with sample ${zSample + 1}; not written`); continue; }
+    if (noteByte === null) { warnings.push(`${a.where}: no note byte plays ${a.note} with sample ${zSample + 1} (the player's period table, scaled by the sample's tuning, does not reach it; a channel transpose reads the same table); not written`); continue; }
     const middle: number[] = [];
     const afterZ: number[] = [];
     if (a.instrument > 0 && inForce && a.instrument - 1 !== inForce.a) {
@@ -276,14 +276,14 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
             const ins = c.instrument ?? 0;
             const sample = ins > 0 ? ins - 1 : noteEv.kind === DW_WALK.note ? noteEv.a : (noteSample.get(noteEv)?.a ?? -1);
             const byte = dwNoteToByte(walk.layout.pitch, n, sample, transposes.get(noteEv));
-            if (byte === null) warnings.push(`${where}: no note byte plays ${n} with sample ${sample + 1}; not written`);
+            if (byte === null) warnings.push(`${where}: no note byte plays ${n} with sample ${sample + 1} (the player's period table, scaled by the sample's tuning, does not reach it; a channel transpose reads the same table); not written`);
             else want(cmdOffset(noteEv), byte, `${where} note`);
           }
         }
         if ((c.instrument ?? 0) !== (b.instrument ?? 0) && !restedCells.has(where)) {
           const ins = c.instrument ?? 0;
           const sc = noteEv ? noteSample.get(noteEv) : null;
-          if (!noteEv) { if (!adds.some((a) => a.where === where)) warnings.push(`${where}: an instrument without a note is not part of the module; not written`); }
+          if (!noteEv) { if (!adds.some((a) => a.where === where)) warnings.push(`${where}: an instrument is stored only with a note (a sample command sets the sample the next note plays and the grid shows it on that note), so a cell without a note cannot hold one; not written`); }
           else if (!sc) warnings.push(`${where}: no sample-change command is in force for this note (old player or the voice's first sample); not written`);
           else if (ins < 1 || ins > walk.samples) warnings.push(`${where}: instrument ${ins} is not one of the module's ${walk.samples} samples; not written`);
           else {
@@ -313,7 +313,7 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
             const bt2 = k2t ? b[k2t] ?? 0 : 0, bv2 = k2v ? b[k2v] ?? 0 : 0;
             done.add(s + 1);
             if (oldPair && (bt2 !== oldPair[1] || fxEvents[s + 1]?.e !== src!.e)) { warnings.push(`${where}: effect column ${s + 1} is not a whole ${oldPair[2] === DW_WALK.slide ? 'slide' : 'vibrato'}; not written`); continue; }
-            if (!oldPair && (bt2 !== 0 || bv2 !== 0)) { warnings.push(`${where}: a slide or vibrato needs two empty neighbouring effect columns; not written`); continue; }
+            if (!oldPair && (bt2 !== 0 || bv2 !== 0)) { warnings.push(`${where}: a slide or vibrato is three bytes shown in two consecutive effect columns, and the grid lists a cell's commands in the order they run, so the next column must be empty; not written`); continue; }
             if (newPair && (nt !== newPair[1] || !cmdByteOf.has(ct))) { warnings.push(`${where}: a slide or vibrato needs both its values in neighbouring columns (and this module must run one); not written`); continue; }
             const clear = ct === 0 && cv === 0;
             if (!newPair && !clear && (!CMD_KIND.some(([t]) => t === ct) || !cmdByteOf.has(ct) || ((ct === FX_SPEED) && (cv < 1 || cv > 31)))) { warnings.push(`${where}: effect column ${s + 1} changed to a command this module never runs; not written`); continue; }
