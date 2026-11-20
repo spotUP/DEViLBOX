@@ -96,4 +96,23 @@ describe('IFF SMUS edit write-back', () => {
     }
     expect(refused).toBeGreaterThan(0);
   });
+
+  it('refuses an edit on a note the import clamped and keeps the source', async () => {
+    // Real file; no real song has an out-of-range note, so push the first note event of the first TRAK to MIDI 5 (grid note 1).
+    const t = new Uint8Array(readFileSync(FILE));
+    const u32 = (o: number) => ((t[o] << 24) | (t[o + 1] << 16) | (t[o + 2] << 8) | t[o + 3]) >>> 0;
+    let at = -1;
+    for (let pos = 12; at < 0 && pos + 8 <= t.length; pos += 8 + u32(pos + 4) + (u32(pos + 4) & 1)) {
+      if (String.fromCharCode(t[pos], t[pos + 1], t[pos + 2], t[pos + 3]) !== 'TRAK') continue;
+      for (let i = pos + 8; i < pos + 8 + u32(pos + 4); i += 2) if (t[i] >= 12 && t[i] < 107) { at = i; break; }
+    }
+    t[at] = 5;
+    const song = await parseIffSmusFile(t.buffer.slice(0) as ArrayBuffer, 'Alanko1.smus');
+    const cell = song.patterns.flatMap((pt) => pt.channels.flatMap((ch) => ch.rows)).find((x) => x.note === 1);
+    expect(cell).toBeDefined();
+    cell!.note = 4;
+    const res = await exportIffSmus(song);
+    expect(res.warnings.some((w) => w.includes('outside the 1-96'))).toBe(true);
+    expect(new Uint8Array(await res.data.arrayBuffer())).toEqual(t);
+  });
 });

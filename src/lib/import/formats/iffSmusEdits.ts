@@ -105,6 +105,8 @@ export function applyIffSmusGridEdits(
       if (cell.note === 0 || cell.note === 97) { warnings.push(`${label} row ${n.row}: a note removed changes the track's length; not written`); continue; }
       const type = source[n.at] + (cell.note - was.note);
       if (cell.note !== was.note) {
+        // The import clamps MIDI-11 to 1-96; a delta on a clamped cell would land on the wrong pitch.
+        if (was.note !== source[n.at] - 11) { warnings.push(`${label} row ${n.row}: the source note is outside the 1-96 range the grid shows; not written`); continue; }
         if (type < 0 || type > 127) warnings.push(`${label} row ${n.row}: note outside 0-127; not written`);
         else poke(n.at, type);
       }
