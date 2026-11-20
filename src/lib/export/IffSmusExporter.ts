@@ -30,6 +30,7 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { isSonixSynthInstr } from '@lib/import/formats/IffSmusParser';
+import { applyIffSmusGridEdits } from '@lib/import/formats/iffSmusEdits';
 import { readSonixSynthParams, serializeSonixSynthInstr } from '@engine/sonix/sonixInstrument';
 
 /** One extra file emitted alongside the `.smus` (e.g. an updated `Instruments/*.instr`). */
@@ -243,6 +244,24 @@ export async function exportIffSmus(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[]; companions?: IffSmusCompanion[] }> {
   const warnings: string[] = [];
+
+  // A song opened from a .smus keeps its bytes: write the grid's note and instrument edits into them (iffSmusEdits.ts)
+  // so every other byte (durations, INS1, SNX chunks, names) stays as loaded. A new song is built from scratch below.
+  const layout = song.uadeVariableLayout;
+  const loaded = song.uadeEditableFileData;
+  if (layout?.formatId === 'iffSmus' && layout.blockRows && loaded) {
+    const edit = applyIffSmusGridEdits(new Uint8Array(loaded), layout.blockRows, layout.filePatternAddrs, layout.filePatternSizes, song.patterns, song.songPositions);
+    warnings.push(...edit.warnings);
+    const companions = await buildSonixCompanionsFromStores(song);
+    const name = song.uadeEditableFileName ?? 'untitled.smus';
+    return {
+      data: new Blob([edit.data], { type: 'application/octet-stream' }),
+      filename: name,
+      warnings,
+      ...(companions.length > 0 ? { companions } : {}),
+    };
+  }
+
   const numChannels = Math.max(1, Math.min(4, song.numChannels));
 
   if (song.numChannels > 4) {
