@@ -720,3 +720,45 @@ Listen ROM: ~/Desktop/md-roms/highscorefollin-1n.bin.
 - **FM6.** Furnace sends no FM6 KEYON on this song (likely DAC/PCM), but MDSDRV plays tones there.
 - **PSG1.** From 17.4 s the error is up to about 40 cents. The cause is not yet found; it may be PSG period rounding or a vibrato depth on PSG.
 - **FM4.** The 2.13 s slur (portamento/legato) is still open.
+
+## Phase 1o results (2026-11-21)
+
+Fix commit: b5272c7a2 (src/lib/export/md/mdsSong.ts + mdsSong.test.ts). Scratch tools: keylag.py (Furnace VGM key-ons vs MAME key-ons, nearest match within 100 ms, extended by one loop pass), flow.mts, fm6.mts, run.sh (from md1n).
+
+### Q1. Conductor proof (key-on lag, MAME vs Furnace VGM)
+
+- golden_shit: no loop, song ends at 101.35 s (MAME capture 206 s, also stops at 101 s). No drift. Worst 19.3 ms (FM6, 50.67 s). Median offset 5-9 ms (constant pipeline offset, about 5.6 ms in 0-10 s); without it the worst is about 13.7 ms, under 1 frame. FM5/FM6 carry the worst values (written last in VINT).
+- Solar_Man before the fix: a step of about 96 ms from 71.43 s (tick 4000, order 13 row 0) to the loop point, 140-200 key-ons per 10 s window over 1 frame. Root cause was not the conductor: `0D` with no value at order 12 row 31 jumped to row -1, one extra empty row (5 ticks, 89 ms).
+- Solar_Man after the fix (168 s: intro plus 2 loop passes, loop start 22.875 s, loop length 71.43 s): 0 unmatched key-ons, worst 18.1 ms (FM5, 28.57 s), median about 5 ms, at most 2 key-ons over 16.7 ms per window. The conductor holds Furnace time over the loop.
+
+Violated invariant: an effect with no value plays as value 0 (Furnace playback.cpp `if (effectVal==-1) effectVal=0;`). Fixed once in `cellAt`, so it covers every effect. Side effects on Solar_Man: seq 19864 to 15576 bytes; the lossy entry "04xy with a pitch slide" (257) disappeared, because 04 with no value made bogus vibrato; fractional 01/02 went from 13 to 4; "past driver key range" disappeared.
+
+Solar_Man pitch (lagcmp, 0-94 s; frames over 10 cents, worst cents):
+
+| Channel | Before | After |
+|---------|--------|-------|
+| FM1 | 876, 898.5 | 476, 199.1 |
+| FM2 | 324, 899 | 35, 197.8 |
+| FM3 | 769, 899.1 | 468, 199.5 |
+| FM4 | 1260, 2298 | 1061, 1200 |
+| FM5 | 2796, 2199 | 2796, 1357 |
+
+The remaining error comes from other gaps (E1/E2 lossy and others).
+
+### Q2. FM6 on highscorefollin
+
+Root cause: FM6 uses instrument 0 "Drums (Kit Map)", type 4 (DIV_INS_AMIGA, a sample instrument). Furnace genesis.cpp note-on: `if (ins->type==DIV_INS_AMIGA) dacMode=1` (2B=0x80 at 3.6 s, then 436 DAC stream starts, no FM key-ons). The converter ignored the type and built a default FM voice, so it played tones about 1200 cents off.
+
+Violated invariant: a sample instrument on FM6 plays the DAC, never an FM voice.
+
+Fix: those notes become key-offs, flagged lossy "FM6 sample instrument (DAC PCM): silenced" (298 notes). After the fix there are 0 MAME FM6 key-ons after 3.5 s (same as the Furnace VGM), and FM6 has 0 frames over 10 cents.
+
+Open: MDSDRV supports PCM from source (`f0` pcm, `f1` pcmrate, 8-byte PCM header, drum-mode subroutine; mdsseq.md). Wiring it needs sample conversion to the mdspcm blob, a kit map to drum mode, and a ROM builder slot. 17xx (DAC enable by effect) is not handled.
+
+### Q3. PSG1 residue on highscorefollin (not fixed)
+
+The first divergent frame is 17.400 s. Furnace PSG1 dips for one 2-frame step from 1575.5 Hz to 1471.9 Hz (-118 cents), then returns to 1575.5 Hz at 17.433 s. MAME writes 1491.5 Hz (-95 cents) for the same step: about 23 cents off. After that the steps match (17.67 s: 1747.8/1398.3 Hz on both). With the current lagcmp, PSG1 has 1010 frames over 10 cents, worst 48.8 cents at 32.1 s.
+
+Next step: find the pattern cell at 17.4 s on PSG1. It is probably a pitch macro or arp node scaled in 1/256 semitone against a non-linear PSG period, or a fine-pitch rounding. Compare the PEG node value with the Furnace period.
+
+Listen ROMs: ~/Desktop/md-roms/Solar_Man-1o.bin, ~/Desktop/md-roms/highscorefollin-1o.bin.
