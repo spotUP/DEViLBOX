@@ -47,6 +47,7 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   if (ascii(m, 0, 'THX')) return 'AbyssHighestExperience';
   if (ascii(m, 0, 'FC14') || ascii(m, 0, 'SMOD') || ascii(m, 0, 'FC13')) return 'FutureComposer1.4';
   if (ascii(m, 0, 'BeEp')) return 'JamCracker';
+  if (ascii(m, 0, 'COSO')) return 'JochenHippel-CoSo';
   if (ascii(m, 0, ' MUGICIAN/SOFTEYES 1990')) return 'Mugician';
   if (ascii(m, 0, 'DIGI Booster module')) return 'DIGI-Booster';
   if (['M.K.', 'M!K!', 'FLT4', '4CHN'].some((t) => ascii(m, 1080, t))) return 'PTK-Prowiz';

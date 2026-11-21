@@ -507,6 +507,45 @@
         "player": "1686b55a62f7469096b84dc7769c4d71b73530d8e15b5b032a1d1a08795d4f5d"
       }
     },
+    "JochenHippel-CoSo": {
+      "adf": "JochenHippel-CoSo.adf",
+      "adfSha256": "7bdcd3e9890c01e87bda477e3b645941fb3180847643cf496cd7b5d75aad8e25",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 40928,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 40924,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 270794,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 311556,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42400",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5A400",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4C104",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "prehistoric_tale.hipc",
+        "bytes": 24340
+      },
+      "sources": {
+        "tool": "039c208c1dd9159d39f50cd4def612cc44863b9c28163d0da785d2e286e71c3f",
+        "player": "d008b7a6bd2bbb7f1e281a64ff29a8e37db1d564ea130294317f4b5e86dc418f"
+      }
+    },
     "MCMD": {
       "adf": "MCMD.adf",
       "adfSha256": "c93e215e1fa84a463ce8c16a6c5d618e4d4719019e690e0ceec345bda2d00672",
