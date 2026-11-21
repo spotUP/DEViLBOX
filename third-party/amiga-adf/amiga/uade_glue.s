@@ -2672,6 +2672,7 @@ _uade_vbl_seen:         dc.l 0
 _uade_switch_intena:    dc.w 0          ; INTENA bits step 1b masked, to put back
         even
 _uade_reloc_base:       dc.l 0
+        xdef    _uade_mod_base
 _uade_mod_base:         dc.l 0
 _uade_host_sp:          dc.l 0
 _uade_score_sp:         dc.l 0

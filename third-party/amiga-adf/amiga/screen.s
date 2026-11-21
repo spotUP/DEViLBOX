@@ -9,10 +9,13 @@
 ; `tst.b pt_audchan1temp+34 / bne.b / tst.b pt_audchan2temp+34` sequence.
 ; Level = n_volume*15/64 while the channel's DMACONR AUDxEN bit is set.
 ; Every other player: Paula AUDxVOL is write-only, so hook_install patches each
-; `move.w Dn,d16(An)` with d16 in {8,$a8,$b8,$c8,$d8} in the relocated player
-; into `trap #15 / index`; hook_trap performs the same store and, when the
-; address is AUDxVOL, records the value (hookvol). Forms not of that shape
-; (immediate or memory source, (An) indirect, abs.l) are not seen.
+; `move.<b|w> Dn,d16(An)`, `move.w Dn,8(An,Dx.w)` and `move.<b|w> d16(Am),d16(An)`
+; with d16 in {8,9,$a8,$a9,..,$d8,$d9} (plus the AUDxPER note-on fallback) in
+; the relocated player, and in a module that carries its own replayer code
+; (SUN-Tronic: `movem.l / lea data(pc),a6` header), into `trap #15 / index`;
+; hook_trap performs the same store and, when the address is AUDxVOL or its
+; low byte, records the value (hookvol). Immediate source, (An) indirect, abs.l
+; and software mixers (EMS-6: voice volume in RAM) are not seen.
 ; shortcut: channel volume, not a sample envelope; a held or one-shot sample
 ; keeps its bar up. Upgrade: read Paula AUDxDAT or the sample position.
 
@@ -26,6 +29,7 @@
         xref    _uade_sub_cur
         xref    _uade_sub_max
         xref    _uade_reloc_base
+        xref    _uade_mod_base
         xref    _uade_module_src
         xref    _uprough_vbr
         xref    _uade_saved_execbase
@@ -361,65 +365,24 @@ hook_install:
         move.l  a1,$bc(a0)
         lea     hook_flush(pc),a1               ; trap #14: cache flush (below)
         move.l  a1,$b8(a0)
-        move.l  _uade_reloc_base,d0
-        move.l  d0,a0
+        move.l  _uade_reloc_base,a0
         lea     hooktab,a1
         moveq   #0,d6
         move.l  #54*1024/2,d7
-.hs:    move.w  (a0),d0
-        move.w  d0,d1
-        and.w   #$f1f8,d1
-        cmp.w   #$3140,d1
-        beq.b   .hplain
-        cmp.w   #$1140,d1               ; move.b Dn,disp(An): EMS stores bytes
-        beq.b   .hplain
-        cmp.w   #$3180,d1               ; move.w Dn,8(An,Dx.w)
-        bne.b   .hn
-        move.w  2(a0),d3
-        move.w  d3,d5
-        and.w   #$8fff,d5
-        cmp.w   #8,d5
-        bne.b   .hn
-        bra.b   .hbase
-.hplain:
-        move.w  2(a0),d3
-.hbase: move.w  d0,d2
-        lsr.w   #8,d2
-        lsr.w   #1,d2
-        and.w   #7,d2
-        cmp.w   #7,d2
-        beq.b   .hn
-        btst    #7,d0
-        bne.b   .hok                    ; indexed form: disp already checked
-        cmp.w   #8,d3
-        beq.b   .hok
-        cmp.w   #$a8,d3
-        beq.b   .hok
-        cmp.w   #$a6,d3                 ; AUDxPER: note-on fallback for players that never rewrite volume
-        beq.b   .hok
-        cmp.w   #$b6,d3
-        beq.b   .hok
-        cmp.w   #$c6,d3
-        beq.b   .hok
-        cmp.w   #$d6,d3
-        beq.b   .hok
-        cmp.w   #$b8,d3
-        beq.b   .hok
-        cmp.w   #$c8,d3
-        beq.b   .hok
-        cmp.w   #$d8,d3
-        bne.b   .hn
-.hok:   cmp.w   #HOOKMAX,d6
-        bhs.b   .hfin
-        move.w  d0,(a1)+
-        move.w  d3,(a1)+
-        move.l  #$4e4f0000,d4
-        or.w    d6,d4
-        move.l  d4,(a0)
-        addq.w  #1,d6
-.hn:    addq.l  #2,a0
-        subq.l  #1,d7
-        bne.w   .hs
+        bsr.w   hook_scan
+        move.l  _uade_mod_base,d0       ; SUN-Tronic: replayer code sits in the module
+        beq.b   .hfin
+        move.l  d0,a0
+        cmp.l   #$48e7fffe,(a0)
+        bne.b   .hfin
+        cmp.w   #$4dfa,4(a0)            ; lea data(pc),a6: code ends where data starts
+        bne.b   .hfin
+        moveq   #0,d7
+        move.w  6(a0),d7
+        addq.l  #6,d7
+        lsr.l   #1,d7
+        beq.b   .hfin
+        bsr.w   hook_scan
 .hfin:
         tst.w   d6
         beq.b   .hdone
@@ -428,6 +391,91 @@ hook_install:
         trap    #14                     ; Supervisor() is gone once the takeover has run
 .hdone: movem.l (sp)+,d0-d7/a0-a6
         rts
+
+; hook_scan: patch d7 words from a0; a1 = next hooktab slot, d6 = count.
+hook_scan:
+.hs:    move.w  (a0),d0
+        move.w  d0,d1
+        and.w   #$f1f8,d1
+        cmp.w   #$3140,d1
+        beq.w   .hplain
+        cmp.w   #$1140,d1               ; move.b Dn,disp(An): EMS stores bytes
+        beq.w   .hplain
+        cmp.w   #$3168,d1               ; move.w d16(Am),d16(An): AHX
+        beq.w   .hmem
+        cmp.w   #$1168,d1               ; move.b d16(Am),d16(An): SUN-Tronic
+        beq.w   .hmem
+        cmp.w   #$3180,d1               ; move.w Dn,8(An,Dx.w)
+        bne.w   .hn
+        move.w  2(a0),d3
+        move.w  d3,d5
+        and.w   #$8fff,d5
+        cmp.w   #8,d5
+        bne.w   .hn
+        move.w  d3,d5
+        bra.w   .hbase
+.hmem:  move.w  d0,d2
+        and.w   #7,d2
+        cmp.w   #7,d2                   ; source sp: not in the trap frame
+        beq.w   .hn
+        move.w  4(a0),d3                ; destination disp stays in the code
+        move.w  2(a0),d5                ; source disp goes to hooktab
+        bra.w   .hbase
+.hplain:
+        move.w  2(a0),d3
+        move.w  d3,d5
+.hbase: move.w  d0,d2
+        lsr.w   #8,d2
+        lsr.w   #1,d2
+        and.w   #7,d2
+        cmp.w   #7,d2
+        beq.w   .hn
+        btst    #7,d0
+        bne.w   .hok                    ; indexed form: disp already checked
+        cmp.w   #8,d3
+        beq.w   .hok
+        cmp.w   #$a8,d3
+        beq.w   .hok
+        cmp.w   #9,d3                   ; byte store to the AUDxVOL low byte
+        beq.w   .hok
+        cmp.w   #$a9,d3
+        beq.w   .hok
+        cmp.w   #$b9,d3
+        beq.w   .hok
+        cmp.w   #$c9,d3
+        beq.w   .hok
+        cmp.w   #$d9,d3
+        beq.w   .hok
+        cmp.w   #$a6,d3                 ; AUDxPER: note-on fallback for players that never rewrite volume
+        beq.w   .hok
+        cmp.w   #$b6,d3
+        beq.w   .hok
+        cmp.w   #$c6,d3
+        beq.w   .hok
+        cmp.w   #$d6,d3
+        beq.w   .hok
+        cmp.w   #$b8,d3
+        beq.w   .hok
+        cmp.w   #$c8,d3
+        beq.w   .hok
+        cmp.w   #$d8,d3
+        bne.w   .hn
+.hok:   btst    #0,d3                   ; odd disp: byte stores only, a word
+        beq.b   .hev                    ; store there is data, not code
+        btst    #13,d0
+        bne.w   .hn
+.hev:   cmp.w   #HOOKMAX,d6
+        bhs.w   .hend
+        move.w  d0,(a1)+
+        move.w  d5,(a1)+
+        move.l  #$4e4f0000,d4
+        or.w    d6,d4
+        move.l  d4,(a0)
+        addq.w  #1,d6
+.hn:    addq.l  #2,a0
+        subq.l  #1,d7
+        bne.w   .hs
+.hend:  rts
 
 ; trap #14: flush the caches after patching code. Same CPU choice as
 ; cache_flush.i, but entered by trap: exec's Supervisor() rides the privilege
@@ -472,7 +520,20 @@ hook_trap:
         and.w   #7,d1
         lsl.w   #2,d1
         move.l  32(sp,d1.w),a1          ; An
-        btst    #7,d5                   ; opcode bit 7: indexed form
+        btst    #5,d5                   ; source mode 101: d16(Am)
+        beq.b   .tdn
+        move.l  32(sp,d3.w),a2          ; Am
+        add.l   d2,a2
+        move.l  62(sp),a0
+        move.w  (a0)+,d2                ; destination disp
+        ext.l   d2
+        move.l  a0,62(sp)
+        move.b  (a2),d4
+        btst    #13,d5
+        beq.b   .tplain
+        move.w  (a2),d4
+        bra.b   .tplain
+.tdn:   btst    #7,d5                   ; opcode bit 7: indexed form
         beq.b   .tplain
         move.w  d2,d0
         rol.w   #4,d0
@@ -505,13 +566,14 @@ hook_trap:
         move.b  d6,61(sp)
         move.l  a1,d0
         sub.l   #$dff0a6,d0
-        cmp.l   #$32,d0
+        cmp.l   #$33,d0
         bhi.b   .out
         move.w  d0,d1
         and.w   #$f,d1
         beq.b   .period
-        cmp.w   #2,d1
-        bne.b   .out
+        subq.w  #2,d1                   ; AUDxVOL word (2) or its low byte (3)
+        cmp.w   #1,d1
+        bhi.b   .out
         lsr.w   #4,d0
         lea     hookvol,a2
         move.b  d4,(a2,d0.w)
