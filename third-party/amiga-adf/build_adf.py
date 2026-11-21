@@ -111,6 +111,7 @@ def publish(adf_path, layout, pub_dir, name=None):
         'cpu': '68020' if layout['target'] == 'a1200' else '68000',
         'moduleSlot': layout['moduleSlot'],
         'moduleLengthWord': layout['moduleLengthWord'],
+        **{k: layout[k] for k in ('companionSlot', 'companionLengthWord') if k in layout},
         'titleSlot': layout['titleSlot'],
         'chipArenaBytes': int(mem['CHIP_LEN'], 16),
         'memory': mem,
@@ -129,6 +130,8 @@ def main():
     ap.add_argument('--out', required=True)
     ap.add_argument('--player', help='eagleplayer.conf player name; default: what the module matches')
     ap.add_argument('--slot-bytes', type=int, default=SLOT_BYTES)
+    ap.add_argument('--companion-slot-bytes', type=int, default=0,
+                    help='second slot for the format\'s companion file (TFMX smpl.*, SynthDream smp.*); the staged companion is padded to it')
     ap.add_argument('--publish', metavar='DIR', help='also copy the ADF to DIR/<player>.adf and update DIR/manifest.json '
                     '(only for templates proven on the target)')
     ap.add_argument('--publish-name', help='manifest key and file stem when it is not the player name (MED-A1200)')
@@ -160,6 +163,7 @@ def main():
     os.makedirs(stage)
     print(run([sys.executable, os.path.join(HERE, 'tools', 'uade_stage.py'), '--module', a.module,
                '--uade-root', UADE_ROOT, '--outdir', stage]
+              + (['--companion-slot-bytes', str(a.companion_slot_bytes)] if a.companion_slot_bytes else [])
               + (['--player', a.player] if a.player else []) + sizes_args).strip())
 
     if player == 'PTK-Prowiz':
@@ -176,6 +180,15 @@ def main():
     s, n = re.subn(r'^UADE_MODULE_BYTES\s+equ\s+\d+', f'UADE_MODULE_BYTES       equ     {slot_bytes}', s, flags=re.M)
     assert n == 1, 'uade_sizes.i: no UADE_MODULE_BYTES line'
     open(sizes, 'w').write(s + f'UADE_MODULE_LEN         equ     {len(mod)}\n')
+
+    comp_n = 0
+    if a.companion_slot_bytes:
+        blob_path = os.path.join(stage, 'current.uadefiles.bin')
+        blob = open(blob_path, 'rb').read()
+        comp_n = len(blob)
+        if not blob or comp_n > a.companion_slot_bytes:
+            sys.exit(f'companion slot: staged blob is {comp_n} B, slot {a.companion_slot_bytes} B (need exactly one companion)')
+        open(blob_path, 'wb').write(blob + bytes(a.companion_slot_bytes - comp_n))
 
     inc = ['-I', HERE, '-I', os.path.join(HERE, 'score'), '-I', stage,
            '-I', os.path.join(UADE_ROOT, 'amigasrc', 'score')]
@@ -202,7 +215,7 @@ SECTIONS {{
     sym = {}
     for m in re.finditer(r'0x([0-9a-fA-F]+)\s+(\w+)', open(mapf).read()):
         sym.setdefault(m.group(2), int(m.group(1), 16))
-    need = ('_start', '_uade_module_len', '_uade_module_src', '_adf_title', '_img_end', '_bss_end', '_chip_end')
+    need = ('_start', '_uade_module_len', *(('_uade_files_blob', 'uade_file_table') if a.companion_slot_bytes else ()), '_uade_module_src', '_adf_title', '_img_end', '_bss_end', '_chip_end')
     miss = [k for k in need if k not in sym]
     if miss:
         sys.exit(f'map lacks {miss}; see {mapf}')
@@ -243,6 +256,14 @@ SECTIONS {{
     len_off = IMG_DISK + sym['_uade_module_len'] - IMG_BASE
     assert adf[slot_off:slot_off + len(mod)] == mod
     assert int.from_bytes(adf[len_off:len_off + 4], 'big') == len(mod)
+    comp_layout = {}
+    if a.companion_slot_bytes:
+        # The one table entry is dc.l name,offset,length,song; offset 0 = blob start.
+        cl_off = IMG_DISK + sym['uade_file_table'] - IMG_BASE + 8
+        assert 0 < int.from_bytes(adf[cl_off:cl_off + 4], 'big') <= comp_n, 'companion length word not where expected'
+        cs_off = IMG_DISK + sym['_uade_files_blob'] - IMG_BASE
+        comp_layout = {'companionSlot': {'diskOffset': cs_off, 'maxBytes': a.companion_slot_bytes},
+                       'companionLengthWord': {'diskOffset': cl_off, 'bytes': 4, 'endian': 'big'}}
     title_off = IMG_DISK + sym['_adf_title'] - IMG_BASE
     layout = {
         'adfBytes': ADF_SIZE,
@@ -250,6 +271,7 @@ SECTIONS {{
         'target': target,
         'moduleSlot': {'diskOffset': slot_off, 'maxBytes': slot_bytes},
         'moduleLengthWord': {'diskOffset': len_off, 'bytes': 4, 'endian': 'big'},
+        **comp_layout,
         'titleSlot': {'diskOffset': title_off, 'bytes': TITLE_BYTES, 'note': 'ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)'},
         'bootblock': {'diskOffset': 0, 'bytes': 1024, 'checksumOffset': 4,
                       'note': 'the slot is outside the bootblock, so patching it keeps the checksum valid'},

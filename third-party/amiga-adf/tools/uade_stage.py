@@ -946,6 +946,8 @@ def main():
     ap.add_argument('--player', default=None)
     ap.add_argument('--uade-root', default=uade_lookup.DEFAULT_ROOT)
     ap.add_argument('--outdir', default='out')
+    ap.add_argument('--companion-slot-bytes', type=int, default=0,
+                    help='DEViLBOX ADF: charge the pool for a companion of this size, not the staged one')
     ap.add_argument('--pool-bytes', type=int, default=None,
                     help='override the measured pool size (bytes)')
     ap.add_argument('--target-cpu', default=None,
@@ -1129,6 +1131,8 @@ def main():
         pool_bytes += loadseg
         why += f" +{loadseg} LoadSeg"
     comp_bytes = sum((os.path.getsize(c) + 15) & ~15 for c in companions)
+    if companions and args.companion_slot_bytes:
+        comp_bytes = (args.companion_slot_bytes + 15) & ~15
     if comp_bytes:
         pool_bytes += comp_bytes
         why += f" +{comp_bytes} companions"
