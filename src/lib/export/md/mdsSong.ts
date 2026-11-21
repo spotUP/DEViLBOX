@@ -121,13 +121,18 @@ export function psgFix(k: number, offs?: number[], o0 = 0): number {
  * 04xy vibrato offset. The driver adds them to key*256 + detune (mtab transpose, E8 envelope), so one detune must fit them all
  * (newer_song_lol PSG1 instrument 10 arp 1,0: the edge detune left the +1 step one period low). undefined: no macro, no vibrato.
  */
-export function psgOffsets(ins: FurnaceInstrument | undefined, version: number, vib?: number[]): number[] | undefined {
+export function psgOffsets(ins: FurnaceInstrument | undefined, version: number, vib?: number[], vibAt?: (t: number) => number): number[] | undefined {
   const am = macro(ins, MACRO_ARP, version), pm = macro(ins, MACRO_PITCH, version);
   const arp = am && !am.data.slice(0, am.length).some(arpIsFixed) ? am.data.slice(0, am.length).map((v) => ((v << 2) >> 2) * 128) : [0];
   const pit = pm && !(pm.mode & 1) ? pm.data.slice(0, pm.length) : [0];
   if (!vib && arp.length + pit.length === 2) return undefined;
   const out = new Set<number>();
-  for (const a of arp) for (const q of pit) for (const v of vib ?? [0]) out.add(a + q + v);
+  // vibAt: the vibrato offset on Furnace tick t after the note-on (phase reset at the note). A non-looping arp's leading steps only play
+  // on their first ticks, so they get exactly those offsets; crossing them with every vibrato offset spent the detune on offsets never
+  // played (newer_song_lol PSG1 arp 1,0: 04 55 note-on plays 128 + 18, 04 22 peak +15 missed; one period off each).
+  const lead = vibAt && am && arp.length > 1 && (am.loop < 0 || am.loop >= am.length || am.loop === 255) ? arp.length - 1 : 0, sp = Math.max(1, am?.speed ?? 1);
+  for (let i = 0; i < lead; i++) for (let t = i * sp; t < (i + 1) * sp; t++) for (const q of pit) out.add(arp[i] + q + vibAt!(t));
+  for (const a of arp.slice(lead)) for (const q of pit) for (const v of vib ?? [0]) out.add(a + q + v);
   return [...out].sort((x, y) => x - y);
 }
 
@@ -336,13 +341,16 @@ const VIB_TABLE = Array.from({ length: 64 }, (_, i) => Math.trunc(127 * Math.sin
  * first tick after `pos0` already plays pos0 + x. Written as an extended pitch envelope, one 1/256-semitone node per driver
  * frame, looping over the 64/gcd(64, x)-tick cycle; `tpf` (Furnace ticks per frame, see portaEnvelope) picks the Furnace tick each node lands on.
  */
-export function vibratoEnvelope(pos0: number, rate: number, depth: number, fine = 15, tpf = 1): number[] {
-  const off = (t: number) => Math.trunc(((depth * VIB_TABLE[(pos0 + (t + 1) * rate) % 64] * fine) >> 4) / 15);
+export const vibOffAt = (rate: number, depth: number, fine: number, t: number, pos0 = 0): number => Math.trunc(((depth * VIB_TABLE[(pos0 + (t + 1) * rate) % 64] * fine) >> 4) / 15);
+export function vibratoEnvelope(pos0: number, rate: number, depth: number, fine = 15, tpf = 1, lead: number[] = []): number[] {
+  const off = (t: number) => vibOffAt(rate, depth, fine, t, pos0);
   let g = 64; for (let r = rate; r; ) [g, r] = [r, g % r];
-  const frames = rate ? Math.max(1, Math.round(64 / g / tpf)) : 1, out: number[] = [];
+  const frames = rate ? Math.max(1, Math.round(64 / g / tpf)) : 1, out: number[] = [], L = lead.length;
+  // lead: node values for the first frames of the note, played once, then the cycle goes on at its frame L (psgLead).
+  lead.forEach((v, n) => { const w = v & 0xffff; out.push(w >> 8, w & 0xff, 0, 0, 0, n + 1 < L ? n + 1 : L + (L % frames)); });
   for (let n = 0; n < frames; n++) {
     const w = (2 * off(Math.round(n * tpf))) & 0xffff;
-    out.push(w >> 8, w & 0xff, 0, 0, rate ? 0 : 255, (n + 1) % frames);
+    out.push(w >> 8, w & 0xff, 0, 0, rate ? 0 : 255, L + ((n + 1) % frames));
   }
   return out;
 }
@@ -604,7 +612,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     const fTick = (t: number) => furnaceTickOf(t, fpt);
     let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0, dtnOut = 0;
     // PSG: E6 carries E5xx plus psgFix(key); each PSG chunk restates it, since a subroutine chunk can follow any detune.
-    const psgOffs = () => psgOffsets(m.instruments[ins], m.version, vDepth ? vibOffsets(vRate, vDepth, vFine) : undefined);
+    const psgOffs = () => psgOffsets(m.instruments[ins], m.version, vDepth ? vibOffsets(vRate, vDepth, vFine) : undefined, vDepth && !m.compatFlags.continuousVibrato ? (t) => vibOffAt(vRate, vDepth, vFine, t) : undefined);
     const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey, psgOffs()))) : dtn;
     // Pitch offset under the slide plus detune: a PSG slide step gets its own fix, since the driver truncates the interpolated period.
     const slidePitch = (off: number) => (kind === 'psg' && off ? Math.max(-128, Math.min(127, dtn)) + psgFix(curKey, psgOffs(), off) : 2 * off + effDtn());
@@ -656,11 +664,31 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       if (!noiseArps.has(key)) noiseArps.set(key, tbItem(out));
       return noiseArps.get(key)!;
     };
-    const vibCmd = (t: number): number[] => {
+    // PSG note-on under 04xy with a non-looping arp: the leading arp steps play one vibrato offset each (phase reset at the note), and
+    // the single detune cannot fit them and the whole vibrato on another key (newer_song_lol PSG1 key 42 04 55: detune -13 misses
+    // vibrato +25, -12/-11 miss the note-on 128 + 18, 142 vs 141). Those frames get their own E8 node, the value nearest the vibrato
+    // that writes Furnace's period. Empty when the plain node already hits.
+    const psgLead = (): number[] => {
+      const am = macro(m.instruments[ins], MACRO_ARP, m.version);
+      if (kind !== 'psg' || sA || dtn || !vRate || !am || am.length < 2 || macro(m.instruments[ins], MACRO_PITCH, m.version)) return [];
+      if ((am.loop >= 0 && am.loop < am.length && am.loop !== 255) || am.data.slice(0, am.length).some(arpIsFixed)) return [];
+      const sp = Math.max(1, am.speed), out: number[] = [];
+      for (let n = 0; ; n++) {
+        const T = Math.round(n * fpf), i = Math.floor(T / sp);
+        if (i >= am.length - 1) break;
+        const a = (am.data[i] << 2) >> 2, o = vibOffAt(vRate, vDepth, vFine, T), base = curKey * 256 + dtnOut + 256 * a;
+        const want = Math.min(1023, Math.round(sndPeriod(curKey + a + o / 128)));
+        let w = 2 * o;
+        for (let j = 1; j <= 64 && mdsPsgPitch(base + w) !== want; j++) w = [2 * o - j, 2 * o + j].find((c) => mdsPsgPitch(base + c) === want) ?? 2 * o;
+        out.push(w);
+      }
+      return out.some((w, n) => w !== 2 * vibOffAt(vRate, vDepth, vFine, Math.round(n * fpf))) ? out : [];
+    };
+    const vibCmd = (t: number, noteOn = false): number[] => {
       vSync(t);
       // The PSG detune depends on the vibrato (psgFix offsets), so a 04xy change restates E6; a slide in flight owns E6 (slideCmd).
       const d = kind === 'psg' && !sA && effDtn() !== dtnOut ? [0xe6, (dtnOut = effDtn()) & 0xff] : [];
-      return [...d, 0xe8, extItem(vibratoEnvelope(vPos, vRate, vDepth, vFine, fpf)) + 1];
+      return [...d, 0xe8, extItem(vibratoEnvelope(vPos, vRate, vDepth, vFine, fpf, noteOn && !vPos ? psgLead() : [])) + 1];
     };
     // 0Axy: Furnace keeps volume in 1/256 steps and adds x*64 (or -y*64) every tick, the row's first tick included, until it clamps at
     // 0 or the channel maximum (playback.cpp per-tick volume slides); the driver gets an E2 on every tick where volume>>8 changes.
@@ -913,11 +941,12 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             else if (pegDirty) cmds.push(0xe8, insRef(kind, ins).peg + 1);
             if (trsOut || sA || (kind === 'fm' && dtnOut !== effDtn())) cmds.push(...slideCmd(tick + delay));
             pegDirty = slide || prate !== 0; portaXx = 0;
+            const fresh = !m.compatFlags.continuousVibrato && !portaSlur;
             if (!m.compatFlags.continuousVibrato && (!portaSlur || retarget)) { vPos = 0; vAt = tick + delay; }
             if (!portaSlur) { arpT0 = tick + delay; if (baked && insRef(kind, ins).mtab >= 0) cmds.push(0xeb, insRef(kind, ins).mtab + 1); baked = false; }
             if (vDepth) {
               if ((slide && !sA) || prate || insRef(kind, ins).peg >= 0) lossy.add('04xy with a pitch slide or pitch macro (vibrato replaces it)');
-              cmds.push(...vibCmd(tick + delay)); pegDirty = true;
+              cmds.push(...vibCmd(tick + delay, fresh)); pegDirty = true;
             }
             prevKey = kind === 'psg' || kind === 'fm' ? nv : -1;
             tok.push({ cmd: 'note', n, t: 0, pre: cmds }); sounding = true; any = true;

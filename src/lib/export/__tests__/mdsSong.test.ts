@@ -131,6 +131,21 @@ describe('PSG period rounding', () => {
     expect(psgOffsets(ins, 223, [-3, 0, 3])).toEqual([-3, 0, 3, 125, 128, 131]);
     expect(psgOffsets({ macros: [] } as never, 223)).toBeUndefined();
   });
+  it('psgOffsets: a non-looping arp lead step only gets the vibrato offsets of its own ticks (newer_song_lol PSG1, arp 1,0 with 04 55)', () => {
+    const ins = { macros: [{ code: 1, type: 0, mode: 0, length: 2, loop: -1, release: -1, speed: 1, delay: 0, data: [1, 0] }] } as never;
+    const got = psgOffsets(ins, 223, [-3, 0, 3], (t) => (t === 0 ? 18 : 99)) ?? [];
+    expect([...got].sort((a, b) => a - b)).toEqual([-3, 0, 3, 146]);
+  });
+  it('vibratoEnvelope: lead nodes play once, then the cycle goes on at its frame L; no lead keeps the plain envelope', () => {
+    const plain = vibratoEnvelope(0, 5, 5), env = vibratoEnvelope(0, 5, 5, 15, 1, [10, 20]);
+    expect(env.slice(0, 12)).toEqual([0, 10, 0, 0, 0, 1, 0, 20, 0, 0, 0, 4]);
+    expect(env.length).toBe(plain.length + 12);
+    for (let n = 0; n < plain.length / 6; n++) {
+      expect(env.slice(12 + 6 * n, 12 + 6 * n + 5)).toEqual(plain.slice(6 * n, 6 * n + 5));
+      expect(env[12 + 6 * n + 5]).toBe(2 + plain[6 * n + 5]);
+    }
+    expect(vibratoEnvelope(0, 5, 5, 15, 1, [])).toEqual(plain);
+  });
 });
 
 describe('PSG envelope rate', () => {

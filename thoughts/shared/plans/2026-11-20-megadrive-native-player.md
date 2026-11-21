@@ -1585,3 +1585,28 @@ Measured MAME vs Furnace VGM (lagcmp, frames over 10 cents; Solar_Man to 94.3 s,
 - Q4 (not started): newer_song_lol PSG1 first-tick vibrato, 16 frames still off.
 - Remaining Solar_Man FM4 frames (20.883, 31.417, 33.383, 85.717, 86.6 s) were there before 2u; not checked.
 - Listen ROM: ~/Desktop/md-roms/Solar_Man-2u.bin (newer_song_lol unchanged, no new ROM).
+
+## Phase 2v result (2026-11-21)
+
+**newer_song_lol PSG1, 16 frames: fixed (16 -> 0).** Root cause in `psgOffsets` / the PSG vibrato envelope, two classes:
+- (a) 113 vs 112, 6 frames (04 22, key 47). `psgOffsets` crossed every arp step with every vibrato offset. Instrument 10 has a non-looping arp `[1, 0]`, so step +1 plays only on the note-on tick. The per-note detune was spent on offsets never played and missed the vibrato peak +15.
+- (b) 141/142 and 167/166, 9 frames (04 55, key 42). Furnace resets the vibrato phase at note-on (no continuousVibrato, no porta slur), so the note-on tick plays arp +1 at vibrato +18 (offset 146). No single detune fits both 146 and vibrato +25.
+
+Fix:
+- `psgOffsets(ins, version, vib, vibAt)`: the leading steps of a non-looping arp get only the vibrato offsets of their own ticks (`vibOffAt`, a new export shared with `vibratoEnvelope`).
+- `psgLead()` + `vibratoEnvelope(..., lead)`: for a fresh-phase PSG note with such an arp, the E8 envelope gets per-note lead nodes. Each lead node holds the exact value that makes `mdsPsgPitch` equal Furnace's `round(sndPeriod)` on that frame. The lead plays once, then the cycle goes on at frame L. Without a lead the envelope bytes are unchanged (golden_shit hex holds).
+- Tests: psgOffsets lead offsets; vibratoEnvelope lead layout and next indices, unchanged when the lead is empty.
+
+| Song (frames >10 cents) | Before | After |
+|---|---|---|
+| newer_song_lol FM4 / PSG1 / PSG2 | 2 / 16 / 4 | 2 / 0 / 4 |
+| Solar_Man FM1 / FM4 / FM5 / PSG1 / PSG2 | 1 / 5 / 2 / 2 / 2 | 1 / 5 / 2 / 2 / 2 |
+
+Seq bytes: newer_song_lol 61702 -> 63356 (+1654, lead envelope items); Solar_Man 21154 unchanged.
+
+Open:
+- newer_song_lol PSG2, 4 frames (19.417, 30.017, 31.283, 32.35): 03 88 fast slides. Not examined.
+- Solar_Man FM4, 5 frames (20.883, 31.417, 33.383, 85.717, 86.6): all sit on a row with a new note (or the 0a/02 end at 33.393). MAME either misses the last slide/vibrato step before the key-on, or plays one extra step before a late note change. 33.383 matches PSG1/PSG2 misses on the same frame. Classified as a likely note-boundary timing artifact (56 Hz ticks on 60 Hz frames), not a pitch-value bug. Not confirmed, not fixed.
+- Known artifacts unchanged: Solar_Man FM6 at about frame 5996, newer_song_lol FM4 at 10.97 s.
+
+Listen ROM: `~/Desktop/md-roms/newer_song_lol-2v.bin`.
