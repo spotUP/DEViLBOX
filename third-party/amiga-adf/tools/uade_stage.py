@@ -647,6 +647,10 @@ def check_player(module, player_name, allow_reason, what):
     oracle = uade_lookup.cross_check(module, player_name)
     if not oracle or oracle == player_name:
         return
+    # A custom module IS its replayer: uade123 names the module file itself as
+    # the player (skyfox2.cus), while we call that same thing `custom`.
+    if player_name == 'custom' and oracle == os.path.basename(module):
+        return
     if allow_reason:
         print(f"uade_stage: {what}: linking {player_name}, uade123 picks {oracle} "
               f"(allowed: {allow_reason})")
