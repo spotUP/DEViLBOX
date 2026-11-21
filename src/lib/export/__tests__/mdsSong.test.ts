@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { arpTable, furnaceTickOf, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, psgOffsets, vibOffsets, vibratoEnvelope } from '../md/mdsSong';
+import { arpTable, furnaceTickOf, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, psgOffsets, vibNodeOff, vibOffsets, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
@@ -136,6 +136,15 @@ describe('PSG period rounding', () => {
     const got = psgOffsets(ins, 223, [-3, 0, 3], (t) => (t === 0 ? 18 : 99)) ?? [];
     expect([...got].sort((a, b) => a - b)).toEqual([-3, 0, 3, 146]);
   });
+  it('vibNodeOff: the node MDSDRV plays n frames after an E8 or note byte, looping with the envelope cycle (PSG slide-step scoring)', () => {
+    // newer_song_lol PSG2 04 6x at 72 Hz on 60 Hz frames: slide steps are scored on this node, not on every vibrato offset.
+    const fpf = 72 / 60, env = vibratoEnvelope(16, 6, 6, 15, fpf), nodes = env.length / 6;
+    for (let n = 0; n < 3 * nodes; n++) {
+      const i = (n % nodes) * 6, w = ((env[i] << 8) | env[i + 1]) << 16 >> 16;
+      expect(2 * vibNodeOff(16, 6, 6, 15, fpf, n)).toBe(w);
+    }
+  });
+
   it('vibratoEnvelope: lead nodes play once, then the cycle goes on at its frame L; no lead keeps the plain envelope', () => {
     const plain = vibratoEnvelope(0, 5, 5), env = vibratoEnvelope(0, 5, 5, 15, 1, [10, 20]);
     expect(env.slice(0, 12)).toEqual([0, 10, 0, 0, 0, 1, 0, 20, 0, 0, 0, 4]);

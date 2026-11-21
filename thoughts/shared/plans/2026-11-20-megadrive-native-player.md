@@ -1618,3 +1618,24 @@ Baseline reproduced (lagcmp, >10 cents, best of lag -1..+1): Solar_Man FM1 1, FM
 - newer_song_lol PSG2 (19.417, 30.017, 31.283, 32.35): period misses of 1-2 (MAME 124 vs Furnace 125 at 30.0 s, 333/335, 141/142, 200/198), checked from the raw MAME tap, not index-aligned rows. All four sit in linear-pitch 03 88 slides under 04xy (vibrato depth 6), so they go out on the sA path (slideCmd/arpBake, E4+E6 per sequence tick), not portaEnvelope. Hypothesis: slidePitch scores each step's psgFix against the whole vibrato offset set, and at period ~125 (1 period = 14 cents) one detune cannot fit every offset.
 - Tried: score only the vibrato offset at the step's Furnace tick (vibOffAt(vRate, vDepth, vFine, f - fTick(vAt) - 1, vPos)). Result: newer_song_lol PSG1 0 -> 37, PSG2 4 -> 18; Solar_Man unchanged. Reverted. So the per-tick phase this formula assumes does not match the E8 envelope phase the driver plays; the all-offset scoring is the safer fit. Next step: log the E8 envelope position per sequence tick from the driver (or MAME) and score against that phase, not the Furnace phase.
 - Solar_Man FM4 (20.883, 31.417, 33.383, 85.717, 86.6) and FM1/FM5/PSG1/PSG2 residue: not reached in this phase. 33.383 hits FM4+PSG1+PSG2 at once (worst 100 cents), which points at a shared timing event rather than per-channel pitch; unproven.
+
+## Phase 2x result (2026-11-21)
+
+**MDSDRV E8 phase model (measured from source and a MAME RAM log of the track structs).** `@do_peg` clears `t_peg_delay`/`t_peg_pos` whenever `nf_key_on` is set, and `@cmd_note` sets that flag on every note byte, slurred (E0) notes included; E8 also clears mod and pos. After that the envelope steps one node per sequence tick (frame). E4 (transpose) and E6 (detune) without a note byte leave the envelope alone. So a slide step at tick k plays node `k - t` of the envelope sent at the last note byte or E8 at tick t. RAM evidence: newer_song_lol track 7 (PSG2) at 30.105 s raw (events 30.005 s) has `peg_pos` restarting at 1 on each slide note and `peg_mod` -78, -36, 18, 66, 92 per frame.
+
+**Violated invariant (PSG2 30.017 s).** The PSG slide-step pitch must write Furnace's period at the envelope node the driver plays on that tick. slidePitch scored the step detune with psgFix over every vibrato offset. On the miss frame, node -36 plus pitch 11642 wrote period 124 where Furnace writes 125.
+
+**Fix.** slidePitch(off, t) now records the tick and vibrato pos of the last envelope restart (eT, eP; set at every note byte and every vibCmd). It searches outward from the psgFix detune for the first value that writes Furnace's period at node `vibNodeOff(eP, ..., t - eT)`. The vibrato-pos reset moved ahead of arpBake/slideCmd so that the note's own steps score on the new phase. Shortcut: an E5xx detune under such a slide keeps the old detune.
+
+| Song / channel | before (over 10 c) | after |
+|---|---|---|
+| newer_song_lol PSG2 | 4 [19.417, 30.017, 31.283, 32.35] | 3 [19.417, 31.283, 32.35] |
+| newer_song_lol FM1-5, PSG1 | 0,0,0,2 (10.97 s artifact),0 / 0 | unchanged |
+| Solar_Man all channels | FM1 1, FM4 5, FM5 2, PSG1 2, PSG2 2 | unchanged |
+
+The seq sizes did not change (21154 / 63356). The golden_shit hex test passes.
+
+**Open.**
+- newer_song_lol PSG2 32.35 s is not a rounding miss. It is 17.6 c (about 3 periods) on the first frame of a fast slide from note 29 to note 37 (trs -8, dtn 63, node -18). That points at the slide-step count or phase at the note, not the detune.
+- Solar_Man 33.383 s: at 33.375 s Furnace already writes one more descending slide step on FM4 (277.16), PSG1 (220.2) and PSG2 (440.4). MDSDRV still writes the previous step (293.82 / 233.0 / 466.1). Both sides agree again at 33.39 s (next row). The frame cadence matches there (VGM 56 Hz ticks, MAME frames), so the driver is one slide step behind on all three channels in the last tick before the row. This is likely ours (the slide's last step is dropped or late at the row edge), not an artifact. Unverified: the slide kind on each channel (E8 portaEnvelope or per-tick E4/E6).
+- Solar_Man FM4 20.883, 31.417, 85.717, 86.6 s were not investigated.

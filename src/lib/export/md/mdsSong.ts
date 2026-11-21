@@ -342,10 +342,12 @@ const VIB_TABLE = Array.from({ length: 64 }, (_, i) => Math.trunc(127 * Math.sin
  * frame, looping over the 64/gcd(64, x)-tick cycle; `tpf` (Furnace ticks per frame, see portaEnvelope) picks the Furnace tick each node lands on.
  */
 export const vibOffAt = (rate: number, depth: number, fine: number, t: number, pos0 = 0): number => Math.trunc(((depth * VIB_TABLE[(pos0 + (t + 1) * rate) % 64] * fine) >> 4) / 15);
+const vibFrames = (rate: number, tpf: number): number => { let g = 64; for (let r = rate; r; ) [g, r] = [r, g % r]; return rate ? Math.max(1, Math.round(64 / g / tpf)) : 1; };
+// Offset (1/128 semitone) of cycle node n of vibratoEnvelope (no lead): the node MDSDRV plays n frames after the E8 or note byte.
+export const vibNodeOff = (pos0: number, rate: number, depth: number, fine: number, tpf: number, n: number): number => vibOffAt(rate, depth, fine, Math.round((n % vibFrames(rate, tpf)) * tpf), pos0);
 export function vibratoEnvelope(pos0: number, rate: number, depth: number, fine = 15, tpf = 1, lead: number[] = []): number[] {
   const off = (t: number) => vibOffAt(rate, depth, fine, t, pos0);
-  let g = 64; for (let r = rate; r; ) [g, r] = [r, g % r];
-  const frames = rate ? Math.max(1, Math.round(64 / g / tpf)) : 1, out: number[] = [], L = lead.length;
+  const frames = vibFrames(rate, tpf), out: number[] = [], L = lead.length;
   // lead: node values for the first frames of the note, played once, then the cycle goes on at its frame L (psgLead).
   lead.forEach((v, n) => { const w = v & 0xffff; out.push(w >> 8, w & 0xff, 0, 0, 0, n + 1 < L ? n + 1 : L + (L % frames)); });
   for (let n = 0; n < frames; n++) {
@@ -615,7 +617,20 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     const psgOffs = () => psgOffsets(m.instruments[ins], m.version, vDepth ? vibOffsets(vRate, vDepth, vFine) : undefined, vDepth && !m.compatFlags.continuousVibrato ? (t) => vibOffAt(vRate, vDepth, vFine, t) : undefined);
     const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey, psgOffs()))) : dtn;
     // Pitch offset under the slide plus detune: a PSG slide step gets its own fix, since the driver truncates the interpolated period.
-    const slidePitch = (off: number) => (kind === 'psg' && off ? Math.max(-128, Math.min(127, dtn)) + psgFix(curKey, psgOffs(), off) : 2 * off + effDtn());
+    // Under 04xy the step is scored on the E8 node the driver plays at tick t: MDSDRV restarts the envelope at node 0 on every note
+    // byte (slurred too, @do_peg nf_key_on) and every E8, then steps one node per frame; E4/E6 leave it alone (newer_song_lol PSG2
+    // 30.017 s: node -36 at step 2 wrote 124 where Furnace has 125). eT/eP: tick and vibrato pos of the last envelope restart.
+    // shortcut: E5xx detune under such a slide keeps the plain psgFix detune; upgrade if a song slides a detuned PSG under 04xy.
+    let eT = -1, eP = 0;
+    const slidePitch = (off: number, t?: number) => {
+      if (kind !== 'psg' || !off) return 2 * off + effDtn();
+      const base = Math.max(-128, Math.min(127, dtn)) + psgFix(curKey, psgOffs(), off);
+      if (!vDepth || dtn || t === undefined || eT < 0 || t < eT) return base;
+      const o = vibNodeOff(eP, vRate, vDepth, vFine, fpf, t - eT), at = (c: number) => mdsPsgPitch(curKey * 256 + c + 2 * o);
+      const want = Math.min(1023, Math.round(sndPeriod(curKey + (off + o) / 128)));
+      for (let j = 0; j <= 64; j++) for (const c of j ? [base - j, base + j] : [base]) if (curKey * 256 + c + 2 * o >= 0 && at(c) === want) return c;
+      return base;
+    };
     // 03xx under a running 04xy: MDSDRV has one pitch envelope (E8, the vibrato), so the linear slide goes out per sequence tick as
     // E4 transpose + E6 detune, which mds_pitch_update adds before the envelope (pitch = note + trs + dtn, then + E8 output).
     // sA: slide offset from the target at the note (1/128 semitone, 0 = none), stepped sStep per Furnace tick from Furnace tick sF0.
@@ -634,7 +649,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     let fA = 0, fF0 = 0, pXx = 0;
     const flyOff = (f: number) => (fA ? Math.sign(fA) * Math.max(0, Math.abs(fA) - pXx * pss * (f - fF0 + 1)) : 0);
     const slideCmd = (t: number): number[] => {
-      const off = slideOff(fTick(t)), o = slidePitch(off), tr = Math.floor((o + 128) / 256), d = o - 256 * tr, out: number[] = [];
+      const off = slideOff(fTick(t)), o = slidePitch(off, t), tr = Math.floor((o + 128) / 256), d = o - 256 * tr, out: number[] = [];
       if (!off) sA = 0;
       if (baked) trsOut = tr;
       else if (tr !== trsOut) out.push(0xe4, (trsOut = tr) & 0xff);
@@ -654,7 +669,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       const arpAt = (j: number) => { let i = 0; while (i + 1 < vals.length && at(i + 1) <= j) i++; return vals[i]; };
       const out: number[] = [];
       for (let k = t0; ; k++) {
-        const off = slideOff(fTick(k)), v = arpAt(k - arpT0) + Math.floor((slidePitch(off) + 128) / 256);
+        const off = slideOff(fTick(k)), v = arpAt(k - arpT0) + Math.floor((slidePitch(off, k) + 128) / 256);
         if (out.length && out[out.length - 3] === (v & 0xff) && out[out.length - 1] < 255) out[out.length - 1]++;
         else out.push(0x16, v & 0xff, 0x81, 0);
         if (!off && k - arpT0 >= at(vals.length - 1)) break;
@@ -685,7 +700,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       return out.some((w, n) => w !== 2 * vibOffAt(vRate, vDepth, vFine, Math.round(n * fpf))) ? out : [];
     };
     const vibCmd = (t: number, noteOn = false): number[] => {
-      vSync(t);
+      vSync(t); eT = t; eP = vPos;
       // The PSG detune depends on the vibrato (psgFix offsets), so a 04xy change restates E6; a slide in flight owns E6 (slideCmd).
       const d = kind === 'psg' && !sA && effDtn() !== dtnOut ? [0xe6, (dtnOut = effDtn()) & 0xff] : [];
       return [...d, 0xe8, extItem(vibratoEnvelope(vPos, vRate, vDepth, vFine, fpf, noteOn && !vPos ? psgLead() : [])) + 1];
@@ -926,6 +941,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             const portaSlur = portaXx > 0 && sounding && Number.isNaN(shFrom);
             // E0 slurs every such note, also a PSG 03xx onto the note already reached (no slide): a key-on would restart the macros.
             if ((kind === 'fm' || kind === 'psg') && portaSlur) cmds.push(0xe0);
+            const fresh = !m.compatFlags.continuousVibrato && !portaSlur;
+            if (!m.compatFlags.continuousVibrato && (!portaSlur || retarget)) { vPos = 0; vAt = tick + delay; }
+            if (vDepth) { vSync(tick + delay); eT = tick + delay; eP = vPos; } // the note byte restarts E8 (slide steps below score on it)
             sA = 0; fA = 0; pXx = slide && m.compatFlags.linearPitch ? portaXx : 0;
             if (slide && vDepth && m.compatFlags.linearPitch) {
               sA = from - nv * 128; sStep = portaXx * pss; sF0 = fTick(tick + delay);
@@ -941,8 +959,6 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             else if (pegDirty) cmds.push(0xe8, insRef(kind, ins).peg + 1);
             if (trsOut || sA || (kind === 'fm' && dtnOut !== effDtn())) cmds.push(...slideCmd(tick + delay));
             pegDirty = slide || prate !== 0; portaXx = 0;
-            const fresh = !m.compatFlags.continuousVibrato && !portaSlur;
-            if (!m.compatFlags.continuousVibrato && (!portaSlur || retarget)) { vPos = 0; vAt = tick + delay; }
             if (!portaSlur) { arpT0 = tick + delay; if (baked && insRef(kind, ins).mtab >= 0) cmds.push(0xeb, insRef(kind, ins).mtab + 1); baked = false; }
             if (vDepth) {
               if ((slide && !sA) || prate || insRef(kind, ins).peg >= 0) lossy.add('04xy with a pitch slide or pitch macro (vibrato replaces it)');
