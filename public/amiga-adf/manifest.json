@@ -1542,6 +1542,45 @@
         "player": "fdf114e1d76ec0fc1d6e7471ec63fe93f0a043d367a562b8b2a398b74538dc21"
       }
     },
+    "TomyTracker": {
+      "adf": "TomyTracker.adf",
+      "adfSha256": "3a3bceac4ffaa8c5881ebdab03b6359776b28fa33f85465cba16294bad288d89",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 42120,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 42116,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 271988,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 359684,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42A00",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5AA00",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x57D04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "irrepressible intro.sg",
+        "bytes": 25894
+      },
+      "sources": {
+        "tool": "ac79e2ed0964b364258e0645d83b308e877b7e453e01730d5fb90504db62846d",
+        "player": "a89e24b7c81dad6d4dda6a3f8fc6e4746e625ac0710149811753611a7a41c765"
+      }
+    },
     "Tronic": {
       "adf": "Tronic.adf",
       "adfSha256": "51bdb34d42a361703c91b38d1db7e072f6ad5ab2b8dab065ba6a139f73cb5bfa",
