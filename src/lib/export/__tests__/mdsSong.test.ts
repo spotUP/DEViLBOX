@@ -151,6 +151,13 @@ describe('furnaceToMds', () => {
     expect(hex).toContain('020405021b1a8d18');
     expect(hex).not.toContain('020504021b8d1a18');
   });
+  it('highscorefollin FM3 order 8 row 64: instrument 21 (alg 3, TL 13 23 21 16, kvs 1 2 1 0) restates KVS with EE so TL matches Furnace 16 23 24 16 at attenuation 3', async () => {
+    // MDSDRV adds the volume to carriers only (op 3 for alg 3). Furnace KVS scales ops 0 and 2 (kvs 1) and leaves op 3 (kvs 0) alone.
+    const m = await parse('highscorefollin.fur');
+    expect(m.instruments[21].fm!.operators.map((o) => [o.tl, o.kvs])).toEqual([[13, 1], [23, 2], [21, 1], [16, 0]]);
+    const hex = Buffer.from(furnaceToMds(m).seq).toString('hex');
+    expect(hex).toContain('ee0010ee0218ee030d'); // op0 13+3, op2 21+3, op3 16-3 (driver adds 3 back)
+  });
   it('highscorefollin (Furnace version < 224): FM operators parse without the v224 block byte, so the Wurlitzer voice writes TL 1e 1c 10 16 like Furnace', async () => {
     // Raw FM feature: f4 47 00 20 | 52 1e df 07 ... The extra block byte read shifted every operator one byte (TL 5f 5f 19 19, -14 dB on FM1).
     const m = await parse('highscorefollin.fur');

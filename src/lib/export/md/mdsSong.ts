@@ -167,6 +167,9 @@ function ticksOf(m: FurnaceMacro, lossy: Lossy, what: string): { vals: number[];
 }
 
 /** 30-byte FM voice in register order (+0,+4,+8,+C). Furnace operators are already stored in register order (genesis.cpp writes op[i] at opOffs[i] = 4*i), as MDSDRV reads them (mdsdrv.68k load inst data). */
+/** MDSDRV mds_fm_op_table: operator i (register order) of algorithm a is a carrier when i >= MDS_FIRST_CARRIER[a]. */
+const MDS_FIRST_CARRIER = [3, 3, 3, 3, 2, 1, 1, 0];
+
 function fmVoice(ins: FurnaceInstrument | undefined, lossy: Lossy): number[] {
   const fm = ins?.fm;
   if (!fm || fm.operators.length < 4) { lossy.add('FM channel instrument without FM data (default voice)'); return [...Array<number>(24).fill(0), 0x7f, 0x7f, 0x7f, 0, 7, FM_TRANSPOSE]; }
@@ -369,7 +372,24 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // past that holds at the driver's end key instead of Furnace's (measured: golden_shit FM1 kick 02 c0 wrapped to 4 kHz below key 0).
     // PSG: E2 $80|v gives attenuation 15-v, added to the envelope attenuation 15-macro and clamped, the same sum as Furnace VOL_SCALE_LOG.
     // FM6 on a sample instrument: the driver turns E2 into one of 16 PCM gains (pcmDacAtt), so pick the one nearest Furnace's dacVolTable.
-    const volCmd = (v: number) => [0xe2, kind === 'fm' ? (ch === 5 && m.instruments[ins]?.type === 4 ? pcmDacAtt(v) : 127 - v) : 0x80 | Math.max(0, Math.min(15, v))];
+    // Furnace KVS (fmsharedbase.h KVS): an operator takes the channel volume when kvs is 1, or 2 on a carrier; MDSDRV adds it to the carriers
+    // of mds_fm_op_table[alg] only (same carriers as Furnace isOutput). An operator whose KVS differs gets base TL tl + att*(kvs - carrier)
+    // through EE (fmtl), restated after every E1 (which reloads the voice TLs) and every E2. kvsIns is the voice the driver holds.
+    let kvsIns = -1;
+    const kvsCmd = (v: number): number[] => {
+      const ops = kind === 'fm' ? m.instruments[kvsIns]?.fm?.operators : undefined;
+      if (!ops || ops.length < 4 || (ch === 5 && m.instruments[ins]?.type === 4)) return [];
+      const alg = m.instruments[kvsIns]!.fm!.algorithm & 7, att = 127 - v, out: number[] = [];
+      for (let i = 0; i < 4; i++) {
+        const car = i >= MDS_FIRST_CARRIER[alg], k = ops[i].kvs ?? 2, scaled = k === 1 || (k === 2 && car);
+        if (scaled === car) continue;
+        const base = (ops[i].tl & 127) + (scaled ? att : -att);
+        if (base < 0 || base > 127) lossy.add('FM KVS operator TL beyond 0..127 (clamped)');
+        out.push(0xee, i, Math.max(0, Math.min(127, base)));
+      }
+      return out;
+    };
+    const volCmd = (v: number) => [0xe2, kind === 'fm' ? (ch === 5 && m.instruments[ins]?.type === 4 ? pcmDacAtt(v) : 127 - v) : 0x80 | Math.max(0, Math.min(15, v)), ...kvsCmd(v)];
     let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0, dtnOut = 0;
     // PSG: E6 carries E5xx plus psgFix(key); each PSG chunk restates it, since a subroutine chunk can follow any detune.
     const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey))) : dtn;
@@ -412,7 +432,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       const insCmd = (chunkStart = false) => {
         const r = insRef(kind, ins);
         const peg = (chunkStart ? sounding && (prate || poff) : prate) ? pslideCmd() : chunkStart && tick < slideEnd ? [] : [0xe8, r.peg + 1];
-        return [0xe1, r.ins, ...peg, 0xeb, r.mtab + 1];
+        kvsIns = ins;
+        return [0xe1, r.ins, ...peg, 0xeb, r.mtab + 1, ...kvsCmd(vol)];
       };
       // FM6 with a sample instrument plays PCM (genesis.cpp: dacMode from the instrument type at each note-on); E1 would leave PCM mode.
       const isDac = (n: number) => kind === 'fm' && ch === 5 && m.instruments[n]?.type === 4;
