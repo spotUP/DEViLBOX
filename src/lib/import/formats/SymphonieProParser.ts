@@ -733,7 +733,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
 
       case CHUNK_PATTERN_EVENTS:
         if (patternData.length === 0) {
-          patternEventsFileOffset = r.pos;  // record before data is consumed
+          patternEventsFileOffset = r.pos + 4;  // first event byte, past the uint32 length prefix
           patternData = new Uint8Array(decodeSymArray(r));
         } else {
           if (r.canRead(4)) { const l = r.u32be(); r.skip(l); }
@@ -1067,12 +1067,13 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
       cell.cutoff = inst;   // raw inst byte
       return cell;
     },
-    // The events are RLE-packed in the file, so a cell has no byte of its own there: this is the cell's byte offset in
-    // the unpacked event stream (the same id for every grid pattern that shows the event; -1 for a row outside the stream).
+    // File offset of the cell's event: chunk data start + its position in the event stream (the same id for every grid
+    // pattern that shows the event; -1 for a row outside the stream). Exact bytes when the chunk is stored unpacked;
+    // in an RLE-packed chunk the event has no byte of its own, so the offset is only the cell's identity.
     getCellFileOffset(pattern: number, row: number, channel: number): number {
       const src = patternSources[pattern];
       if (!src) return -1;
-      return ((src.pattern * patternSize + (src.start + row) * numChannels + channel) * 4);
+      return patternEventsFileOffset + (src.pattern * patternSize + (src.start + row) * numChannels + channel) * 4;
     },
     noteOffset: (pattern: number): number => patternSources[pattern]?.transpose ?? 0,
     propagateSharedCells: true,

@@ -42,7 +42,7 @@ describe('SymphoniePro export keeps the module', () => {
   it('an edit changes exactly the cells sharing it', async () => {
     const song = (await load(new Uint8Array(readFileSync(FIXTURE))))!;
     const layout = song.uadePatternLayout!;
-    const linear = (p: number, r: number, c: number) => (p * layout.rowsPerPattern * layout.numChannels + r * layout.numChannels + c) * 4;
+    const linear = (p: number, r: number, c: number) => layout.patternDataFileOffset + (p * layout.rowsPerPattern * layout.numChannels + r * layout.numChannels + c) * 4;
     // The fixture plays raw blocks out of grid order, so a linear guess is wrong for some grid pattern.
     const p = song.patterns.findIndex((_, i) => layout.getCellFileOffset!(i, 0, 0) !== linear(i, 0, 0));
     expect(p).toBeGreaterThanOrEqual(0);
