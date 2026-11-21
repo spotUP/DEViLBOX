@@ -828,3 +828,22 @@ Song: highscorefollin, 40 s, MAME headless, current converter. Listen ROM: `~/De
 1. Implement the Q3 PSG rounding compensation and re-run lagcmp on PSG1-3. PASS: 0 frames over 10 cents.
 2. Apply the DAC volume (`dacVolTable`) on FM6 PCM.
 3. Run the 1q PCM taps on a second song with dense drums.
+
+## Phase 1r results (2026-11-21)
+
+Song: highscorefollin.fur, 40 s, MAME genesis headless taps vs Furnace VGM.
+
+1. **PSG rounding: PASS** (ecd6411aa). MDSDRV `mds_get_psg_pitch` truncates `>> octave`; Furnace rounds `sndPeriod`. Fix: per-key E6 detune (`psgFix`) so the post-shift period equals Furnace's rounded period. Frames over 10 cents, baseline -> fixed: PSG1 317 -> 0 (worst was 48.8 c), PSG2 69 -> 0, PSG3 349 -> 0. Worst left: 9.7 c on PSG2 (same as baseline). Residuals: keys 0-8 clamp at period 1023; keys 85+ one period high; arpeggio steps not corrected.
+2. **Tick 1060: no bug.** The 1q note was an arithmetic error: 1281 >> 4 = 80 and Furnace round(80.08) = 80.
+3. **FM6 DAC: sign bug fixed, volume mapped** (aa4096978).
+   - MDSDRV PCM is unsigned (68k builds volume tables as (byte - 128) * gain, `out_dac` XORs $80); export wrote Furnace's signed bytes, so FM6 PCM played as noise (MAME DAC RMS ~106 vs Furnace ~42).
+   - After fix, DAC RMS MAME vs Furnace per 4 s window: 4-40 s within -0.07..+0.23 dB; 0-4 s +1.46 dB (not investigated).
+   - Volume: E2 attenuation -> `mds_psg_vol_table` level -> Z80 `volume_table` (2 dB steps). Old `127 - vol` played 0..3.25 dB loud. `pcmDacAtt` now picks the nearest driver gain to Furnace `dacVolTable`: max error 1.2 dB for vol 89..127 (unit test).
+   - Not measured in MAME: volume below 127. Furnace VGM DAC streams ignore volume, so the VGM is only a reference at vol 127. DAC volume macro is ignored; volCmd uses the current instrument to detect PCM.
+4. **Dense-drum key-on taps: not done** (budget).
+
+Listen ROM: ~/Desktop/md-roms/highscorefollin-1r.bin (sign fix; vol 127 song so volume map has no effect).
+
+Open: PSG3 noise-rate gap (silent-tone period differs while noise uses PSG3 rate, e.g. 13982 Hz Furnace vs 6214 Hz MAME near 34.13 s).
+
+Next: (a) bake residual DAC gain into sample data or measure volume against a Furnace audio render; (b) PSG3 noise-rate gap; (c) task 4 dense-drum key-on taps.
