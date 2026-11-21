@@ -1025,33 +1025,34 @@
       }
     },
     "SonicArranger": {
+      "player": "SonicArranger-pc-all",
       "adf": "SonicArranger.adf",
-      "adfSha256": "9ae59968321930239556279ef07ee44f2ba7ca93d776891536f8bd8e17daa9d5",
+      "adfSha256": "84254e1aba972b480904e4ed073dfaa6fa15d63ae582166bff34ffb09f6d1ebd",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 44404,
+        "diskOffset": 37248,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 44400,
+        "diskOffset": 37244,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 274260,
+        "diskOffset": 267104,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
-      "chipArenaBytes": 315652,
+      "chipArenaBytes": 356612,
       "memory": {
         "IMG_BASE": "0xC18000",
-        "IMG_LEN": "0x43200",
+        "IMG_LEN": "0x41600",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC5B200",
-        "BSS_LEN": "0x8808",
+        "BSS_BASE": "0xC59600",
+        "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
-        "CHIP_LEN": "0x4D104",
+        "CHIP_LEN": "0x57104",
         "ENTRY": "0xC18000"
       },
       "provenWith": {
@@ -1059,8 +1060,8 @@
         "bytes": 93062
       },
       "sources": {
-        "tool": "6ad98888fc563b650cafa95616adbead9544588a94fc3756f182df5436a1cfb2",
-        "player": "43b079b94aabbbd54a2dd4f2c0a39890d8f7cf2730fd46f46cebea025c3218ff"
+        "tool": "765c74271c7da17b3eaa81b0583e47e325c43f18e90d4eb2b7ac36fb0126af8e",
+        "player": "c8e08908de1f0b2dac9a11c03c3ddcabb48de0b740f3c5e4f7fe7e22c2f9eb31"
       }
     },
     "Sound-FX": {
