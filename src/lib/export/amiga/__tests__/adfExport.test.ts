@@ -46,6 +46,8 @@ const CASES: Array<[string, string]> = [
   ['sonic-arranger/mega end.sa', 'SonicArranger'],
   ['formats/anthrox_intro.dm2', 'DeltaMusic2.0'],
   ['delta-music-2/asperity megademo 3.dm2', 'DeltaMusic2.0'],
+  ['formats/anarchy.sid1', 'SIDMon1.0'],
+  ['sidmon-1/myfunnymazea.sid', 'SIDMon1.0'],
 ];
 
 describe('adf slot patcher', () => {
