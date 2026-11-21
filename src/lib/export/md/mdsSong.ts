@@ -296,6 +296,9 @@ export function vibratoEnvelope(pos0: number, rate: number, depth: number, fine 
   return out;
 }
 
+// Furnace engine tick of virtual tick t at fpt engine ticks per virtual tick (playback.cpp nextTick: tempoAccum from 0, a tick each D).
+export const furnaceTickOf = (t: number, fpt: number): number => Math.ceil((t + 1) * fpt - 1e-9) - 1;
+
 export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const lossy = new Lossy();
   const sys = m.systems;
@@ -437,8 +440,10 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       return out;
     };
     const volCmd = (v: number) => [0xe2, kind === 'fm' ? (ch === 5 && m.instruments[ins]?.type === 4 ? pcmDacAtt(dacVol(v)) : 127 - v) : 0x80 | Math.max(0, Math.min(15, v)), ...kvsCmd(v)];
-    // Sequence tick t runs on Furnace tick ceil(t * fpt) (tempoAccum counts N per engine tick); counted absolutely so carried phase does not drift.
-    const fTick = (t: number) => Math.ceil(t * fpt - 1e-9);
+    // Sequence tick t runs on Furnace tick ceil((t + 1) * fpt) - 1: engine tick f adds N to tempoAccum and consumes every virtual tick
+    // that brings it to D (playback.cpp nextTick, accum from 0), so at 180/150 the row ticks 4 and 5 share an engine tick (0,1,2,3,4,4).
+    // Counted absolutely so carried phase does not drift.
+    const fTick = (t: number) => furnaceTickOf(t, fpt);
     let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0, dtnOut = 0;
     // PSG: E6 carries E5xx plus psgFix(key); each PSG chunk restates it, since a subroutine chunk can follow any detune.
     const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey))) : dtn;

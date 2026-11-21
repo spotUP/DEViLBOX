@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { arpTable, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
+import { arpTable, furnaceTickOf, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
@@ -339,6 +339,9 @@ describe('furnaceToMds', () => {
     expect(first(s.keyOns).tick).toBe(2);
     expect(first(decode(s.seq)).tick).toBe(2);
     expect(s.lossy.some((l) => l.startsWith('effect ED'))).toBe(false);
+  });
+  it('180/150: virtual ticks 4 and 5 of a row share Furnace engine tick 4 (0,1,2,3,4,4), rows on engine tick 5r', () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 11, 12].map((t) => furnaceTickOf(t, 5 / 6))).toEqual([0, 1, 2, 3, 4, 4, 5, 9, 10]);
   });
   it('EDxx/ECxx count Furnace engine ticks under virtual tempo: at 180/150 (1.2 sequence ticks per engine tick) ED 03 and EC 03 land on tick 4', async () => {
     const d = await solarManRow0([{ type: 0xed, value: 0x03 }], [180, 150]);

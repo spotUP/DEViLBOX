@@ -1211,3 +1211,24 @@ newer_song_lol, frames > 10 cents in first 40 s (before -> after): FM1 11->11, F
 - Tests: retarget E8 item equals the from-pos-0 note's item (fails before fix); decode walks every newer_song_lol track (fails before fix).
 - Solar_Man PSG4 -0.15 dB: not started (budget).
 - Listen ROM: ~/Desktop/md-roms/newer_song_lol-2g.bin.
+
+## Phase 2h results (2026-11-21)
+
+Song: newer_song_lol, frames over 10 cents in the first 40 s (lagcmp best of lag -1..+1), FM1/FM2/FM3/FM4/FM5/PSG1/PSG2/PSG3.
+
+| Run | Change | FM1 | FM2 | FM3 | FM4 | FM5 | PSG1 | PSG2 | PSG3 |
+|---|---|---|---|---|---|---|---|---|---|
+| baseline (2g) | - | 11 | 11 | 15 | 5 | 9 | 46 | 67 | 0 |
+| **committed** | Furnace tick of virtual tick t = ceil((t+1)*fpt)-1 | 8 | 8 | 12 | 5 | 9 | 40 | 65 | 0 |
+| tried, not kept | slide steps counted in driver frames (dF = ceil(t*128/(dd+1))) from the slide start | 6 | 6 | 8 | 7 | 8 | 39 | 62 | 0 |
+| tried, not kept | absolute fTick = driver frame | 7 | 7 | 8 | 6 | 8 | 49 | 313 | 0 |
+
+Cause fixed: Furnace playback.cpp nextTick adds N (180) to tempoAccum per engine tick and consumes a virtual tick each time it reaches D (150), accum from 0. Virtual tick t therefore runs on engine tick ceil((t+1)*5/6)-1, so row ticks 4 and 5 share engine tick 4 (0,1,2,3,4,4). mdsSong used ceil(t*fpt), which put the shared engine tick on ticks 0 and 1 of the next row and moved every 03xx-under-04xy E4/E6 value, arp bake value and vibrato phase sync one engine tick late on ticks 5 of each row. Exported as `furnaceTickOf`, test row "180/150: virtual ticks 4 and 5 of a row share Furnace engine tick 4".
+
+PSG1 22.167 s (887.8 Hz hold for 2 frames at a retarget): gone with the fix; PSG1 worst is now 25.5 cents at 25.3 s.
+
+Open, PSG2 24.698 s (MAME periods 106,86,84 one frame late against Furnace 135,105,84) and 8.14-8.16 s: driver tick rate, not export data. MDSDRV adds dd+1 = 154 per frame and runs a tick per 128, so sequence tick t plays on driver frame ceil(t*128/154): 1.203125 ticks per frame against Furnace 1.2 (dd = 153 would give 1.1953). Rows drift 0.26% against frames, about 1 tick per 320 frames, and the driver's doubled tick lands on row ticks 5,6 against Furnace 4,5, moving by one frame about every 64 frames. The 03xx slide (per sequence tick, E4/E6) and the vibrato (per frame, E8 envelope) then align to different frames and MAME plays mixed values Furnace never writes. Counting slide steps in driver frames fixes 24.7 s (PSG2 worst 40.8 to 27.8 cents) but regresses FM4 at 38.58 s (8 frames about 15 cents low, row 7/13 n8 3:5 under vibrato), because which mapping is right depends on the counter phase at the slide start. A real fix needs the slide in the same time base as the vibrato: either the 03xx-under-04xy slide also as a per-frame envelope, or the conductor dithering the tempo so the counter phase matches Furnace per row (as F9 7f/80 does for 60 Hz songs).
+
+Solar_Man PSG4 -0.15 dB: not started (budget).
+
+Listen ROM: ~/Desktop/md-roms/newer_song_lol-2h.bin.
