@@ -154,6 +154,19 @@ function dpcmFrames(writes: Array<Array<[number, number]>>): DpcmFrame[] {
   });
 }
 
+/** Frame 0 = first frame any channel starts sounding (tone or DPCM start). A $4015 DPCM start with length register 0 (one byte) is
+ *  not a sound: Furnace writes one on a note-off / 18xx row before the first sample (one_sided_love row 0, lag 10 -> 0). A PCM-mode
+ *  ($4018, $4011 stream) start is a sound whatever $4013 holds (going_up_a_step_at_time frame 0, lag -24 -> 0). */
+function firstOn(st: ChState[][], d: DpcmFrame[]): number {
+  const a = st.findIndex((x) => x.some(Boolean)), b = d.findIndex((x) => x.start && (x.len > 0 || x.pcm === true));
+  return a < 0 ? b : b < 0 ? a : Math.min(a, b);
+}
+{ // self-check of the two cases above
+  const tone = [[null], [null], [{} as ChState]] as ChState[][];
+  const len0 = dpcmFrames([[[0x4013, 0], [0x4015, 0x1f]], [], []]), pcm = dpcmFrames([[[0x4018, 1]], [], []]);
+  if (firstOn(tone, len0) !== 2 || firstOn(tone, pcm) !== 0) throw new Error('firstOn self-check failed');
+}
+
 /** Exact per-frame compare, the ROM shifted by `lag` frames. Pulse/triangle/noise: silent-vs-sounding or any field differing is bad.
  *  Noise period is an index (not Hz) and DPCM is rate/length, so only pulse/triangle periods are rescaled for a PAL/Dendy reference clock. */
 function lockstep(ref: ChState[][], got: ChState[][], rd: DpcmFrame[], gd: DpcmFrame[], lag: number, refClock: number, rowOf: (t: number) => string): ChannelVerdict[] {
@@ -244,9 +257,6 @@ for (const name of names) {
     const got = apuStates(gotWrites);
     const gotD = dpcmFrames(run.writes);
     // Frame 0 = first frame any channel starts sounding (tone or DPCM start) on each side; the constant difference is the printed offset.
-    // A DPCM start with length register 0 (one byte) is not a sound: Furnace writes one on a note-off / 18xx row before the first
-    // sample (one_sided_love row 0), which shifted the whole compare by two rows.
-    const firstOn = (st: ChState[][], d: DpcmFrame[]): number => { const a = st.findIndex((x) => x.some(Boolean)), b = d.findIndex((x) => x.start && x.len > 0); return a < 0 ? b : b < 0 ? a : Math.min(a, b); };
     const lag = firstOn(got, gotD) - firstOn(ref, refD);
     const channels = lockstep(ref, got, refD, gotD, lag, FURNACE_CLOCK[Number(/clockSel=(\d)/.exec(m.chipFlags?.[0] ?? '')?.[1] ?? 0)] ?? CPU_NTSC, rowOf);
     labelChannels(channels, song);
