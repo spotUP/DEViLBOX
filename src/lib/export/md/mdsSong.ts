@@ -153,7 +153,7 @@ function noiseKey(m: FurnaceModule, nv: number, lossy: { add(s: string): void })
   return 0;
 }
 
-class Lossy {
+export class Lossy {
   private counts = new Map<string, number>();
   add(item: string, n = 1): void { this.counts.set(item, (this.counts.get(item) ?? 0) + n); }
   list(): string[] { return [...this.counts].map(([k, n]) => `${k}: ${n}`); }
@@ -197,11 +197,19 @@ function fmVoice(ins: FurnaceInstrument | undefined, lossy: Lossy): number[] {
   ];
 }
 
-/** PSG envelope: `xy` nodes (x frames 1..15, y attenuation), `01` sustain + `00` end, or `02 pos` loop. */
-function psgEnvelope(ins: FurnaceInstrument | undefined, version: number, lossy: Lossy): number[] {
+/**
+ * PSG envelope: `xy` nodes (x frames 1..15, y attenuation), `01` sustain + `00` end, or `02 pos` loop.
+ * MDSDRV steps the envelope once per NTSC frame (mds_psg_update_env runs every VINT), Furnace once per tick, so the macro is resampled to
+ * frames: frame f plays the tick at its midpoint, floor((f + 0.5) * tickHz / NTSC_HZ) (measured Solar_Man PSG4 at 56 Hz: -0.3 dB from a 7% fast decay).
+ */
+export function psgEnvelope(ins: FurnaceInstrument | undefined, version: number, lossy: Lossy, tickHz = NTSC_HZ): number[] {
   const m = macro(ins, MACRO_VOL, version);
   if (!m) return [0x10, 0x01, 0x00];
-  const { vals, loop } = ticksOf(m, lossy, 'PSG volume');
+  const tv = ticksOf(m, lossy, 'PSG volume');
+  // Within the 0.5 Hz "on frame" band the envelope stays one node per tick.
+  const r = Math.abs(tickHz - NTSC_HZ) > 0.5 ? tickHz / NTSC_HZ : 1;
+  const vals = Array.from({ length: Math.max(1, Math.round(tv.vals.length / r)) }, (_, f) => tv.vals[Math.min(tv.vals.length - 1, Math.floor((f + 0.5) * r))]);
+  const loop = tv.loop >= 0 ? Math.min(vals.length - 1, Math.max(0, Math.ceil(tv.loop / r - 0.5))) : -1;
   const out: number[] = [];
   let loopPos = -1;
   for (let t = 0; t < vals.length;) {
@@ -358,7 +366,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       const pm = macro(ins, MACRO_PITCH, m.version), am = macro(ins, MACRO_ARP, m.version);
       const peg = pm && pitchEnvelope(pm, lossy), mt = am && arpTable(am, lossy);
       if (kind === 'fm' && macro(ins, MACRO_VOL, m.version)) lossy.add('FM volume macro (ignored)');
-      v = { ins: item(kind === 'fm' ? fmVoice(ins, lossy) : psgEnvelope(ins, m.version, lossy)), peg: peg ? item(peg) : -1, mtab: mt ? tbItem(mt) : -1 };
+      v = { ins: item(kind === 'fm' ? fmVoice(ins, lossy) : psgEnvelope(ins, m.version, lossy, rate)), peg: peg ? item(peg) : -1, mtab: mt ? tbItem(mt) : -1 };
       insCache.set(key, v);
     }
     return v;

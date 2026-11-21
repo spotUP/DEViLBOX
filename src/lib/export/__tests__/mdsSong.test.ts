@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { furnaceToMds, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
+import { furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
@@ -59,6 +59,24 @@ describe('PSG period rounding', () => {
     expect(mdsPsgPitch(54 * 256 + psgFix(54))).toBe(76);
     expect(mdsPsgPitch(51 * 256 + psgFix(51))).toBe(90);
     for (let k = 9; k <= 84; k++) expect(mdsPsgPitch(k * 256 + psgFix(k)), `key ${k}`).toBe(Math.round(3579545 / (27.5 * 2 ** ((k + 3) / 12)) / 64));
+  });
+});
+
+describe('PSG envelope rate', () => {
+  // Solar_Man "Hi-Hat Open" volume macro, 26 ticks.
+  const hat = [15, 15, 15, 14, 14, 13, 13, 12, 11, 11, 10, 10, 9, 9, 8, 7, 6, 6, 5, 5, 4, 3, 2, 1, 1, 0];
+  const ins = { macros: [{ code: 0, type: 0, mode: 0, length: hat.length, data: hat, speed: 1, delay: 0, loop: -1, release: -1 }] } as unknown as Parameters<typeof psgEnvelope>[0];
+  const frames = (env: number[]) => env.slice(0, -2).reduce((n, b) => n + (b >> 4), 0);
+  it('a 56 Hz macro is resampled to NTSC frames (MDSDRV steps the envelope per VINT): 26 ticks play 28 frames, first node 3 frames at 15', () => {
+    const env = psgEnvelope(ins, 184, new Lossy(), 56);
+    expect(frames(env)).toBe(28);
+    expect(env[0]).toBe(0x30);
+    expect(env.slice(-2)).toEqual([0x01, 0x00]);
+  });
+  it('an on-frame (60 Hz) macro keeps one node per tick', () => {
+    const env = psgEnvelope(ins, 184, new Lossy());
+    expect(frames(env)).toBe(26);
+    expect(env.slice(0, 4)).toEqual([0x30, 0x21, 0x22, 0x13]);
   });
 });
 
