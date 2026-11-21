@@ -496,3 +496,37 @@ Measured with headless MAME 0.286 (tools/md-phase0/tap.lua + events.py) against 
 - **Slide across a chunk start (IMPLEMENTED, NOT MEASURED).** `insCmd` skips the `E8` at a chunk start while a slide is still running (`slideEnd`). Affects golden_shit FM1, RubyIllusions FM3, djtBMX FM1; no slide crosses a chunk start in Fancy_Promenard or Puyopuyo (seq bytes identical). Unverified against Furnace; worst case equals the old behaviour (envelope cut).
 - **Open:** FM 03xx where the previous key is not sounding (no slide emitted), PAL clock (NTSC clock only), other FM slides in Puyopuyo/Ruby/golden_shit not compared. Other lossy effects (02, 80, EC, ED, E2, 19, 0A, 04) unchanged.
 - **Listen ROMs** (headless-built, no emulator opened): `~/Desktop/md-roms/Fancy_Promenard.bin`, `~/Desktop/md-roms/Puyopuyo.bin` (shell + `F9 7F` tempo; Puyopuyo has many unmapped effects, measured only for the pitch envelope).
+
+## Phase 1i results (2026-11-21)
+
+Headless MAME 0.286 (tools/md-phase0/tap.lua) against Furnace `-vgmout`, decoded with tools/md-phase0/events.py; MAME runs about 40 ms behind Furnace.
+
+**Task 1: chunk-start slide (14aab7bbd) and the FM 03xx model.**
+- Measuring the chunk crossings showed the bigger fault was the slide model itself. All four test songs except Fancy_Promenard have `compatFlags.linearPitch` = 2 and `pitchSlideSpeed` = 4. In linear-pitch mode Furnace keeps the base frequency as note<<7 and steps it by xx * pitchSlideSpeed (1/128 semitone) per tick on FM and PSG (genesis.cpp / sms.cpp NOTE_PORTA, playback.cpp portaSpeed multiplier). The 1h Hz-linear model is right only for non-linear songs (Fancy).
+- Fix: `portaEnvelope(..., linStep)` gives exact nodes, 2 * (cur - dest) in 1/256 semitone. The caller passes `linStep` when linearPitch is set. `03 00` now only stops the porta and is no longer counted as lossy.
+- RubyIllusions FM3 03 0F (35 -> 32, 30.45 s):
+  - Before: MAME 121.92 -> 109.73 Hz in about 1.5 Hz steps, 9+ steps, and the target was never reached.
+  - After: MAME 120.19, 116.94, 113.89, 110.84, 107.9, 104.95, 103.83. Furnace 120.19, 116.94, 113.79, 110.84, 107.8, 104.95, 103.83. This is 1:1.
+  - The chunk start at 30.6 s re-keys with a new instrument, so the crossing is harmless.
+- golden_shit FM5 (32.17-32.42 s, the slide after the 32.0 s chunk start):
+  - Before: 100.28, 113.38, 126.29 ... (Hz-linear, 7 steps).
+  - After: 98.04, 110.03, 123.44, 138.58, 155.65, 174.55 and back down. Furnace has the same values (155.45 vs 155.65 is fnum rounding). This is 1:1.
+  - The FM1 crossings (13.3/40/89.3/100 s) all end 1 tick after the chunk start. The slide is already done, so they are harmless.
+- New finding, djtBMX FM1 (tick rate 156 Hz, F9 ff = 2 sequence ticks per frame): MDSDRV steps a pitch envelope once per frame, not once per sequence tick.
+  - A 72-tick Furnace slide (193.44 -> 53.69 Hz, 0.305 semitone per tick) played as 36 frame nodes of 0.31 semitone, so it covered only half the range (192.43 -> 102.31).
+  - Fix: the `tpf` = (tempo + 1) / 128 argument samples the Furnace tick for each frame node. slideEnd is now counted in sequence ticks.
+  - After: 188.97, 182.27, 175.77 ... 55.42, 53.44 Hz, then key 130.86. This is Furnace's every second tick (189.79, 183.08 ... 53.69, key 131.27) with the song's constant 5-7 cent note-tuning offset, which also shows on plain notes.
+- Test: mdsSong.test.ts "portaEnvelope: linear-pitch 03xx ..." covers the exact first node and node count at tpf 1 and 2.
+- Listen ROMs: ~/Desktop/md-roms/RubyIllusions_Genesis.bin, golden_shit.bin, djtBMX.bin.
+
+**Task 2: FM 03xx when the previous key is not sounding.** This was checked in source only, not measured. playback.cpp:1153 drops the note-on only `if (chan[i].keyOn)`. After a note off or release, Furnace therefore keys the new note on at its own pitch, with no slide. The converter's FM `sounding` guard matches that.
+- Open: the PSG path slides even when not sounding. Per the same source line it should not. Change it only after a measured case (no corpus case found yet).
+
+**Task 3 (02, 80, EC, ED, E2, 19, 0A, 04): not started** (agent budget). Corpus usage, highest first:
+- golden_shit: 0A 1276, 02 1046, 01 562, 04 146.
+- djtBMX: 02 868, EC 194, ED 110.
+- RubyIllusions: E2 162, 04 74, 02 47, ED 42.
+- Suggested order: 01/02 (pitch slides; same linear-pitch model, per-frame nodes), then 0A, EC/ED, 04, E2.
+
+Open gaps:
+- Other pitch envelopes (instrument pitch macros, arps) on songs above 60 Hz also run per frame. Not yet measured.

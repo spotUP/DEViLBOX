@@ -65,16 +65,25 @@ const sndPeriod = (nv: number): number => 3579545 / (27.5 * 2 ** ((nv + 3) / 12)
 const FM_FNUM_HZ = 7670454 / 144 / 2 ** 21; // Hz per fnum unit at block 0
 const fmHzPerXx = (targetHz: number): number => FM_FNUM_HZ * 2 ** Math.max(0, Math.ceil(Math.log2(targetHz / FM_FNUM_HZ / 1216)));
 const fmHz = (nv: number): number => 27.5 * 2 ** ((nv - 9) / 12);
-export function portaEnvelope(fromNv: number, toNv: number, xx: number, fm = false): number[] {
-  const a = fm ? fmHz(fromNv) : sndPeriod(fromNv), b = fm ? fmHz(toNv) : sndPeriod(toNv), out: number[] = [];
-  if (fm) xx *= fmHzPerXx(b);
+/**
+ * Linear-pitch songs (compatFlags.linearPitch, measured RubyIllusions FM3 03 0F: 7 steps of 0.47 semitone): Furnace keeps the base frequency
+ * as note<<7 and steps it by xx * pitchSlideSpeed per tick on every chip (genesis.cpp / sms.cpp DIV_CMD_NOTE_PORTA, playback.cpp
+ * portaSpeedMultiplier), so the slide is linear in pitch; pass that step as `linStep` (1/128 semitone) and the nodes are exact.
+ * MDSDRV steps a pitch envelope once per frame, not once per sequence tick (measured djtBMX FM1 at F9 ff: 36 nodes of 0.31 semitone over
+ * a 72-tick slide), so `tpf` (sequence ticks per frame, (tempo + 1) / 128) picks the Furnace tick each frame node lands on.
+ */
+export function portaEnvelope(fromNv: number, toNv: number, xx: number, fm = false, linStep = 0, tpf = 1): number[] {
+  const lin = linStep > 0;
+  const a = lin ? fromNv * 128 : fm ? fmHz(fromNv) : sndPeriod(fromNv), b = lin ? toNv * 128 : fm ? fmHz(toNv) : sndPeriod(toNv), out: number[] = [];
+  if (lin) xx = linStep; else if (fm) xx *= fmHzPerXx(b);
   const node = (p: number, len: number) => {
-    const w = Math.max(-0x8000, Math.min(0x7eff, Math.round(256 * 12 * Math.log2(fm ? p / b : b / p)))) & 0xffff;
+    const w = Math.max(-0x8000, Math.min(0x7eff, Math.round(lin ? 2 * (p - b) : 256 * 12 * Math.log2(fm ? p / b : b / p)))) & 0xffff;
     out.push(w >> 8, w & 0xff, 0, len);
   };
+  const up = a < b, ticks: number[] = [a];
+  for (let p = a; p !== b && ticks.length < 512; ) { p = up ? Math.min(b, p + xx) : Math.max(b, p - xx); ticks.push(p); }
   let n = 0;
-  const up = a < b;
-  for (let p = a; p !== b && n < 120; n++) { p = up ? Math.min(b, p + xx) : Math.max(b, p - xx); node(p, 0); }
+  for (; n < 120 && Math.round((n + 1) * tpf) < ticks.length; n++) node(ticks[Math.round((n + 1) * tpf)], 0);
   node(b, 255); // length counts delay 0..len; 0 = one tick
   out.push(0x7f, n);
   return out;
@@ -310,7 +319,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (!(noise & 2)) lossy.add('noise fixed-rate mode (20xy, x=0)');
             cmds.push(0xea, NOISE_EA[noise]); continue;
           }
-          if (e.type === 0x03 && (kind === 'psg' || kind === 'fm') && e.value > 0) { portaXx = e.value; continue; }
+          if (e.type === 0x03 && (kind === 'psg' || kind === 'fm')) { portaXx = e.value; continue; } // 03 00 only stops the porta
           lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}`);
         }
         const isNote = nv >= 0 && nv < 253, isOff = nv >= 253;
@@ -327,9 +336,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             const slide = (kind === 'psg' || (kind === 'fm' && sounding)) && portaXx > 0 && prevKey >= 0 && prevKey !== nv;
             if (kind === 'fm' && portaXx > 0 && sounding) cmds.push(0xe0);
             if (slide) {
-              const env = portaEnvelope(prevKey, nv, portaXx, kind === 'fm');
+              const env = portaEnvelope(prevKey, nv, portaXx, kind === 'fm', m.compatFlags.linearPitch ? portaXx * (Number(m.compatFlags.pitchSlideSpeed) || 1) : 0, (tempo + 1) / 128);
               if (kind === 'psg') cmds.push(0xe0);
-              cmds.push(0xe8, slideItem(env) + 1); slideEnd = tick + env[env.length - 1] + 1;
+              cmds.push(0xe8, slideItem(env) + 1); slideEnd = tick + Math.round((env[env.length - 1] + 1) * (tempo + 1) / 128);
             }
             else if (pegDirty) cmds.push(0xe8, insRef(kind, ins).peg + 1);
             pegDirty = slide; portaXx = 0; prevKey = kind === 'psg' || kind === 'fm' ? nv : -1;

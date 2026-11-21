@@ -79,6 +79,15 @@ describe('furnaceToMds', () => {
     // nv 48 -> 50, xx 3: four ticks of -386, -256, -122, 0 (1/256 semitone), a held 0 node (len 255), jump to it.
     expect(Buffer.from(portaEnvelope(48, 50, 3)).toString('hex')).toBe('fe7e0000ff000000ff860000000000000000' + '00ff7f04');
   });
+  it('portaEnvelope: linear-pitch 03xx steps xx * pitchSlideSpeed / 128 semitone per tick, one node per frame at tpf ticks per frame', () => {
+    // RubyIllusions / djtBMX (linearPitch 2, pitchSlideSpeed 4): nv 48 -> 50, step 12/128 semitone = 22 ticks; node = 2 * (cur - dest).
+    const one = Buffer.from(portaEnvelope(48, 50, 3, true, 12)).toString('hex');
+    expect(one.slice(0, 8)).toBe('fe180000');
+    expect(one.slice(-4)).toBe('7f16'); // 22 stepping nodes, then the held target node
+    const two = Buffer.from(portaEnvelope(48, 50, 3, true, 12, 2)).toString('hex'); // F9 ff: two sequence ticks per frame
+    expect(two.slice(0, 8)).toBe('fe300000');
+    expect(two.slice(-4)).toBe('7f0b');
+  });
   it('Fancy_Promenard: PSG 03xx tone portamento is emitted as slur + per-slide pitch envelope (E0 E8 xx), not the E7 glide', async () => {
     const hex = Buffer.from((await convert('Fancy_Promenard.fur')).seq).toString('hex');
     expect(hex).toMatch(/e0e8[0-9a-f]{2}/);
