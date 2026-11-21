@@ -432,18 +432,41 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // E4 transpose + E6 detune, which mds_pitch_update adds before the envelope (pitch = note + trs + dtn, then + E8 output).
     // sA: slide offset from the target at the note (1/128 semitone, 0 = none), stepped sStep per Furnace tick from Furnace tick sF0.
     // shortcut: the E4 state is not re-set at the song loop point; a slide running across the loop starts the loop transposed.
-    let sA = 0, sStep = 0, sF0 = 0, trsOut = 0;
+    // An arp macro table writes t_trs too (`16 tt`, absolute, every step), so while it runs it would overwrite the slide's E4. Under
+    // such a slide the slur note gets its own table (arpBake): arp value + slide transpose per sequence tick, and E4 stays out.
+    let sA = 0, sStep = 0, sF0 = 0, trsOut = 0, arpT0 = 0, baked = false;
     const slideOff = (f: number) => (sA ? Math.sign(sA) * Math.max(0, Math.abs(sA) - sStep * (f - sF0 + 1)) : 0);
     const slideCmd = (t: number): number[] => {
       const off = slideOff(fTick(t)), o = 2 * off + effDtn(), tr = Math.floor((o + 128) / 256), d = o - 256 * tr, out: number[] = [];
       if (!off) sA = 0;
-      if (tr !== trsOut) out.push(0xe4, (trsOut = tr) & 0xff);
+      if (baked) trsOut = tr;
+      else if (tr !== trsOut) out.push(0xe4, (trsOut = tr) & 0xff);
       if (d !== dtnOut) out.push(0xe6, (dtnOut = d) & 0xff);
       return out;
     };
     // 04xy state: pos was `vPos` at tick `vAt` and advances by vRate per tick while vDepth > 0 (playback.cpp).
     let vDepth = 0, vRate = 0, vPos = 0, vAt = 0, vFine = 15;
     const vSync = (t: number) => { if (vDepth) vPos = (vPos + (fTick(t) - fTick(vAt)) * vRate) % 64; vAt = t; };
+    // Driver mtab steps once per sequence tick after the row's commands (mds_update_mtab), from table position 0 at note-on or EB.
+    // shortcut: a looping arp macro is not baked (lossy); upgrade by appending its loop body with a jump if a song needs it.
+    const arpBake = (t0: number): number | undefined => {
+      const am = macro(m.instruments[ins], MACRO_ARP, m.version);
+      if (!am || insRef(kind, ins).mtab < 0) return undefined;
+      if (am.loop >= 0 && am.loop < am.length && am.loop !== 255) { lossy.add('03xx under 04xy on a looping arp macro (arp overwrites the slide transpose)'); return undefined; }
+      const sp = Math.max(1, am.speed), at = (i: number) => Math.round((i * sp) / fpt), vals = am.data.slice(0, am.length).map((v) => (v << 2) >> 2);
+      const arpAt = (j: number) => { let i = 0; while (i + 1 < vals.length && at(i + 1) <= j) i++; return vals[i]; };
+      const out: number[] = [];
+      for (let k = t0; ; k++) {
+        const off = slideOff(fTick(k)), v = arpAt(k - arpT0) + Math.floor((2 * off + effDtn() + 128) / 256);
+        if (out.length && out[out.length - 3] === (v & 0xff) && out[out.length - 1] < 255) out[out.length - 1]++;
+        else out.push(0x16, v & 0xff, 0x81, 0);
+        if (!off && k - arpT0 >= at(vals.length - 1)) break;
+      }
+      out.push(0x80, 0);
+      const key = out.join(',');
+      if (!noiseArps.has(key)) noiseArps.set(key, tbItem(out));
+      return noiseArps.get(key)!;
+    };
     const vibCmd = (t: number): number[] => { vSync(t); return [0xe8, extItem(vibratoEnvelope(vPos, vRate, vDepth, vFine, fpf)) + 1]; };
     // 0Axy: Furnace keeps volume in 1/256 steps and adds x*64 (or -y*64) every tick, the row's first tick included, until it clamps at
     // 0 or the channel maximum (playback.cpp per-tick volume slides); the driver gets an E2 on every tick where volume>>8 changes.
@@ -494,6 +517,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       // FM6 with a sample instrument plays PCM (genesis.cpp: dacMode from the instrument type at each note-on); E1 would leave PCM mode.
       const isDac = (n: number) => kind === 'fm' && ch === 5 && m.instruments[n]?.type === 4;
       let curPcm = -1, pcmOn = false;
+      baked = false; arpT0 = tick; // insCmd(true) restates EB, which restarts the instrument's arp table
       const bytes: number[] = [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && sounding ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(sA && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
       // One sequence tick's mid-row commands: 0Axy volume step and the per-tick slide.
       const tickPre = (t: number): number[] | null => { const v = volStep(), sl = sA && sounding ? slideCmd(t) : []; return v || sl.length ? [...(v ?? []), ...sl] : null; };
@@ -628,6 +652,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (slide && vDepth && m.compatFlags.linearPitch) {
               if (kind === 'psg') cmds.push(0xe0);
               sA = from - nv * 128; sStep = portaXx * pss; sF0 = fTick(tick + delay);
+              const bt = arpBake(tick + delay);
+              if (bt !== undefined) { cmds.push(0xeb, bt + 1); baked = true; }
             } else if (slide) {
               const env = portaEnvelope(prevKey, nv, portaXx, kind === 'fm', m.compatFlags.linearPitch ? portaXx * (Number(m.compatFlags.pitchSlideSpeed) || 1) : 0, fpf);
               if (kind === 'psg') cmds.push(0xe0);
@@ -638,6 +664,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (trsOut || sA || (kind === 'fm' && dtnOut !== effDtn())) cmds.push(...slideCmd(tick + delay));
             pegDirty = slide || prate !== 0; portaXx = 0;
             if (!m.compatFlags.continuousVibrato && !portaSlur) { vPos = 0; vAt = tick + delay; }
+            if (!portaSlur) { arpT0 = tick + delay; if (baked && insRef(kind, ins).mtab >= 0) cmds.push(0xeb, insRef(kind, ins).mtab + 1); baked = false; }
             if (vDepth) {
               if ((slide && !sA) || prate || insRef(kind, ins).peg >= 0) lossy.add('04xy with a pitch slide or pitch macro (vibrato replaces it)');
               cmds.push(...vibCmd(tick + delay)); pegDirty = true;

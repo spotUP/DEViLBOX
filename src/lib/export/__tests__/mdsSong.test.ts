@@ -281,6 +281,11 @@ describe('furnaceToMds', () => {
     // the phase runs on from pos (10 - 5) * 4 = 20 instead of restarting at 0.
     expect(hex).toContain(Buffer.from(vibratoEnvelope(8, 4, 4, 15, fpf)).toString('hex'));
   });
+  it('03xx under 04xy on an arp-macro instrument: the slide transpose rides in the slur note\'s own mtab, since `16 tt` and E4 both set t_trs (newer_song_lol PSG1 order 0 row 31)', async () => {
+    // SustainedSquare (ins 2) arp [1, 0, ...] still steps when row 31 slides 03 12 under 04 44; a plain E4 would be overwritten next tick.
+    const hex = Buffer.from((await convert('newer_song_lol.fur')).seq).toString('hex');
+    expect(hex).toMatch(/16fe81..16ff81..160081/); // arp 0 + slide transpose -2, -1, 0 per sequence tick
+  });
   it('highscorefollin: mid-note 04 66 on FM2 (order 0 row 32) is an E8 extended vibrato envelope from pos 0, not lossy', async () => {
     const s = await convert('highscorefollin.fur');
     expect(Buffer.from(s.seq).toString('hex')).toContain(Buffer.from(vibratoEnvelope(0, 6, 6)).toString('hex'));

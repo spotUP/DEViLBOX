@@ -1115,3 +1115,43 @@ Open:
 - loud.py (4 s windows, 40 s) on the final export: every FM/PSG channel within +-0.3 dB per window except FM2 -0.91 (window 2), FM3 -0.76 (window 10). FM6/DAC rows show +-89 dB only because MAME taps the DAC as FM6 tone; the levels match (-9.8 vs -10.0 dB).
 - Items: newer_song_lol and Solar_Man convert (256-item throw not hit).
 - Open: PSG1 405 frames (first bad 2.58 s, 4.5 s, 7.93 s) and PSG2 146 still over 10 cents, cause not yet read; Solar_Man PSG4 -0.15 dB envelope phase (task 3) not started. Listen ROM: ~/Desktop/md-roms/newer_song_lol-2c.bin.
+
+## Phase 2d results (2026-11-21)
+
+**Cause (PSG1 2.58 s, order 0 row 31).** SustainedSquare (instrument 2) has an arp macro `[1, 0, ...]` (27 steps, no loop).
+Its MDSDRV mtab writes `16 tt`, which sets t_trs as an absolute value every step. Phase 2c sends 03xx under a running 04xy as
+per-tick E4 (semitones) + E6 (1/256 semitone), so E4 also owns t_trs. While the arp table still runs (5 frames after the
+row-30 note-on), every `16 tt` overwrites the slide's E4 transpose. Evidence: reference 515.5 / 530.1 / 545.7 Hz at frames
+155-157, export 545.7 / 562.1 / 545.7 Hz: exactly +100 cents on the frames where the slide transpose is -1.
+
+**Fix (mdsSong.ts).** On a 03xx-under-04xy slur note whose instrument has an arp mtab, the exporter bakes a per-note mtab
+(`arpBake`): per sequence tick, `16 (arp value at tick - arpT0) + slide transpose`, equal runs merged into `81 nn` holds,
+ending with `80 00` once the slide reaches the target and the arp has ended. The note sends `EB <baked>`, and slideCmd stops
+sending E4 while the baked table is active (it still tracks trsOut). E6 detune stays per tick as before. The next fresh
+(non-slur) note restores the instrument's own mtab with `EB`. arpT0 is the last fresh note-on or chunk start, because the
+driver restarts the mtab there (EB in insCmd). Baked tables are deduplicated with the noise-arp tables.
+Limit: a looping arp macro is not baked; it is reported as lossy ("03xx under 04xy on a looping arp macro").
+Test: `03xx under 04xy on an arp-macro instrument ...` in mdsSong.test.ts (fails before the fix: no `16fe 16ff 1600` table).
+
+**Frames over 10 cents, 40 s (lagcmp.py):**
+
+| Channel | 2c | 2d |
+|---------|----|----|
+| FM1 | 11 | 11 |
+| FM2 | 11 | 11 |
+| FM3 | 15 | 15 |
+| FM4 | 5 | 5 |
+| FM5 | 9 | 9 |
+| PSG1 | 405 | 349 |
+| PSG2 | 146 | 139 |
+| PSG3 | 0 | 0 |
+
+**Open.**
+- PSG1 now first goes bad at 4.5 s: one 10.2-cent frame at a note-on edge (order 0 row 54), not a class.
+- PSG1 worst is now 408 cents at 22.18 s (order 4 rows 9-10, SustainedLead, instrument 10): row 9 is a plain 03 12
+  (no 04xy) from note 6 to 11, then row 10 is a fresh note 1. The reference keeps rising smoothly (940 -> 1065 Hz),
+  while the export jumps to 1190 Hz and then holds 1130 Hz. This is the plain-porta (non-vibrato) path plus the instrument's
+  macros, not the baked path. Next step: read rows 8-10 with win.py and the instrument 10 macros (ins.mts).
+- PSG2 (139 frames, worst 26 cents at 21.73 s; first bad 4.75 s and 8.15 s) is not classified yet.
+- The Solar_Man PSG4 -0.15 dB level check (loud.py) was not done (budget).
+- Listen ROM: ~/Desktop/md-roms/newer_song_lol-2d.bin.
