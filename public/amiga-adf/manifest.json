@@ -1454,6 +1454,45 @@
         "player": "b4ea4f36b8769cb5d394357c16eabe0340487b0d68b5858a6b345bcfaa2c2faa"
       }
     },
+    "Special-FX": {
+      "adf": "Special-FX.adf",
+      "adfSha256": "fd327d7c7bf6e3513e87e2a377bbdfd43dbf682532ee402260774d59a1ce1ce9",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 40776,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 40772,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 270642,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 358660,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42400",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5A400",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x57904",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "wildwheels_ingame.jd",
+        "bytes": 9924
+      },
+      "sources": {
+        "tool": "ac79e2ed0964b364258e0645d83b308e877b7e453e01730d5fb90504db62846d",
+        "player": "d331f792b4df75eef8c0a0d8b9541e96b3db642c7a0a965ecb4d388d3d1e121a"
+      }
+    },
     "SpeedySystem": {
       "adf": "SpeedySystem.adf",
       "adfSha256": "c27e7d33aa6ddb6a6b7f239194d0a458b7301c34d04b0545257ba7a60b812f9d",
