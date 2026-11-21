@@ -26,6 +26,7 @@ Medley	0	0	48796	68000	combat.mso
 Mugician	0	0	48028	68000	flight.dmu
 MugicianII	0	264	136860	68000	snickle.mug2
 MusicAssembler	0	0	32412	68000	thanatos.ma
+MusicMaker-8V	8720	126976	94992	68000	house2.mm8 (fork IPC, agents 78/79: pool/any on a500 200000/200000 build at PLAY+6 s; chip = chippoint 0x41310 - mod_base 0x2a000 on a1200 build; both runs stop at the GetVBR fault right after init, so these are init high-waters; player asks 106021 B MEMF_ANY for the PINS unpack buffer)
 MusiclineEditor	35632	71256	183500	68000	drax.ml
 PreTracker	0	0	329116	68000	the little things.prt
 PumaTracker	0	0	65180	68000	liquid kids - lv1a.puma

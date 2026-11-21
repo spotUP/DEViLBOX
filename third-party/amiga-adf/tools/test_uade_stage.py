@@ -50,5 +50,16 @@ class CustomPlayerCheck(unittest.TestCase):
             self.check('ProTracker', 'custom')
 
 
+class MeasuredArenaRows(unittest.TestCase):
+
+    def test_musicmaker_8v_any_pool_holds_pins_buffer(self):
+        # house2.mm8 asks 106021 B MEMF_ANY; the 64K default died with "AllocMem past end of pool".
+        import uade_arena_table
+        row = uade_arena_table.load().get('MusicMaker-8V')
+        self.assertIsNotNone(row)
+        self.assertGreaterEqual(row['any_hw'], 106021)
+        self.assertGreater(row['chip_hw'], 0)
+
+
 if __name__ == '__main__':
     unittest.main()
