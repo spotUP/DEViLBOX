@@ -132,10 +132,12 @@ def loadseg_bytes(module_path):
 
     Some deliplayers do not parse their module -- the file IS an AmigaDOS
     executable and the player LoadSeg()s it (CoreDesign, BenDaglish-SID,
-    FredGray, FuturePlayer). score answers that twice over: dos_loadseg copies
-    the whole FILE to `chippoint` (score.s:2194), then relocator.s hands out a
-    chip block per hunk from the same bump pointer -- including BSS hunks,
-    which cost nothing in the file and everything in the arena.
+    FredGray, FuturePlayer, DaveLowe). For a LoadSeg of the module's own name
+    score's dos_loadseg relocates straight from moduleptr (PORT: SELF-LOADSEG,
+    no file copy); relocator.s hands out a chip block per hunk from the
+    `chippoint` bump pointer -- including BSS hunks, which cost nothing in the
+    file and everything in the arena. So the charge is the relocated hunks
+    only (measured on DaveLowe: chippoint moved by exactly this number).
 
     NEITHER bump is bounded upstream, because UADE's emulated machine is chip
     RAM end to end. Here the arena is a fixed block with the demo's bitplanes

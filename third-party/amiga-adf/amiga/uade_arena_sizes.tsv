@@ -5,6 +5,7 @@ ArtOfNoise-4V	0	0	41884	68000	sunray.aon
 BenDaglish	0	0	92572	68000	motorhead-titleandingame.bd
 BenDaglish-SID	16208	0	53996	68000	terramex.bds
 CustomMade	0	0	42652	68000	the plague game end.cm
+DaveLowe	0	0	242760	68000	incredibleshrinkingsphere.dl (fork a500 IPC, agent 58: chippoint-mod_base after PLAY; chippoint moved only by the 119368 B self-LoadSeg hunks)
 DeltaMusic1.3	0	0	35996	68000	crusaders1.dm
 DeltaMusic2.0	0	0	50332	68000	anthrox_intro.dm2
 EarAche	0	0	53916	68000	bladerunner.ea
