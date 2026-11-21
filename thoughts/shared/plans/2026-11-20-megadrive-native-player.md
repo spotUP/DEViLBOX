@@ -1666,3 +1666,23 @@ No code change. All three newer_song_lol PSG2 misses are classified. Neither cau
 - Solar_Man FM4 note-boundary frames (task 3): not reached.
 
 Counts unchanged from the 2y baseline: Solar_Man FM1 1, FM4 5, FM5 2, PSG1 2, PSG2 2 (seq 21154); newer_song_lol PSG2 3, artifacts FM4 2, FM6 ~5996 (seq 63356).
+
+## Phase 3a result (2026-11-21)
+
+Commit f2024b3cc: the NTSC conductor merge in `frameTempos` is placed on a quiet frame.
+
+- Invariant violated: a merge runs two Furnace frames' ticks in one NTSC driver frame, so frame f-1 never sounds. That dropped frame must not be one where a channel changes pitch or volume. Before the fix, the merge always sat at the nominal drift point (0.5). On newer_song_lol it dropped a PSG2 slide step at 32.35 s.
+- Fix: `furnaceToMds` scores each Furnace frame by the count of channels that change in it. A channel counts when the row has data, when 00/01/02/04/0A or a porta (03/E1/E2) is running, on an ED delay, or while a vol/arp/pitch macro is still running. `frameTempos(n, fpt, hz, busy)` moves each merge to the lowest-scored frame whose unmerged drift stays in (0, 0.75]. On a tie, or when the nominal point is past the song end, it keeps the nominal behaviour. Furnace time error stays under 1 NTSC frame, so the loop-pass test bound changed from 0.75 to 1.
+- Boolean "quiet" frames do not exist: newer_song_lol has 0 of 31360 frames with no change, and 8-9 of 10 channels change almost everywhere. That is why the merge uses a count. Weighting slides by 8 gave the same misses and a bigger seq, so it was reverted.
+- Measured, lagcmp frames over 10 cents:
+
+| Song | Before | After |
+|---|---|---|
+| newer_song_lol PSG2 | 3 (19.417, 31.283, 32.35) | 2 (19.417, 31.283) |
+| newer_song_lol seq | 63356 | 63326 |
+| newer_song_lol other channels | FM4 2, FM6 5996 artifacts | unchanged |
+| Solar_Man | FM1 1, FM4 5, FM5 2, PSG1 2, PSG2 2 | unchanged: no frameTempos path (rate under NTSC) |
+
+- 19.417 s remains because frame 1165 has PSG2 busy and its window has no better frame. 31.283 s is the psgFix/vibrato-lead case (owner decision, not done).
+- Task 2 (Solar_Man FM4 20.883/31.417/85.717/86.6 s) was not reached because the budget ran out.
+- Listen ROM: ~/Desktop/md-roms/newer_song_lol-3a.bin.
