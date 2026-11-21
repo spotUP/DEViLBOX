@@ -649,6 +649,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           let n = 0;
           // Furnace clears a running 00xy arp when a note follows a note off or release (playback.cpp: keyOffAffectsArp is
           // true for NES and VRC6); a 00xy on the note's own row is applied after that and wins.
+          const keyOnBefore = !keyOff && curNote > 0; // Furnace chan.keyOn before this row (note off / release clear it)
           if (nv === 253 || nv === 254) keyOff = true;
           else if (nv >= 0 && ch !== DPCM_CH) {
             if (keyOff && arpXY !== 0 && !cell.effects.some((e) => e.type === 0x00)) { arpXY = 0; fxChanged = true; }
@@ -682,7 +683,10 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           // pitch (measured with furnace -vgmout), so the amplitude in period units follows the playing note.
           // Without vibrato, a linear-pitch instrument pitch macro (value v = v/128 semitone up) goes through the same
           // override, scaled to the note: FamiStudio pitch envelopes add period units (positive = lower), note-independent.
-          if (n > 0 && !m.compatFlags?.continuousVibrato) vibPos = 0;
+          // Furnace zeroes vibratoPos only when the note is committed (playback.cpp "commit note on"); a 03xx (xx > 0) on a
+          // keyed-on channel clears doNote ("if (chan[i].keyOn) chan[i].doNote=false"), so a porta target keeps the phase.
+          // The driver agrees: a 0x43 no-attack note leaves the pitch envelope running (only an attack or 0x49 restarts it).
+          if (n > 0 && !m.compatFlags?.continuousVibrato && !(keyOnBefore && slideFx === 0x03 && slideVal > 0)) vibPos = 0;
           if (tonal && (fxChanged || n > 0)) {
             // Speed is exact (a snapped speed changes the vibrato rate audibly); identical rounded envelopes share one id.
             const x = vibXY >> 4, y = vibXY & 15;

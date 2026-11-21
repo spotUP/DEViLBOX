@@ -201,6 +201,17 @@ describe('furnaceToFamistudio', () => {
     expect(has(music, encodeEnvelope(vib(445), 0, -1, 'pitch'))).toBe(true);
     expect(has(music, encodeEnvelope(vib(440), 0, -1, 'pitch'))).toBe(false);
   });
+  it('keeps the vibrato phase on a 03xx porta note (Furnace clears doNote on a keyed-on channel; one_sided_love frame 3730)', () => {
+    // playback.cpp: 03xx with keyOn sets doNote=false, so "commit note on" (vibratoPos=0) is skipped. 4 rows x 6 ticks of 04:63
+    // leave vibratoPos at 6 * 24 & 63 = 16; the override sent on the porta row starts there, not at 0.
+    const vib = (pos: number): number[] => Array.from({ length: 32 }, (_, i) => {
+      const X = 1789772.727 / (16 * 440 * 2), P = Math.round(X) - 1;
+      const u = Math.trunc(((3 * Math.trunc(127 * Math.sin(2 * Math.PI * ((pos + 6 * (i + 1)) & 63) / 64)) * 15) >> 4) / 15);
+      return Math.round(X * 2 ** (-u / 1536)) - 1 - P;
+    });
+    const music = furnaceToFamistudio(nesModule({ 0: { 0: { ...A4, ...fx(0x04, 0x63) }, 4: { ...A4, ...fx(0x03, 0x10) } } })).music;
+    expect(has(music, encodeEnvelope(vib(16), 0, -1, 'pitch'))).toBe(true);
+  });
   it('adds 04 vibrato to the instrument pitch macro in one relative envelope (Furnace sums pitch and pitch2)', () => {
     const notes: string[] = [];
     const vib = [0, 5, 0, -5];
