@@ -93,6 +93,30 @@ describe('furnaceToMds', () => {
     const hex = Buffer.from(s.seq).toString('hex');
     expect(hex).toContain('e28c');
   });
+  it('highscorefollin: a noise arp in PSG3-rate mode steps the PSG3 period like Furnace easy noise (crash 8,6,5,4,3)', async () => {
+    // Measured 34.13 s: Furnace crash (arp -5,-3,-2,-1,0, note 70) writes PSG3 periods 8,6,5,4,3; the table's `16 tt` sets t_trs.
+    const s = await convert('highscorefollin.fur');
+    const sd = s.seq.subarray(8), w = (o: number) => (sd[o] << 8) | sd[o + 1];
+    const bgm = (w(4) << 16) | w(6), tbase = bgm + w(bgm), TAB = [1710, 1614, 1524, 1438, 1357, 1281, 1209, 1141, 1077, 1017, 960, 906];
+    const periods = new Set<string>();
+    const walk = (p: number, mt: number): void => { // every track, subroutines followed: note byte + table tt -> PSG3 period
+      for (;;) {
+        const c = sd[p++];
+        if (c === 0xeb) mt = sd[p++];
+        else if (c >= 0x82 && c < 0xe0) {
+          p++;
+          if (!mt) continue;
+          const ks: number[] = [];
+          for (let q = tbase + ((w(tbase + (mt - 1) * 2) << 16) >> 16); sd[q] === 0x16; q += 4) ks.push(c - 0x82 + ((sd[q + 1] << 24) >> 24));
+          periods.add(ks.map((k) => TAB[k % 12] >> Math.floor(k / 12)).join(','));
+        } else if (c === 0xfe) walk(tbase + ((w(tbase + sd[p++] * 2) << 16) >> 16), mt);
+        else if (c === 0xfb || c === 0xff) return;
+        else if (c === 0x81 || ARG1.has(c)) p++;
+      }
+    };
+    for (let i = 0; i < sd[bgm + 3]; i++) walk(tbase + w(bgm + 6 + i * 4), 0);
+    expect([...periods]).toContain('8,6,5,4,3');
+  });
   it('portaEnvelope: Furnace linear-period 03xx step as one pitch-envelope node per tick, relative to the target (exact bytes)', () => {
     // nv 48 -> 50, xx 3: four ticks of -386, -256, -122, 0 (1/256 semitone), a held 0 node (len 255), jump to it.
     expect(Buffer.from(portaEnvelope(48, 50, 3)).toString('hex')).toBe('fe7e0000ff000000ff860000000000000000' + '00ff7f04');

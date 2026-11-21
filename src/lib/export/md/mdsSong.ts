@@ -221,13 +221,13 @@ function pitchEnvelope(m: FurnaceMacro, lossy: Lossy): number[] | undefined {
 }
 
 /** Macro table for a relative arpeggio: `16 tt` set transpose, `81 nn` hold nn+1 ticks, `80 nn` jump / `80 00` end. */
-function arpTable(m: FurnaceMacro, lossy: Lossy): number[] | undefined {
+function arpTable(m: FurnaceMacro, lossy: Lossy, step = (v: number) => v): number[] | undefined {
   if (m.data.slice(0, m.length).some(arpIsFixed)) { lossy.add('fixed arpeggio macro'); return undefined; }
   const sp = Math.max(1, m.speed);
   const out: number[] = [];
   const loop = m.loop >= 0 && m.loop < m.length && m.loop !== 255 ? m.loop : -1;
   if (m.delay > 0) lossy.add('arpeggio macro delay (ignored)');
-  m.data.slice(0, m.length).forEach((v) => out.push(0x16, ((v << 2) >> 2) & 0xff, 0x81, sp - 1));
+  m.data.slice(0, m.length).forEach((v) => out.push(0x16, step((v << 2) >> 2) & 0xff, 0x81, sp - 1));
   const after = out.length / 2 + 1; // node position after the jump
   out.push(0x80, loop < 0 ? 0 : (loop * 2 - after) & 0xff);
   return out;
@@ -337,6 +337,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     pcmItems.set(k, i);
     return i;
   };
+  const noiseArps = new Map<string, number>();
   const insCache = new Map<string, { ins: number; peg: number; mtab: number }>();
   const insRef = (kind: Kind, idx: number) => {
     const key = `${kind === 'fm' ? 'fm' : 'psg'}:${idx}`;
@@ -516,10 +517,17 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           if (isNote) {
             let n = kind === 'fm' ? nv : kind === 'noise' && noise & 2 ? noiseKey(m, nv, lossy) : nv;
             // Keys above the note-byte range go through track transpose (E4). shortcut: trs state is linear, not re-set at the loop point.
-            if (kind === 'noise' && (n - trs < 0 || n - trs > MAX_NOTE)) { trs = n > MAX_NOTE ? n - MAX_NOTE : 0; cmds.push(0xe4, trs); }
+            if (kind === 'noise' && !(n - trs >= 0 && n - trs <= MAX_NOTE)) { trs = n > MAX_NOTE ? n - MAX_NOTE : 0; cmds.push(0xe4, trs); }
             n -= trs;
             if (n < 0 || n > MAX_NOTE) { lossy.add(`${kind.toUpperCase()} note out of range (clamped)`); n = Math.max(0, Math.min(MAX_NOTE, n)); }
             curKey = n + trs;
+            // Easy noise steps the PSG3 period linearly per semitone, so an arp step is a noiseKey per (note + step), not a
+            // tone-table transpose. The table's `16 tt` writes t_trs (the E4 transpose), so tt is absolute and trs is unknown after.
+            const am = kind === 'noise' && noise & 2 ? macro(m.instruments[ins], MACRO_ARP, m.version) : undefined;
+            if (am && insRef(kind, ins).mtab >= 0) {
+              const nb = n, t = arpTable(am, lossy, (v) => noiseKey(m, nv + v, lossy) - nb);
+              if (t) { const k = t.join(','); if (!noiseArps.has(k)) noiseArps.set(k, tbItem(t)); cmds.push(0xeb, noiseArps.get(k)! + 1); trs = NaN; }
+            }
             if (kind === 'psg' && effDtn() !== dtnOut) { dtnOut = effDtn(); cmds.push(0xe6, dtnOut & 0xff); }
             // 03xx: slur into the note (no key-off, envelope keeps running) and slide from the previous key; E7 00 turns it off again.
             const slide = (kind === 'psg' || (kind === 'fm' && sounding)) && portaXx > 0 && prevKey >= 0 && prevKey !== nv;
