@@ -198,5 +198,7 @@ describe('furnaceToMds', () => {
     // Kit map C-3 / C#-3 -> bassdrum_thud (5569 @ 22050 Hz) / JK_SNR_01 (6993 @ 26633 Hz), resampled to 17520 Hz, 32-byte aligned.
     expect(s.pcm.length).toBe(Math.ceil((4424 + 32) / 32) * 32 + 4600 + 32);
     expect([...s.seq].some((b, i) => b === 0xf0 && i > 0)).toBe(true);
+    // MAME phase 1q: 160 of 160 Furnace 0x95 starts in 40 s get a z_pcm1_key_on request, median +8 ms, so PCM is not lossy.
+    expect(s.lossy.some((l) => l.startsWith('FM6'))).toBe(false);
   });
 });

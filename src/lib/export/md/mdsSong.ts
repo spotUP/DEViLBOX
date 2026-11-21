@@ -470,8 +470,6 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           if (smp >= 0 && smp < m.samples.length && m.samples[smp].length > 0) dacHdr = pcmRef(smp, a?.useNoteMap ? a.noteMap?.[fn]?.freq ?? fn : fn);
         }
         const isNote = nv >= 0 && nv < 253 && (!dac || dacHdr >= 0), isOff = (dac && dacHdr < 0) || nv >= 253 || (dacOff && !isNote);
-        // shortcut: MAME phase 1p measured PCM key-ons ~6 frames late and about 40 percent dropped; flag stays until that is fixed.
-        if (dac && isNote) lossy.add('FM6 sample instrument (DAC PCM): key-on timing not 1:1 yet');
         if (dac && isNote) { curIns = ins; pcmOn = true; if (dacHdr !== curPcm) { curPcm = dacHdr; cmds.unshift(0xf0, dacHdr); } }
         else if (isNote) { pcmOn = false; curPcm = -1; }
         if (isNote) { poff = 0; curNv = nv; }
