@@ -117,6 +117,45 @@
         "player": "3e58a705b80e61ceb42c2e17e7c4a1f95ae829125267b041fcd434877b416b0a"
       }
     },
+    "ArtAndMagic": {
+      "adf": "ArtAndMagic.adf",
+      "adfSha256": "b83c5658a108ca690a9596c5e40587eef46181e94d973d5fef6f03b691023d3b",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 37212,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 37208,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 267074,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 356612,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x41600",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC59600",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x57104",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "agony-level1.aam",
+        "bytes": 57522
+      },
+      "sources": {
+        "tool": "039c208c1dd9159d39f50cd4def612cc44863b9c28163d0da785d2e286e71c3f",
+        "player": "c89661bc4b22bb5c05ae8f69321da6bdb54d59d21ae87453689ca3f056ed36ae"
+      }
+    },
     "BeathovenSynthesizer": {
       "adf": "BeathovenSynthesizer.adf",
       "adfSha256": "d87c0ec2d85004fe6f2d1f3c6141d899d6d1972f22db7a5bddf2b359e52ccb73",
@@ -662,6 +701,45 @@
       "sources": {
         "tool": "039c208c1dd9159d39f50cd4def612cc44863b9c28163d0da785d2e286e71c3f",
         "player": "2ab53b0fc75461d73518752864a64efce8266ef19b6015497d7b2bc546e3f1bd"
+      }
+    },
+    "SoundImages": {
+      "adf": "SoundImages.adf",
+      "adfSha256": "613487a45266fed52ae3d02d157dcb01cd91077ba73d0a888de772e7c7d2e4eb",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 39872,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 39868,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 269742,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 359684,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42000",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5A000",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x57D04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "future basketball main.tw",
+        "bytes": 102144
+      },
+      "sources": {
+        "tool": "039c208c1dd9159d39f50cd4def612cc44863b9c28163d0da785d2e286e71c3f",
+        "player": "d4f4119e7da53c7cca58430af97854d394865426f4a54bbb80815645a5f1c29c"
       }
     },
     "SpeedySystem": {

@@ -10,6 +10,7 @@ import { isBeathovenSynthesizerFormat } from '../../import/formats/BeathovenSynt
 import { isMcmdFormat } from '../../import/formats/MCMDParser';
 import { isSpeedySystemFormat } from '../../import/formats/SpeedySystemParser';
 import { isAProSysFormat } from '../../import/formats/AProSysParser';
+import { isSoundImagesFormat } from '../../import/formats/SoundImagesParser';
 
 export interface AdfTemplateEntry {
   adf: string;
@@ -35,6 +36,10 @@ const be32 = (b: Uint8Array, at: number): number => ((b[at] << 24) | (b[at + 1] 
 
 /** The template name for a module, from the same magic tests the on-disk screen code uses; null when no player is on a disk. */
 export function adfTemplateFor(m: Uint8Array, filename?: string): string | null {
+  // Checked first: an .aam module can start with bytes another player's magic test accepts (agony-level1.aam reads as SUN-Tronic).
+  // ArtAndMagic has no magic and no detect function: the importer routes by .aam / aam.* name (AmigaFormatParsers).
+  const base = (filename?.split('/').pop() ?? '').toLowerCase();
+  if (base.endsWith('.aam') || base.startsWith('aam.')) return 'ArtAndMagic';
   if (ascii(m, 0, 'THX')) return 'AbyssHighestExperience';
   if (ascii(m, 0, 'FC14') || ascii(m, 0, 'SMOD') || ascii(m, 0, 'FC13')) return 'FutureComposer1.4';
   if (ascii(m, 0, 'BeEp')) return 'JamCracker';
@@ -59,6 +64,7 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   if (isSpeedySystemFormat(m.buffer.slice(m.byteOffset, m.byteOffset + m.byteLength) as ArrayBuffer)) return 'SpeedySystem';
   // AProSys has no magic: the importer detects it by file name only (aps.* / *.aps).
   if (isAProSysFormat(m, filename)) return 'AProSys';
+  if (isSoundImagesFormat(m, filename)) return 'SoundImages';
   return null;
 }
 

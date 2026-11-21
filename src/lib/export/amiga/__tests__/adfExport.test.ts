@@ -29,6 +29,9 @@ const CASES: Array<[string, string]> = [
   ['formats/tristar_cracktro.bss', 'BeathovenSynthesizer'],
   ['formats/pauker_rap_2.ss', 'SpeedySystem'],
   ['formats/action.aps', 'AProSys'],
+  ['formats/agony-level1.aam', 'ArtAndMagic'],
+  ['formats/agony-level2.aam', 'ArtAndMagic'],
+  ['formats/future basketball main.tw', 'SoundImages'],
 ];
 
 describe('adf slot patcher', () => {
