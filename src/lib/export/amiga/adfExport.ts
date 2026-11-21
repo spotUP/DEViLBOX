@@ -40,6 +40,9 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   // ArtAndMagic has no magic and no detect function: the importer routes by .aam / aam.* name (AmigaFormatParsers).
   const base = (filename?.split('/').pop() ?? '').toLowerCase();
   if (base.endsWith('.aam') || base.startsWith('aam.')) return 'ArtAndMagic';
+  // Tronic (dp / trc / tro / tronic) and AM-Composer (amc) have no magic either: isTronicFormat accepts any buffer, so only the eagleplayer.conf prefixes can tell them.
+  if (/^(dp|trc|tro|tronic)\./.test(base) || /\.(dp|trc|tro|tronic)$/.test(base)) return 'Tronic';
+  if (base.startsWith('amc.') || base.endsWith('.amc')) return 'AM-Composer';
   if (ascii(m, 0, 'THX')) return 'AbyssHighestExperience';
   if (ascii(m, 0, 'FC14') || ascii(m, 0, 'SMOD') || ascii(m, 0, 'FC13')) return 'FutureComposer1.4';
   if (ascii(m, 0, 'BeEp')) return 'JamCracker';

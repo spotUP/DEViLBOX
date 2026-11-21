@@ -1,5 +1,44 @@
 {
   "templates": {
+    "AM-Composer": {
+      "adf": "AM-Composer.adf",
+      "adfSha256": "dcc4580fa18b41304875a95e1ddfe853b0e7c4831b46978531c1d47e5d2283a9",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 39844,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 39840,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 269706,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 310532,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42000",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5A000",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4BD04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "krymini title.amc",
+        "bytes": 145210
+      },
+      "sources": {
+        "tool": "039c208c1dd9159d39f50cd4def612cc44863b9c28163d0da785d2e286e71c3f",
+        "player": "81fd19d25d2e5813f314fe54f2f88606926204825e364b3467e56f74c3c34f0b"
+      }
+    },
     "AProSys": {
       "adf": "AProSys.adf",
       "adfSha256": "0c39cf957cae4d613921b2e6727b12bf33ec50c093b29a2f0080f7ed383812f6",
@@ -779,6 +818,45 @@
       "sources": {
         "tool": "039c208c1dd9159d39f50cd4def612cc44863b9c28163d0da785d2e286e71c3f",
         "player": "9a557c331989c1ff462f6f706d67aaa6089d7c6f7043164b7f1bf989440d26db"
+      }
+    },
+    "Tronic": {
+      "adf": "Tronic.adf",
+      "adfSha256": "51bdb34d42a361703c91b38d1db7e072f6ad5ab2b8dab065ba6a139f73cb5bfa",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 39268,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 39264,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 269124,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 358660,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x41E00",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC59E00",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x57904",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "crystal.dp",
+        "bytes": 12552
+      },
+      "sources": {
+        "tool": "039c208c1dd9159d39f50cd4def612cc44863b9c28163d0da785d2e286e71c3f",
+        "player": "e757301807ad2e5da81f5dcff3351959e0cfa571a2e793f799ae0c967c5d7135"
       }
     }
   }
