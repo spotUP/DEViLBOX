@@ -1686,3 +1686,15 @@ Commit f2024b3cc: the NTSC conductor merge in `frameTempos` is placed on a quiet
 - 19.417 s remains because frame 1165 has PSG2 busy and its window has no better frame. 31.283 s is the psgFix/vibrato-lead case (owner decision, not done).
 - Task 2 (Solar_Man FM4 20.883/31.417/85.717/86.6 s) was not reached because the budget ran out.
 - Listen ROM: ~/Desktop/md-roms/newer_song_lol-3a.bin.
+
+## Phase 3b result (2026-11-21, no code change)
+
+- Task 1, byte compare of f2024b3cc^ against HEAD (old mdsSong.ts from `git show` into a temporary module, same converter script): golden_shit seq 51818 bytes and Solar_Man seq 21154 + PCM 212857 bytes are byte-identical. The shell and driver are unchanged, so the ROMs are identical too. newer_song_lol differs as intended (63356 -> 63326). This confirms 3a: Solar_Man (56 Hz, `useFt` false) never reaches the merge path.
+- Task 2, Solar_Man FM4 at 20.883/31.417/85.717/86.6 s: every one is the last 04xy vibrato frame before a new note. At 20.883 and 86.6 (the same pattern on the loop pass, 65.72 s apart) MAME repeats node 337.71 where Furnace plays 341.37. At 31.417 and 85.717 MAME plays one extra vibrato node before the note.
+  - Root cause: MDSDRV steps the E8 pitch envelope once per NTSC frame. `mds_pitch_update` runs in every voice update, whatever `w_seq_step` is. Furnace steps vibrato once per 56 Hz tick. `vibratoEnvelope` loops a 17-frame cycle (round(16 / 0.9375)), and its node -> tick map is round(n * tpf) from the E8. Furnace's cycle is 17.12 NTSC frames, and the repeated node sits at a fixed place in the cycle. So late in a vibrato run it lands more than one frame from Furnace's timing. The channel track's loop pass reuses the same bytes at a different frame phase.
+  - Tried, all reverted:
+    - (a) Cut the cycle per E8 against its driver frame (`frameOfTick`, like PSG `framesOf`): FM4 31.417/85.717 fixed, but FM4 rises to 8 (86.5-86.567 on the loop pass), FM1 rises to 2, and seq is 28254.
+    - (b) Loop k cycles over the nearest whole frame count at the true s.hz/NTSC ratio: FM4 rises to 7, seq 24142.
+    - (c) (a) plus (b): the extended pitch envelopes go past MDSDRV's 32 KiB item range, so the converter throws.
+  - An exact fix needs a non-looping vibrato envelope per note and per pass. That is the vibrato-lead class (owner decision), so it was not done.
+- Counts unchanged: Solar_Man FM1 1, FM4 5, FM5 2, PSG1 2, PSG2 2 (seq 21154). newer_song_lol was not re-measured because no code changed (seq 63326).
