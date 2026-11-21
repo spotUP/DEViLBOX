@@ -71,6 +71,36 @@ def rd(sock, addr, width):
     return int(ipc(sock, "READ_MEM\t%d\t%d" % (addr, width)).split()[-1])
 
 
+def cram_from_state(path):
+    # Chip RAM out of an Amiberry savestate (savestate.cpp save_chunk): "CRAM", u32 chunklen counted from the
+    # name, u32 flags (bit0 zlib), [u32 rawlen if zlib], data.
+    import struct, zlib
+    b = open(path, "rb").read()
+    i = b.find(b"CRAM")
+    if i < 0:
+        raise RuntimeError("no CRAM chunk in %s" % path)
+    ln, fl = struct.unpack(">II", b[i + 4:i + 12])
+    if fl & 1:
+        return zlib.decompress(b[i + 16:i + ln])
+    return b[i + 12:i + ln]
+
+
+def dump_mem(sock, addr, ln, tmpdir):
+    # One SAVESTATE call instead of ln/4 READ_MEM calls (IPC is served once per frame: 512 KB took >7 min).
+    st = os.path.join(tmpdir, "dump.uss")
+    ipc(sock, "SAVESTATE\t%s\t%s" % (st, os.path.join(tmpdir, "dump.uae")), timeout=30)
+    try:
+        chip = cram_from_state(st)
+    finally:
+        for f in (st, os.path.join(tmpdir, "dump.uae")):
+            if os.path.exists(f):
+                os.remove(f)
+    if addr + ln <= len(chip):
+        return chip[addr:addr + ln]
+    # shortcut: non-chip ranges (slow/fast RAM) still read 4 bytes per call; parse BRAM/FRAM chunks if those get dumped often.
+    return b"".join(rd(sock, addr + o, 4).to_bytes(4, "big") for o in range(0, ln, 4))[:ln]
+
+
 def load_mono(path):
     w = wave.open(path)
     a = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2").astype(np.float64)
@@ -167,8 +197,7 @@ def check(adf, purpose, target, ref, keep_wav, extra="", dump=None, dump_at=2.0)
                 addr, ln = (int(x, 0) for x in spec.split(":"))
                 out = os.path.join(os.path.dirname(wav), "dump_%x_%x.bin" % (addr, ln))
                 with open(out, "wb") as fh:
-                    for o in range(0, ln, 4):
-                        fh.write(rd(sock, addr + o, 4).to_bytes(4, "big"))
+                    fh.write(dump_mem(sock, addr, ln, os.path.dirname(wav)))
                 print("dump", out, flush=True); r.setdefault("dumps", []).append(out)
             ipc(sock, "RESUME")
         if tplay:
