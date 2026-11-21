@@ -15,6 +15,7 @@ import { isRiffRaffFormat } from '../../import/formats/RiffRaffParser';
 import { isJochenHippel7VFormat } from '../../import/formats/JochenHippel7VParser';
 import { isSonicArrangerFormat } from '../../import/formats/SonicArrangerParser';
 import { isDeltaMusic2Format } from '../../import/formats/DeltaMusic2Parser';
+import { isTFMXFile } from '../../import/formats/TFMXParser';
 import { isSidMon1Format } from '../../import/formats/SidMon1Parser';
 
 export interface AdfTemplateEntry {
@@ -23,6 +24,9 @@ export interface AdfTemplateEntry {
   cpu: string;
   moduleSlot: { diskOffset: number; maxBytes: number };
   moduleLengthWord: { diskOffset: number; bytes: 4; endian: 'big' };
+  /** Second slot for the format's companion file (TFMX smpl.*); absent on single-file players. */
+  companionSlot?: { diskOffset: number; maxBytes: number };
+  companionLengthWord?: { diskOffset: number; bytes: 4; endian: 'big' };
   /** Fixed ASCII title field on the disk; the EMS / EMS-6 screens show it as the title. */
   titleSlot: { diskOffset: number; bytes: number };
   /** Chip RAM the player needs from CHIP_BASE up, with the slot at its maximum size. */
@@ -82,6 +86,8 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   // SidMon 1.0: exact ' SID-MON BY R.v.VLIET  (c) 1988 ' string behind the lea/add.l loader stub. A1200 build (the player scans the module with odd word reads).
   if (isSidMon1Format(m.buffer.slice(m.byteOffset, m.byteOffset + m.byteLength) as ArrayBuffer)) return 'SIDMon1.0';
   if (isSonicArrangerFormat(m.buffer.slice(m.byteOffset, m.byteOffset + m.byteLength) as ArrayBuffer)) return 'SonicArranger';
+  // TFMX: the mdat header magic (TFMX-SONG / TFMX_SONG / tfmxsong / TFMX 1.5); the smpl file rides in the companion slot.
+  if (isTFMXFile(m.buffer.slice(m.byteOffset, m.byteOffset + m.byteLength) as ArrayBuffer)) return 'TFMX-Pro';
   // Last: the hunk scan for the RIFFRAFF magic is the loosest of the detect functions.
   if (isRiffRaffFormat(m)) return 'RiffRaff';
   return null;
@@ -90,7 +96,7 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
 export class AdfExportError extends Error {}
 
 /** Writes `module` into the template's slot and patches the length word. Throws AdfExportError when it cannot fit. */
-export function patchAdfSlot(template: Uint8Array, entry: AdfTemplateEntry, module: Uint8Array): Uint8Array {
+export function patchAdfSlot(template: Uint8Array, entry: AdfTemplateEntry, module: Uint8Array, companion?: Uint8Array): Uint8Array {
   const { diskOffset, maxBytes } = entry.moduleSlot;
   const lw = entry.moduleLengthWord;
   if (module.length === 0) throw new AdfExportError('The module is empty.');
@@ -109,6 +115,15 @@ export function patchAdfSlot(template: Uint8Array, entry: AdfTemplateEntry, modu
   out.fill(0, diskOffset, diskOffset + maxBytes);
   out.set(module, diskOffset);
   new DataView(out.buffer).setUint32(lw.diskOffset, module.length, false);
+  const cs = entry.companionSlot, cl = entry.companionLengthWord;
+  if (cs && cl) {
+    if (!companion || companion.length === 0) throw new AdfExportError(`The ${entry.adf} disk needs the format's companion (sample) file, and the song has none.`);
+    if (companion.length > cs.maxBytes) throw new AdfExportError(`The companion file is ${companion.length} bytes. The ${entry.adf} disk has room for ${cs.maxBytes} bytes.`);
+    if (out.length < cs.diskOffset + cs.maxBytes || out.length < cl.diskOffset + cl.bytes) throw new AdfExportError(`The template ${entry.adf} is too short for its own companion slot.`);
+    out.fill(0, cs.diskOffset, cs.diskOffset + cs.maxBytes);
+    out.set(companion, cs.diskOffset);
+    new DataView(out.buffer).setUint32(cl.diskOffset, companion.length, false);
+  }
   return out;
 }
 
@@ -124,12 +139,12 @@ export interface AdfResult { data: Uint8Array; filename: string; warnings: strin
 
 /** Pure part: manifest + template loader + module in, disk out. */
 export async function buildAdf(
-  module: Uint8Array, baseName: string, manifest: AdfManifest, loadTemplate: (file: string) => Promise<Uint8Array>,
+  module: Uint8Array, baseName: string, manifest: AdfManifest, loadTemplate: (file: string) => Promise<Uint8Array>, companion?: Uint8Array,
 ): Promise<AdfResult> {
   const name = adfTemplateFor(module, baseName);
   const entry = name ? manifest.templates[name] : undefined;
   if (!name || !entry) throw new AdfExportError('No Amiga disk player exists for this format yet.');
-  const data = patchAdfSlot(await loadTemplate(entry.adf), entry, module);
+  const data = patchAdfSlot(await loadTemplate(entry.adf), entry, module, companion);
   data.set(adfTitleBytes(baseName, entry.titleSlot.bytes), entry.titleSlot.diskOffset);
   return { data, filename: `${baseName.replace(/\.[^.]*$/, '') || 'song'}.adf`, warnings: [], template: name, machine: MACHINE_NAME[entry.target] };
 }
@@ -139,7 +154,15 @@ export async function exportLiveSongAdf(): Promise<AdfResult | null> {
   const { exportNativeFile } = await import('../moduleExportService');
   const native = await exportNativeFile();
   if (!native) return null;
+  // TFMX: the native export is the mdat only; the smpl file the importer kept goes in the companion slot.
+  let companion: Uint8Array | undefined;
+  const fromNative = native.companions?.find((c) => /^(smpl|smp)\./i.test(c.name));
+  if (fromNative) companion = fromNative.data;
+  else {
+    const { useFormatStore } = await import('@/stores/useFormatStore');
+    for (const [n, buf] of useFormatStore.getState().uadeCompanionFiles ?? []) if (/^(smpl|smp)\./i.test(n.split('/').pop() ?? '')) companion = new Uint8Array(buf);
+  }
   const base = `${import.meta.env.BASE_URL}amiga-adf/`;
   const manifest = await (await fetch(`${base}manifest.json`)).json() as AdfManifest;
-  return buildAdf(native.data, native.filename, manifest, async (f) => new Uint8Array(await (await fetch(`${base}${f}`)).arrayBuffer()));
+  return buildAdf(native.data, native.filename, manifest, async (f) => new Uint8Array(await (await fetch(`${base}${f}`)).arrayBuffer()), companion);
 }

@@ -91,6 +91,20 @@ describe('adf slot patcher', () => {
     }
   });
 
+  it('TFMX: writes the smpl companion into its own slot with its length word, and refuses a missing or oversize one', () => {
+    const e = manifest.templates['TFMX-Pro'];
+    const base = tpl(e.adf);
+    const mdat = song('formats/mdat.turrican_bonus');
+    expect(adfTemplateFor(mdat, 'mdat.turrican_bonus')).toBe('TFMX-Pro');
+    const smpl = song('formats/smpl.turrican_bonus');
+    const r = patchAdfSlot(base, e, mdat, smpl);
+    const cs = e.companionSlot!, cl = e.companionLengthWord!.diskOffset;
+    expect(new DataView(r.buffer).getUint32(cl, false)).toBe(smpl.length);
+    expect(Array.from(r.subarray(cs.diskOffset, cs.diskOffset + smpl.length))).toEqual(Array.from(smpl));
+    expect(() => patchAdfSlot(base, e, mdat)).toThrow(/companion/);
+    expect(() => patchAdfSlot(base, e, mdat, new Uint8Array(cs.maxBytes + 1).fill(1))).toThrow(AdfExportError);
+  });
+
   it('refuses a module larger than the slot, and does not modify the template', () => {
     const e = manifest.templates['AbyssHighestExperience'];
     const base = tpl(e.adf);
