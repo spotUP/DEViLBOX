@@ -264,6 +264,15 @@ describe('furnaceToMds', () => {
     expect(env.slice(7 * 6, 7 * 6 + 2)).toEqual([0, 0]); // node 7 = pos 32: vibTable 0
     expect(env.slice(11 * 6, 11 * 6 + 2)).toEqual([0xff, 0x92]); // node 11 = pos 48: vibTable -127, (7*-127*15)>>4 = -834, /15 = -55
   });
+  it('newer_song_lol: per-tick 03xx-under-04xy slides push stream data past 32 KiB, so streams split around the track table (pos is a signed word in 0(tbase,pos))', async () => {
+    const s = await convert('newer_song_lol.fur'), sd = s.seq.subarray(8), w = (o: number) => (sd[o] << 8) | sd[o + 1];
+    const bgm = w(6), tbase = bgm + w(bgm), n = sd[bgm + 3];
+    const pos = Array.from({ length: n }, (_, i) => { const v = w(bgm + 4 + i * 4 + 2); return v >= 0x8000 ? v - 0x10000 : v; });
+    expect(tbase & 1).toBe(0);
+    expect(sd.length - (bgm + 4 + n * 4)).toBeGreaterThan(0x8000); // more stream data than one signed half fits
+    expect(Math.min(...pos)).toBeGreaterThanOrEqual(-0x8000);
+    expect(sd.length - tbase).toBeLessThanOrEqual(0x8000);
+  });
   it('04xy: a 03xx note on a keyed-on channel keeps the vibrato phase (playback.cpp doNote=false), newer_song_lol FM1 row 2', async () => {
     // 180/150 at 60 Hz: 72 Hz sequence ticks, driver tempo round(72 * 128 / NTSC) - 1, fpf = tpf * 5/6 Furnace ticks per frame.
     const fpf = Math.round(72 * 128 / 59.922743) / 128 * 5 / 6;

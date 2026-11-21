@@ -1106,3 +1106,12 @@ Open:
 - Equal slide envelopes are already shared (slideItems Map keyed on the bytes; extItem the same). The growth is distinct vibrato phases (91 extended envelopes) and fewer subroutines (14; subroutines are only added while items < 255). Nothing cheap left without changing playback.
 
 ### 4. Solar_Man PSG4 -0.15 dB: not started (budget).
+
+## Phase 2c results (2026-11-21)
+
+- 03xx porta with a running 04xy vibrato (linearPitch, FM and PSG) is now per-tick E4 (semitones) + E6 (1/256 semitone) writes; the shared plain-vibrato E8 item stays. Driver check (mds_pitch_update, mdsdrv.68k ~1988): target = note + t_trs + t_dtn, then the E8 output is added, so E4/E6 stack on the vibrato.
+- The extra writes grew newer_song_lol stream data after the track table from 29172 to 37876 bytes. MDSDRV reads streams as `0(tbase,pos.w)` (signed word), so everything drifted (FM ~2200 bad frames). Fix: the layout puts leading streams in front of the track table until the rest fits in +32 KiB; tbase stays even; a throw guards both signed halves. Test row in mdsSong.test.ts checks the split on newer_song_lol (fails with the old layout).
+- newer_song_lol lagcmp, frames over 10 cents, 40 s, before -> after: FM1 63->11, FM2 64->11, FM3 63->15, FM4 35->5, FM5 43->9, PSG1 417->405 (worst 976 c at 21.43 s), PSG2 284->146, PSG3 0->0.
+- loud.py (4 s windows, 40 s) on the final export: every FM/PSG channel within +-0.3 dB per window except FM2 -0.91 (window 2), FM3 -0.76 (window 10). FM6/DAC rows show +-89 dB only because MAME taps the DAC as FM6 tone; the levels match (-9.8 vs -10.0 dB).
+- Items: newer_song_lol and Solar_Man convert (256-item throw not hit).
+- Open: PSG1 405 frames (first bad 2.58 s, 4.5 s, 7.93 s) and PSG2 146 still over 10 cents, cause not yet read; Solar_Man PSG4 -0.15 dB envelope phase (task 3) not started. Listen ROM: ~/Desktop/md-roms/newer_song_lol-2c.bin.

@@ -423,13 +423,26 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       return out;
     };
     const volCmd = (v: number) => [0xe2, kind === 'fm' ? (ch === 5 && m.instruments[ins]?.type === 4 ? pcmDacAtt(dacVol(v)) : 127 - v) : 0x80 | Math.max(0, Math.min(15, v)), ...kvsCmd(v)];
+    // Sequence tick t runs on Furnace tick ceil(t * fpt) (tempoAccum counts N per engine tick); counted absolutely so carried phase does not drift.
+    const fTick = (t: number) => Math.ceil(t * fpt - 1e-9);
     let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0, dtnOut = 0;
     // PSG: E6 carries E5xx plus psgFix(key); each PSG chunk restates it, since a subroutine chunk can follow any detune.
     const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey))) : dtn;
+    // 03xx under a running 04xy: MDSDRV has one pitch envelope (E8, the vibrato), so the linear slide goes out per sequence tick as
+    // E4 transpose + E6 detune, which mds_pitch_update adds before the envelope (pitch = note + trs + dtn, then + E8 output).
+    // sA: slide offset from the target at the note (1/128 semitone, 0 = none), stepped sStep per Furnace tick from Furnace tick sF0.
+    // shortcut: the E4 state is not re-set at the song loop point; a slide running across the loop starts the loop transposed.
+    let sA = 0, sStep = 0, sF0 = 0, trsOut = 0;
+    const slideOff = (f: number) => (sA ? Math.sign(sA) * Math.max(0, Math.abs(sA) - sStep * (f - sF0 + 1)) : 0);
+    const slideCmd = (t: number): number[] => {
+      const off = slideOff(fTick(t)), o = 2 * off + effDtn(), tr = Math.floor((o + 128) / 256), d = o - 256 * tr, out: number[] = [];
+      if (!off) sA = 0;
+      if (tr !== trsOut) out.push(0xe4, (trsOut = tr) & 0xff);
+      if (d !== dtnOut) out.push(0xe6, (dtnOut = d) & 0xff);
+      return out;
+    };
     // 04xy state: pos was `vPos` at tick `vAt` and advances by vRate per tick while vDepth > 0 (playback.cpp).
     let vDepth = 0, vRate = 0, vPos = 0, vAt = 0, vFine = 15;
-    // Sequence tick t runs on Furnace tick ceil(t * fpt) (tempoAccum counts N per engine tick); counted absolutely so carried phase does not drift.
-    const fTick = (t: number) => Math.ceil(t * fpt - 1e-9);
     const vSync = (t: number) => { if (vDepth) vPos = (vPos + (fTick(t) - fTick(vAt)) * vRate) % 64; vAt = t; };
     const vibCmd = (t: number): number[] => { vSync(t); return [0xe8, extItem(vibratoEnvelope(vPos, vRate, vDepth, vFine, fpf)) + 1]; };
     // 0Axy: Furnace keeps volume in 1/256 steps and adds x*64 (or -y*64) every tick, the row's first tick included, until it clamps at
@@ -481,7 +494,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       // FM6 with a sample instrument plays PCM (genesis.cpp: dacMode from the instrument type at each note-on); E1 would leave PCM mode.
       const isDac = (n: number) => kind === 'fm' && ch === 5 && m.instruments[n]?.type === 4;
       let curPcm = -1, pcmOn = false;
-      const bytes: number[] = [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && sounding ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, dtn & 0xff] : [])];
+      const bytes: number[] = [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && sounding ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(sA && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
+      // One sequence tick's mid-row commands: 0Axy volume step and the per-tick slide.
+      const tickPre = (t: number): number[] | null => { const v = volStep(), sl = sA && sounding ? slideCmd(t) : []; return v || sl.length ? [...(v ?? []), ...sl] : null; };
       let curIns = ins;
       type Tok = { cmd: 'note' | 'tie' | 'rest'; n: number; t: number; pre: number[] };
       const tok: Tok[] = [];
@@ -523,7 +538,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         cutAt = cutAt ? Math.max(delay + 1, seqAt((fxv(0xed) ? edF : fTick(tick)) + cutAt)) : 0;
         if (cutAt >= c.ticks[i]) { lossy.add('ECxx cut not inside the row (ignored)'); cutAt = 0; }
         i0 = i === 0;
-        for (let k = 0; k < delay; k++) addTick(volStep());
+        for (let k = 0; k < delay; k++) addTick(tickPre(tick + k));
         if (cell && cell.volume >= 0) { vol = cell.volume; vol256 = vol << 8; cmds.push(...volCmd(vol)); }
         for (const e of cell?.effects ?? []) {
           if (e.type < 0 || FX_FLOW.has(e.type)) continue;
@@ -551,7 +566,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           }
           if (e.type === 0x03 && (kind === 'psg' || kind === 'fm')) { portaXx = e.value; if (prate) { prate = 0; pChanged = true; } continue; } // 03 00 only stops the porta
           if ((e.type === 0x01 || e.type === 0x02) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
-            prate = (e.type === 0x01 ? 1 : -1) * e.value * pss; pChanged = true; portaXx = 0; // 01xx/02xx end a 03xx (playback.cpp: inPorta false)
+            prate = (e.type === 0x01 ? 1 : -1) * e.value * pss; pChanged = true; portaXx = 0; sA = 0; // 01xx/02xx end a 03xx (playback.cpp: inPorta false)
             if (m.compatFlags.limitSlides) lossy.add('01xx/02xx with limitSlides (slide range not limited)');
             if (!Number.isInteger(2 * e.value * pss * fpf)) lossy.add('01xx/02xx at a fractional sequence-tick-per-frame rate (rounded per frame)');
             continue;
@@ -582,6 +597,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         // (playback.cpp NOTE_PORTA == 2): the next note keys on. shortcut: a 03xx row that retunes a slide still in flight is not kept.
         else if (portaXx && m.compatFlags.targetResetsSlides) portaXx = 0;
         else if (pChanged && sounding && (prate || poff)) cmds.push(...pslideCmd());
+        if (!isNote && sounding && (sA || trsOut)) cmds.push(...slideCmd(tick + delay));
         if (!isNote && vChanged && sounding) { cmds.push(...(vDepth ? vibCmd(tick + delay) : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
         if (isNote && ins !== curIns) { curIns = ins; cmds.unshift(...insCmd()); }
         if (isNote || isOff || cmds.length || i === 0) {
@@ -607,17 +623,23 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             // 03xx on a keyed-on channel is no note-on (playback.cpp: doNote=false), so the vibrato phase is not reset.
             const portaSlur = portaXx > 0 && sounding;
             if (kind === 'fm' && portaXx > 0 && sounding) cmds.push(0xe0);
-            if (slide) {
+            const from = prevKey * 128 + slideOff(fTick(tick + delay));
+            sA = 0;
+            if (slide && vDepth && m.compatFlags.linearPitch) {
+              if (kind === 'psg') cmds.push(0xe0);
+              sA = from - nv * 128; sStep = portaXx * pss; sF0 = fTick(tick + delay);
+            } else if (slide) {
               const env = portaEnvelope(prevKey, nv, portaXx, kind === 'fm', m.compatFlags.linearPitch ? portaXx * (Number(m.compatFlags.pitchSlideSpeed) || 1) : 0, fpf);
               if (kind === 'psg') cmds.push(0xe0);
               cmds.push(0xe8, slideItem(env) + 1); slideEnd = tick + Math.round((env[env.length - 1] + 1) * (tempo + 1) / 128);
             }
             else if (prate) { if (pChanged || pInit || !pegDirty) cmds.push(...pslideCmd()); }
             else if (pegDirty) cmds.push(0xe8, insRef(kind, ins).peg + 1);
+            if (trsOut || sA || (kind === 'fm' && dtnOut !== effDtn())) cmds.push(...slideCmd(tick + delay));
             pegDirty = slide || prate !== 0; portaXx = 0;
             if (!m.compatFlags.continuousVibrato && !portaSlur) { vPos = 0; vAt = tick + delay; }
             if (vDepth) {
-              if (slide || prate || insRef(kind, ins).peg >= 0) lossy.add('04xy with a pitch slide or pitch macro (vibrato replaces it)');
+              if ((slide && !sA) || prate || insRef(kind, ins).peg >= 0) lossy.add('04xy with a pitch slide or pitch macro (vibrato replaces it)');
               cmds.push(...vibCmd(tick + delay)); pegDirty = true;
             }
             prevKey = kind === 'psg' || kind === 'fm' ? nv : -1;
@@ -627,7 +649,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           else { tok.push({ cmd: sounding ? 'tie' : 'rest', n: 0, t: 0, pre: cmds }); if (i === 0) tieStart = sounding; }
         }
         tok[tok.length - 1].t += 1;
-        for (let k = delay + 1; k < c.ticks[i]; k++) addTick(volStep(), k === cutAt);
+        for (let k = delay + 1; k < c.ticks[i]; k++) addTick(tickPre(tick + k), k === cutAt);
         if (prate && curNv >= 0) {
           const lim = pLimit();
           poff += prate * c.ticks[i] * fpt;
@@ -693,14 +715,21 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   sd.push(0, 0, 0, streams.length);
   const trackHdr = sd.length;
   streams.forEach(() => sd.push(0, 0, 0, 0));
-  const tbase = sd.length;
+  // The driver reads streams as 0(tbase,pos.w): pos is a signed word, so stream bytes must sit within
+  // tbase-32 KiB .. tbase+32 KiB. Streams that do not fit after the tbase table go in front of it.
+  const place = (st: number[], i: number) => { sd.splice(trackHdr + i * 4, 4, chanIds[i], 0, ...be16(sd.length - tbase)); sd.push(...st); };
+  let after = items.length * 2 + streams.reduce((n, st) => n + st.length, 0), nBefore = 0, tbase: number;
+  while (after > 0x7fff && nBefore < streams.length) after -= streams[nBefore++].length;
+  const preLen = sd.length + streams.slice(0, nBefore).reduce((n, st) => n + st.length, 0);
+  tbase = preLen + (preLen & 1); // the table is read with move.w
+  streams.slice(0, nBefore).forEach(place);
+  even();
+  if (sd.length !== tbase) throw new Error('MDSDRV layout: stream placement out of step');
   if (itemOff.some((a, i) => extRel.has(i) && a >= 0x8000)) throw new Error('MDSDRV extended pitch envelope beyond 32 KiB of song data');
+  if (itemOff.some((a, i) => tbaseRel.has(i) && a - tbase < -0x8000) || after > 0x7fff || trackHdr - tbase < -0x8000)
+    throw new Error('MDSDRV song data does not fit the signed 32 KiB window around the track table');
   itemOff.forEach((a, i) => sd.push(...be16(tbaseRel.has(i) ? a - tbase : extRel.has(i) ? a | 0x8000 : a)));
-  streams.forEach((st, i) => {
-    const pos = sd.length - tbase;
-    sd.splice(trackHdr + i * 4, 4, chanIds[i], 0, ...be16(pos));
-    sd.push(...st);
-  });
+  streams.slice(nBefore).forEach((st, k) => place(st, nBefore + k));
   even();
   if (sd.length > 0xffff) throw new Error('MDSDRV sequence over 64 KiB');
   sd.splice(0, 4, 0, 0, 0, 8);       // pcm_tab-sdtop
