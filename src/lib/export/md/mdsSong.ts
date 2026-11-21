@@ -694,8 +694,20 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       let env: number[];
       if (!prate) env = node(2 * poff, 0, 255, 0);
       else {
-        const lim = pLimit(), d = 2 * prate * fpf, j = Math.ceil((2 * (lim - poff)) / d) - 1;
-        env = j >= 1 ? [...node(2 * poff, d, Math.min(254, j - 1), 1), ...node(2 * lim, 0, 255, 1)] : node(2 * lim, 0, 255, 0);
+        // Furnace steps the offset once per engine tick, not per frame: frame k plays tick round((k + 1) * fpf), so the first 64 frames
+        // follow that staircase (Solar_Man FM4 68.77 s, 02 20 at 56 Hz: a smooth per-frame ramp ran up to 50 cents off). Runs of
+        // equal steps share a node; `next` is the node index the driver goes to after len + 1 frames. Beyond 64 frames the ramp goes on linearly.
+        const lim = pLimit(), past = (v: number) => (prate > 0 ? v >= lim : v <= lim), vals: number[] = [];
+        for (let k = 0; k < 64 && !past(poff + prate * Math.round((k + 1) * fpf)); k++) vals.push(poff + prate * Math.round((k + 1) * fpf));
+        const nodes: Array<[number, number, number]> = [];
+        for (let i = 0, prev = poff; i < vals.length; ) {
+          const dv = vals[i] - prev; let j = i;
+          while (j + 1 < vals.length && vals[j + 1] - vals[j] === dv && j - i < 254) j++;
+          nodes.push([2 * prev, 2 * dv, j - i]); prev = vals[j]; i = j + 1;
+        }
+        const last = vals.length ? vals[vals.length - 1] : poff, d = 2 * prate * fpf, j = Math.ceil((2 * (lim - last)) / d) - 1;
+        if (vals.length === 64 && j >= 1) nodes.push([2 * last, d, Math.min(254, j - 1)]);
+        env = [...nodes.flatMap(([v, dv, len], i) => node(v, dv, len, i + 1)), ...node(2 * lim, 0, 255, nodes.length)];
       }
       return [0xe8, extItem(env) + 1];
     };
@@ -708,6 +720,12 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     for (const [ci, c] of (lc ? [...chunks, lc] : chunks).entries()) {
       const wrapPass = ci === chunks.length;
       let faAt = -1;
+      // A finished one-shot arp table replays from step 0 when the head restates EB, and the driver steps it on rests too (Solar_Man FM4
+      // 34.3 s: a key-off row at a chunk head played the +12 step on the release tail). EB 00 + E4 <last step> holds the pitch Furnace keeps;
+      // `baked` makes the next note restate the table.
+      const am0: FurnaceMacro | undefined = kind === 'noise' || baked ? undefined : macro(m.instruments[ins], MACRO_ARP, m.version);
+      const arpHold: number | undefined = am0 && insRef(kind, ins).mtab >= 0 && !(am0.loop >= 0 && am0.loop < am0.length && am0.loop !== 255)
+        && tick - arpT0 >= Math.round(((am0.length - 1) * Math.max(1, am0.speed)) / fpt) ? (am0.data[am0.length - 1] << 2) >> 2 : undefined;
       // A slide still running at a chunk start keeps its envelope: E8 would restart it from the instrument's own one.
       const insCmd = (chunkStart = false) => {
         const r = insRef(kind, ins, envPh);
@@ -717,12 +735,13 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         // an 0/12 arp instrument), so an instrument without one restates the transpose; a chunk head can follow any table.
         const tr = r.mtab < 0 && (chunkStart || mtabOn) ? [0xe4, (kind === 'noise' ? (Number.isNaN(trs) ? (trs = 0) : trs) : trsOut || 0) & 0xff] : [];
         mtabOn = r.mtab >= 0;
+        if (chunkStart && arpHold !== undefined) return [0xe1, r.ins, ...peg, 0xeb, 0, 0xe4, arpHold & 0xff, ...kvsCmd(vol)];
         return [0xe1, r.ins, ...peg, 0xeb, r.mtab + 1, ...tr, ...kvsCmd(vol)];
       };
       // FM6 with a sample instrument plays PCM (genesis.cpp: dacMode from the instrument type at each note-on); E1 would leave PCM mode.
       const isDac = (n: number) => kind === 'fm' && ch === 5 && m.instruments[n]?.type === 4;
       let curPcm = -1, pcmOn = false;
-      baked = false; arpT0 = tick; // insCmd(true) restates EB, which restarts the instrument's arp table
+      baked = arpHold !== undefined; arpT0 = tick; // insCmd(true) restates EB, which restarts the instrument's arp table
       // Chunk head: the channel state a chunk starts from. The loop chunk's head plays once; the wrap restates it from the song-end state.
       const head = (): number[] => [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && any ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(sA && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
       const bytes = head(), headLen = bytes.length;

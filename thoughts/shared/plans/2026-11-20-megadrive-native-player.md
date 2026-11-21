@@ -1549,3 +1549,39 @@ Open:
 - Question 2 (Solar_Man FM4 68.77-68.92 s, 10 frames ~50 cents, VGM writes the
   frequency only twice), question 3 (FM4 34.3 s, a rest steps the arp table once)
   and question 4 (track 6 enters the loop on a rest after Phase 2r): not started.
+
+## Phase 2t result (2026-11-21, no code change)
+
+Baseline lagcmp counts (HEAD f3e3128ae, reproduced): Solar_Man FM1 1, FM4 16, FM5 2, PSG1 2, PSG2 2. newer_song_lol FM4 2, PSG1 16, PSG2 4 (FM6 5996 is the known artifact).
+
+Q1 newer_song_lol PSG1 (instrument 10, arp macro [1,0] with no loop, 04 22 vibrato on most notes, 04 55 on some):
+- The 112/113 frames at 42.45 and 70.6 s come from psgOffsets crossing every arp step with every vibrato offset. The one-tick +1 step then gets as much weight as the sustained vibrato, and psgFix picks a detune that misses the vibrato peak.
+- Tried: score the leading steps of a non-looping arp at vibrato 0 only (weighted or not). Result: PSG1 16 -> 15. The 42.45/70.6 frames are fixed, but new misses appear on the arp+1 note-on frame: 22.333/22.5 s 79 vs 80, 30.5/34.0/34.333 s 106 vs 107, 35.0/35.667 s 84 vs 85. Weighting the lead step changed nothing, so the miss is not a scoring trade-off. The note-on tick does not play at offset arp*128+0. Either the driver's first E8 vibrato node or Furnace's vibrato at note-on is not 0.
+- Reverted: it moves the misses instead of removing them.
+- Next: dump the first-tick vibrato value on both sides (Furnace vibPos at note-on, MDSDRV E8 node 0) for one note (30.5 s, key ~50). Then combine the lead step with that value.
+- The slide+arp frames (11.5, 13.167, 16.667, 18.33-18.83, 96.8, 98.5 s; 141 vs 142) use the baked 04xy slide path (slideCmd/arpBake), not portaEnvelope. Idea, not tried: per tick, fit slidePitch with off + 128*arp(t) and score only vibrato offsets there.
+
+Q2 (Solar_Man FM4 68.77 s, about 50 cents), Q3 (FM4 34.3 s, a rest steps the arp table) and Q4 (track 6 loop entry on a rest): not started (budget).
+
+## Phase 2u result
+
+Measured MAME vs Furnace VGM (lagcmp, frames over 10 cents; Solar_Man to 94.3 s, newer_song_lol to 100 s).
+
+| Run | Solar_Man seq bytes | Solar_Man FM1/FM4/FM5/PSG1/PSG2 | newer_song_lol seq bytes | newer_song_lol FM4/PSG1/PSG2 |
+|---|---|---|---|---|
+| Base | 20880 | 1/16/2/2/2 | 61702 | 2/16/4 |
+| Q1 fix | 20884 | 1/15/2/2/2 | 61702 (identical) | 2/16/4 |
+| Q1+Q2 fix | 21154 | 1/5/2/2/2 | 61702 (identical) | 2/16/4 |
+
+- Q1 (fixed): Solar_Man FM4 34.3 s, order 6 row 0 is a key-off at a chunk head. The head restated EB for instrument 21 (one-shot arp 12,0), the
+  table restarted, and MDSDRV steps mtab on rests (cmd_rest2 calls mds_update_mtab), so the release tail played +12 for one frame. A chunk head
+  after a finished one-shot arp now writes EB 00 + E4 <last step>, and the next note restates the table (`baked`).
+- Q2 (fixed): Solar_Man FM4 68.77-68.92 s, 02 20 at 56 Hz on 60 Hz frames. Furnace steps the slide once per engine tick; the MDSDRV
+  envelope ramped smoothly per frame and drifted up to 50 cents. pslideCmd now writes a per-frame staircase of Furnace ticks
+  (frame k = tick round((k+1)*fpf)) for the first 64 frames, then a linear tail and the clamp hold. 10 frames off -> 0. fpf 1 songs are unchanged
+  (golden_shit test hex holds).
+- Q3 (not a bug): Solar_Man tracks 3, 6, 7 (FM4, PSG1, PSG2) have no note in the loop chunk (order 1, 77.232 s; FM4 only a key-off), so FA sits
+  after the chunk's rests and the wrap replays the whole chunk with song-end state. Timing is correct.
+- Q4 (not started): newer_song_lol PSG1 first-tick vibrato, 16 frames still off.
+- Remaining Solar_Man FM4 frames (20.883, 31.417, 33.383, 85.717, 86.6 s) were there before 2u; not checked.
+- Listen ROM: ~/Desktop/md-roms/Solar_Man-2u.bin (newer_song_lol unchanged, no new ROM).

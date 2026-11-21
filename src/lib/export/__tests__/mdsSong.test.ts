@@ -269,6 +269,17 @@ describe('furnaceToMds', () => {
     const hex = Buffer.from((await convert('golden_shit.fur')).seq).toString('hex');
     expect(hex).toContain('0000fa000d01a800');
   });
+  it('Solar_Man FM4: a 02xx slide at 56 Hz on 60 Hz frames is a staircase of Furnace ticks, not a smooth per-frame ramp (68.77 s, Phase 2u)', async () => {
+    // Furnace steps once per engine tick; frame k plays tick round((k+1)*fpf). Runs of 8 and 15 sliding frames with a one-frame hold between
+    // them (delta 0, len 0). The smooth ramp drifted up to 50 cents from the VGM; measured in MAME: 10 frames off before, 0 after.
+    const hex = Buffer.from((await convert('Solar_Man.fur')).seq).toString('hex');
+    expect(hex).toContain('000000180701' + '00c000000002' + '00c000180e03');
+  });
+  it('Solar_Man FM4: a chunk head after a finished one-shot arp holds the last step (EB 00 E4 00) instead of restarting the table (34.3 s, Phase 2u)', async () => {
+    // Instrument 21 arp 12,0 one-shot. The head restated EB 18, the driver stepped the table on the key-off rest and played +12 for a frame.
+    const hex = Buffer.from((await convert('Solar_Man.fur')).seq).toString('hex');
+    expect(hex.split('e116e800eb00e400e207').length - 1).toBe(2); // 0 before the fix; heads where the arp still runs keep EB 18
+  });
   it('golden_shit: FM voice operators keep Furnace register order (+0,+4,+8,+C), as Furnace genesis.cpp and MDSDRV write them', async () => {
     // FM2 voice, from Furnace's own VGM: DT/MUL 02 04 05 02, KS/AR 1b 1a 8d 18 (the [0,2,1,3] remap wrote 02 05 04 02 / 1b 8d 1a 18).
     const hex = Buffer.from((await convert('golden_shit.fur')).seq).toString('hex');
@@ -494,7 +505,7 @@ describe('furnaceToMds', () => {
     expect(e1).not.toEqual(await run([{ type: 0x01, value: 0 }]));
   });
   it('loop point sits at each track\'s first note of the loop chunk, so leading rests and 04xy replay with song-end state (newer_song_lol FM4 96.17 s, Phase 2r)', async () => {
-    for (const name of ['newer_song_lol.fur']) { // Solar_Man track 6 enters the loop on a rest (cause not checked yet, Phase 2r open item)
+    for (const name of ['newer_song_lol.fur']) { // Solar_Man is left out: its loop chunk has no note on FM4, PSG1 or PSG2, so FA sits at the chunk end (correct, Phase 2u)
       const sd = (await convert(name)).seq.subarray(8);
       const w = (o: number) => (sd[o] << 8) | sd[o + 1];
       const bgm = (w(4) << 16) | w(6), tbase = bgm + w(bgm);
