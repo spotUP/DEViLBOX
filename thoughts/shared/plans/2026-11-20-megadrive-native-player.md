@@ -553,3 +553,44 @@ Commit 24e441379: linear-pitch 01xx/02xx now converts to an MDSDRV extended pitc
 - PSG key-off slide (Furnace playback.cpp:1153 does not slide after key-off; our PSG path does): no corpus check done, still open.
 
 Listen ROM: ~/Desktop/md-roms/golden_shit-02-slide.bin
+
+## Phase 1k results (2026-11-21)
+
+Code: commit 340847596 (src/lib/export/md/mdsSong.ts, tools/md-phase0/events.py).
+Listen ROMs: ~/Desktop/md-roms/golden_shit-0A-volslide.bin, Solar_Man-EC-cut.bin, djtBMX-ED-delay.bin.
+
+### 01 pitch slide up (Solar_Man o3 r24 ch3 / FM4, 01 03, 56 Hz speed 5)
+- Furnace per tick from 19.2857 s: 525.88, 529.13, 531.57, 534.82, 537.25 Hz.
+- MAME per frame: 525.88, 528.31, 531.57, 534.00, 537.25 Hz. Worst gap about 2.7 cents (fnum rounding).
+- Verdict: 1:1 in rate. After r25 Furnace stops at 554.32 Hz because of E1 11 (note slide up); E1 is unsupported, so MAME keeps rising.
+- Side note: MAME key-on about 60 ms early on this song (19.2237 s vs 19.2857 s). Not chased.
+
+### 0A volume slide (golden_shit FM2, 0A 01 then 0A 0F, 60 Hz speed 1)
+- Before: lossy "effect 0A", no slide in MAME.
+- After: TL0 and TL3 match on all 449 frames (0-7.5 s). TL1/TL2 match on all frames once MAME TL1/TL2 are swapped.
+- Verdict: 1:1. The TL1/TL2 swap is a separate bug (see open gaps).
+
+### EC note cut (Solar_Man FM1/FM3, EC 01, 56 Hz speed 5)
+- Before: lossy "effect EC", note never cut.
+- After: Furnace key-off 1 tick (17.9 ms) after key-on (0.17857 -> 0.19642 s; 0.26785 -> 0.28571 s). MAME key-off 1-2 frames after key-on (0.18198 -> 0.19846 s; 0.26538 -> 0.29858 s).
+- Verdict: 1:1 within 60 Hz frame quantisation of 56 Hz ticks.
+
+### ED note delay (djtBMX FM3, ED 04, 156 Hz time-scaled to 120 Hz)
+- Before: lossy "effect ED", note on the row start.
+- After: Furnace key-on 0.02562 s (4 ticks at 156 Hz). MAME key-on 0.03194 s; expected 4 ticks at 120 Hz = 0.0333 s, inside one frame.
+- Verdict: 1:1 in ticks; absolute time carries the existing lossy 120 Hz cap of this song. Not measured on a song under 120 Hz.
+
+### 04 vibrato
+- Not started (budget).
+
+### Open gaps
+- NEW, top priority: fmVoice op order [0, 2, 1, 3] puts Furnace op2/op3 on the opposite registers from Furnace's own writes (0x44 vs 0x48). Probably swaps every op2/op3 parameter on every FM voice, not only TL.
+- E1/E2 note slides unsupported (215 E1 uses in corpus).
+- PSG key-off slide.
+- golden_shit 1 frame late from 7.83 s.
+- FM2/FM3 1102-cent clamp.
+- FA and other volume-slide effects still lossy.
+- ED delay does not shift 01/02/03 slide accounting (slides still start on the row tick).
+- MAME 60 ms early on Solar_Man key-on (cause unknown).
+- djtBMX tick rate capped at 120 Hz (MDSDRV maximum), time-scaled.
+- 04 vibrato unmeasured.
