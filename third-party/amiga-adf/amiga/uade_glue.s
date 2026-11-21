@@ -438,7 +438,14 @@ _uade_init_super:
         ; 0x57414C4C -- 'WALL' -- in user mode. That was the fault.
         move.l  #_uade_user_stack_end,$110.w            ; user stack
         move.l  #_uade_score_stack_end,$114.w           ; supervisor stack
+        ifd     UADE_FORCE
+;     TFMX Pro's DTP_Check2 rejects an "(Empty)"-titled mdat whose header word is not in its
+;     table of known songs (Turrican bonus: score sends CHECKERROR, player never starts); the
+;     browser's UADE.wasm plays it, so the template forces the player like it does.
+        move.l  #1,$118.w                               ; force
+        else
         clr.l   $118.w                                  ; force
+        endif
         clr.l   $11c.w                                  ; setsubsong flag
         clr.l   $120.w                                  ; subsong
         clr.l   $124.w                                  ; ntsc flag: PAL

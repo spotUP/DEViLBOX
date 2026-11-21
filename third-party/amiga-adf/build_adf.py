@@ -142,6 +142,8 @@ def main():
     player = entry['player']
     # UADE ignores the end report of these players (SONG_END_NOT_POSSIBLE -> $12C = 0); match it.
     asm = ASM + (['-DUADE_NO_SONG_END=1'] if {'broken_song_end', 'no_ep_end_detect'} & set(entry.get('flags', [])) else [])
+    # TFMX Pro's own check rejects some mdat files that the browser's UADE.wasm plays (forced).
+    asm += ['-DUADE_FORCE=1'] if player == 'TFMX-Pro' else []
     # EMS / EMS-6 modules have no magic and no text fields: screen.s must not print the MOD layout.
     asm += ['-DNOTEXT=1'] if player in ('EMS', 'EMS-6') else []
     # EMS-6 (software mixer, A1200) ticks from a real level-3 VBL like the demo; other players stay polled.
