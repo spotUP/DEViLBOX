@@ -905,3 +905,27 @@ Not done (budget). The harness has the Z80 0x0E02-0F tap (P lines) and the 68k A
 **Not done:** task 4 (PCM key-on lag tap on a second Genesis .fur with dense FM6 drums), out of budget.
 
 Listen ROM: `~/Desktop/md-roms/highscorefollin-1u.bin` (md1u fix.rom, 1t tap shell + PCM blob).
+
+## Phase 1v results (2026-11-21)
+
+Listen ROMs: `~/Desktop/md-roms/highscorefollin-1v.bin`, `~/Desktop/md-roms/Solar_Man-1v.bin`. Measurement scratch tool: `pcmlag.py` in the md1v session scratchpad (Furnace VGM `0x95` starts vs MAME `Q A00E08` / `P E08` taps, from the first FM key-on; greedy nearest match -50..+100 ms).
+
+### V1: highscorefollin FM2/FM3 36-40 s gap (FIXED, commit bf8bb6035)
+
+- Not operator order and not a fade. Both sides use register order (S1 S3 S2 S4); the MDX/OPM order is covered by `fmOperatorRegisterOrder.test.ts` (no `OPM_OP_OFFSETS` left in the tree).
+- Root cause: Furnace KVS. `fmsharedbase.h` `KVS(x,y) = (kvs==2 && isOutput[alg][y]) || kvs==1`; MDSDRV `mds_fm_update_vol` adds the volume to the carriers only (`mds_fm_op_table`). FM3 order 8 row 64 switches to instrument 21 "Funk Gt(Lower Volume)" (alg 3, TL 13 23 21 16, kvs 1 2 1 0) at attenuation 3: Furnace writes TL 16 23 24 16, MDSDRV wrote 13 23 21 19 (-2.25 dB). Instruments 9, 10, 22 share kvs 1 2 1 0 (FM2).
+- Fix: after every E1 (voice reload) and E2, emit `EE op base` for each operator where Furnace scaling differs from the driver: base + att on a scaled modulator, base - att on an unscaled carrier. Out-of-range base clamps and is reported lossy.
+- loud.py last window (36-40 s): FM2 -0.98 -> -0.06 dB, FM3 -2.08 -> +0.02 dB. Other channels unchanged.
+
+### V2: PCM key-on lag on a second song (Solar_Man, 534 FM6 hits, speed 5 at 56 Hz)
+
+- MegadriveOverdrive (most FM6 hits) is system 0xbe (YM2612 extended DualPCM), which the exporter rejects; Solar_Man used instead.
+- Baseline: Furnace 270 `0x95` starts in 40 s, MAME 209. All 72 missing hits were instrument 4 "Snare": a sample instrument with no SM feature, so the parser leaves `amiga` undefined and the converter took sample -1 (silent). Furnace `DivInstrumentAmiga` defaults `initSample(0)` (instrument.h), so it plays sample 0.
+- Fix (converter): `initSample ?? 0`. Test: Solar_Man FM6 key-ons at ticks 0 10 20 35.
+- After: 270 of 270 matched, 0 unmatched (the 15 "extra" MAME hits are past the 40 s compare window). Lag 68k median +5.3 ms (min -5.0, max 18.5), 269 of 270 within one 56 Hz frame; Z80 median +6.3 ms, 266 of 270. Same as highscorefollin 1q (FM pipeline offset), so no conversion lag.
+
+### Open
+
+- Solar_Man DAC level -0.6 .. -1.5 dB per window vs Furnace (loud.py). Known `pcmDacAtt` 2 dB-step shortcut; -1.54 dB exceeds the stated 1.2 dB max error, so check the 120-volume hits against `dacVolTable` before baking residual gain into the sample data.
+- Solar_Man PSG4 -0.3 dB flat (highscorefollin -0.03..-0.23). Not investigated.
+- Parser: `amiga` undefined for a sample instrument without SM; other consumers of `instrument.amiga` may need the same Furnace default. Not checked.
