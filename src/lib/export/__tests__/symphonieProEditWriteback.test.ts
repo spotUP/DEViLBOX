@@ -84,4 +84,14 @@ describe('SymphoniePro export keeps the module', () => {
     const back = (await load(exportSymphonieProFile(song)))!;
     expect(JSON.stringify(back.patterns[2].channels[6].rows[1])).toBe(orig);
   });
+
+  it('a note edit on a cell with an unencodable effect lands; the effect is dropped', async () => {
+    const song = (await load(new Uint8Array(readFileSync(FIXTURE))))!;
+    const cell = song.patterns[2].channels[6].rows[1]; // a volume slide in the fixture
+    expect(cell.effTyp).toBe(0x0A);
+    Object.assign(cell, { note: 50, instrument: 2, effTyp: 0x0C, eff: 0x40 });
+    const back = (await load(exportSymphonieProFile(song)))!;
+    const bc = back.patterns[2].channels[6].rows[1];
+    expect([bc.note, bc.instrument, bc.effTyp]).toEqual([50, 2, 0]);
+  });
 });

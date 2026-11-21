@@ -23,6 +23,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { TrackerCell } from '@/types';
+import { notify } from '@stores/useNotificationStore';
 import { _convertEvent } from '@/lib/import/formats/SymphonieProParser';
 
 // ── SymEvent command constants (same as parser) ────────────────────────────
@@ -391,6 +392,7 @@ export function exportSymphonieProFile(song: TrackerSong): Uint8Array {
   // Then for each TrackerSong pattern, write its cells back to the raw event array
   const numInstruments = song.patterns[0]?.importMetadata?.originalInstrumentCount ?? 0;
   let changed = false;
+  const dropped = new Set<string>();
   const patternMap = new Map<string, number>();
   let trackerPatIdx = 0;
 
@@ -440,6 +442,7 @@ export function exportSymphonieProFile(song: TrackerSong): Uint8Array {
               const byteOffset = eventIdx * 4;
 
               // Patch only cells whose grid view differs from what the parser shows for the source event.
+              let noteEdited = true;
               if (byteOffset + 4 <= originalPatternEventsRaw.length) {
                 const shown: TrackerCell = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
                 _convertEvent({
@@ -447,14 +450,18 @@ export function exportSymphonieProFile(song: TrackerSong): Uint8Array {
                   param: newEvents[byteOffset + 2], inst: newEvents[byteOffset + 3],
                 }, shown, effectiveTranspose, numInstruments);
                 if (ch === 0 && row === 0) { shown.effTyp = 0x0F; shown.eff = pos.speed > 0 ? pos.speed : 6; }
-                if ((cell.note ?? 0) === shown.note && (cell.instrument ?? 0) === shown.instrument
-                  && (cell.volume ?? 0) === shown.volume && (cell.effTyp ?? 0) === shown.effTyp
+                noteEdited = (cell.note ?? 0) !== shown.note || (cell.instrument ?? 0) !== shown.instrument
+                  || (cell.volume ?? 0) !== shown.volume;
+                if (!noteEdited && (cell.effTyp ?? 0) === shown.effTyp
                   && (cell.eff ?? 0) === shown.eff) continue;
               }
-              const encoded = encodeSymEvent(cellToEncode, effectiveTranspose);
+              let encoded = encodeSymEvent(cellToEncode, effectiveTranspose);
               if (!encoded) {
-                console.warn(`[SymphonieProExporter] effect ${(cell.effTyp ?? 0).toString(16)}${(cell.eff ?? 0).toString(16).padStart(2, '0')} has no Symphonie event; source event kept`);
-                continue;
+                // One event is a key-on OR a command, so a note edit and an unencodable effect cannot both land: the edit wins.
+                const fx = `${(cell.effTyp ?? 0).toString(16)}${(cell.eff ?? 0).toString(16).padStart(2, '0')}`.toUpperCase();
+                if (!noteEdited) { console.warn(`[SymphonieProExporter] effect ${fx} has no Symphonie event; source event kept`); continue; }
+                encoded = encodeSymEvent({ ...cellToEncode, effTyp: 0, eff: 0 }, effectiveTranspose)!;
+                dropped.add(fx);
               }
               changed = true;
 
@@ -472,6 +479,8 @@ export function exportSymphonieProFile(song: TrackerSong): Uint8Array {
       }
     }
   }
+
+  if (dropped.size) notify.warning(`SymphoniePro export: effect ${[...dropped].join(', ')} cannot be written with a note in the same cell; the note edit was kept and the effect dropped.`);
 
   // Pack the new events
   // Unedited: keep the source chunk bytes (a repack would not reproduce the original packing).
