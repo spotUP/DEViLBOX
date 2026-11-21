@@ -623,3 +623,47 @@ Listen ROM: ~/Desktop/md-roms/golden_shit-oporder.bin.
 - 04 vibrato unimplemented and unmeasured.
 - Sibling, unverified: src/lib/export/MDXExporter.ts has OPM_OP_OFFSETS = [0, 2, 1, 3]. Furnace OPM also stores ops in register order (fmshared_OPM.h opOffs 0x00/0x08/0x10/0x18), so MDX may carry the same swap; check against MDX's voice layout before changing.
 - All Phase 1k open gaps except the op-order item remain.
+
+## Phase 1m results (2026-11-21)
+
+Code: commits b1e49f8f9 (MDX/PMD operator order) and the Phase 1m vibrato commit (src/lib/export/md/mdsSong.ts, src/lib/export/__tests__/mdsSong.test.ts).
+Listen ROM: ~/Desktop/md-roms/highscorefollin-04-vibrato.bin.
+
+### Sibling audit: Furnace FM operator order in exporters
+Furnace stores operators in register order (OPM opOffs 0x00/0x08/0x10/0x18 in fmshared_OPM.h, OPN 0x00/0x04/0x08/0x0c in fmshared_OPN.h; arcade.cpp and ym2608.cpp write state.op[j] at chanOffs|opOffs[j]). orderedOps only renumbers operators for effects.
+
+| Hit | Verdict | Action |
+|---|---|---|
+| MDXExporter OPM_OP_OFFSETS [0,2,1,3] (*8) | Wrong: swaps op 2/3 on every 0x40-0xE0 write. MDX emits raw register writes (0xFE reg val), so only the register address matters | Fixed to i*8 |
+| PMDExporter OPN_OP_OFFSETS [0,8,4,12] | Wrong: same swap on OPN registers | Fixed to i*4 |
+| fmOperatorModel FM_FOUR_OPERATOR_DISPLAY_ORDER [0,2,1,3] | Correct: UI display order (Furnace insEdit.cpp opOrder) | None |
+| FurnaceRegisterMapper | Correct: storage order | None |
+| engine/furnace/__tests__/operatorOrder.test.ts | Correct: pins storage order | None |
+| AdPlugExporter (OPL 2-op) | Correct: operators[0] modulator, [1] carrier | None |
+| md/mdsSong fmVoice | Fixed in 8ddf0fda1 | None |
+
+Unit test: src/lib/export/__tests__/fmOperatorRegisterOrder.test.ts (MULT 1,2,3,4 lands at slots +0,+8,+16,+24 for MDX and +0,+4,+8,+C for PMD).
+
+### 04 vibrato: design
+- Furnace (playback.cpp): 04xy sets rate x, depth y. A note resets pos to 0 unless continuousVibrato. Every tick, after the row runs, pos += x (mod 64) while depth > 0. The pitch offset is ((y * vibTable[pos] * vibratoFine) >> 4) / 15 in 1/128 semitone under linear pitch. vibTable[i] = (int)(127 * sin(i / 64 * 2 pi)). vibratoFine = 15, set by E4xx.
+- MDSDRV: an extended pitch envelope (E8, doc/mdsseq.md). There is one node per driver frame: init = 2 * offset (1/256 semitone), delta 0, len 0. The cycle is 64 / gcd(64, x) nodes and the last node loops to node 0. Node n plays pos0 + (n + 1) * x, the same "first frame is tick 1" rule portaEnvelope uses.
+- Rejected: EA FM LFO sensitivity. It is global, hardware-shaped and does not reach PSG.
+- Emission: E8 on a note while depth > 0 (phase from 0, or the carried phase with continuousVibrato); E8 on a mid-note 04/E4 change from the current phase; the instrument pitch envelope comes back on 04 x0; the envelope is re-sent at chunk start while sounding. The phase is tracked per channel in ticks.
+- Lossy (flagged): non-linear pitch (still "effect 04"); 04 together with a 01/02/03 slide or an instrument pitch macro (vibrato replaces it); tpf != 1 rounds the frame to the nearest tick.
+- Not handled: vibrato shapes (E3xx), 05xy, vibratoDirection. These are not flagged yet.
+
+### 04 vibrato: measurement
+- Song: highscorefollin.fur (linear pitch, 60 Hz). It has mid-note 04 66 on FM2-FM4 at order 0 row 32, with vibrato from 4.0 s.
+- Measurement: Furnace VGM against headless MAME, per-frame FM frequency, lag-tolerant +-1 frame (scratch lagcmp.py).
+- 0-19.4 s results:
+  - FM1-FM3 worst 2.4 cents, 0 frames over 10 cents. Verdict: 1:1 through the vibrato sections.
+  - FM4 has 19 frames over 10 cents (worst 87.5) at 2.13-2.25 s, before any vibrato. Furnace keys off and re-keys with a rising slide; MDSDRV slurs with no key-off.
+- Unit tests:
+  - vibratoEnvelope(0, 4, 7) exact nodes.
+  - highscorefollin sequence contains vibratoEnvelope(0, 6, 6), with no "effect 04" lossy.
+
+### Open gaps
+- From 19.5 s, all FM channels diverge: 35-40 frames over 10 cents, worst 701 cents at 23.48 s. The cause is not traced. The listen ROM is a good place to hear it. It is unverified whether this predates the vibrato change.
+- FM4 slide/slur at 2.13 s (above).
+- Vibrato shapes, 05xy and vibratoDirection are unimplemented.
+- MDX/PMD exporters write no voice table, so SET_VOICE points at nothing. PMD's 0xFE register-write meaning is unverified.

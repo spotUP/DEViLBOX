@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { furnaceToMds, portaEnvelope } from '../md/mdsSong';
+import { furnaceToMds, portaEnvelope, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf9, 0xfb]);
@@ -117,6 +117,19 @@ describe('furnaceToMds', () => {
     const hex = Buffer.from((await convert('golden_shit.fur')).seq).toString('hex');
     expect(hex).toContain('020405021b1a8d18');
     expect(hex).not.toContain('020504021b8d1a18');
+  });
+  it('vibratoEnvelope: 04 47 is 16 one-frame nodes of 2 * ((7 * vibTable[pos] * 15) >> 4) / 15, first node at pos 4, looping to node 0', () => {
+    const env = vibratoEnvelope(0, 4, 7);
+    expect(env.length).toBe(16 * 6);
+    expect(env.slice(0, 6)).toEqual([0x00, 0x2a, 0, 0, 0, 1]); // vibTable[4] = 48: (7*48*15)>>4 = 315, /15 = 21
+    expect(env.slice(15 * 6)).toEqual([0, 0, 0, 0, 0, 0]); // pos 64 = 0, next 0
+    expect(env.slice(7 * 6, 7 * 6 + 2)).toEqual([0, 0]); // node 7 = pos 32: vibTable 0
+    expect(env.slice(11 * 6, 11 * 6 + 2)).toEqual([0xff, 0x92]); // node 11 = pos 48: vibTable -127, (7*-127*15)>>4 = -834, /15 = -55
+  });
+  it('highscorefollin: mid-note 04 66 on FM2 (order 0 row 32) is an E8 extended vibrato envelope from pos 0, not lossy', async () => {
+    const s = await convert('highscorefollin.fur');
+    expect(Buffer.from(s.seq).toString('hex')).toContain(Buffer.from(vibratoEnvelope(0, 6, 6)).toString('hex'));
+    expect(s.lossy.some((l) => l.startsWith('effect 04'))).toBe(false);
   });
   it('0Axy: volume slides down one step per tick, row tick included, one E2 per changed tick (Solar_Man FM1, 0A 04)', async () => {
     const s = await solarManRow0([{ type: 0x0a, value: 0x04 }]);

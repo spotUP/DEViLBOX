@@ -203,6 +203,24 @@ function arpTable(m: FurnaceMacro, lossy: Lossy): number[] | undefined {
 
 const be16 = (v: number): number[] => [(v >> 8) & 0xff, v & 0xff];
 
+const VIB_TABLE = Array.from({ length: 64 }, (_, i) => Math.trunc(127 * Math.sin((i / 64) * 2 * Math.PI))); // engine.cpp vibTable
+/**
+ * Furnace 04xy (linear pitch, sine shape): every tick, after the row runs, pos += x (mod 64) and the pitch offset is
+ * ((y * vibTable[pos] * fine) >> 4) / 15 in 1/128 semitone (playback.cpp per-tick vibrato; fine = E4xx, default 15), so the
+ * first tick after `pos0` already plays pos0 + x. Written as an extended pitch envelope, one 1/256-semitone node per driver
+ * frame, looping over the 64/gcd(64, x)-tick cycle; `tpf` (sequence ticks per frame) picks the Furnace tick each node lands on.
+ */
+export function vibratoEnvelope(pos0: number, rate: number, depth: number, fine = 15, tpf = 1): number[] {
+  const off = (t: number) => Math.trunc(((depth * VIB_TABLE[(pos0 + (t + 1) * rate) % 64] * fine) >> 4) / 15);
+  let g = 64; for (let r = rate; r; ) [g, r] = [r, g % r];
+  const frames = rate ? Math.max(1, Math.round(64 / g / tpf)) : 1, out: number[] = [];
+  for (let n = 0; n < frames; n++) {
+    const w = (2 * off(Math.round(n * tpf))) & 0xffff;
+    out.push(w >> 8, w & 0xff, 0, 0, rate ? 0 : 255, (n + 1) % frames);
+  }
+  return out;
+}
+
 export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const lossy = new Lossy();
   const sys = m.systems;
@@ -291,6 +309,10 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // PSG: E2 $80|v gives attenuation 15-v, added to the envelope attenuation 15-macro and clamped, the same sum as Furnace VOL_SCALE_LOG.
     const volCmd = (v: number) => [0xe2, kind === 'fm' ? 127 - v : 0x80 | Math.max(0, Math.min(15, v))];
     let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0;
+    // 04xy state: pos was `vPos` at tick `vAt` and advances by vRate per tick while vDepth > 0 (playback.cpp).
+    let vDepth = 0, vRate = 0, vPos = 0, vAt = 0, vFine = 15;
+    const vSync = (t: number) => { if (vDepth) vPos = (vPos + (t - vAt) * vRate) % 64; vAt = t; };
+    const vibCmd = (t: number): number[] => { vSync(t); return [0xe8, extItem(vibratoEnvelope(vPos, vRate, vDepth, vFine, tpf)) + 1]; };
     // 0Axy: Furnace keeps volume in 1/256 steps and adds x*64 (or -y*64) every tick, the row's first tick included, until it clamps at
     // 0 or the channel maximum (playback.cpp per-tick volume slides); the driver gets an E2 on every tick where volume>>8 changes.
     const vmax = kind === 'fm' ? 127 : 15;
@@ -328,7 +350,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         const peg = (chunkStart ? sounding && (prate || poff) : prate) ? pslideCmd() : chunkStart && tick < slideEnd ? [] : [0xe8, r.peg + 1];
         return [0xe1, r.ins, ...peg, 0xeb, r.mtab + 1];
       };
-      const bytes: number[] = [...insCmd(true), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(dtn ? [0xe6, dtn & 0xff] : [])];
+      const bytes: number[] = [...insCmd(true), ...(vDepth && sounding ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(dtn ? [0xe6, dtn & 0xff] : [])];
       let curIns = ins;
       type Tok = { cmd: 'note' | 'tie' | 'rest'; n: number; t: number; pre: number[] };
       const tok: Tok[] = [];
@@ -360,7 +382,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         const nv = cell ? convertFurnaceNoteValue(cell) : -1;
         if (cell && cell.instrument >= 0) ins = cell.instrument;
         const cmds: number[] = [];
-        let pChanged = false;
+        let pChanged = false, vChanged = false;
         // EDxx runs the whole row xx ticks late; ECxx keys off xx ticks after the row runs (playback.cpp rowDelay / cut, delayBehavior 2).
         const fxv = (t: number) => cell?.effects?.find((e) => e.type === t && e.value > 0)?.value ?? 0;
         let delay = fxv(0xed), cutAt = fxv(0xec);
@@ -386,6 +408,11 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           }
           if (e.type === 0x0a) { vspeed = !e.value ? 0 : e.value & 15 ? -(e.value & 15) * 64 : (e.value >> 4) * 64; continue; }
           if (e.type === 0xec || e.type === 0xed) continue;
+          if ((e.type === 0x04 || e.type === 0xe4) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
+            vSync(tick + delay);
+            if (e.type === 0xe4) vFine = e.value; else { vDepth = e.value & 15; vRate = e.value >> 4; }
+            vChanged = true; continue;
+          }
           if (e.type === 0x03 && (kind === 'psg' || kind === 'fm')) { portaXx = e.value; if (prate) { prate = 0; pChanged = true; } continue; } // 03 00 only stops the porta
           if ((e.type === 0x01 || e.type === 0x02) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
             prate = (e.type === 0x01 ? 1 : -1) * e.value * pss; pChanged = true;
@@ -400,6 +427,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         const isNote = nv >= 0 && nv < 253, isOff = nv >= 253;
         if (isNote) { poff = 0; curNv = nv; }
         else if (pChanged && sounding && (prate || poff)) cmds.push(...pslideCmd());
+        if (!isNote && vChanged && sounding) { cmds.push(...(vDepth ? vibCmd(tick + delay) : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
         if (isNote && ins !== curIns) { curIns = ins; cmds.unshift(...insCmd()); }
         if (isNote || isOff || cmds.length || i === 0) {
           if (tok.length) emit(tok.pop()!);
@@ -420,7 +448,13 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             }
             else if (prate) { if (pChanged || pInit || !pegDirty) cmds.push(...pslideCmd()); }
             else if (pegDirty) cmds.push(0xe8, insRef(kind, ins).peg + 1);
-            pegDirty = slide || prate !== 0; portaXx = 0; prevKey = kind === 'psg' || kind === 'fm' ? nv : -1;
+            pegDirty = slide || prate !== 0; portaXx = 0;
+            if (!m.compatFlags.continuousVibrato) { vPos = 0; vAt = tick + delay; }
+            if (vDepth) {
+              if (slide || prate || insRef(kind, ins).peg >= 0) lossy.add('04xy with a pitch slide or pitch macro (vibrato replaces it)');
+              cmds.push(...vibCmd(tick + delay)); pegDirty = true;
+            }
+            prevKey = kind === 'psg' || kind === 'fm' ? nv : -1;
             tok.push({ cmd: 'note', n, t: 0, pre: cmds }); sounding = true; any = true;
             keyOns.push({ tick: tick + delay, ch, note: nv });
           } else if (isOff) { tok.push({ cmd: 'rest', n: 0, t: 0, pre: cmds }); sounding = false; }
