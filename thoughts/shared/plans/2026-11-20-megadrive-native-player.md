@@ -1653,3 +1653,16 @@ No code change landed. Counts unchanged from 2x (Solar_Man seq 21154: FM1 1, FM4
 - Real fix needs a per-tick slide in the driver (step on the tick, not the frame). That is a driver change, out of scope here. Attempt saved as scratch patch only (not kept).
 
 Not reached: newer_song_lol PSG2 32.35 / 19.417 / 31.283 s (task 2), Solar_Man FM4 20.883 / 31.417 / 85.717 / 86.6 s (task 3).
+
+## Phase 2z result (2026-11-21)
+
+No code change. All three newer_song_lol PSG2 misses are classified. Neither cause can be fixed in mdsSong.ts without moving misses elsewhere.
+
+- 32.35 s (17.6 cents, first frame of a fast slide): step count, first-step offset and phase are all correct. Slide note 25 -> 37, sA -1536, step 544; Furnace frames 1940/1941/1942 sit at offsets -992/-448/0 (352.9 / 456.6 / 565 Hz). Sequence ticks 2329 and 2330 (Furnace ticks 1941 and 1942) both run in driver frame 1939, so the -448 step (456.6 Hz) is never heard; MAME writes 559.3 Hz. Cause: the NTSC conductor merge in `frameTempos` (two Furnace frames into one 59.92 Hz frame, about every 12.94 s) lands on a fast slide step.
+- 19.417 s: same class. Ticks 1398/1399 (Furnace 1165/1166) share driver frame 1164; slide step offset 96 (350.7 Hz) is lost. The merges recur at 19.41 s and 32.35 s, 12.94 s apart.
+  - Possible fix (not tried): place each merge on a frame pair where no channel changes pitch or volume. The tempo track is shared by every channel, so a merge can only move inside the drift window (+-0.5 frame). Each candidate must be checked against all channels. This is a `frameTempos` change.
+- 31.283 s: new class, a psgFix one-period rounding miss. Key 43, vibrato 04 rate 6 depth 6, detune -11 (the psgFix pick). Vibrato offset 18 (nodes 2 and 6) gives driver period 141 where Furnace writes 142 (793.3 vs 787.8 Hz). Every other offset matches. A sweep over all detunes -128..127 for key 43 over vibOffsets(6,6) finds no detune with zero misses (best 1: -15/-14/-13 miss offset -43, -11 misses 18). So one detune per key cannot be exact; the driver truncates the interpolated period where Furnace rounds.
+  - Possible fix (not tried): bake the vibrato as a per-node pitch envelope with a per-node lead, like `psgLead`, when psgFix leaves a missing offset. This adds seq bytes for every such note.
+- Solar_Man FM4 note-boundary frames (task 3): not reached.
+
+Counts unchanged from the 2y baseline: Solar_Man FM1 1, FM4 5, FM5 2, PSG1 2, PSG2 2 (seq 21154); newer_song_lol PSG2 3, artifacts FM4 2, FM6 ~5996 (seq 63356).
