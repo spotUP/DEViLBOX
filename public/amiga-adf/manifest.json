@@ -1297,6 +1297,45 @@
         "player": "72ec3766fe73156e6ac352e8de4d1470a3a8b9bd092c633f5de897c6b457382c"
       }
     },
+    "Medley": {
+      "adf": "Medley.adf",
+      "adfSha256": "c577e54ed6b0f05daf21bde6dc2b8d008495e0c4f8fe1cab1672a00bc643cc8f",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 45616,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 45612,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 275472,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 314628,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x43600",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5B600",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4CD04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "combat.mso",
+        "bytes": 11076
+      },
+      "sources": {
+        "tool": "9f6e5eb40f36329978bfa532f63eba29fd2720e77e24f7896c5610e0dc0d66de",
+        "player": "848ece09e39e00cccc8c7495e8666b8080621dfe69cacb1e09971c91f9354beb"
+      }
+    },
     "Mugician": {
       "adf": "Mugician.adf",
       "adfSha256": "4f7f909b6fed833ede8669d13b83fe6b915ed53cb7d3f657674bf84bfa86af62",
@@ -1568,6 +1607,45 @@
       "sources": {
         "tool": "8a0f9af8f17b9b236b64f1375f4e30f4a43b894b98f7f15b6f3db7ca1dc9b789",
         "player": "803f830e56676b0abd8b25075860764db266e35dbea9258163e99814db2705bc"
+      }
+    },
+    "PumaTracker": {
+      "adf": "PumaTracker.adf",
+      "adfSha256": "4e67fdb6602da8880c47449d53c5c0386dc41d2e34d6ffa8c279a9f9078bbc84",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 44568,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 44564,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 274436,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 329988,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x43200",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5B200",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x50904",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "liquid kids - lv1a.puma",
+        "bytes": 15338
+      },
+      "sources": {
+        "tool": "9f6e5eb40f36329978bfa532f63eba29fd2720e77e24f7896c5610e0dc0d66de",
+        "player": "383851f0c1ee26252d08baa7798d99a6b73029a4cf386bc541e078b97708c9c3"
       }
     },
     "QuadraComposer": {
