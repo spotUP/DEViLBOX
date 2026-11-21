@@ -1333,3 +1333,42 @@ Solar_Man: byte-identical seq (18090 bytes). All lagcmp counts unchanged, so no 
 - PSG1/PSG2: not analysed.
 
 Listen ROM: `~/Desktop/md-roms/newer_song_lol-2l.bin`.
+
+## Phase 2m results (03xx slide after note-off)
+
+**Furnace source (third-party furnace, src/engine/playback.cpp):**
+- 791-815: a note-off on a channel with `inPorta` and `noteOffResetsSlides` sets `scheduledSlideReset=true` (814).
+- 1722-1727: at the end of processRow, `!keyOn && scheduledSlideReset` clears portaNote, portaSpeed and inPorta.
+- 2290 (nextRow/processRow) runs before the per-channel effect loop at 2299. The porta step at 2537-2556 runs when `(keyOn || keyOff) && portaSpeed>0`, so it keeps stepping while the channel is keyed off.
+- genesis.cpp:1852 `keyOffAffectsPorta` is `ch>5`. It is false for FM1-5, so a key-off does not stop the porta on FM.
+- Both songs: noteOffResetsSlides=1, targetResetsSlides=1, noSlidesOnFirstTick=0, linearPitch=2, pitchSlideSpeed=4.
+
+**Invariant:** the exported pitch slide steps on every Furnace tick that Furnace steps it, including ticks after a note-off, and stops on the target.
+
+**Cause:** `tickPre` and the row slide line in mdsSong.ts emitted slide steps only while `sounding`. A note-off froze the pitch mid-slide. This caused FM1-3 to sit 23-31 cents sharp at 22.75 s, and caused the long post-note-off slide error at 58.9 s.
+
+**Fix:** `sTail` in mdsSong.ts. After a note-off on a sounding channel, slide steps keep running (`sounding || fTick(t) <= sTail`), and `slideOff` already clamps at the target. A first try with a one-tick tail fixed only 22.75 s (100 s: FM1-3 11 -> 7). The run-to-target rule fixes both cases. The source reading for 22.75 s (reset at 1722 before the step at 2537) does not explain why the slide continues there. The rule comes from the measured VGM, not fully from the source.
+
+**newer_song_lol, frames over 10 cents (lagcmp.py, Furnace VGM vs MAME):**
+
+| Channel | 40 s before (2l) | 40 s after | 100 s before | 100 s after |
+|---|---|---|---|---|
+| FM1 | 3 (31.3 c at 22.82) | 0 | 11 (563 c at 58.97) | 0 (worst 8.9) |
+| FM2 | 3 | 0 | 11 | 0 (8.9) |
+| FM3 | 3 (31.3 c at 22.90) | 0 | 11 | 0 (8.9) |
+| FM4 | 3 (21.0 c at 10.88) | 3 | 13 | 13 (22.2 c at 96.02) |
+| FM5 | 0 | 0 | not measured | 0 (8.4) |
+| PSG1 | 15 | 15 | not measured | 69 |
+| PSG2 | 13 | 13 | not measured | 13 |
+| PSG3 | 0 | 0 | not measured | 0 |
+
+FM6 is DAC. The metric does not apply, and the result is unchanged.
+
+**Regression:** the Solar_Man (2k) sequence is byte-identical to 2l (18090 bytes). The newer_song_lol (2j) sequence grows from 60704 bytes to about 60730.
+
+**Listen ROM:** ~/Desktop/md-roms/newer_song_lol-2m.bin.
+
+**Limits / open:**
+- The ECxx note cut path (playback.cpp:2569-2591) also schedules a slide reset. Not measured.
+- FM4 at 10.87 s (3 frames, 21 c) and at 96.02 s: not started.
+- PSG1/PSG2 over-10-cent frames: not part of 2m.

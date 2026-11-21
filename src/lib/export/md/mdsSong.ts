@@ -575,6 +575,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // An arp macro table writes t_trs too (`16 tt`, absolute, every step), so while it runs it would overwrite the slide's E4. Under
     // such a slide the slur note gets its own table (arpBake): arp value + slide transpose per sequence tick, and E4 stays out.
     let sA = 0, sStep = 0, sF0 = 0, trsOut = 0, arpT0 = 0, baked = false;
+    // sTail: last Furnace tick a keyed-off slide still steps on. Furnace runs NOTE_PORTA while keyOff is set (playback.cpp:2537), so a
+    // slide keeps stepping past a note-off until it lands on its target (measured 1:1, newer_song_lol FM1-3 22.75 s and 58.9 s).
+    let sTail = -1;
     const slideOff = (f: number) => (sA ? Math.sign(sA) * Math.max(0, Math.abs(sA) - sStep * (f - sF0 + 1)) : 0);
     // Furnace keeps inPorta after a 03xx note until the slide reaches its target (targetResetsSlides), 03 00, 01xx/02xx or a note off:
     // a note in between without 03 only retargets the slide (playback.cpp commit note on: inPorta && keyOn -> portaNote = note, no
@@ -666,7 +669,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       baked = false; arpT0 = tick; // insCmd(true) restates EB, which restarts the instrument's arp table
       const bytes: number[] = [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && sounding ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(sA && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
       // One sequence tick's mid-row commands: 0Axy volume step and the per-tick slide.
-      const tickPre = (t: number): number[] | null => { const v = volStep(), sl = sA && sounding ? slideCmd(t) : []; return v || sl.length ? [...(v ?? []), ...sl] : null; };
+      const tickPre = (t: number): number[] | null => { const v = volStep(), sl = sA && (sounding || fTick(t) <= sTail) ? slideCmd(t) : []; return v || sl.length ? [...(v ?? []), ...sl] : null; };
       let curIns = ins;
       type Tok = { cmd: 'note' | 'tie' | 'rest'; n: number; t: number; pre: number[] };
       const tok: Tok[] = [];
@@ -825,7 +828,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             prevKey = kind === 'psg' || kind === 'fm' ? nv : -1;
             tok.push({ cmd: 'note', n, t: 0, pre: cmds }); sounding = true; any = true;
             keyOns.push({ tick: tick + delay, ch, note: nv });
-          } else if (isOff) { tok.push({ cmd: 'rest', n: 0, t: 0, pre: cmds }); sounding = false; }
+          } else if (isOff) { tok.push({ cmd: 'rest', n: 0, t: 0, pre: cmds }); if (sounding) sTail = Infinity; sounding = false; }
           else { tok.push({ cmd: sounding ? 'tie' : 'rest', n: 0, t: 0, pre: cmds }); if (i === 0) tieStart = sounding; }
         }
         tok[tok.length - 1].t += 1;
