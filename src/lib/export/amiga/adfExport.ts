@@ -13,6 +13,8 @@ import { isAProSysFormat } from '../../import/formats/AProSysParser';
 import { isSoundImagesFormat } from '../../import/formats/SoundImagesParser';
 import { isRiffRaffFormat } from '../../import/formats/RiffRaffParser';
 import { isJochenHippel7VFormat } from '../../import/formats/JochenHippel7VParser';
+import { isSonicArrangerFormat } from '../../import/formats/SonicArrangerParser';
+import { isDeltaMusic2Format } from '../../import/formats/DeltaMusic2Parser';
 
 export interface AdfTemplateEntry {
   adf: string;
@@ -74,6 +76,9 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   if (isSoundImagesFormat(m, filename)) return 'SoundImages';
   // Path A of the 7V check accepts any $6000 loader stub, so it comes after every magic-based test.
   if (isJochenHippel7VFormat(m)) return 'JochenHippel-7V';
+  // DeltaMusic2 checks the ".FNL" tag at $bc6; SonicArranger's SOARV1.0 magic is exact but its 4EFA player-binary path is loose, so both come after the exact magics.
+  if (isDeltaMusic2Format(m)) return 'DeltaMusic2.0';
+  if (isSonicArrangerFormat(m.buffer.slice(m.byteOffset, m.byteOffset + m.byteLength) as ArrayBuffer)) return 'SonicArranger';
   // Last: the hunk scan for the RIFFRAFF magic is the loosest of the detect functions.
   if (isRiffRaffFormat(m)) return 'RiffRaff';
   return null;

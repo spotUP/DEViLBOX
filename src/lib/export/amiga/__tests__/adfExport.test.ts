@@ -42,6 +42,10 @@ const CASES: Array<[string, string]> = [
   ['oktalyzer/les granges brulees.okta', 'Oktalyzer'],
   ['formats/ghostbattle_gameover.hip7', 'JochenHippel-7V'],
   ['hippel-7v/lethalxcess-intro.hip7', 'JochenHippel-7V'],
+  ['formats/almighty.sa', 'SonicArranger'],
+  ['sonic-arranger/mega end.sa', 'SonicArranger'],
+  ['formats/anthrox_intro.dm2', 'DeltaMusic2.0'],
+  ['delta-music-2/asperity megademo 3.dm2', 'DeltaMusic2.0'],
 ];
 
 describe('adf slot patcher', () => {
