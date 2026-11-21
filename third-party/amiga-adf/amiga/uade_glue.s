@@ -2159,6 +2159,13 @@ uade_msg_trap:
 .adv_set:
         move.w  d1,(a0)
 .adv_done:
+        else
+;*--- PORT: single-module disk (the ADF export): score stops the player on a
+;     reported end (score.s end_song) and waits for a subsong request, so with
+;     nothing here the music ended for good (FC, anthrox.fc). Re-post the
+;     current subsong: the same latch the musicdisk path uses, so it loops.
+        move.l  _uade_sub_cur(pc),$120.w
+        move.l  #AMSG_SETSUBSONG,UADE_INPUT_MSG.w
         endc
         bra     .done
 .not_songend:

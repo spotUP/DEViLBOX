@@ -236,20 +236,20 @@
     },
     "FutureComposer1.4": {
       "adf": "FutureComposer1.4.adf",
-      "adfSha256": "23af89f188bde967e5fceac9d5f392c39bc636e13fa394d36c9d47f25c8a6a5a",
+      "adfSha256": "f4895900a92213f902c3b15f467db6815fa575182f88aa246bf44ef627ad1d2d",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 41172,
+        "diskOffset": 41184,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 41168,
+        "diskOffset": 41180,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 271028,
+        "diskOffset": 271040,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -269,7 +269,7 @@
         "bytes": 13724
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "507e430c3cf08c3e324820111ba49ef25125ce80fd5bd7d787ebb3d83a9552e3"
       }
     },
