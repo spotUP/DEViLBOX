@@ -1219,6 +1219,45 @@
         "player": "5f3595024cffd7753f5f1854d49aa2bcb09a094d86d4544fa3dbc6e734c8ba4c"
       }
     },
+    "SIDMon2.0": {
+      "adf": "SIDMon2.0.adf",
+      "adfSha256": "ef248108056d20234d545e677f8313063d17eec37d893bbf454e8288fd722ae4",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 41836,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 41832,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 271696,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 310532,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42800",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5A800",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4BD04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "bruno_time.sid2",
+        "bytes": 11408
+      },
+      "sources": {
+        "tool": "ac79e2ed0964b364258e0645d83b308e877b7e453e01730d5fb90504db62846d",
+        "player": "0eacdeb971ff72da0fa6fc6c7a3db84bc0764721689c1fb4d1c7865fab95bb29"
+      }
+    },
     "SUN-Tronic": {
       "adf": "SUN-Tronic.adf",
       "adfSha256": "024628e2f53aa7cb9e041926afb0d33b90ca59cfcab664bbb43cd8eebfe12ec4",
@@ -1335,6 +1374,45 @@
       "sources": {
         "tool": "6ad98888fc563b650cafa95616adbead9544588a94fc3756f182df5436a1cfb2",
         "player": "5317864b73d15d4c50dcbd613c4319ec3b62ab48f58935b00e33aec676cf632e"
+      }
+    },
+    "SoundControl": {
+      "adf": "SoundControl.adf",
+      "adfSha256": "bdbe4970b9b69042ba6bcce588e9c520ff88913a47d8efb410ef38e3ad44ab77",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 50248,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 50244,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 280114,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 366852,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x44800",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5C800",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x59904",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "north_sea_inferno.sc",
+        "bytes": 64994
+      },
+      "sources": {
+        "tool": "ac79e2ed0964b364258e0645d83b308e877b7e453e01730d5fb90504db62846d",
+        "player": "d8a7cb2bac53068bd659026c207fd6656ef5515f9480248b6d241266da4eec7a"
       }
     },
     "SoundImages": {
