@@ -423,6 +423,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   const macroRate = (s.hz > 0 ? s.hz : 60) / 60;
   const tempoBase = FT_TEMPO * (s.hz > 0 ? s.hz : 60) / 60 / vtScale;
   const cellAt = (ch: number, o: number, r: number): FurnacePatternCell | undefined => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o]}`)?.rows[r];
+  // Flow and speed effects (0B/0D/09/0F/FD/FE) are global in Furnace: they act from every channel, dropped expansion channels included.
+  const rowFx = (o: number, r: number): Array<{ type: number; value: number }> => s.orders.flatMap((_, ch) => cellAt(ch, o, r)?.effects ?? []);
 
   // Order lengths (0B/0D in any channel ends the order) and the loop target (last 0B, else order 0).
   const orderLen: number[] = [];
@@ -430,11 +432,9 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   for (let o = 0; o < endOrder; o++) {
     let len = s.patLen;
     for (let r = 0; r < s.patLen && len === s.patLen; r++) {
-      for (let ch = 0; ch < NCH; ch++) {
-        for (const e of cellAt(ch, o, r)?.effects ?? []) {
-          if (e.type === 0x0d) len = r + 1;
-          if (e.type === 0x0b) { len = r + 1; if (e.value <= o) { loopOrder = e.value; endOrder = o + 1; } }
-        }
+      for (const e of rowFx(o, r)) {
+        if (e.type === 0x0d) len = r + 1;
+        if (e.type === 0x0b) { len = r + 1; if (e.value <= o) { loopOrder = e.value; endOrder = o + 1; } }
       }
     }
     orderLen.push(len);
@@ -449,9 +449,10 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     for (let o = 0; o < endOrder; o++) {
       rowFrame.push([]); rowSpeed.push([]);
       for (let r = 0; r < orderLen[o]; r++) {
-        for (let ch = 0; ch < NCH; ch++) for (const e of cellAt(ch, o, r)?.effects ?? []) {
+        for (const e of rowFx(o, r)) {
           if (e.type === 0x09 && e.value > 0) sp[0] = e.value;
           if (e.type === 0x0f && e.value > 0) sp[sp.length === 2 ? 1 : 0] = e.value;
+          if (e.type === 0xfd || e.type === 0xfe) lossy.add(`virtual tempo change ${e.type === 0xfd ? 'FD' : 'FE'}xx (ignored: rows keep the song start tempo)`);
         }
         rowFrame[o].push(Math.round(f));
         rowSpeed[o].push(sp[cur]);
@@ -600,7 +601,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             if (speedFx.has(t)) continue; // speed rows are written per row on channel 0 from rowSpeed
             else if ((t === 0x15 || t === 0x16) && ch < DPCM_CH && ch !== 2) { if (t === 0x15) envMode = v & 3; else lenIdx = v & 0x1f; }
             else if (t === 0x12 && ch < DPCM_CH && ch !== 2) ops.push(0x4f, v & 3);
-            else if (t === 0x0b || t === 0x0d) continue;
+            else if (t === 0x0b || t === 0x0d || t === 0xfd || t === 0xfe) continue; // global, handled (or reported) in the row scans
             else if (t === 0x00 && ch !== DPCM_CH) { if (v !== arpXY || atLoop) fxChanged = true; arpXY = v; }
             else if (t === 0x04 && tonal) { if (v !== vibXY || atLoop) fxChanged = true; vibXY = v; }
             else if (SLIDE_FX.has(t) && tonal) { slideFx = t; slideVal = v; }

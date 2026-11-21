@@ -130,6 +130,19 @@ describe('furnaceToFamistudio', () => {
     expect(song.firstNoteFrames.slice(0, 3)).toEqual([0, 12, -1]);
   });
 
+  it('applies flow and speed effects from a dropped expansion channel (one_sided_love 0B21 in channel 7)', () => {
+    // Channel 5 belongs to a dropped expansion chip; its 0F03 at row 0 and 0D00 at row 2 still act on the 2A03 channels.
+    const m = nesModule({}, { ordersLen: 2, orders: [[0, 0], [0, 1], [0, 0], [0, 0], [0, 0], [0, 0]] });
+    Object.assign(m, { systems: [6, 139] });
+    const pats = m.patterns as unknown as Map<string, { rows: Cell[] }>;
+    pats.set('0_1_1', { rows: Array.from({ length: 16 }, (_, r) => ({ ...empty(), ...(r === 0 ? { note: 0, octave: 4 } : {}) })) });
+    pats.set('0_5_0', { rows: Array.from({ length: 16 }, (_, r) => ({ ...empty(), effects: r === 0 ? [{ type: 0x0f, value: 3 }] : r === 2 ? [{ type: 0x0d, value: 0 }, { type: 0xfd, value: 100 }] : [] })) });
+    const song = furnaceToFamistudio(m);
+    // Order 0 ends after row 2 at speed 3: order 1 row 0 starts at frame 9 (16 rows x speed 6 = 96 if channel 5 were ignored).
+    expect(song.firstNoteFrames[1]).toBe(9);
+    expect(song.lossy.some((l) => l.startsWith('virtual tempo change FDxx'))).toBe(true);
+  });
+
   it('virtual tempo scales row timing but not effect ticks', () => {
     // Virtual tempo 150/100: rows advance 1.5 per tick, so speed 6 rows last 4 frames and row 4 starts at frame 16.
     const song = furnaceToFamistudio(nesModule({ 0: { 0: { note: 0, octave: 4 } }, 1: { 4: { note: 0, octave: 4 } } }, { virtualTempo: 150, virtualTempoD: 100 }));
