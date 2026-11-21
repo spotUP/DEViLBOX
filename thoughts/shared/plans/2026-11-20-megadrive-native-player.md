@@ -594,3 +594,32 @@ Listen ROMs: ~/Desktop/md-roms/golden_shit-0A-volslide.bin, Solar_Man-EC-cut.bin
 - MAME 60 ms early on Solar_Man key-on (cause unknown).
 - djtBMX tick rate capped at 120 Hz (MDSDRV maximum), time-scaled.
 - 04 vibrato unmeasured.
+
+## Phase 1l results (2026-11-21)
+
+Code: commit 8ddf0fda1 (src/lib/export/md/mdsSong.ts, src/lib/export/__tests__/mdsSong.test.ts).
+Listen ROM: ~/Desktop/md-roms/golden_shit-oporder.bin.
+
+### FM voice operator order (root cause of the 1k TL1/TL2 swap)
+- Layer: the converter. fmVoice remapped Furnace operators [0, 2, 1, 3] before packing.
+- Furnace stores operators in register order: genesis.cpp writes state.op[i] at opOffs[i] (fmshared_OPN.h: 0x00, 0x04, 0x08, 0x0c). orderedOps {0,2,1,3} (fmsharedbase.h) only remaps the operator number in effects (12xx etc.).
+- MDSDRV reads each voice row in register order (mdsdrv.68k "load inst data": byte k goes to base + 4k; doc/mdsseq.md "FM voice format").
+- events.py was not at fault: both the Furnace VGM and the MAME tap go through the same decoder, so it cannot swap one side only.
+- Fix: pack fm.operators as stored (identity order). One change covers DT/MUL, KS/AR, AM/DR, SR, SL/RR, SSG-EG and TL on every FM voice.
+- Measured, golden_shit FM2, first write per operator register (scratch regdump.py), slots +0/+4/+8/+C:
+  - Furnace: DT/MUL 02 04 05 02, KS/AR 1b 1a 8d 18, AM/DR 01 04 06 03, SR 03 03 01 08, SL/RR 37 27 08 06.
+  - MAME before: DT/MUL 02 05 04 02, KS/AR 1b 8d 1a 18, AM/DR 01 06 04 03, SR 03 01 03 08, SL/RR 37 08 27 06.
+  - MAME after: identical to Furnace on every row. TL0..TL3 match on all 449 frames (0-7.5 s) with no decode swap.
+- Verdict: 1:1. The 1k 0A verdict now holds without the TL1/TL2 decode swap.
+- Unit test: golden_shit hex contains `020405021b1a8d18` (DT/MUL + KS/AR rows) and not the old remapped bytes.
+
+### 0A / EC / ED unit tests
+- Added to mdsSong.test.ts on Solar_Man channel 0 order 0 row 0 with the effect added: 0A 04 gives E2 0d/0e/0f/10 ties on ticks 1-4; EC 02 gives a rest at tick 2; ED 02 moves the first key-on to tick 2 (keyOns and decoded sequence). None flag lossy.
+
+### 04 vibrato
+- Not started: the converter has no 04 handling yet (still lossy "effect 04"). Needs a design for Furnace vibrato (vibTable, depth/speed, vibratoDirection) on an MDSDRV pitch envelope; larger than this phase's budget.
+
+### Open gaps
+- 04 vibrato unimplemented and unmeasured.
+- Sibling, unverified: src/lib/export/MDXExporter.ts has OPM_OP_OFFSETS = [0, 2, 1, 3]. Furnace OPM also stores ops in register order (fmshared_OPM.h opOffs 0x00/0x08/0x10/0x18), so MDX may carry the same swap; check against MDX's voice layout before changing.
+- All Phase 1k open gaps except the op-order item remain.
