@@ -1610,3 +1610,11 @@ Open:
 - Known artifacts unchanged: Solar_Man FM6 at about frame 5996, newer_song_lol FM4 at 10.97 s.
 
 Listen ROM: `~/Desktop/md-roms/newer_song_lol-2v.bin`.
+
+## Phase 2w result (2026-11-21, no code change)
+
+Baseline reproduced (lagcmp, >10 cents, best of lag -1..+1): Solar_Man FM1 1, FM4 5, FM5 2, PSG1 2, PSG2 2; newer_song_lol FM4 2 (10.97 s artifact), FM6 5996 (artifact), PSG2 4.
+
+- newer_song_lol PSG2 (19.417, 30.017, 31.283, 32.35): period misses of 1-2 (MAME 124 vs Furnace 125 at 30.0 s, 333/335, 141/142, 200/198), checked from the raw MAME tap, not index-aligned rows. All four sit in linear-pitch 03 88 slides under 04xy (vibrato depth 6), so they go out on the sA path (slideCmd/arpBake, E4+E6 per sequence tick), not portaEnvelope. Hypothesis: slidePitch scores each step's psgFix against the whole vibrato offset set, and at period ~125 (1 period = 14 cents) one detune cannot fit every offset.
+- Tried: score only the vibrato offset at the step's Furnace tick (vibOffAt(vRate, vDepth, vFine, f - fTick(vAt) - 1, vPos)). Result: newer_song_lol PSG1 0 -> 37, PSG2 4 -> 18; Solar_Man unchanged. Reverted. So the per-tick phase this formula assumes does not match the E8 envelope phase the driver plays; the all-offset scoring is the safer fit. Next step: log the E8 envelope position per sequence tick from the driver (or MAME) and score against that phase, not the Furnace phase.
+- Solar_Man FM4 (20.883, 31.417, 33.383, 85.717, 86.6) and FM1/FM5/PSG1/PSG2 residue: not reached in this phase. 33.383 hits FM4+PSG1+PSG2 at once (worst 100 cents), which points at a shared timing event rather than per-channel pitch; unproven.
