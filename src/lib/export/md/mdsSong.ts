@@ -820,10 +820,19 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const introEnd = loopChunk >= 0 ? loopChunk : chunks.length;
   const nIntro = spanTicks(0, introEnd), nBody = loopChunk >= 0 ? spanTicks(loopChunk, chunks.length) : 0;
   // Virtual tempo above the engine rate: Furnace runs 1 or 2 ticks per engine frame (tempoAccum), so the conductor sets each frame's
-  // tick count. shortcut: the loop body keeps its first pass's frame phase; a body whose length is not a whole tempoAccum period drifts per pass.
-  const ft = fpt < 1 - 1e-9 && rate >= NTSC_HZ ? frameTempos(nIntro + nBody, fpt, s.hz) : null;
+  // tick count. One conductor loop holds K bodies: K * nBody ticks is a whole number of Furnace frames (tempoAccum phase repeats) and
+  // the fewest whole NTSC frames off per pass, so loop passes keep Furnace's frame phase (measured newer_song_lol: one body, 6399 ticks
+  // = 5332.5 Furnace frames, drifted 0.41 NTSC frames per pass). Channel tracks loop on their own, so a longer conductor loop is fine.
+  const useFt = fpt < 1 - 1e-9 && rate >= NTSC_HZ;
+  let K = 1;
+  for (let k = 1, best = Infinity; useFt && nBody && k <= 8; k++) {
+    const fF = k * nBody * fpt, x = (fF * NTSC_HZ) / s.hz, e = Math.abs(x - Math.round(x)) / k;
+    if (Math.abs(fF - Math.round(fF)) < 1e-6 && e < best - 1e-9) [best, K] = [e, k];
+  }
+  // One extra body after the loop so the block's last frame tempo leads into the next pass, not into silence.
+  const ft = useFt ? frameTempos(nIntro + (K + 1) * nBody, fpt, s.hz) : null;
   const span = (a: number, n: number) => (ft ? encodeTempos(ft.slice(a, a + n)) : conduct(n));
-  streams.push([...span(0, nIntro), ...(loopChunk >= 0 ? [0xfa, ...span(nIntro, nBody), 0xfb, 0x00] : []), 0xff]);
+  streams.push([...span(0, nIntro), ...(loopChunk >= 0 ? [0xfa, ...span(nIntro, K * nBody), 0xfb, 0x00] : []), 0xff]);
   const chanIds = [...tracks.map((t) => MDS_CHAN[t.ch]), 0x0f];
 
   // 5. Layout.

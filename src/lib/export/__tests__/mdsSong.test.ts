@@ -58,6 +58,30 @@ function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1): { c
 
 const key = (k: { ch: number; tick: number; n: number }) => `${k.tick}:${k.ch}:${k.n}`;
 
+/** Conductor (dummy channel 0f) expanded to per-tick F9 values: intro plus `passes` loop passes (inner FA .. FB kk played kk times). */
+function conductorTempos(seq: Uint8Array, passes: number): number[] {
+  const sd = seq.subarray(8);
+  const w = (o: number) => (sd[o] << 8) | sd[o + 1];
+  const bgm = (w(4) << 16) | w(6), last = bgm + 4 + (sd[bgm + 3] - 1) * 4;
+  expect(sd[last]).toBe(0x0f);
+  const tempos: number[] = [];
+  let stack: { at: number; left: number }[] = [], tempo = 0x7f;
+  for (let p = bgm + w(bgm) + ((w(last + 2) << 16) >> 16); ;) {
+    const c = sd[p++];
+    if (c === 0xf9) tempo = sd[p++];
+    else if (c < 0x80) for (let k = 0; k <= c; k++) tempos.push(tempo);
+    else if (c === 0xfa) stack.push({ at: p, left: -1 });
+    else if (c === 0xfb) {
+      const top = stack[stack.length - 1], kk = sd[p++];
+      if (kk === 0) { if (--passes <= 0) break; stack = [stack[0]]; p = stack[0].at; continue; } // outer loop end
+      if (top.left < 0) top.left = kk;
+      if (--top.left > 0) p = top.at; else stack.pop();
+    } else if (c === 0xff) break;
+    else throw new Error(`conductor command ${c.toString(16)}`);
+  }
+  return tempos;
+}
+
 describe('PSG period rounding', () => {
   it('psgFix makes the driver write the rounded Furnace period (highscorefollin PSG1 note 54: 76, not 75)', () => {
     expect(mdsPsgPitch(54 * 256)).toBe(75);
@@ -379,26 +403,7 @@ describe('furnaceToMds', () => {
     spans.forEach((e) => expect(Math.abs(e)).toBeLessThan(0.01)); // intro and loop body each balanced: no drift across loop passes
   });
   it('newer_song_lol 180/150: the conductor runs Furnace ticks 1,1,1,1,2 per frame, every tick on its Furnace frame in NTSC time (one F9 drifted 1.203125 ticks/frame)', async () => {
-    const sd = (await convert('newer_song_lol.fur')).seq.subarray(8);
-    const w = (o: number) => (sd[o] << 8) | sd[o + 1];
-    const bgm = (w(4) << 16) | w(6), last = bgm + 4 + (sd[bgm + 3] - 1) * 4;
-    expect(sd[last]).toBe(0x0f);
-    // Expand intro + one loop pass to per-tick F9 values (inner FA .. FB kk loops played kk times).
-    const tempos: number[] = [], stack: { at: number; left: number }[] = [];
-    let tempo = 0x7f;
-    for (let p = bgm + w(bgm) + ((w(last + 2) << 16) >> 16); ;) {
-      const c = sd[p++];
-      if (c === 0xf9) tempo = sd[p++];
-      else if (c < 0x80) for (let k = 0; k <= c; k++) tempos.push(tempo);
-      else if (c === 0xfa) stack.push({ at: p, left: -1 });
-      else if (c === 0xfb) {
-        const top = stack[stack.length - 1], kk = sd[p++];
-        if (kk === 0) break; // outer loop end: one pass of the body
-        if (top.left < 0) top.left = kk;
-        if (--top.left > 0) p = top.at; else stack.pop();
-      } else if (c === 0xff) break;
-      else throw new Error(`conductor command ${c.toString(16)}`);
-    }
+    const tempos = conductorTempos((await convert('newer_song_lol.fur')).seq, 1);
     // mdsdrv.68k: counter += tempo + 1 per frame, a tick per 128; the last tick of a frame sets the next frame's tempo.
     const n = Math.min(tempos.length, 40 * 72);
     // Every Furnace frame's ticks play on one driver frame (no split pair), within a frame of Furnace time.
@@ -415,6 +420,18 @@ describe('furnaceToMds', () => {
     }
     expect(split).toBe(0);
     expect(worst).toBeLessThan(1.5);
+  });
+  it('newer_song_lol: loop passes 2 and 3 keep Furnace frame time (one 6399-tick body = 5332.5 Furnace frames drifted 0.41 NTSC frames per pass)', async () => {
+    const tempos = conductorTempos((await convert('newer_song_lol.fur')).seq, 3);
+    const n = 3 + 3 * 6399;
+    expect(tempos.length).toBeGreaterThanOrEqual(n);
+    let c = 0, g = 0, t = 0, worst = 0;
+    while (t < n) {
+      c += (t ? tempos[t - 1] : 0x7f) + 1; let k = c >> 7; c &= 127;
+      for (; k > 0 && t < n; k--, t++) worst = Math.max(worst, Math.abs(g / 59.922743 - furnaceTickOf(t, 5 / 6) / 60) * 60);
+      g++;
+    }
+    expect(worst).toBeLessThan(0.75);
   });
   it('Solar_Man: unhandled vibrato direction (E3 01/02), 05xy, E1xy and E2xy flag lossy through the generic effect flag; E3 00 does not', async () => {
     for (const [type, value, flag] of [[0xe3, 1, 'effect E3'], [0xe3, 2, 'effect E3'], [0x05, 0x01, 'effect 05'], [0xe1, 0x13, 'effect E1'], [0xe2, 0x13, 'effect E2']] as const) {

@@ -1263,3 +1263,15 @@ Listen ROM: `~/Desktop/md-roms/newer_song_lol-2i.bin`.
 - Shortcut: the loop body reuses the first pass's frame phase. Second and later passes can drift if the body's tick count is not a whole number of Furnace frame patterns.
 - The new conductor covers only fpt < 1 with rate >= NTSC. Songs with fpt >= 1 or rates under NTSC still use the 7f/80 dither.
 - Solar_Man PSG4 envelope phase (above).
+
+## Phase 2j results
+
+**Item 2: loop passes drifted (fixed).** newer_song_lol has a 3-tick intro and a 6399-tick loop body. 6399 mod 6 = 3, so one body is 5332.5 Furnace frames, half a tempoAccum period. The 2i conductor looped one body with its first-pass frame phase. A simulation of the driver counter over intro plus 3 passes showed no split frames but a worst time error of 0.50, 0.91 and 1.32 NTSC frames in passes 1, 2 and 3 (0.41 frames of drift per pass). Fix in `furnaceToMds`: the conductor loop now holds K bodies (K in 1..8). K * nBody ticks must be a whole number of Furnace frames, so the tempoAccum phase repeats. Among those, K gives the smallest NTSC-frame remainder per pass. newer_song_lol picks K = 8: 42660 Furnace frames = 42605.08 NTSC frames, so about 0.01 frames of drift per pass. frameTempos runs over one extra body so that the block's last frame tempo leads into the next pass. Channel tracks loop on their own. The sequence grows from 59846 to 60314 bytes. Test row: "loop passes 2 and 3 keep Furnace frame time" expands the conductor over 3 passes and asserts worst < 0.75 frames. Old code gives 1.32. MAME, first 40 s and first 100 s: the counts are identical to 2i (FM1-3 3, FM4 3, FM5 5, PSG1 15, PSG2 13, PSG3 0). Pass 2 starts after 100 s, beyond the Furnace VGM: Furnace `-loops 1` still stops at 101.33 s, so pass 2 is checked by the simulation only. Listen ROM: ~/Desktop/md-roms/newer_song_lol-2j.bin.
+
+**Item 1: Solar_Man PSG4 -0.126 dB (diagnosed, not fixed).** The Furnace noise ATT sequence steps per-note volume macros on 56 Hz ticks, and each hit has its own phase against the NTSC frames. Examples: Furnace 7:4 9:5 11:4 against MAME 7:4 9:5 12:4, and Furnace 29:4 30:5 32:4 against MAME 29:4 31:5 33:4. `framesOf` resamples the macro once per instrument, anchored at key-on (`floor((f+0.5)*r)`), so every hit gets the same table. Some note starts are also off by one frame (Furnace 11/21/32/43 against MAME 12/22/33/44). Planned fix:
+1. Compute the conductor's tick-to-driver-frame map before emitting tracks. nIntro and nBody are already known from `chunks`.
+2. Per PSG key-on at tick k on driver frame F0, build `vals[f] = macro[floor((F0+f+0.5)*r) - k]`.
+3. Key insCache on the table content, and emit insCmd when the variant changes, not only when the instrument changes.
+4. Add a test row with the per-hit phase for Solar_Man noise.
+
+**Item 3: residual FM error in newer_song_lol (not investigated).** FM1-3 31 cents at 22.8 s, FM5 50 cents at 11.0 s, FM4 21 cents at 10.9 s. These are unchanged by 2j. The first differing register write has not been found yet.
