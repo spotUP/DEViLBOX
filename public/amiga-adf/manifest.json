@@ -1337,6 +1337,45 @@
         "player": "c8e08908de1f0b2dac9a11c03c3ddcabb48de0b740f3c5e4f7fe7e22c2f9eb31"
       }
     },
+    "SonixMusicDriver": {
+      "adf": "SonixMusicDriver.adf",
+      "adfSha256": "84cc4eb215aa5081d0fc415306d334f06e1dbc9358f7ad2518e0e3e9800f7adb",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 54484,
+        "maxBytes": 8192
+      },
+      "moduleLengthWord": {
+        "diskOffset": 54480,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 165378,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 226484,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x28800",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC40800",
+        "BSS_LEN": "0x8840",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x374B4",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "Radiokomppi.smus",
+        "bytes": 6146
+      },
+      "sources": {
+        "tool": "ac79e2ed0964b364258e0645d83b308e877b7e453e01730d5fb90504db62846d",
+        "player": "074e8fbcc7e4d0bd64195580d3ed4fb6724ff39559f3238966e08541297bddf2"
+      }
+    },
     "Sound-FX": {
       "adf": "Sound-FX.adf",
       "adfSha256": "1feb35a354abf608d781e0aa7636bf1d87c2421554f938ec4c938afc224973da",
