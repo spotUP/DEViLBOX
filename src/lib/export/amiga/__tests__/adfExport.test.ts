@@ -133,6 +133,18 @@ describe('adf slot patcher', () => {
     expect(Array.from(r.subarray(e.moduleSlot.diskOffset, e.moduleSlot.diskOffset + mod.length))).toEqual(Array.from(mod));
   });
 
+  it.each([
+    ['SoundMon2.0', 'formats/aquarivs.bp'],
+    ['InStereo', 'formats/fantasi8.is'],
+    ['QuadraComposer', 'formats/synth_corn.emod'],
+  ])('%s: routes by magic, patches the slot', (name, path) => {
+    const e = manifest.templates[name];
+    const mod = song(path);
+    expect(adfTemplateFor(mod, path.split('/').pop())).toBe(name);
+    const r = patchAdfSlot(tpl(e.adf), e, mod);
+    expect(Array.from(r.subarray(e.moduleSlot.diskOffset, e.moduleSlot.diskOffset + mod.length))).toEqual(Array.from(mod));
+  });
+
   it('names the export after the whole file for prefix-named files, strips the extension for suffix-named', async () => {
     expect(adfSongName('MAX.DinosaurDetective jingle1')).toBe('MAX.DinosaurDetective jingle1');
     expect(adfSongName('mdat.song')).toBe('mdat.song');

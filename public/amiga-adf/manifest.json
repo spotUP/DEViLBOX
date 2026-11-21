@@ -507,6 +507,45 @@
         "player": "4d00b5fbd586cd0638303939fa490a5ff29f1da9ccd54042f6910c42b2e75227"
       }
     },
+    "InStereo": {
+      "adf": "InStereo.adf",
+      "adfSha256": "bebf09ce77c80cfff1a44811eb8ee3a94c2b2dc598a2ef2b0a4cf749c08a5632",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 44280,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 44276,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 274136,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 312580,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x43200",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5B200",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4C504",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "fantasi8.is",
+        "bytes": 45656
+      },
+      "sources": {
+        "tool": "31ef8ad896dc5de4abf5c0823451fc4adac44fdcb38c952b00c36f60cb4619df",
+        "player": "13ba07791cfb2100088cecd16fe0c698894eecdebc02ef5538a4cf71509705dc"
+      }
+    },
     "JamCracker": {
       "adf": "JamCracker.adf",
       "adfSha256": "c51f8eb2a4789187949bd83d077c9752f748bbecdc006b503c32889a39cce0ae",
@@ -907,6 +946,45 @@
         "player": "cea8f553a382654d56d8d7e27ec26cf9374db54e3e9dcab5be9b4f092e57e9ca"
       }
     },
+    "QuadraComposer": {
+      "adf": "QuadraComposer.adf",
+      "adfSha256": "166940785501e430605484fa09496c9347d266a7c0354db159d4dba9d984c8c8",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 48556,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 48552,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 278416,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 315652,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x44200",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5C200",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4D104",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "synth_corn.emod",
+        "bytes": 39490
+      },
+      "sources": {
+        "tool": "31ef8ad896dc5de4abf5c0823451fc4adac44fdcb38c952b00c36f60cb4619df",
+        "player": "5753455cd768b3cd6880442673a659bc7ae95328da00be9cb5e200cc3315c92e"
+      }
+    },
     "RiffRaff": {
       "adf": "RiffRaff.adf",
       "adfSha256": "f39ac9dc2846fba24cb259b1ac482bb3be7ad95f1e77bc8f43866d8b568b16ce",
@@ -1179,6 +1257,45 @@
       "sources": {
         "tool": "6ad98888fc563b650cafa95616adbead9544588a94fc3756f182df5436a1cfb2",
         "player": "5333b44d3e5f26198d81c5acc5a2ab66738f2f1579e8e479ab469a2642b23c0f"
+      }
+    },
+    "SoundMon2.0": {
+      "adf": "SoundMon2.0.adf",
+      "adfSha256": "869eb728c7245e8ec29f86741566d15887b156c76f417c0f4988f35641834ed1",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 40848,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 40844,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 270704,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 310532,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42400",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5A400",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4BD04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "aquarivs.bp",
+        "bytes": 92962
+      },
+      "sources": {
+        "tool": "31ef8ad896dc5de4abf5c0823451fc4adac44fdcb38c952b00c36f60cb4619df",
+        "player": "b4ea4f36b8769cb5d394357c16eabe0340487b0d68b5858a6b345bcfaa2c2faa"
       }
     },
     "SpeedySystem": {

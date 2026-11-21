@@ -63,6 +63,10 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   if (ascii(m, 0, 'OKTASONG')) return 'Oktalyzer';
   if (ascii(m, 0, 'COSO')) return 'JochenHippel-CoSo';
   if (ascii(m, 0, ' MUGICIAN/SOFTEYES 1990')) return 'Mugician';
+  if (ascii(m, 0, 'ISM!V1.2')) return 'InStereo';
+  if (ascii(m, 0, 'FORM') && ascii(m, 8, 'EMOD')) return 'QuadraComposer';
+  // SoundMon: only V.2 is proven on the SoundMon2.0 disk (aquarivs.bp); V.3 (SoundMon2.2) and BPSM (V1) are not.
+  if (ascii(m, 26, 'V.2')) return 'SoundMon2.0';
   if (ascii(m, 0, 'DIGI Booster module')) return 'DIGI-Booster';
   if (['M.K.', 'M!K!', 'FLT4', '4CHN'].some((t) => ascii(m, 1080, t))) return 'PTK-Prowiz';
   if (m.length >= 4 && be32(m, 0) === 0x48e7fffe) return 'SUN-Tronic';
