@@ -16,8 +16,10 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, statSync } from 'fs';
-import { join, basename } from 'path';
+import { join, basename, dirname } from 'path';
+import { listingFromRelativePaths, resolveCompanions } from '../../src/lib/import/companionResolver';
 import {
+  addCompanions,
   loadUADEModule,
   renderToSamples,
   PROJECT_ROOT,
@@ -76,6 +78,10 @@ async function renderFile(
 
   let result;
   try {
+    // Sidecars (SMP.set, smpl.*) from the module's own directory, resolved like the app's folder drop.
+    const dir = dirname(inputPath);
+    const wanted = resolveCompanions(filename, listingFromRelativePaths(readdirSync(dir))).companions;
+    addCompanions(mod, wanted.map((name) => ({ name, data: readFileSync(join(dir, name)) })));
     result = await renderToSamples(mod, data, filename, {
       sampleRate: SAMPLE_RATE,
       seconds: RENDER_SECONDS,
