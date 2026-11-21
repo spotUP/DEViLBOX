@@ -148,8 +148,18 @@ describe('furnaceToFamistudio', () => {
     }
   });
 
+  it('fires each row of a 56 Hz song on the nearest 60 Hz frame, not the next one (Famitune1)', () => {
+    const song = furnaceToFamistudio(nesModule({ 0: { 0: { note: 0, octave: 4 } } }, { hz: 56 }));
+    const step = song.music[7 + 5 * 2] | (song.music[8 + 5 * 2] << 8);
+    expect(step).toBe(3584); // 256 x 140 / 150 x q 15: whole
+    const h = (song.tempoAcc ?? 0) - 0x600, S = 6 * 15;
+    // Engine: row n fires on the first frame k with 0x600 + h + k x step >= 0x600 + 256 S n; Furnace row n at 56 Hz tick
+    // 6n is 60 Hz frame 6n x 60 / 56, which the check bins to the nearest frame (half up).
+    for (let n = 0; n < 3000; n++) expect(Math.max(0, Math.ceil((256 * S * n - h) / step))).toBe(Math.floor(6 * n * 60 / 56 + 0.5));
+  });
+
   const A4 = { note: 9, octave: 4 };
-  const fx = (type: number, value: number) => ({ effects: [{ type, value }] });
+  const fx =(type: number, value: number) => ({ effects: [{ type, value }] });
   const music = (cells: Record<number, Record<number, Partial<Cell>>>) => furnaceToFamistudio(nesModule(cells));
 
   it('maps 04 vibrato to a pitch envelope override and stops it with 0x4a', () => {

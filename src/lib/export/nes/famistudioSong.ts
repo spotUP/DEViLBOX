@@ -904,8 +904,13 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   w16(7 + NCH * 2, Math.round(256 * tempo / (60 * 60 / 24)));
   // Furnace adds N to its tempo accumulator before the first tick (playback.cpp), so with N > D its first frame already
   // holds part of the next tick: the player starts the accumulator at 6 x 256 - 256 q + step (6 x 256 when N = D), which
-  // puts every row on Furnace's frame. Other tick rates keep 6 x 256 (shortcut: hz != 60 is approximated anyway).
-  const tempoAcc = Math.abs(hz - 60) > 0.5 || tempo !== tempoRaw ? 0x600 : 0x600 - 256 * spdMul + stepNtsc;
+  // puts every row on Furnace's frame. At another tick rate a row's Furnace time falls between 60 Hz frames: a start of
+  // 6 x 256 + step / 2 (just under) fires each row on the nearest frame, where 6 x 256 fired it on the next one
+  // (Famitune1, 56 Hz: speeds x 15 make the step whole, so every row sat up to a frame late).
+  // shortcut: N != D off 60 Hz keeps 6 x 256; combine both phases if such a song shows up.
+  const tempoAcc = tempo !== tempoRaw ? 0x600
+    : Math.abs(hz - 60) > 0.5 ? (s.virtualTempo === s.virtualTempoD ? 0x600 + ((stepNtsc - 1) >> 1) : 0x600)
+    : 0x600 - 256 * spdMul + stepNtsc;
   insEnvs.forEach((ids, i) => ids.forEach((id, k) => w16(insOff + i * 8 + k * 2, envAddr[id])));
   dpcmList.forEach((d, i) => {
     const at = sampleAt.get(d.sample)!;
