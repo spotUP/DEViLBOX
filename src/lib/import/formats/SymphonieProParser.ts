@@ -319,7 +319,7 @@ function readAmigaString(data: Uint8Array, offset: number, maxLen: number): stri
 
 // ── Format structures ─────────────────────────────────────────────────────────
 
-interface SymEvent {
+export interface SymEvent {
   command: number;  // uint8
   note:    number;  // int8
   param:   number;  // uint8
@@ -1100,7 +1100,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
  * We extract note and instrument from KeyOn events only.
  * Effect conversion is deliberately minimal — just volume and note.
  */
-function _convertEvent(
+export function _convertEvent(
   ev: SymEvent,
   cell: TrackerCell,
   transpose: number,

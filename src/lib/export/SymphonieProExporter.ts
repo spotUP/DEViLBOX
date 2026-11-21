@@ -23,6 +23,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { TrackerCell } from '@/types';
+import { _convertEvent } from '@/lib/import/formats/SymphonieProParser';
 
 // ── SymEvent command constants (same as parser) ────────────────────────────
 
@@ -161,7 +162,7 @@ function writePackedChunk(data: Uint8Array): Uint8Array {
  *
  * Reverse of _convertEvent() in the parser.
  */
-function encodeSymEvent(cell: TrackerCell): Uint8Array {
+function encodeSymEvent(cell: TrackerCell, transpose = 0): Uint8Array {
   const out = new Uint8Array(4);
   // Note byte is a SIGNED int8: the parser treats note < 0 as "no note" and only
   // reads a note (and its instrument) when 0 <= note <= 84. An all-zero event is
@@ -181,7 +182,7 @@ function encodeSymEvent(cell: TrackerCell): Uint8Array {
     // Reverse note: parser did xmNote = symNote + 25 + transpose
     // We export with transpose=0: symNote = xmNote - 25
     if (note > 0) {
-      const symNote = Math.max(0, Math.min(84, note - 25));
+      const symNote = Math.max(0, Math.min(84, note - 25 - transpose));
       out[1] = symNote; // note (int8, but 0-84 fits in unsigned)
     }
 
@@ -373,6 +374,8 @@ export function exportSymphonieProFile(song: TrackerSong): Uint8Array {
 
   // Build the same patternMap the parser uses to map (key → trackerSongPatIdx)
   // Then for each TrackerSong pattern, write its cells back to the raw event array
+  const numInstruments = song.patterns[0]?.importMetadata?.originalInstrumentCount ?? 0;
+  let changed = false;
   const patternMap = new Map<string, number>();
   let trackerPatIdx = 0;
 
@@ -417,12 +420,24 @@ export function exportSymphonieProFile(song: TrackerSong): Uint8Array {
                 cellToEncode = { ...cell, effTyp: 0, eff: 0 };
               }
 
-              const encoded = encodeSymEvent(cellToEncode);
-
-              // Write to the flat event array
               const srcRow = rowStart + row;
               const eventIdx = pos.pattern * patternSize + srcRow * numChannels + ch;
               const byteOffset = eventIdx * 4;
+
+              // Patch only cells whose grid view differs from what the parser shows for the source event.
+              if (byteOffset + 4 <= originalPatternEventsRaw.length) {
+                const shown: TrackerCell = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+                _convertEvent({
+                  command: newEvents[byteOffset], note: (newEvents[byteOffset + 1] << 24) >> 24,
+                  param: newEvents[byteOffset + 2], inst: newEvents[byteOffset + 3],
+                }, shown, effectiveTranspose, numInstruments);
+                if (ch === 0 && row === 0) { shown.effTyp = 0x0F; shown.eff = pos.speed > 0 ? pos.speed : 6; }
+                if ((cell.note ?? 0) === shown.note && (cell.instrument ?? 0) === shown.instrument
+                  && (cell.volume ?? 0) === shown.volume && (cell.effTyp ?? 0) === shown.effTyp
+                  && (cell.eff ?? 0) === shown.eff) continue;
+              }
+              changed = true;
+              const encoded = encodeSymEvent(cellToEncode, effectiveTranspose);
 
               if (byteOffset + 4 <= newEvents.length) {
                 newEvents[byteOffset] = encoded[0];
@@ -440,7 +455,9 @@ export function exportSymphonieProFile(song: TrackerSong): Uint8Array {
   }
 
   // Pack the new events
-  const packedEvents = writePackedChunk(newEvents.slice(0, totalEvents * 4));
+  // Unedited: keep the source chunk bytes (a repack would not reproduce the original packing).
+  const origChunk13 = chunks.find((c) => c.chunkType === -13)?.rawBytes;
+  const packedEvents = !changed && origChunk13 ? origChunk13 : writePackedChunk(newEvents.slice(0, totalEvents * 4));
 
   // ── Reassemble file ────────────────────────────────────────────────────
 
