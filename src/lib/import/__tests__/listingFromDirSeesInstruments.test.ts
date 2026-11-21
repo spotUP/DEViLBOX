@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
-import { listingFromDir } from '../../../../tools/uade-audit/listingFromDir';
+import { listingFromDir, companionFilesFromDir } from '../../../../tools/uade-audit/listingFromDir';
 import { resolveCompanions } from '../companionResolver';
 
 const dir = join(__dirname, '../../../../public/data/songs/iff-smus/Petri Alanko/Radiokomppi');
@@ -15,5 +15,11 @@ describe('listingFromDir', () => {
     const wanted = resolveCompanions('Radiokomppi.smus', listingFromDir(dir)).companions;
     expect(wanted).toContain('Instruments/BassDrum.instr');
     expect(wanted).toContain('Instruments/SnareDrum.ss');
+  });
+
+  it('reads a shared Paul Robotham bank under the name the player asks for', () => {
+    const files = companionFilesFromDir(join(__dirname, '../../../../public/data/songs/paul-robotham'), 'dawnpatrol-sad.dat');
+    expect(files.map((f) => f.name)).toEqual(['dawnpatrol-sad.SSD']);
+    expect(files[0].data.length).toBe(152704);
   });
 });
