@@ -1,5 +1,6 @@
 # loud.py <vgm> <tap> [win=4] [T=40]: per-channel register loudness (dB, rel full scale), Furnace vs MAME, per window.
 # FM: sum of carrier amplitudes 10^(-0.75*TL/20) while keyed (no envelope). PSG: 10^(-2*ATT/20). DAC: RMS of output bytes.
+# Every register state is weighted by how long it holds (until the next write on either chip), not sampled per frame.
 import sys, struct, math; sys.path.insert(0, '/Users/spot/Code/DEViLBOX/tools/md-phase0')
 from events import writes_tap, writes_vgm
 CAR = {0:[3],1:[3],2:[3],3:[3],4:[1,3],5:[1,2,3],6:[1,2,3],7:[0,1,2,3]}
@@ -31,9 +32,8 @@ def vgm_dac(path):  # yields (t, byte) from DAC stream starts (0x95) at the 0x92
 def analyse(path, win, T):
     src = writes_vgm(path) if path.endswith('.vgm') else writes_tap(path)
     reg = {0:{}, 1:{}}; lat = {}; key = [0]*7; att = [15]*4; snl = None; dac = []
-    frames = []; t0 = None; nextf = None
-    acc = {}
-    def sample(t):
+    t0 = None; last = None; nw = int(T / win); res = {}
+    def sample():
         row = {}
         for c in range(1, 7):
             port, ch = (0, c-1) if c <= 3 else (1, c-4)
@@ -41,7 +41,17 @@ def analyse(path, win, T):
             row[f'FM{c}'] = sum(10**(-0.75*tl[o]/20) for o in CAR[al] if key[c] >> o & 1)
         for i in range(4): row[f'PSG{i+1}'] = 10**(-2*att[i]/20) if att[i] < 15 else 0
         return row
+    def advance(t):  # add the current state's power, held from `last` to t, to the windows it spans
+        nonlocal last
+        if t0 is None: return
+        row = sample()
+        while last < t and last < t0 + T:
+            w = min(nw - 1, int((last - t0) // win)); end = min(t, t0 + (w + 1) * win, t0 + T)
+            if end <= last: end = min(t, t0 + T, last + win)  # float rounding at a window edge: always move forward
+            for k, x in row.items(): res.setdefault(k, [0.0]*nw)[w] += x*x * (end - last) / win
+            last = end
     for t, chip, a, v in src:
+        advance(t)
         if chip == 'sn':
             if v & 0x80: snl = v
             if snl is not None and v & 0x90 == 0x90: att[(v >> 5) & 3] = v & 15
@@ -49,20 +59,14 @@ def analyse(path, win, T):
         if not a & 1: lat[a >> 1] = v; continue
         r = lat.get(a >> 1); port = a >> 1
         if r is None: continue
-        if t0 is None and port == 0 and r == 0x28 and v & 0xF0 and (v & 7) != 3: t0 = t; nextf = t
-        while nextf is not None and t >= nextf:
-            frames.append((nextf - t0, sample(nextf))); nextf += 1/60
+        if t0 is None and port == 0 and r == 0x28 and v & 0xF0 and (v & 7) != 3: t0 = t; last = t
         if port == 0 and r == 0x2A: dac.append((t, v)); continue
         if port == 0 and r == 0x28:
             c = v & 7
             if c != 3 and c != 7: key[(c & 3) + 1 + (3 if c & 4 else 0)] = v >> 4
         reg[port][r] = v
+    advance(t0 + T)
     if path.endswith('.vgm'): dac = vgm_dac(path)
-    nw = int(T / win); res = {}
-    for t, row in frames:
-        w = int(t // win)
-        if 0 <= w < nw:
-            for k, x in row.items(): res.setdefault(k, [0.0]*nw)[w] += x*x / (win*60)
     d = [0.0]*nw; n = [0]*nw
     for i, (t, x) in enumerate(dac):  # hold each byte until the next one, at most 1 ms
         dt = min(1e-3, (dac[i+1][0] - t) if i + 1 < len(dac) else 1e-3); w = int((t - t0) // win)
