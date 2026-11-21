@@ -64,8 +64,9 @@ const OPN_REG = {
   FB_ALG: 0xB0,
 } as const;
 
-// OPN operator slot order: Op1, Op2, Op3, Op4
-const OPN_OP_OFFSETS = [0, 8, 4, 12]; // Register offsets for each operator slot
+// Furnace stores OPN operators in register order: op[i] sits at slot offset i*4
+// (fmshared_OPN.h opOffs 0x00/0x04/0x08/0x0c; orderedOps only renumbers effects).
+const OPN_SLOT_STRIDE = 4;
 
 // Chips that support PMD export
 const PMD_SUPPORTED_CHIPS = new Set([
@@ -408,7 +409,7 @@ function emitVoiceRegisters(
   // Per-operator registers
   for (let opIdx = 0; opIdx < 4; opIdx++) {
     const op = patch.operators[opIdx];
-    const slot = OPN_OP_OFFSETS[opIdx];
+    const slot = opIdx * OPN_SLOT_STRIDE;
 
     // DT/ML
     cmds.push(

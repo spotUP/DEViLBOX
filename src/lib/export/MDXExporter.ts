@@ -42,8 +42,9 @@ const MDX_CMD = {
   OPM_WRITE: 0xFE,
 } as const;
 
-// YM2151 operator index mapping: M1=0, C1=1, M2=2, C2=3
-const OPM_OP_OFFSETS = [0, 2, 1, 3]; // Slot order: M1, M2, C1, C2
+// Furnace stores OPM operators in register order: op[i] sits at slot offset i*8
+// (fmshared_OPM.h opOffs 0x00/0x08/0x10/0x18; orderedOps only renumbers effects).
+const OPM_SLOT_STRIDE = 8;
 
 // OPM register bases per operator parameter
 const OPM_REG = {
@@ -419,7 +420,7 @@ function emitVoiceRegisters(
   // Per-operator registers
   for (let opIdx = 0; opIdx < 4; opIdx++) {
     const op = patch.operators[opIdx];
-    const slot = OPM_OP_OFFSETS[opIdx] * 8;
+    const slot = opIdx * OPM_SLOT_STRIDE;
 
     cmds.push(
       MDX_CMD.OPM_WRITE,
