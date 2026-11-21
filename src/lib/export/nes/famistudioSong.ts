@@ -577,6 +577,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     const fx: Array<[number, number]> = [];
     // 2A03 hardware volume state (nes.cpp): 15xx envMode, 16xx length index, volume column = envelope period in envelope modes.
     let envMode = 3, lenIdx = 0x1f, furVol = 15, hwVol = false, baked = false, lastSpd = -1;
+    let bake: { vol: number; vals: number[]; held: boolean; frame: number } | null = null; // the baked note's channel volume and volume macro frames
     let slideOps: number[] = [];
     let slVol = ch === 7 ? 63 : 15, slStep = 0, slFrame = 0; // Furnace channel volume under a running 0Axy (volume units), its step per tick
     let loopSlide = ''; // running 0Axy as the first pass enters the loop target
@@ -767,7 +768,15 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           if (withCuts && cutTicks > 0 && seq[ri + 1] && cutTicks * perTick < seq[ri + 1].frame - seq[ri].frame) ops.push(0x48, Math.min(255, Math.round(cutTicks * perTick)));
           if (cell.volume >= 0) {
             if (ch === DPCM_CH) lossy.add('volume column on DPCM');
-            else { slVol = cell.volume; furVol = Math.min(15, ch === 7 ? Math.round(cell.volume / 4) : cell.volume); /* VRC6 saw volume is 0-63 */ if (!hwVol && !(baked && n === 0) && cell.volume !== lastVol) { ops.push(0x70 | furVol); lastVol = cell.volume; } }
+            else { slVol = cell.volume; furVol = Math.min(15, ch === 7 ? Math.round(cell.volume / 4) : cell.volume); /* VRC6 saw volume is 0-63 */ if (!hwVol && baked && n === 0 && bake) {
+              // The envelope holds bake x macro; Furnace now plays v x macro. After a finished macro that is v x L (L = its last
+              // value): send the FamiStudio channel volume c with table[c][bake x L] = v x L (table = floor(c * e / 15)).
+              const L = bake.vals[bake.vals.length - 1] ?? 15, e = scaleVol(bake.vol, L, m.compatFlags), want = scaleVol(furVol, L, m.compatFlags);
+              let c = 0;
+              while (c < 15 && Math.floor((c * e) / 15) !== want) c++;
+              if (bake.held || seq[ri].frame - bake.frame < bake.vals.length || Math.floor((c * e) / 15) !== want) lossy.add('volume column under a running baked volume macro');
+              if (c !== lastVol) { ops.push(0x70 | c); lastVol = c; } // lastVol stays under 15, so the next baked note sends 15 again
+            } else if (!hwVol && !(baked && n === 0) && cell.volume !== lastVol) { ops.push(0x70 | furVol); lastVol = cell.volume; } }
           }
           if (volSlide >= 0) {
             const x = volSlide >> 4, y = volSlide & 15;
@@ -785,6 +794,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             const volMac = curIns?.macros.some((x) => x.code === MACRO_VOL && x.length > 0);
             // A running 0Axy changes the channel volume every tick, so it cannot be baked into the envelope: FamiStudio slides it instead.
             baked = !hwVol && ch !== DPCM_CH && ch !== 2 && !!volMac && furVol < 15 && !slideOps.length;
+            if (baked) { const f = macroFrames(curIns!.macros.find((x) => x.code === MACRO_VOL && x.length > 0)!, 'vol', lossy, undefined, macroRate, m.version); bake = { vol: furVol, vals: f.vals, held: f.loop >= 0 || f.release >= 0, frame: seq[ri].frame }; }
             const key = (hwVol ? idx + 65536 * (1 + (envMode | (furVol << 2) | (lenIdx << 6))) : idx) + (baked ? KEY_BAKE * (1 + furVol) : 0);
             if (key !== lastIns) { insOps.push(0x80 | (insNo(key) << 1)); lastIns = key; }
             const fsVol = hwVol || baked ? 15 : furVol;
