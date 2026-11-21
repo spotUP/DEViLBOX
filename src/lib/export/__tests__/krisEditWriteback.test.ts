@@ -61,4 +61,17 @@ describe('KRIS export keeps the module', () => {
     expect([...out.subarray(off, off + 4)].map((b, i) => (i === 2 ? b & 0x0F : b))).toEqual([...live].map((b, i) => (i === 2 ? b & 0x0F : b)));
     expect((await load(out)).patterns[o].channels[ch].rows[row].note).toBe(cell.note);
   });
+
+  it('a rebuilt module (no loaded bytes) reloads every note of the first pattern as the grid showed it', async () => {
+    const song = await load(new Uint8Array(readFileSync(FIXTURE)));
+    const edited = song.patterns[0].channels[0].rows[1];
+    edited.note = 60;
+    song.uadeEditableFileData = undefined; // new-song path: rebuild instead of patching the source
+    const back = await load(await save(song));
+    const notes = (s: typeof song) => s.patterns[0].channels.map((c) => c.rows.map((r) => r.note));
+    const want = notes(song);
+    expect(want.flat().filter((n) => n > 0).length).toBeGreaterThan(0);
+    expect(back.patterns[0].channels[0].rows[1].note).toBe(60);
+    expect(notes(back)).toEqual(want);
+  });
 });
