@@ -54,17 +54,27 @@ const psgPeriod = (k: number): number => PSG_TAB[k % 12] >> Math.floor(k / 12);
  * Furnace 03xx on an SN tone channel steps the period by xx per tick until it reaches the target period (sms.cpp, linear in period).
  * MDSDRV's own `E7 pta` glide is exponential in pitch, so the slide is written as a pitch envelope (`E8`, one node per tick, relative to the
  * target note, 1/256 semitone) holding Furnace's per-tick period sequence; the driver adds it to the slurred note's pitch (mdsdrv.68k @do_peg).
- * shortcut: ideal 2^(-semitone/12) period curve, not the driver's table, and the envelope is cut at a chunk start (insCmd resets E8).
+ * shortcut: ideal 2^(-semitone/12) period curve, not the driver's table, (a chunk start keeps a running slide, see insCmd).
  */
 const sndPeriod = (nv: number): number => 3579545 / (27.5 * 2 ** ((nv + 3) / 12)) / 64;
-export function portaEnvelope(fromNv: number, toNv: number, xx: number): number[] {
-  const a = sndPeriod(fromNv), b = sndPeriod(toNv), out: number[] = [];
+/**
+ * FM 03xx (measured, Fancy_Promenard FM4 03 70: 1567.06, 1749.13, 1931.19, then the target 1975.08 Hz): Furnace steps the frequency linearly in Hz
+ * by xx fnum units of the target's block per tick (1.6256 Hz per xx at block 6, 3.25 Hz at block 7; block = lowest with fnum <= 1215) and clamps at the target. Hz = 27.5 * 2^((nv-9)/12), nv = the converter's FM key (83 = 1975 Hz).
+ * shortcut: ideal equal-temperament target Hz (Furnace's fnum quantisation differs by under 0.03 percent), NTSC clock only.
+ */
+const FM_FNUM_HZ = 7670454 / 144 / 2 ** 21; // Hz per fnum unit at block 0
+const fmHzPerXx = (targetHz: number): number => FM_FNUM_HZ * 2 ** Math.max(0, Math.ceil(Math.log2(targetHz / FM_FNUM_HZ / 1216)));
+const fmHz = (nv: number): number => 27.5 * 2 ** ((nv - 9) / 12);
+export function portaEnvelope(fromNv: number, toNv: number, xx: number, fm = false): number[] {
+  const a = fm ? fmHz(fromNv) : sndPeriod(fromNv), b = fm ? fmHz(toNv) : sndPeriod(toNv), out: number[] = [];
+  if (fm) xx *= fmHzPerXx(b);
   const node = (p: number, len: number) => {
-    const w = Math.max(-0x8000, Math.min(0x7eff, Math.round(256 * 12 * Math.log2(b / p)))) & 0xffff;
+    const w = Math.max(-0x8000, Math.min(0x7eff, Math.round(256 * 12 * Math.log2(fm ? p / b : b / p)))) & 0xffff;
     out.push(w >> 8, w & 0xff, 0, len);
   };
   let n = 0;
-  for (let p = a; p !== b && n < 120; n++) { p = a > b ? Math.max(b, p - xx) : Math.min(b, p + xx); node(p, 0); }
+  const up = a < b;
+  for (let p = a; p !== b && n < 120; n++) { p = up ? Math.min(b, p + xx) : Math.max(b, p - xx); node(p, 0); }
   node(b, 255); // length counts delay 0..len; 0 = one tick
   out.push(0x7f, n);
   return out;
@@ -257,13 +267,14 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const tracks: Array<{ ch: number; chunks: Array<{ bytes: number[]; tieStart: boolean }> }> = [];
   for (let ch = 0; ch < nCh; ch++) {
     const kind = KIND[ch];
-    let trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0, prevKey = -1, pegDirty = false, portaXx = 0;
+    let trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0, slideEnd = 0, prevKey = -1, pegDirty = false, portaXx = 0;
     const out: Array<{ bytes: number[]; tieStart: boolean }> = [];
     for (const c of chunks) {
       // PSG: E2 $80|v gives attenuation 15-v, added to the envelope attenuation 15-macro and clamped, the same sum as Furnace VOL_SCALE_LOG.
       const volCmd = (v: number) => [0xe2, kind === 'fm' ? 127 - v : 0x80 | Math.max(0, Math.min(15, v))];
-      const insCmd = () => { const r = insRef(kind, ins); return [0xe1, r.ins, 0xe8, r.peg + 1, 0xeb, r.mtab + 1]; };
-      const bytes: number[] = [...insCmd(), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(dtn ? [0xe6, dtn & 0xff] : [])];
+      // A slide still running at a chunk start keeps its envelope: E8 would restart it from the instrument's own one.
+      const insCmd = (chunkStart = false) => { const r = insRef(kind, ins); return [0xe1, r.ins, ...(chunkStart && tick < slideEnd ? [] : [0xe8, r.peg + 1]), 0xeb, r.mtab + 1]; };
+      const bytes: number[] = [...insCmd(true), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(dtn ? [0xe6, dtn & 0xff] : [])];
       let curIns = ins;
       type Tok = { cmd: 'note' | 'tie' | 'rest'; n: number; t: number; pre: number[] };
       const tok: Tok[] = [];
@@ -313,12 +324,15 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             n -= trs;
             if (n < 0 || n > MAX_NOTE) { lossy.add(`${kind.toUpperCase()} note out of range (clamped)`); n = Math.max(0, Math.min(MAX_NOTE, n)); }
             // 03xx: slur into the note (no key-off, envelope keeps running) and slide from the previous key; E7 00 turns it off again.
-            // shortcut: FM 03xx only slurs (no key-off/key-on, pitch jumps); the FM fnum slide model is not measured, upgrade with a per-slide E8 once it is.
-            if (kind === 'fm' && portaXx > 0 && sounding) { cmds.push(0xe0); lossy.add('FM 03xx slide (slurred, pitch jumps)'); }
-            const slide = kind === 'psg' && portaXx > 0 && prevKey >= 0 && prevKey !== nv;
-            if (slide) cmds.push(0xe0, 0xe8, slideItem(portaEnvelope(prevKey, nv, portaXx)) + 1);
+            const slide = (kind === 'psg' || (kind === 'fm' && sounding)) && portaXx > 0 && prevKey >= 0 && prevKey !== nv;
+            if (kind === 'fm' && portaXx > 0 && sounding) cmds.push(0xe0);
+            if (slide) {
+              const env = portaEnvelope(prevKey, nv, portaXx, kind === 'fm');
+              if (kind === 'psg') cmds.push(0xe0);
+              cmds.push(0xe8, slideItem(env) + 1); slideEnd = tick + env[env.length - 1] + 1;
+            }
             else if (pegDirty) cmds.push(0xe8, insRef(kind, ins).peg + 1);
-            pegDirty = slide; portaXx = 0; prevKey = kind === 'psg' ? nv : -1;
+            pegDirty = slide; portaXx = 0; prevKey = kind === 'psg' || kind === 'fm' ? nv : -1;
             tok.push({ cmd: 'note', n, t: 0, pre: cmds }); sounding = true; any = true;
             keyOns.push({ tick, ch, note: nv });
           } else if (isOff) { tok.push({ cmd: 'rest', n: 0, t: 0, pre: cmds }); sounding = false; }

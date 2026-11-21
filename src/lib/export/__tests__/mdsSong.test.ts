@@ -89,4 +89,15 @@ describe('furnaceToMds', () => {
     const hex = Buffer.from((await convert('Puyopuyo~n_DopplegangerArle-TsuuStyle.fur')).seq).toString('hex');
     expect(hex).toContain('ff160000ff580000ff9c000000000' + '0ff7f03');
   });
+  it('portaEnvelope FM: 03 70 takes three steps of 182 Hz then holds the target, 03 20 three steps of 104 Hz (Furnace Fancy_Promenard FM4)', () => {
+    const hz = (hex: string) => { // nodes of 4 bytes: signed 1/256 semitone, 0, length
+      const b = Buffer.from(hex, 'hex'); const out: number[] = [];
+      for (let i = 0; b[i] !== 0x7f; i += 4) out.push(b.readInt16BE(i) / 256);
+      return out;
+    };
+    const a = hz(Buffer.from(portaEnvelope(79, 83, 0x70, true)).toString('hex')).map((st) => 1975.08 * 2 ** (st / 12));
+    [1749, 1931, 1975, 1975].forEach((f, i) => expect(Math.abs(a[i] - f)).toBeLessThan(3));
+    const b = hz(Buffer.from(portaEnvelope(86, 88, 0x20, true)).toString('hex')).map((st) => 2636.69 * 2 ** (st / 12));
+    [2451, 2555, 2637, 2637].forEach((f, i) => expect(Math.abs(b[i] - f)).toBeLessThan(3));
+  });
 });
