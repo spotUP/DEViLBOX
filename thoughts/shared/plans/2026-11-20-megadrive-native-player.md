@@ -530,3 +530,26 @@ Headless MAME 0.286 (tools/md-phase0/tap.lua) against Furnace `-vgmout`, decoded
 
 Open gaps:
 - Other pitch envelopes (instrument pitch macros, arps) on songs above 60 Hz also run per frame. Not yet measured.
+
+## Phase 1j results (2026-11-21)
+
+Commit 24e441379: linear-pitch 01xx/02xx now converts to an MDSDRV extended pitch envelope (bit 15 in the envelope table; node = init sw, delta sw, len ub, next ub; frame k = init + (k+1) * delta, held len+1 frames). The converter tracks the running offset per channel, steps xx * pitchSlideSpeed / 128 semitone per tick (row tick included), keeps the slide across notes and note offs, clamps at Furnace note 179 / 0 and also at the driver key range 0..93 (MDSDRV wraps below key 0; flagged lossy), and stops the slide at the clamp when targetResetsSlides is set. Key-on, instrument change and chunk starts re-emit the envelope from the current offset. Unit test: golden_shit hex contains `0000fa000d01a800`.
+
+### 01/02 measured (MAME vs Furnace, per frame)
+
+- golden_shit FM1, 02 c0 then 02 ff kick, 60 Hz speed 1.
+  - Before: no slide (lossy "effect 02"), flat note.
+  - After: MAME 554.32 / 349.5 / 220.88 / 139.19 / 87.88 / 55.52 Hz, Furnace 554.32 / 349.91 / 220.88 / 139.39 / 87.88 / 55.52 Hz. Worst 2.5 cents over 0-7.8 s.
+- Verdict 02: 1:1 within the driver key range.
+- Verdict 01: same code path, not measured. No Genesis-only corpus song uses nonzero 01 (Plok_Beach, Equinox Intro, Kobito, SpareHalloween2 have other systems; Solar_Man has 01 03 on ch3 and is the next candidate).
+
+### Open gaps
+
+- Below driver key 0 (16.36 Hz FM) MAME holds 16.36 Hz while Furnace keeps falling (to 0.51 Hz). Inaudible; flagged lossy.
+- golden_shit from 7.83 s: MAME one frame late (timing drift, not pitch). Not chased.
+- golden_shit FM2/FM3 1102-cent error is the existing "FM note out of range (clamped)" at 6655 Hz, not 01/02.
+- limitSlides songs and fractional tpf: flagged lossy, not modelled.
+- Not started this phase: 0A volume slide, EC/ED, 04 vibrato, E2.
+- PSG key-off slide (Furnace playback.cpp:1153 does not slide after key-off; our PSG path does): no corpus check done, still open.
+
+Listen ROM: ~/Desktop/md-roms/golden_shit-02-slide.bin
