@@ -112,11 +112,11 @@ describe.each(FIXTURES)('Maniacs of Noise grid: $name', ({ name, path }) => {
     ['slide length', (g: ReturnType<typeof buildManiacsOfNoiseGrid>) => g!.placements.filter(p => p.slideNoteAt >= 0), 'slideLengthAt',
       (c: TrackerCell) => { c.eff2 = 0x15; }, (c: TrackerCell) => c.eff2, 0x15],
   ] as const)('%s column', (column, pick, atKey, edit, read, expected) => {
-    it('writes one command byte and reads back on every note that command reaches', async () => {
+    it('writes one command byte and reads back on every note that command reaches', async (ctx) => {
       const { raw, song } = load(path, name);
       const grid = buildManiacsOfNoiseGrid(raw, name)!;
       const pls = pick(grid);
-      if (pls.length === 0) return; // this fixture has no such command
+      if (pls.length === 0) return ctx.skip(); // neither corpus module uses this command: unproven on real data
       const at = pls[0][atKey as 'instrumentAt'];
       const same = pls.filter(p => p[atKey as 'instrumentAt'] === at);
       const cells = same.map(pl => song.patterns[Math.floor(pl.tick / MANIACS_OF_NOISE_ROWS_PER_PATTERN)].channels[pl.voice].rows[pl.tick % MANIACS_OF_NOISE_ROWS_PER_PATTERN]);

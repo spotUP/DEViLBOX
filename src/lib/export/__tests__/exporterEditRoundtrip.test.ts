@@ -14,6 +14,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import { getCellFileOffset } from '@/engine/uade/UADEPatternEncoder';
+import { sharedCellEdits } from '@/lib/song/sharedCellEdits';
 import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
@@ -95,7 +96,13 @@ async function measure(id: string): Promise<Row> {
         useTrackerStore.setState({ patterns: structuredClone(fresh.patterns), currentPatternIndex: 0 });
         editHivelyCell(p, c, r, field, nv);
         fresh.hivelyNative = useFormatStore.getState().hivelyNative!;
-      } else fresh.patterns[p].channels[c].rows[r] = { ...orig, [field]: nv };
+      } else {
+        const before = structuredClone(fresh.patterns[p]);
+        fresh.patterns[p].channels[c].rows[r] = { ...orig, [field]: nv };
+        // The editor moves every cell that plays one stored cell together (propagateSharedCells); the probe does the same.
+        const vl = fresh.uadeVariableLayout;
+        if (vl) for (const e of sharedCellEdits(vl, p, before, fresh.patterns[p], fresh.patterns)) Object.assign(fresh.patterns[e.pattern].channels[e.channel].rows[e.row], e.values);
+      }
       let out: Uint8Array;
       try { out = id in LAYOUT_EXPORTERS ? await invokeLayoutExport(id, fresh) : await invokeNamedExport(id, fresh); }
       catch (e) { last = { verdict: 'fail', edited: field, slotClean: null, detail: `export: ${(e as Error).message}` }; continue; }
