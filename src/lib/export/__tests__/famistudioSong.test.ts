@@ -283,6 +283,21 @@ describe('furnaceToFamistudio', () => {
     expect(slides(2)).toBe(2);
     expect(slides(12)).toBe(1);
   });
+  it('slides the channel volume instead of baking it into a volume macro while 0Axy runs (sweatsmile noise order 4)', () => {
+    // Furnace keeps 0A20 sliding the channel volume under the macro after the row-4 volume set; a baked envelope would hold it at 8.
+    const m = nesModule({ 3: { 0: { ...A4, instrument: 0, volume: 0, ...fx(0x0a, 0x20) }, 4: { ...A4, instrument: 0, volume: 8 } } });
+    const vol = { code: 0, type: 0, mode: 0, speed: 1, delay: 0, length: 2, loop: 255, release: 255, data: [15, 6] };
+    Object.assign(m, { instruments: [{ type: 34, macros: [vol], amiga: { initSample: 0 } }] });
+    const song = furnaceToFamistudio(m);
+    expect(has(song.music, [0x78, 0x51, 8, 240])).toBe(true);
+    // 0A20 passes 15 after row 4 (Furnace stops it), so both passes enter the loop target without a slide.
+    expect(song.lossy.some((l) => l.startsWith('volume slide 0Axy'))).toBe(false);
+  });
+  it('labels a 0Axy still running at the song end as lossy: the loop pass replays bytes written for no slide', () => {
+    // Speed 1: 0A10 from v0 reaches only 4 by the end, so the loop target is entered with the slide on the second pass only.
+    const song = furnaceToFamistudio(nesModule({ 0: { 0: { ...A4, volume: 0, ...fx(0x0a, 0x10) } } }, { speed1: 1, speed2: 1 }));
+    expect(song.lossy.some((l) => l.startsWith('volume slide 0Axy running on one pass'))).toBe(true);
+  });
   it('maps ED note delay to 0x47 with ticks*frames-1', () => {
     const song = music({ 0: { 0: { ...A4, ...fx(0xed, 0x03) } } });
     const at = [...song.music].indexOf(0x47);

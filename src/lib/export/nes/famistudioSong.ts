@@ -579,6 +579,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     let envMode = 3, lenIdx = 0x1f, furVol = 15, hwVol = false, baked = false, lastSpd = -1;
     let slideOps: number[] = [];
     let slVol = ch === 7 ? 63 : 15, slStep = 0, slFrame = 0; // Furnace channel volume under a running 0Axy (volume units), its step per tick
+    let loopSlide = ''; // running 0Axy as the first pass enters the loop target
     let lastIns = -1, lastVol = -1, empty = 0, hasNotes = false, loopAt = 0, first = -1, firstFrame = -1;
     let curIns: FurnaceInstrument | undefined;
     let vibPos = 0, vibFrame = 0; // Furnace's vibratoPos (64-step sine) at the row start
@@ -603,7 +604,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     let ri = 0;
     for (let o = 0; o < endOrder; o++) {
       // The loop target is entered with the end-of-song instrument, not the first pass's: send the instrument again.
-      if (o === loopOrder) { flush(); loopAt = out.length; lastIns = -1; }
+      if (o === loopOrder) { flush(); loopAt = out.length; lastIns = -1; loopSlide = slideOps.join(); }
       for (let r = 0; r < orderLen[o]; r++, ri++) {
         const cell = cellAt(ch, o, r);
         const ops: Array<number | { env: number }> = [];
@@ -778,7 +779,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             hwVol = ch !== 2 && ch < DPCM_CH && envMode !== 3;
             const idx = curInsIdx >= 0 ? curInsIdx : 0;
             const volMac = curIns?.macros.some((x) => x.code === MACRO_VOL && x.length > 0);
-            baked = !hwVol && ch !== DPCM_CH && ch !== 2 && !!volMac && furVol < 15;
+            // A running 0Axy changes the channel volume every tick, so it cannot be baked into the envelope: FamiStudio slides it instead.
+            baked = !hwVol && ch !== DPCM_CH && ch !== 2 && !!volMac && furVol < 15 && !slideOps.length;
             const key = (hwVol ? idx + 65536 * (1 + (envMode | (furVol << 2) | (lenIdx << 6))) : idx) + (baked ? KEY_BAKE * (1 + furVol) : 0);
             if (key !== lastIns) { insOps.push(0x80 | (insNo(key) << 1)); lastIns = key; }
             const fsVol = hwVol || baked ? 15 : furVol;
@@ -861,6 +863,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         if (empty === MAX_EMPTY) flush();
       }
     }
+    // The loop pass replays the first pass's bytes: a 0Axy running there on one pass only plays wrong on the other (sweatsmile noise order 4).
+    if (slideOps.join() !== loopSlide) lossy.add('volume slide 0Axy running on one pass of the loop target only');
     flush();
     const packed = compressRefs(out, ev, efx, loopAt);
     out.length = 0; out.push(...packed.out);
