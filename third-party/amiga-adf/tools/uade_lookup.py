@@ -83,15 +83,29 @@ def candidates(basename):
     return [c for c in out if c]
 
 
+def _entry_for(player, base, entries, prefix_map):
+    """The conf line of PLAYER for this file. A player can own several lines whose
+    epopt differs (PTK-Prowiz: type:st24 for mod_doc, type:pt30 for mod, ...); the
+    first line is not the right one (Virgill-mothership.mod played as SoundTracker
+    2.4, repeat start in bytes). Same order as UADE: the file's prefix, then the
+    line UADE reaches through content detection, then the first line."""
+    for cand in candidates(base):
+        if cand in prefix_map and prefix_map[cand]['player'] == player:
+            return prefix_map[cand]
+    own = [e for e in entries if e['player'] == player]
+    # shortcut: a prefix-less file takes the detect_format_by_content line (MOD -> pt30), not uade's exact content prefix (MOD15 -> st20); map uade123's formatname if that matters
+    return next((e for e in own if 'detect_format_by_content' in e['flags']), own[0] if own else None)
+
+
 def lookup(module, root=DEFAULT_ROOT, override=None):
     conf = os.path.join(root, 'eagleplayer.conf')
     entries, prefix_map = parse_conf(conf)
     base = os.path.basename(module)
 
     if override:
-        for e in entries:
-            if e['player'] == override:
-                return e
+        e = _entry_for(override, base, entries, prefix_map)
+        if e:
+            return e
         raise SystemExit(f"--player {override!r}: not in {conf}")
 
     for cand in candidates(base):
@@ -105,9 +119,9 @@ def lookup(module, root=DEFAULT_ROOT, override=None):
     # answer back onto a conf entry.
     detected = cross_check(module, None)
     if detected:
-        for e in entries:
-            if e['player'] == detected:
-                return e
+        e = _entry_for(detected, base, entries, prefix_map)
+        if e:
+            return e
 
     raise SystemExit(
         f"{base}: no eagleplayer.conf prefix matches (tried "
