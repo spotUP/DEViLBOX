@@ -797,3 +797,34 @@ Next:
 1. Fix the missing PCM key-ons (nf_key_off / rest before a repeated note), then re-measure the hit count.
 2. Find the source of the PCM lag, then re-measure against the 1-frame target.
 3. Q2: find the PSG1 cell at 17.4 s, its pitch macro and the scaling root cause.
+
+## Phase 1q results (2026-11-21)
+
+Song: highscorefollin, 40 s, MAME headless, current converter. Listen ROM: `~/Desktop/md-roms/highscorefollin-1q.bin`.
+
+### Q1 + Q2: PCM hits and lag (PASS, measurement artifact)
+
+- Phase 1p counted YM `2B=0x80` writes as PCM key-ons. `mdssub.z80` writes `2B=0x80` (DAC enable) only when it leaves `idle_loop`, so back-to-back hits during playback never write it. The "98 of 161, +105 ms" numbers came from that artifact.
+- The phase 1p fix hypothesis (missing `nf_key_off`) was wrong: `@cmd_note` sets both `nf_key_on` and `nf_key_off` for every note that is not slurred, and `mds_pcm_key_on` needs `nf_key_off`.
+- New taps: a 68k write tap on `0xA00E02-0xA00E0F` (`z_pcm1_key_on` = `0xA00E08`) and a Z80 write tap on `0x0E08`. Both are aligned to the first FM key-on.
+- Result: Furnace 160 `0x95` starts. MAME gives 160 68k requests and 160 Z80 consumes, 0 unmatched.
+  - 68k: median +8.0 ms (min -3.1, max 19.4), 157 of 160 within 1 frame.
+  - Z80: median +8.4 ms, 156 of 160 within 1 frame.
+  - The median equals the FM pipeline offset from 1o (5-9 ms).
+- Sample identity is bijective: Furnace block 0 maps to Z80 `(1,0,128)` and block 1 to `(1,128,145)`.
+- The FM6 lossy flag is removed (commit 4512900aa). A test asserts that no FM6 lossy entry exists. The DAC volume (`dacVolTable`) shortcut stays open.
+
+### Q3: PSG1 dip at 17.4 s (root cause found, not fixed)
+
+- This is not a macro. PSG1 (ch 6) keys note 54 (F#6) at tick 1044. Furnace writes period 76 (1471.9 Hz). MDSDRV writes 75 (1491.5 Hz), +23 cents. Note 51 (D#6): Furnace 90, MAME 89.
+- Root cause: Furnace linear pitch computes `period = round(clock / fbase / toneDivider)` (`engine.cpp` `calcFreq`, `sms.cpp` `toneDivider = 64`). MDSDRV `mds_get_psg_pitch` interpolates `mds_psg_freq_tab` and then does `lsr.w d2,d0` by octave, which truncates. Every note where the fraction lost by the truncation is 0.5 or more lands one period high.
+- The comment at `mdsSong.ts:38-42` ("which is the period Furnace 0.6.8.3 writes for note value k") is wrong for the same reason. `psgPeriod()` mirrors the MDSDRV truncation, not Furnace.
+- Baseline: PSG1 has 317 frames over 10 cents in 40 s. The worst is 48.8 cents at 32.1 s. The first bad frames are at 17.400, 17.417 and 17.8 s.
+- Fix (converter layer): per PSG note, compute the Furnace period `round(3579545 / (16 * f))` with Furnace tuning. Where it differs from the truncated table value, emit a fine detune so that the interpolated table value after `lsr` equals the Furnace period. Check the existing PSG detune/pitch-envelope path in `mdsSong.ts:446-504` first.
+- Open: at tick 1060, note 53 writes period 80 on both sides, while `psgPeriod(53)` = 84. The note probably carries an instrument arp offset. Not investigated.
+
+### Next
+
+1. Implement the Q3 PSG rounding compensation and re-run lagcmp on PSG1-3. PASS: 0 frames over 10 cents.
+2. Apply the DAC volume (`dacVolTable`) on FM6 PCM.
+3. Run the 1q PCM taps on a second song with dense drums.
