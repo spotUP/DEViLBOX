@@ -52,6 +52,7 @@ def events(path):
         if port == 0 and r == 0x28:
             c = CH.get(v & 7)
             if c: out.append((t, f'FM{c}', 'KEYON' if v & 0xF0 else 'KEYOFF', v >> 4))
+        elif 0x40 <= r <= 0x4F and r & 3 != 3: out.append((t, f'FM{port * 3 + (r & 3) + 1}', f'TL{(r >> 2) & 3}', v & 0x7F))
         elif 0xA4 <= r <= 0xA6: hi[port * 3 + r - 0xA4] = v
         elif 0xA0 <= r <= 0xA2:
             k = port * 3 + r - 0xA0; h = hi.get(k, 0); blk = (h >> 3) & 7; fn = ((h & 7) << 8) | v

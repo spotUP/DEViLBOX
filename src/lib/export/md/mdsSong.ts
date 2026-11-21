@@ -288,7 +288,22 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // shortcut: limitSlides (156 / dispatch porta floor) and offsets past the driver's signed 16-bit range are clamped, lossy.
     // The driver key (note byte + transpose) must stay in 0..MAX_NOTE (mds_get_fm_pitch indexes its octave/note tables with it), so a slide
     // past that holds at the driver's end key instead of Furnace's (measured: golden_shit FM1 kick 02 c0 wrapped to 4 kHz below key 0).
+    // PSG: E2 $80|v gives attenuation 15-v, added to the envelope attenuation 15-macro and clamped, the same sum as Furnace VOL_SCALE_LOG.
+    const volCmd = (v: number) => [0xe2, kind === 'fm' ? 127 - v : 0x80 | Math.max(0, Math.min(15, v))];
     let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0;
+    // 0Axy: Furnace keeps volume in 1/256 steps and adds x*64 (or -y*64) every tick, the row's first tick included, until it clamps at
+    // 0 or the channel maximum (playback.cpp per-tick volume slides); the driver gets an E2 on every tick where volume>>8 changes.
+    const vmax = kind === 'fm' ? 127 : 15;
+    let vol256 = vol << 8, vspeed = 0;
+    const volStep = (): number[] | null => {
+      if (!vspeed) return null;
+      const before = vol;
+      vol256 += vspeed;
+      if (vol256 > vmax << 8) { vol256 = vmax << 8; if (!m.compatFlags.noVolSlideReset) vspeed = 0; }
+      else if (vol256 < 0) { vol256 = m.compatFlags.legacyVolumeSlides ? (vmax << 8) + 1 : 0; if (!m.compatFlags.noVolSlideReset) vspeed = 0; }
+      vol = vol256 >> 8;
+      return vol !== before ? volCmd(vol) : null;
+    };
     const pss = Number(m.compatFlags.pitchSlideSpeed) || 1, tpf = (tempo + 1) / 128;
     const pLimit = () => (prate > 0 ? Math.min(119 - curNv, MAX_NOTE - curKey) : -Math.min(curNv + 60, curKey)) * 128;
     // MDSDRV extended node: frame k of a node is init + (k+1)*delta, held len+1 frames (mdsdrv.68k @extended).
@@ -307,8 +322,6 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     };
     const out: Array<{ bytes: number[]; tieStart: boolean }> = [];
     for (const c of chunks) {
-      // PSG: E2 $80|v gives attenuation 15-v, added to the envelope attenuation 15-macro and clamped, the same sum as Furnace VOL_SCALE_LOG.
-      const volCmd = (v: number) => [0xe2, kind === 'fm' ? 127 - v : 0x80 | Math.max(0, Math.min(15, v))];
       // A slide still running at a chunk start keeps its envelope: E8 would restart it from the instrument's own one.
       const insCmd = (chunkStart = false) => {
         const r = insRef(kind, ins);
@@ -331,13 +344,32 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         }
       };
       let tieStart = false;
+      // One sequence tick of the current state; `pre` or `cut` starts a new tie/rest token there (0A steps, ECxx, EDxx split rows).
+      const addTick = (pre: number[] | null, cut = false) => {
+        if (cut) sounding = false;
+        if (pre || cut || !tok.length) {
+          if (!tok.length && i0) tieStart = sounding;
+          if (tok.length) emit(tok.pop()!);
+          tok.push({ cmd: sounding ? 'tie' : 'rest', n: 0, t: 0, pre: pre ?? [] });
+        }
+        tok[tok.length - 1].t += 1;
+      };
+      let i0 = false;
       c.rows.forEach((r, i) => {
         const cell = cellAt(ch, c.o, r);
         const nv = cell ? convertFurnaceNoteValue(cell) : -1;
         if (cell && cell.instrument >= 0) ins = cell.instrument;
         const cmds: number[] = [];
         let pChanged = false;
-        if (cell && cell.volume >= 0) { vol = cell.volume; cmds.push(...volCmd(vol)); }
+        // EDxx runs the whole row xx ticks late; ECxx keys off xx ticks after the row runs (playback.cpp rowDelay / cut, delayBehavior 2).
+        const fxv = (t: number) => cell?.effects?.find((e) => e.type === t && e.value > 0)?.value ?? 0;
+        let delay = fxv(0xed), cutAt = fxv(0xec);
+        if (delay >= c.ticks[i]) { lossy.add('EDxx delay not shorter than the row (played on the row)'); delay = 0; }
+        cutAt = cutAt ? delay + cutAt : 0;
+        if (cutAt >= c.ticks[i]) { lossy.add('ECxx cut not inside the row (ignored)'); cutAt = 0; }
+        i0 = i === 0;
+        for (let k = 0; k < delay; k++) addTick(volStep());
+        if (cell && cell.volume >= 0) { vol = cell.volume; vol256 = vol << 8; cmds.push(...volCmd(vol)); }
         for (const e of cell?.effects ?? []) {
           if (e.type < 0 || FX_FLOW.has(e.type)) continue;
           if (e.type === 0x08 && kind === 'fm') { const l = e.value >> 4, rr = e.value & 15; pan = l && rr ? 0xc0 : l ? 0x80 : rr ? 0x40 : 0xc0; cmds.push(0xe9, pan); continue; }
@@ -352,6 +384,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (!(noise & 2)) lossy.add('noise fixed-rate mode (20xy, x=0)');
             cmds.push(0xea, NOISE_EA[noise]); continue;
           }
+          if (e.type === 0x0a) { vspeed = !e.value ? 0 : e.value & 15 ? -(e.value & 15) * 64 : (e.value >> 4) * 64; continue; }
+          if (e.type === 0xec || e.type === 0xed) continue;
           if (e.type === 0x03 && (kind === 'psg' || kind === 'fm')) { portaXx = e.value; if (prate) { prate = 0; pChanged = true; } continue; } // 03 00 only stops the porta
           if ((e.type === 0x01 || e.type === 0x02) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
             prate = (e.type === 0x01 ? 1 : -1) * e.value * pss; pChanged = true;
@@ -361,6 +395,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           }
           lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}`);
         }
+        const vs = volStep();
+        if (vs) cmds.push(...vs);
         const isNote = nv >= 0 && nv < 253, isOff = nv >= 253;
         if (isNote) { poff = 0; curNv = nv; }
         else if (pChanged && sounding && (prate || poff)) cmds.push(...pslideCmd());
@@ -386,11 +422,12 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             else if (pegDirty) cmds.push(0xe8, insRef(kind, ins).peg + 1);
             pegDirty = slide || prate !== 0; portaXx = 0; prevKey = kind === 'psg' || kind === 'fm' ? nv : -1;
             tok.push({ cmd: 'note', n, t: 0, pre: cmds }); sounding = true; any = true;
-            keyOns.push({ tick, ch, note: nv });
+            keyOns.push({ tick: tick + delay, ch, note: nv });
           } else if (isOff) { tok.push({ cmd: 'rest', n: 0, t: 0, pre: cmds }); sounding = false; }
           else { tok.push({ cmd: sounding ? 'tie' : 'rest', n: 0, t: 0, pre: cmds }); if (i === 0) tieStart = sounding; }
         }
-        tok[tok.length - 1].t += c.ticks[i];
+        tok[tok.length - 1].t += 1;
+        for (let k = delay + 1; k < c.ticks[i]; k++) addTick(volStep(), k === cutAt);
         if (prate && curNv >= 0) {
           const lim = pLimit();
           poff += prate * c.ticks[i];
