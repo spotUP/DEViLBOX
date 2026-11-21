@@ -158,6 +158,12 @@ describe('furnaceToMds', () => {
     const hex = Buffer.from(furnaceToMds(m).seq).toString('hex');
     expect(hex).toContain('ee0010ee0218ee030d'); // op0 13+3, op2 21+3, op3 16-3 (driver adds 3 back)
   });
+  it('Solar_Man FM6: the Snare (sample instrument with no SM feature) plays sample 0 like Furnace (DivInstrumentAmiga initSample 0), so order 0 row 4 keys on', async () => {
+    const m = await parse('Solar_Man.fur');
+    expect(m.instruments[4].amiga).toBeUndefined();
+    const ticks = furnaceToMds(m).keyOns.filter((k) => k.ch === 5).map((k) => k.tick);
+    expect(ticks.slice(0, 4)).toEqual([0, 10, 20, 35]); // rows 0, 2, 4 (Snare), 7 at speed 5
+  });
   it('highscorefollin (Furnace version < 224): FM operators parse without the v224 block byte, so the Wurlitzer voice writes TL 1e 1c 10 16 like Furnace', async () => {
     // Raw FM feature: f4 47 00 20 | 52 1e df 07 ... The extra block byte read shifted every operator one byte (TL 5f 5f 19 19, -14 dB on FM1).
     const m = await parse('highscorefollin.fur');

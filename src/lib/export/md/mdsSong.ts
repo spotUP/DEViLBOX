@@ -523,7 +523,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         let dacHdr = -1;
         if (dac) {
           const a = m.instruments[ins].amiga, fn = Math.max(0, Math.min(179, nv + 60));
-          const smp = a?.useNoteMap ? a.noteMap?.[fn]?.map ?? -1 : a?.initSample ?? -1;
+          // No SM feature in the file means the DivInstrumentAmiga defaults (instrument.h: initSample 0, no note map).
+          const smp = a?.useNoteMap ? a.noteMap?.[fn]?.map ?? -1 : a?.initSample ?? 0;
           if (smp >= 0 && smp < m.samples.length && m.samples[smp].length > 0) dacHdr = pcmRef(smp, a?.useNoteMap ? a.noteMap?.[fn]?.freq ?? fn : fn);
         }
         const isNote = nv >= 0 && nv < 253 && (!dac || dacHdr >= 0), isOff = (dac && dacHdr < 0) || nv >= 253 || (dacOff && !isNote);
