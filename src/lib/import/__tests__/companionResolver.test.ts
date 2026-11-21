@@ -56,6 +56,11 @@ describe('splitName / stemOf', () => {
 });
 
 describe('the discriminating pair — SynthDream', () => {
+  it('pairs a Dirk Bialluch tpu.<tune> with its smp.<tune>', () => {
+    const r = resolveCompanions('tpu.timelock ingame', { siblings: ['tpu.timelock ingame', 'smp.timelock ingame', 'smp.timelock title'] });
+    expect(r.companions).toEqual(['smp.timelock ingame']);
+  });
+
   it('takes the tune\'s own smp.<tune> and NOT the shared bank', () => {
     const r = resolveCompanions('sdr.nobuddiesland end 2', { siblings: SYNTH_DREAM });
     expect(r.companions).toEqual(['smp.nobuddiesland end 2']);
