@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { FurnaceModule } from '../../import/formats/FurnaceSongParser';
 import { MESEN } from './nesMesenHarness';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { buildFamistudioRom, compressRefs, expandRefs, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, loopPeriodicTail, mergeVibratoPitch, noiseNote, type FamistudioMeta } from '../nes/famistudioSong';
+import { buildFamistudioRom, compressRefs, expandRefs, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, loopPeriodicTail, mergeVibratoPitch, noiseNote, type FamistudioMeta, bestSlideStep } from '../nes/famistudioSong';
 
 const ROOT = path.resolve(__dirname, '../../../..');
 const DIR = path.join(ROOT, 'public/nes/famistudio');
@@ -244,6 +244,14 @@ describe('furnaceToFamistudio', () => {
     const song = music({ 0: { 0: A4, 4: { note: 9, octave: 5, ...fx(0x03, 0x20) } } });
     expect(song.music.includes(0x50)).toBe(true);
     expect(song.music.includes(0x43)).toBe(true);
+  });
+  it('picks the 03 slide step that follows the Furnace per-tick curve, not round(average)', () => {
+    // one_sided_love triangle frame 115 (030D, A-4 = 445, periods 140 -> 132): Furnace 137,134,132; step 7 gave 136,133,132.
+    const raw = (n: number): number => 1789773 / (16 * 445 * 2 ** ((n - 46) / 12));
+    const [step, err] = bestSlideStep({ rawFrom: raw(56), fromPeriod: 140, toPeriod: 132, unitsPerTick: 13 * 4, totalUnits: 128, dirUp: true, furPitch: 0, fsOffset: 0, frames: 12, perTick: 1, guess: 6.5 });
+    expect([step, err]).toEqual([-6, 0]);
+    const curve = [1, 2, 3].map((f) => 132 + Math.floor(Math.max(0, 16 + f * step) / 2));
+    expect(curve).toEqual([137, 134, 132]);
   });
   it('maps 01 slide up to a 0x50 slide toward the note it reaches', () => {
     const song = music({ 0: { 0: { ...A4, ...fx(0x01, 0x20) }, 8: { note: 9, octave: 5 } } });

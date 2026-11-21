@@ -399,6 +399,35 @@ export function expandRefs(p: PackedStream): number[] {
   return out;
 }
 
+/**
+ * FamiStudio slide step (half-periods per frame, signed) that best follows Furnace's linear-pitch slide.
+ * Furnace moves `unitsPerTick` 1/128 semitones per tick up to `totalUnits` (Infinity for 01/02, which slide on) and
+ * writes round(rawFrom * 2^(-(u + furPitch)/1536)) - 1 (calcFreq with E5 fine pitch, NES freq--). FamiStudio starts at
+ * 2 * (from - to) half-periods, adds the step every frame and plays to + fsOffset (its fine pitch) + floor(pitch / 2).
+ * Rounding the average step drifts by one mid-slide (one_sided_love 030D: 140 -> 132 wants 6, round(6.5) = 7), so
+ * every step is simulated and the closest curve wins. Returns [signed step, summed period error]; an error above 0
+ * means no constant FamiStudio step reproduces the slide.
+ */
+export function bestSlideStep(o: { rawFrom: number; fromPeriod: number; toPeriod: number; unitsPerTick: number; totalUnits: number; dirUp: boolean; furPitch: number; fsOffset: number; frames: number; perTick: number; guess: number }): [number, number] {
+  const sign = o.toPeriod < o.fromPeriod ? -1 : 1;
+  const fur: number[] = [];
+  for (let f = 0; f < o.frames; f++) {
+    const u = Math.min(o.totalUnits, o.unitsPerTick * (Math.floor(f / o.perTick) + 1));
+    fur.push(Math.round(o.rawFrom * 2 ** (-((o.dirUp ? u : -u) + o.furPitch) / 1536)) - 1);
+  }
+  let best = Math.max(1, Math.min(127, Math.round(o.guess))), bestCost = Infinity;
+  for (let st = 1; st <= 127; st++) {
+    let pitch = 2 * (o.fromPeriod - o.toPeriod), cost = 0;
+    for (let f = 0; f < o.frames && cost <= bestCost; f++) {
+      pitch += sign * st;
+      if (sign < 0 ? pitch < 0 : pitch > 0) pitch = 0;
+      cost += Math.abs(o.toPeriod + o.fsOffset + Math.floor(pitch / 2) - fur[f]);
+    }
+    if (cost < bestCost || (cost === bestCost && Math.abs(st - o.guess) < Math.abs(best - o.guess))) { best = st; bestCost = cost; }
+  }
+  return [sign * best, bestCost];
+}
+
 function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean, base: number): FamistudioSong {
   const lossy = new Lossy();
   const pitchLossy: PitchLossySpan[] = [];
@@ -802,7 +831,13 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               if ((linear && Math.abs(to - from) > 2) || mag > 127.5) markPitchLossy();
               if (linear && Math.abs(to - from) > 2) lossy.add('pitch slide over 2 semitones: FamiStudio slides period-linear, Furnace linear pitch (curve differs mid-slide)');
               if (mag > 127.5) lossy.add('pitch slide faster than FamiStudio step 127 (slowed)');
-              const step = -Math.sign(pFrom(from) - pFrom(to)) * Math.max(1, Math.min(127, Math.round(mag)));
+              // Linear pitch: units per tick and whether Furnace stops at the target (03, E1/E2) or slides on (01/02).
+              const units = slideFx === 0x03 || slideFx === 0x01 || slideFx === 0x02 ? slideVal * slideUnit : (slideVal >> 4) * 4 * slideUnit;
+              const [step, curveErr] = linear && mag <= 127.5
+                ? bestSlideStep({ rawFrom: pulsePeriodRaw(from), fromPeriod: pFrom(from), toPeriod: pFrom(to), unitsPerTick: units, totalUnits: slideFx === 0x01 || slideFx === 0x02 ? Infinity : Math.abs(to - from) * 128, dirUp: to > from, furPitch: fineRaw - 128, fsOffset: fineSent || 0, frames: Math.max(1, span(ri)), perTick, guess: mag })
+                : [-Math.sign(pFrom(from) - pFrom(to)) * Math.max(1, Math.min(127, Math.round(mag))), 0];
+              // one_sided_love triangle frame 295 (148 -> 132): Furnace steps 3,3,4,3,3 periods, no constant FamiStudio step does.
+              if (curveErr > 0 && !(Math.abs(to - from) > 2) && mag <= 127.5) { lossy.add('pitch slide curve not reachable with a constant FamiStudio step'); markPitchLossy(); }
               slide = [step & 0xff, from, to];
               rowByte = null;
               if (n > 0) hasNotes = true;
