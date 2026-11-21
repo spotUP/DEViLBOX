@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { arpTable, furnaceTickOf, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, vibOffsets, vibratoEnvelope } from '../md/mdsSong';
+import { arpTable, furnaceTickOf, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, psgOffsets, vibOffsets, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
@@ -108,6 +108,28 @@ describe('PSG period rounding', () => {
       expect(mdsPsgPitch(k * 256 + psgFix(k, offs)), `key ${k}`).toBe(per(k));
       expect(miss(k, psgFix(k, offs)), `key ${k}`).toBeLessThanOrEqual(miss(k, psgFix(k)));
     }
+  });
+  it('PSG 03xx slide steps write Furnace\'s rounded period, not the driver\'s truncated one (newer_song_lol PSG1 03 12: 141 vs 142)', () => {
+    const per = (nv: number) => Math.round(3579545 / (27.5 * 2 ** ((nv + 3) / 12)) / 64);
+    const node = (env: number[], i: number) => ((env[4 * i] << 8 | env[4 * i + 1]) << 16) >> 16;
+    let ideal = 0, fixed = 0;
+    for (let k = 24; k <= 72; k++) for (let o = -192; o <= 192; o += 9) {
+      if (mdsPsgPitch(k * 256 + psgFix(k, undefined, o)) === per(k + o / 128)) fixed++; // 03xx under 04xy (slideCmd E4/E6)
+      if (mdsPsgPitch(k * 256 + 2 * o + psgFix(k)) === per(k + o / 128)) ideal++;
+      const base = k * 256 + psgFix(k), env = portaEnvelope(k + o / 128, k, 0, false, 9, 1, base); // E8 slide without vibrato
+      for (let i = 0; env[4 * i] !== 0x7f && i < 64; i++) {
+        const p = k * 128 + o - Math.sign(o) * Math.min(Math.abs(o), 9 * (i + 1)); // tick i + 1 of the linear slide
+        expect(mdsPsgPitch(base + node(env, i)), `key ${k} o ${o} node ${i}`).toBe(per(p / 128));
+      }
+    }
+    expect(fixed).toBe(49 * 43);
+    expect(ideal).toBeLessThan(fixed);
+  });
+  it('psgOffsets scores arp steps, pitch macro values and vibrato together, undefined with none', () => {
+    const ins = { macros: [{ code: 1, type: 0, mode: 0, length: 2, loop: -1, release: -1, speed: 1, delay: 0, data: [1, 0] }] } as never;
+    expect(psgOffsets(ins, 223)).toEqual([0, 128]);
+    expect(psgOffsets(ins, 223, [-3, 0, 3])).toEqual([-3, 0, 3, 125, 128, 131]);
+    expect(psgOffsets({ macros: [] } as never, 223)).toBeUndefined();
   });
 });
 

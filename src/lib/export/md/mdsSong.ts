@@ -97,22 +97,38 @@ export function vibOffsets(rate: number, depth: number, fine = 15): number[] {
  * offs: the pitch offsets the note plays (vibOffsets under 04xy). Without them the detune is scored over every offset within half a
  * semitone; with them it is scored on exactly the vibrato's offsets, which leaves fewer one-period misses (newer_song_lol PSG1 04 55).
  */
-export function psgFix(k: number, offs?: number[]): number {
-  const mk = offs ? `${k}:${offs.join(',')}` : k;
+export function psgFix(k: number, offs?: number[], o0 = 0): number {
+  const mk = offs || o0 ? `${k}:${o0}:${offs?.join(',')}` : k;
   const hit = psgFixMemo.get(mk); if (hit !== undefined) return hit;
-  const per = (o: number) => Math.min(1023, Math.round(sndPeriod(k + o / 128)));
+  // o0: a pitch offset (1/128 semitone) the note sits at, e.g. a 03xx slide step under 04xy (slideCmd); the result is then 2 * o0 + fix.
+  const per = (o: number) => Math.min(1023, Math.round(sndPeriod(k + (o0 + o) / 128)));
   // Of the detunes that write Furnace's period at the key, take the one that also writes it for most offsets within a half
   // semitone: the driver interpolates linearly and truncates where Furnace rounds, so the edge detune put 04xy vibrato and slide
   // offsets one period high (newer_song_lol PSG1). Ties go to the detune nearest 0.
-  let best = 0, bestMiss = Infinity;
-  for (let a = 0; a <= 128; a++) for (const d of a ? [-a, a] : [0]) {
-    if (d > 127 || k * 256 + d < 0 || mdsPsgPitch(k * 256 + d) !== per(0)) continue;
+  let best = 2 * o0, bestMiss = Infinity;
+  for (let a = 0; a <= 128; a++) for (const d of (a ? [-a, a] : [0]).map((x) => x + 2 * o0)) {
+    if ((!o0 && d > 127) || k * 256 + d < 0 || mdsPsgPitch(k * 256 + d) !== per(0)) continue;
     let miss = 0;
     for (const o of offs ?? OFFS_HALF) if (k * 256 + d + 2 * o >= 0 && mdsPsgPitch(k * 256 + d + 2 * o) !== per(o)) miss++;
     if (miss < bestMiss) { best = d; bestMiss = miss; }
   }
   psgFixMemo.set(mk, best);
   return best;
+}
+
+/**
+ * Pitch offsets (1/128 semitone) a PSG note plays for psgFix: every arp macro step (x128) plus every absolute pitch macro value plus every
+ * 04xy vibrato offset. The driver adds them to key*256 + detune (mtab transpose, E8 envelope), so one detune must fit them all
+ * (newer_song_lol PSG1 instrument 10 arp 1,0: the edge detune left the +1 step one period low). undefined: no macro, no vibrato.
+ */
+export function psgOffsets(ins: FurnaceInstrument | undefined, version: number, vib?: number[]): number[] | undefined {
+  const am = macro(ins, MACRO_ARP, version), pm = macro(ins, MACRO_PITCH, version);
+  const arp = am && !am.data.slice(0, am.length).some(arpIsFixed) ? am.data.slice(0, am.length).map((v) => ((v << 2) >> 2) * 128) : [0];
+  const pit = pm && !(pm.mode & 1) ? pm.data.slice(0, pm.length) : [0];
+  if (!vib && arp.length + pit.length === 2) return undefined;
+  const out = new Set<number>();
+  for (const a of arp) for (const q of pit) for (const v of vib ?? [0]) out.add(a + q + v);
+  return [...out].sort((x, y) => x - y);
 }
 
 /**
@@ -137,12 +153,21 @@ const fmHz = (nv: number): number => 27.5 * 2 ** ((nv - 9) / 12);
  * MDSDRV steps a pitch envelope once per frame, not once per sequence tick (measured djtBMX FM1 at F9 ff: 36 nodes of 0.31 semitone over
  * a 72-tick slide), so `tpf` (Furnace ticks per frame: (tempo + 1) / 128 sequence ticks times s.hz / rate) picks the Furnace tick each frame node lands on.
  */
-export function portaEnvelope(fromNv: number, toNv: number, xx: number, fm = false, linStep = 0, tpf = 1): number[] {
+export function portaEnvelope(fromNv: number, toNv: number, xx: number, fm = false, linStep = 0, tpf = 1, psgBase?: number): number[] {
   const lin = linStep > 0;
   const a = lin ? fromNv * 128 : fm ? fmHz(fromNv) : sndPeriod(fromNv), b = lin ? toNv * 128 : fm ? fmHz(toNv) : sndPeriod(toNv), out: number[] = [];
   if (lin) xx = linStep; else if (fm) xx *= fmHzPerXx(b);
+  // psgBase: the target's driver pitch (key * 256 + detune). The driver interpolates its period table linearly and truncates where Furnace
+  // rounds the exact period, so each PSG node takes the value nearest the ideal one that writes Furnace's period (newer_song_lol PSG1 03 12:
+  // the ideal node wrote 141 where Furnace wrote 142 on 27 slide frames).
+  const fit = (w: number, p: number) => {
+    if (psgBase === undefined || fm) return w;
+    const want = Math.min(1023, Math.round(lin ? sndPeriod(p / 128) : p));
+    for (let e = 0; e <= 32; e++) for (const v of [w - e, w + e]) if (psgBase + v >= 0 && mdsPsgPitch(psgBase + v) === want) return v;
+    return w;
+  };
   const node = (p: number, len: number) => {
-    const w = Math.max(-0x8000, Math.min(0x7eff, Math.round(lin ? 2 * (p - b) : 256 * 12 * Math.log2(fm ? p / b : b / p)))) & 0xffff;
+    const w = Math.max(-0x8000, Math.min(0x7eff, fit(Math.round(lin ? 2 * (p - b) : 256 * 12 * Math.log2(fm ? p / b : b / p)), p))) & 0xffff;
     out.push(w >> 8, w & 0xff, 0, len);
   };
   const up = a < b, ticks: number[] = [a];
@@ -579,7 +604,10 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     const fTick = (t: number) => furnaceTickOf(t, fpt);
     let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0, dtnOut = 0;
     // PSG: E6 carries E5xx plus psgFix(key); each PSG chunk restates it, since a subroutine chunk can follow any detune.
-    const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey, vDepth ? vibOffsets(vRate, vDepth, vFine) : undefined))) : dtn;
+    const psgOffs = () => psgOffsets(m.instruments[ins], m.version, vDepth ? vibOffsets(vRate, vDepth, vFine) : undefined);
+    const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey, psgOffs()))) : dtn;
+    // Pitch offset under the slide plus detune: a PSG slide step gets its own fix, since the driver truncates the interpolated period.
+    const slidePitch = (off: number) => (kind === 'psg' && off ? Math.max(-128, Math.min(127, dtn)) + psgFix(curKey, psgOffs(), off) : 2 * off + effDtn());
     // 03xx under a running 04xy: MDSDRV has one pitch envelope (E8, the vibrato), so the linear slide goes out per sequence tick as
     // E4 transpose + E6 detune, which mds_pitch_update adds before the envelope (pitch = note + trs + dtn, then + E8 output).
     // sA: slide offset from the target at the note (1/128 semitone, 0 = none), stepped sStep per Furnace tick from Furnace tick sF0.
@@ -598,7 +626,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     let fA = 0, fF0 = 0, pXx = 0;
     const flyOff = (f: number) => (fA ? Math.sign(fA) * Math.max(0, Math.abs(fA) - pXx * pss * (f - fF0 + 1)) : 0);
     const slideCmd = (t: number): number[] => {
-      const off = slideOff(fTick(t)), o = 2 * off + effDtn(), tr = Math.floor((o + 128) / 256), d = o - 256 * tr, out: number[] = [];
+      const off = slideOff(fTick(t)), o = slidePitch(off), tr = Math.floor((o + 128) / 256), d = o - 256 * tr, out: number[] = [];
       if (!off) sA = 0;
       if (baked) trsOut = tr;
       else if (tr !== trsOut) out.push(0xe4, (trsOut = tr) & 0xff);
@@ -618,7 +646,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       const arpAt = (j: number) => { let i = 0; while (i + 1 < vals.length && at(i + 1) <= j) i++; return vals[i]; };
       const out: number[] = [];
       for (let k = t0; ; k++) {
-        const off = slideOff(fTick(k)), v = arpAt(k - arpT0) + Math.floor((2 * off + effDtn() + 128) / 256);
+        const off = slideOff(fTick(k)), v = arpAt(k - arpT0) + Math.floor((slidePitch(off) + 128) / 256);
         if (out.length && out[out.length - 3] === (v & 0xff) && out[out.length - 1] < 255) out[out.length - 1]++;
         else out.push(0x16, v & 0xff, 0x81, 0);
         if (!off && k - arpT0 >= at(vals.length - 1)) break;
@@ -859,7 +887,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             } else if (slide) {
               const lin = !!m.compatFlags.linearPitch;
               if (lin) { fA = from - nv * 128; fF0 = fNow; }
-              const env = portaEnvelope(lin ? from / 128 : prevKey, nv, portaXx, kind === 'fm', m.compatFlags.linearPitch ? portaXx * (Number(m.compatFlags.pitchSlideSpeed) || 1) : 0, fpf);
+              const env = portaEnvelope(lin ? from / 128 : prevKey, nv, portaXx, kind === 'fm', m.compatFlags.linearPitch ? portaXx * (Number(m.compatFlags.pitchSlideSpeed) || 1) : 0, fpf, kind === 'psg' ? curKey * 256 + dtnOut : undefined);
               cmds.push(0xe8, slideItem(env) + 1); slideEnd = tick + Math.round((env[env.length - 1] + 1) * (tempo + 1) / 128);
             }
             else if (prate) { if (pChanged || pInit || !pegDirty) cmds.push(...pslideCmd()); }

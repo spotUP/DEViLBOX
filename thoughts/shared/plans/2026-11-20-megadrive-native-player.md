@@ -1521,3 +1521,31 @@ Sequence size: Solar_Man 20630 -> 20640 bytes, newer_song_lol 61122 -> 61140 byt
 - Open: Solar_Man track 6 enters the loop on a rest after the Q1 change (cause not checked; no measured regression on any channel).
 
 Listen ROMs: ~/Desktop/md-roms/newer_song_lol-2r.bin, ~/Desktop/md-roms/Solar_Man-2r.bin.
+
+## Phase 2s result (2026-11-21): PSG slide steps and arp/pitch offsets
+
+Question 1 (newer_song_lol PSG1, 28 frames one period unit low). Scoring the
+arp and pitch macro offsets in `psgFix` (new `psgOffsets`) alone moved PSG1 only
+28 -> 27: most bad frames were 03xx slide steps, not arp steps. Root cause: the
+slide pitches were taken from the ideal curve and then truncated by
+`mdsPsgPitch`, while Furnace writes `round(sndPeriod)`. Fix in the converter:
+- `portaEnvelope` fits each PSG E8 node (search +-32 around the ideal value) so
+  `mdsPsgPitch(base + node)` equals Furnace's rounded period;
+- `psgFix(k, offs, o0)` scores a detune for a key plus slide offset, and
+  `slidePitch` uses it for the per-tick E4/E6 slide writes and for `arpBake`.
+
+Frames over 10 cents (MAME vs Furnace VGM; Solar_Man T=94.3 s, newer_song_lol T=100 s;
+FM6 ~5996 in every run is the known artifact):
+
+| Run | Solar_Man seq bytes | Solar_Man FM1/FM4/FM5/PSG1/PSG2 | newer_song_lol seq bytes | newer_song_lol FM4/PSG1/PSG2 |
+|---|---|---|---|---|
+| Before | 20640 | 1/16/2/2/6 | 61140 | 2/28/6 |
+| After | 20880 | 1/16/2/2/2 | 61702 | 2/16/4 |
+
+Open:
+- newer_song_lol PSG1 residue 16 frames (+-1 period): MAME 141 vs Furnace 142 on
+  arp [1,0] notes combined with a slide (11.5, 13.167, 16.667 s); MAME 113 vs
+  Furnace 112 at 42.45 and 70.6 s.
+- Question 2 (Solar_Man FM4 68.77-68.92 s, 10 frames ~50 cents, VGM writes the
+  frequency only twice), question 3 (FM4 34.3 s, a rest steps the arp table once)
+  and question 4 (track 6 enters the loop on a rest after Phase 2r): not started.
