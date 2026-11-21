@@ -233,7 +233,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   // Driver: each NTSC VINT adds tempo+1 to a counter and steps one tick per 128 (Phase 0), so ticks/s = (dd+1)*NTSC/128.
   const rate = s.hz * (s.virtualTempo || 1) / (s.virtualTempoD || 1);
   const tempo = Math.max(0, Math.min(255, Math.round(rate * 128 / NTSC_HZ) - 1));
-  if (Math.abs(rate - NTSC_HZ) > 0.5) lossy.add(`tick rate ${rate.toFixed(2)} Hz: F9 ${tempo.toString(16)} = ${((tempo + 1) * NTSC_HZ / 128).toFixed(2)} Hz, ticks land on NTSC frames (up to 1 frame early or late)`);
+  if (Math.abs(rate - NTSC_HZ) > 0.5) lossy.add(`tick rate ${rate.toFixed(2)} Hz: ticks land on NTSC frames (up to 1 frame early or late)`);
+  if (rate * 128 / NTSC_HZ < 1 || rate * 128 / NTSC_HZ > 256) lossy.add(`tick rate ${rate.toFixed(2)} Hz outside the driver's ${(NTSC_HZ / 128).toFixed(2)}-${(2 * NTSC_HZ).toFixed(2)} Hz range (clamped)`);
   if (Math.abs((m.tuning || 440) - 440) > 0.5) lossy.add(`tuning ${m.tuning} Hz: played at 440 Hz`);
   const cellAt = (ch: number, o: number, r: number) => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o]}`)?.rows[r];
 
@@ -408,6 +409,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           }
           if (e.type === 0x0a) { vspeed = !e.value ? 0 : e.value & 15 ? -(e.value & 15) * 64 : (e.value >> 4) * 64; continue; }
           if (e.type === 0xec || e.type === 0xed) continue;
+          if (e.type === 0xe3 && !e.value) continue; // E3 00: Furnace's default vibrato direction (up and down), what vibratoEnvelope plays
           if ((e.type === 0x04 || e.type === 0xe4) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
             vSync(tick + delay);
             if (e.type === 0xe4) vFine = e.value; else { vDepth = e.value & 15; vRate = e.value >> 4; }
@@ -485,7 +487,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   for (const t of tracks) for (const c of t.chunks) uses.set(key(c.bytes), (uses.get(key(c.bytes)) ?? 0) + 1);
   const subs = new Map<string, number>();
   const streams = tracks.map((t) => {
-    const b: number[] = t.ch === tracks[0].ch ? [0xf9, tempo] : [];
+    const b: number[] = [];
     t.chunks.forEach((c, i) => {
       if (i === loopChunk) b.push(0xfa);
       const k = key(c.bytes);
@@ -500,6 +502,23 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     return b;
   });
   if (items.length > 256) throw new Error(`MDSDRV song table holds 256 items; this song needs ${items.length}`);
+  // Conductor track on dummy channel 0f. F9 is one byte in 1/128 NTSC frames, so 60 Hz falls between 7f (59.92 Hz) and 80 (60.39 Hz);
+  // one fixed value drifts 0.13 percent (measured: highscorefollin 40 ms late at 31.6 s). Dither both per 128-tick block so tick k
+  // stays at Furnace's k / rate seconds; each span (intro, loop body) is balanced on its own so loop passes do not accumulate.
+  const fIdeal = NTSC_HZ / rate, lo = Math.max(0, Math.min(254, Math.floor(rate * 128 / NTSC_HZ) - 1)), fLo = 128 / (lo + 1), fHi = 128 / (lo + 2);
+  const conduct = (n: number): number[] => {
+    const nHi = Math.max(0, Math.min(n, Math.round((n * (fLo - fIdeal)) / (fLo - fHi)))), out: number[] = [];
+    for (let a = 0; a < n; a += 128) {
+      const e = Math.min(n, a + 128), h = Math.round((e * nHi) / n) - Math.round((a * nHi) / n);
+      if (h) out.push(0xf9, lo + 1, h - 1);
+      if (e - a - h) out.push(0xf9, lo, e - a - h - 1);
+    }
+    return out;
+  };
+  const spanTicks = (from: number, to: number) => chunks.slice(from, to).reduce((n, c) => n + c.ticks.reduce((x, y) => x + y, 0), 0);
+  const introEnd = loopChunk >= 0 ? loopChunk : chunks.length;
+  streams.push([...conduct(spanTicks(0, introEnd)), ...(loopChunk >= 0 ? [0xfa, ...conduct(spanTicks(loopChunk, chunks.length)), 0xfb, 0x00] : []), 0xff]);
+  const chanIds = [...tracks.map((t) => MDS_CHAN[t.ch]), 0x0f];
 
   // 5. Layout.
   const sd: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // two dc.l + pcm_tab dc.w 0
@@ -507,16 +526,16 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const itemOff = items.map((it) => { even(); const at = sd.length; sd.push(...it); return at; });
   even();
   const bgm = sd.length;
-  sd.push(0, 0, 0, tracks.length);
+  sd.push(0, 0, 0, streams.length);
   const trackHdr = sd.length;
-  tracks.forEach(() => sd.push(0, 0, 0, 0));
+  streams.forEach(() => sd.push(0, 0, 0, 0));
   const tbase = sd.length;
   if (itemOff.some((a, i) => extRel.has(i) && a >= 0x8000)) throw new Error('MDSDRV extended pitch envelope beyond 32 KiB of song data');
   itemOff.forEach((a, i) => sd.push(...be16(tbaseRel.has(i) ? a - tbase : extRel.has(i) ? a | 0x8000 : a)));
-  tracks.forEach((t, i) => {
+  streams.forEach((st, i) => {
     const pos = sd.length - tbase;
-    sd.splice(trackHdr + i * 4, 4, MDS_CHAN[t.ch], 0, ...be16(pos));
-    sd.push(...streams[i]);
+    sd.splice(trackHdr + i * 4, 4, chanIds[i], 0, ...be16(pos));
+    sd.push(...st);
   });
   even();
   if (sd.length > 0xffff) throw new Error('MDSDRV sequence over 64 KiB');

@@ -164,4 +164,27 @@ describe('furnaceToMds', () => {
     const b = hz(Buffer.from(portaEnvelope(86, 88, 0x20, true)).toString('hex')).map((st) => 2636.69 * 2 ** (st / 12));
     [2451, 2555, 2637, 2637].forEach((f, i) => expect(Math.abs(b[i] - f)).toBeLessThan(3));
   });
+  it('highscorefollin: a dummy-channel 0f conductor dithers F9 7f/80 so 60 Hz ticks stay within a frame of Furnace time, per pass', async () => {
+    // Measured in MAME: one F9 7f (59.92 Hz) left every FM channel 40 ms late at 31.6 s (701 cents at note edges from 19.5 s).
+    const sd = (await convert('highscorefollin.fur')).seq.subarray(8);
+    const w = (o: number) => (sd[o] << 8) | sd[o + 1];
+    const bgm = (w(4) << 16) | w(6), n = sd[bgm + 3], last = bgm + 4 + (n - 1) * 4;
+    expect(sd[last]).toBe(0x0f);
+    let p = bgm + w(bgm) + w(last + 2), tempo = 0x7f, ticks = 0, frames = 0, worst = 0;
+    const spans: number[] = [];
+    for (let c = sd[p++]; c !== 0xff; c = sd[p++]) {
+      if (c === 0xf9) tempo = sd[p++];
+      else if (c < 0x80) for (let k = 0; k <= c; k++) { ticks++; frames += 128 / (tempo + 1); worst = Math.max(worst, Math.abs(frames - ticks * 59.922743 / 60)); }
+      else if (c === 0xfa || c === 0xfb) { spans.push(frames - ticks * 59.922743 / 60); ticks = frames = 0; if (c === 0xfb) p++; }
+      else throw new Error(`conductor command ${c.toString(16)}`);
+    }
+    expect(worst).toBeLessThan(0.5);
+    spans.forEach((e) => expect(Math.abs(e)).toBeLessThan(0.01)); // intro and loop body each balanced: no drift across loop passes
+  });
+  it('Solar_Man: unhandled vibrato direction (E3 01/02), 05xy, E1xy and E2xy flag lossy through the generic effect flag; E3 00 does not', async () => {
+    for (const [type, value, flag] of [[0xe3, 1, 'effect E3'], [0xe3, 2, 'effect E3'], [0x05, 0x01, 'effect 05'], [0xe1, 0x13, 'effect E1'], [0xe2, 0x13, 'effect E2']] as const) {
+      expect((await solarManRow0([{ type, value }])).lossy.some((l) => l.startsWith(flag))).toBe(true);
+    }
+    expect((await solarManRow0([{ type: 0xe3, value: 0 }])).lossy.some((l) => l.startsWith('effect E3'))).toBe(false);
+  });
 });
