@@ -432,7 +432,10 @@ def find_companions(module, limit=16, max_bytes=512 * 1024):
     # Kris Hatlelid's .kh likewise loads its replay code from "songplay" (UADE asks
     # /uade/songplay; without it the disk crashed ILLG at pc 4, measured 2026-11-21).
     # Mirrors the named cases in DEViLBOX src/lib/import/companionResolver.ts.
-    fixed = {'.jo': 'wantedteam.bin', '.kh': 'songplay'}.get(os.path.splitext(module)[1].lower())
+    # Paul Robotham's .dat opens the game's one shared sample bank, whose name
+    # "mdtest.ssd" is a string inside the player (Dawn Patrol ships it beside
+    # every .dat); without it the disk wrote 48 Paula registers and never started.
+    fixed = {'.jo': 'wantedteam.bin', '.kh': 'songplay', '.dat': 'mdtest.ssd'}.get(os.path.splitext(module)[1].lower())
     if fixed:
         for f in entries:
             fp = os.path.join(d, f)

@@ -28,6 +28,12 @@ class FixedNameCompanions(unittest.TestCase):
     def test_wanted_team_stages_bin(self):
         self.assertIn('WantedTeam.bin', self.stage('tune.jo', 'WantedTeam.bin'))
 
+    def test_paul_robotham_stages_shared_bank(self):
+        # dawnpatrol-sad.dat: without mdtest.ssd the disk wrote 48 Paula registers and never started.
+        got = self.stage('dawnpatrol-sad.dat', 'mdtest.ssd')
+        self.assertIn('mdtest.ssd', got)
+        self.assertNotIn('unrelated.txt', got)
+
     def test_other_extension_ignores_songplay(self):
         self.assertNotIn('songplay', self.stage('tune.mod', 'songplay'))
 
