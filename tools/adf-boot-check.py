@@ -180,11 +180,23 @@ def check(adf, purpose, target, ref, keep_wav, extra="", dump=None, dump_at=2.0)
         # With --ref the tune may end before the window: judge by per-second envelope corr (>= 0.95 wherever the reference has audio).
         cs = [c for c in (r.get("ref_delta") or {}).get("corr_per_s", []) if c is not None]
         ok = (bool(cs) and min(cs) >= 0.95) if ref else loud
-        r["verdict"] = "PASS" if (tplay and "crash" not in r and dma and ok) else "FAIL"
+        why = [m for c, m in (
+            (tplay, "no PLAY crumb within 90 s"),
+            ("crash" not in r, "crash %s at pc %s" % (r.get("crash"), r.get("crash_pc"))),
+            (dma, "no audio DMA bit in DMACONR polls %s" % r["dmaconr"]),
+        ) if not c]
+        if ref and not ok:
+            allc = r["ref_delta"]["corr_per_s"]
+            why.append("min per-second corr %s at s%d < 0.95" % (min(cs), allc.index(min(cs))) if cs else "no judged second in the reference")
+        elif not ref and not ok:
+            why.append("last 3 s peak %s, need > 200 each" % [s["peak"] for s in per[-3:]])
+        r["verdict"] = "FAIL" if why else "PASS"
+        if why:
+            r["fail_reason"] = "; ".join(why)
         if keep_wav:
             r["wav"] = wav
     except Exception as e:  # noqa: BLE001
-        r["error"] = str(e); r["verdict"] = "FAIL"
+        r["error"] = str(e); r["verdict"] = "FAIL"; r["fail_reason"] = "error: " + str(e)
     finally:
         p.terminate()
         try:
@@ -231,7 +243,7 @@ def main():
         if r.get("ref_delta"):
             print("corr per s:", r["ref_delta"].get("corr_per_s"), "overall", r["ref_delta"].get("corr_overall"))
         print("peak/rms per s:", [(s["peak"], s["rms"]) for s in r.get("peak_rms_per_s", [])])
-        print("VERDICT %s %s" % (name, r["verdict"]))
+        print("VERDICT %s %s%s" % (name, r["verdict"], (" (%s)" % r["fail_reason"]) if r.get("fail_reason") else ""))
 
 
 if __name__ == "__main__":
