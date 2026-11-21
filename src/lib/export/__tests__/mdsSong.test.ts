@@ -33,7 +33,7 @@ function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1): { c
   for (let i = 0; i < sd[bgm + 3]; i++) {
     const ch = sd[bgm + 4 + i * 4];
     if (onlyCh >= 0 && ch !== onlyCh) continue;
-    let tick = 0, trs = 0, slur = false, peg = 0;
+    let tick = 0, trs = 0, slur = false, peg = 0, depth = 0;
     const walk = (p: number): boolean => {
       for (;;) {
         const c = sd[p++];
@@ -41,9 +41,10 @@ function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1): { c
         else if (c === 0x81) tick += sd[p++] + 1;
         else if (c >= 0x82 && c < 0xe0) { out.push({ ch, tick, n: c - 0x82 + trs, ...(slurs && slur ? { s: 1 as const } : {}), ...(slurs ? { peg } : {}) }); slur = false; tick += sd[p++] + 1; }
         else if (c === 0xfe) { if (!walk(tbase + ((w(tbase + sd[p++] * 2) << 16) >> 16))) return false; }
+        else if (c === 0xfb && depth > 1) { depth--; p++; } // inner counted loop (conductor): one pass
         else if (c === 0xfb || c === 0xff) return c === 0xff;
         else if (c === 0xe0) slur = true; // E0: the next note slurs (no key-on)
-        else if (c === 0xfa) continue;
+        else if (c === 0xfa) depth++;
         else if (c === 0xe4) trs = (sd[p++] << 24) >> 24;
         else if (c === 0xe8) peg = sd[p++]; // slurs: the E8 pitch envelope the note plays
         else if (ARG1.has(c)) p++;
@@ -376,6 +377,44 @@ describe('furnaceToMds', () => {
     }
     expect(worst).toBeLessThan(0.5);
     spans.forEach((e) => expect(Math.abs(e)).toBeLessThan(0.01)); // intro and loop body each balanced: no drift across loop passes
+  });
+  it('newer_song_lol 180/150: the conductor runs Furnace ticks 1,1,1,1,2 per frame, every tick on its Furnace frame in NTSC time (one F9 drifted 1.203125 ticks/frame)', async () => {
+    const sd = (await convert('newer_song_lol.fur')).seq.subarray(8);
+    const w = (o: number) => (sd[o] << 8) | sd[o + 1];
+    const bgm = (w(4) << 16) | w(6), last = bgm + 4 + (sd[bgm + 3] - 1) * 4;
+    expect(sd[last]).toBe(0x0f);
+    // Expand intro + one loop pass to per-tick F9 values (inner FA .. FB kk loops played kk times).
+    const tempos: number[] = [], stack: { at: number; left: number }[] = [];
+    let tempo = 0x7f;
+    for (let p = bgm + w(bgm) + ((w(last + 2) << 16) >> 16); ;) {
+      const c = sd[p++];
+      if (c === 0xf9) tempo = sd[p++];
+      else if (c < 0x80) for (let k = 0; k <= c; k++) tempos.push(tempo);
+      else if (c === 0xfa) stack.push({ at: p, left: -1 });
+      else if (c === 0xfb) {
+        const top = stack[stack.length - 1], kk = sd[p++];
+        if (kk === 0) break; // outer loop end: one pass of the body
+        if (top.left < 0) top.left = kk;
+        if (--top.left > 0) p = top.at; else stack.pop();
+      } else if (c === 0xff) break;
+      else throw new Error(`conductor command ${c.toString(16)}`);
+    }
+    // mdsdrv.68k: counter += tempo + 1 per frame, a tick per 128; the last tick of a frame sets the next frame's tempo.
+    const n = Math.min(tempos.length, 40 * 72);
+    // Every Furnace frame's ticks play on one driver frame (no split pair), within a frame of Furnace time.
+    const at = new Map<number, number>();
+    let c = 0, g = 0, t = 0, worst = 0, split = 0;
+    while (t < n) {
+      c += (t ? tempos[t - 1] : 0x7f) + 1; let k = c >> 7; c &= 127;
+      for (; k > 0 && t < n; k--, t++) {
+        const f = furnaceTickOf(t, 5 / 6);
+        if ((at.get(f) ?? g) !== g) split++;
+        at.set(f, g); worst = Math.max(worst, Math.abs(g / 59.922743 - f / 60) * 60);
+      }
+      g++;
+    }
+    expect(split).toBe(0);
+    expect(worst).toBeLessThan(1.5);
   });
   it('Solar_Man: unhandled vibrato direction (E3 01/02), 05xy, E1xy and E2xy flag lossy through the generic effect flag; E3 00 does not', async () => {
     for (const [type, value, flag] of [[0xe3, 1, 'effect E3'], [0xe3, 2, 'effect E3'], [0x05, 0x01, 'effect 05'], [0xe1, 0x13, 'effect E1'], [0xe2, 0x13, 'effect E2']] as const) {

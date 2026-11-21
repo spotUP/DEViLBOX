@@ -1232,3 +1232,34 @@ Open, PSG2 24.698 s (MAME periods 106,86,84 one frame late against Furnace 135,1
 Solar_Man PSG4 -0.15 dB: not started (budget).
 
 Listen ROM: ~/Desktop/md-roms/newer_song_lol-2h.bin.
+
+## Phase 2i results (2026-11-21)
+
+**Cause.** newer_song_lol runs 180/150 at 60 Hz. One fixed F9 tempo gives the MDSDRV counter 1.203125 ticks per frame. Furnace runs 1.2, in the pattern 1,1,1,1,2 (tempoAccum +180 per frame, one tick per 150). The 0.003125 drift moves the double-tick frame, so Furnace frames that play two ticks get split over two driver frames. Notes, slides and macro steps land one frame early or late. That shows as cents error on every channel.
+
+**Fix.** `frameTempos(n, fpt, hz)` in `src/lib/export/md/mdsSong.ts` simulates the driver counter and picks a per-frame tempo. Each driver frame runs exactly the ticks of one Furnace frame. Furnace frames are mapped onto NTSC frames (59.922743 Hz). An NTSC slip merges two Furnace frames only when their combined tick count is 2 or less, because a driver frame runs at most 2 ticks. `encodeTempos` run-lengths the values into F9 runs and packs repeated groups of 1-4 runs into `fa ... fb k` loops. The conductor uses the new path only when fpt < 1 and rate >= NTSC. Every other song keeps the old `conduct()` 7f/80 dither.
+
+Test: "newer_song_lol 180/150: the conductor runs Furnace ticks 1,1,1,1,2 per frame, every tick on its Furnace frame in NTSC time (one F9 drifted 1.203125 ticks/frame)" in `src/lib/export/__tests__/mdsSong.test.ts`. It expands the conductor, simulates the counter over 40 s and asserts no split Furnace frame and a worst time error under 1.5 frames. On old code it fails with 402 split frames. The test decoder now expands nested `fa`/`fb` loops.
+
+MAME vs Furnace, newer_song_lol, frames over 10 cents in the first 40 s:
+
+| Channel | 2h | 2i |
+|---------|----|----|
+| FM1 | 8 | 3 |
+| FM2 | 8 | 3 |
+| FM3 | 12 | 3 |
+| FM4 | 5 | 3 |
+| FM5 | 9 | 5 |
+| PSG1 | 40 | 15 |
+| PSG2 | 65 | 13 |
+| PSG3 | 0 | 0 |
+
+Listen ROM: `~/Desktop/md-roms/newer_song_lol-2i.bin`.
+
+**Solar_Man PSG4 -0.15 dB (measured, cause is a candidate).** Over 1-12 s the noise channel is -0.126 dB against Furnace, computed from the ATT sequence. Hit count and hit frames match (27 hits, two hits one frame late). The level histogram differs: MAME holds ATT 4 for 126 frames against 110, ATT 7 for 57 against 37, ATT 8 for 48 against 60. Furnace plays the 56 Hz macro with single-frame nodes at varying phase per hit. MDSDRV plays one fixed resampled envelope table per hit, mostly 2-frame holds. Candidate cause: the envelope resample (`floor((f+0.5)*tickHz/NTSC)`) is anchored at envelope start and cannot follow Furnace's per-hit tick phase. Not fixed. Solar_Man is 56 Hz, so the 2i conductor does not affect it.
+
+**Open items.**
+- Residual FM frames: FM1-FM3 31 cents at 22.78-22.9 s, FM5 50 cents at 10.97-11.07 s, FM4 21 cents at 10.88 s. Not investigated.
+- Shortcut: the loop body reuses the first pass's frame phase. Second and later passes can drift if the body's tick count is not a whole number of Furnace frame patterns.
+- The new conductor covers only fpt < 1 with rate >= NTSC. Songs with fpt >= 1 or rates under NTSC still use the 7f/80 dither.
+- Solar_Man PSG4 envelope phase (above).

@@ -299,6 +299,64 @@ export function vibratoEnvelope(pos0: number, rate: number, depth: number, fine 
 // Furnace engine tick of virtual tick t at fpt engine ticks per virtual tick (playback.cpp nextTick: tempoAccum from 0, a tick each D).
 export const furnaceTickOf = (t: number, fpt: number): number => Math.ceil((t + 1) * fpt - 1e-9) - 1;
 
+/**
+ * Per-tick F9 values that put sequence tick t on the NTSC frame nearest its Furnace engine tick F(t) (furnaceTickOf) in time.
+ * Driver (mdsdrv.68k request loop): each frame counter += tempo + 1 and runs one sequence tick per 128; the last tick a frame runs sets
+ * the next frame's tempo. Frame 0 plays tick 0 at the header tempo 7f (counter back to 0). The counter is held at 64 so a frame can run
+ * 0, 1 or 2 ticks. At 180/150 this gives Furnace's 1,1,1,1,2 ticks per frame instead of one fixed F9 (1.203125 ticks/frame, drifting).
+ */
+export function frameTempos(n: number, fpt: number, hz: number): number[] {
+  // Furnace frame f -> NTSC frame D[f]. NTSC frames are longer, so now and then two Furnace frames share one; only merge two whose ticks
+  // fit one driver frame (at most 2), else defer the merge a frame (a 2-tick frame next to any other would need 3).
+  const nF = furnaceTickOf(n - 1, fpt) + 1, cnt = new Array<number>(nF).fill(0), D = [0];
+  for (let t = 0; t < n; t++) cnt[furnaceTickOf(t, fpt)]++;
+  for (let f = 1, shared = cnt[0]; f < nF; f++) {
+    const merge = D[f - 1] + 1 > f * NTSC_HZ / hz + 0.5 && shared + cnt[f] <= 2;
+    D.push(merge ? D[f - 1] : D[f - 1] + 1);
+    shared = merge ? shared + cnt[f] : cnt[f];
+  }
+  const G = (t: number) => D[furnaceTickOf(t, fpt)];
+  const out = new Array<number>(n).fill(-1);
+  let t = 1, c = 0, last = 0;
+  for (let g = 1; t < n; g++) {
+    let want = 0;
+    while (want < 2 && t + want < n && G(t + want) <= g) want++;
+    const d = Math.max(1, Math.min(256, want * 128 + 64 - c));
+    out[last] = d - 1;
+    const k = (c + d) >> 7;
+    c = (c + d) & 127;
+    if (k) last = t + k - 1;
+    t += k;
+  }
+  // Ticks that are not the last of their frame set nothing that plays: hold the previous value so runs merge.
+  for (let i = 0; i < n; i++) if (out[i] < 0) out[i] = i ? out[i - 1] : 0x7f;
+  return out;
+}
+
+/** Conductor bytes for per-tick F9 values: runs of F9 vv ll (ll = ticks - 1, max 128), repeated groups of up to 4 runs in FA .. FB kk loops. */
+export function encodeTempos(v: number[]): number[] {
+  const seg: number[][] = [];
+  for (let i = 0; i < v.length;) {
+    let j = i + 1;
+    while (j < v.length && v[j] === v[i] && j - i < 128) j++;
+    seg.push([0xf9, v[i], j - i - 1]);
+    i = j;
+  }
+  const same = (x: number, y: number, p: number) => y + p <= seg.length && seg.slice(x, x + p).every((s, q) => s.join() === seg[y + q].join());
+  const out: number[] = [];
+  for (let i = 0; i < seg.length;) {
+    let bp = 1, bk = 1;
+    for (let p = 1; p <= 4; p++) {
+      let k = 1;
+      while (k < 255 && same(i, i + k * p, p)) k++;
+      if (k > 1 && k * p > bp * bk) [bp, bk] = [p, k];
+    }
+    if (bk > 1) { out.push(0xfa, ...seg.slice(i, i + bp).flat(), 0xfb, bk); i += bp * bk; }
+    else out.push(...seg[i++]);
+  }
+  return out;
+}
+
 export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const lossy = new Lossy();
   const sys = m.systems;
@@ -760,7 +818,12 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   };
   const spanTicks = (from: number, to: number) => chunks.slice(from, to).reduce((n, c) => n + c.ticks.reduce((x, y) => x + y, 0), 0);
   const introEnd = loopChunk >= 0 ? loopChunk : chunks.length;
-  streams.push([...conduct(spanTicks(0, introEnd)), ...(loopChunk >= 0 ? [0xfa, ...conduct(spanTicks(loopChunk, chunks.length)), 0xfb, 0x00] : []), 0xff]);
+  const nIntro = spanTicks(0, introEnd), nBody = loopChunk >= 0 ? spanTicks(loopChunk, chunks.length) : 0;
+  // Virtual tempo above the engine rate: Furnace runs 1 or 2 ticks per engine frame (tempoAccum), so the conductor sets each frame's
+  // tick count. shortcut: the loop body keeps its first pass's frame phase; a body whose length is not a whole tempoAccum period drifts per pass.
+  const ft = fpt < 1 - 1e-9 && rate >= NTSC_HZ ? frameTempos(nIntro + nBody, fpt, s.hz) : null;
+  const span = (a: number, n: number) => (ft ? encodeTempos(ft.slice(a, a + n)) : conduct(n));
+  streams.push([...span(0, nIntro), ...(loopChunk >= 0 ? [0xfa, ...span(nIntro, nBody), 0xfb, 0x00] : []), 0xff]);
   const chanIds = [...tracks.map((t) => MDS_CHAN[t.ch]), 0x0f];
 
   // 5. Layout.
