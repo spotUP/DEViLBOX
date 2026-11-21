@@ -160,12 +160,12 @@ function pitchEnvelope(m: FurnaceMacro, lossy: Lossy): number[] | undefined {
   const nodes: Array<[number, number]> = []; // [value, ticks]
   for (let t = 0; t < vals.length; t++) {
     const last = nodes[nodes.length - 1];
-    if (last && last[0] === vals[t] && last[1] < 255 && t !== loop) last[1]++; else nodes.push([vals[t], 1]);
+    if (last && last[0] === vals[t] && last[1] < 256 && t !== loop) last[1]++; else nodes.push([vals[t], 1]);
   }
   const loopNode = loop < 0 ? nodes.length - 1 : nodes.findIndex((_, i) => nodes.slice(0, i).reduce((a, n) => a + n[1], 0) === loop);
-  if (loop < 0) nodes[nodes.length - 1][1] = 255; // hold the last value
+  if (loop < 0) nodes[nodes.length - 1][1] = 256; // hold the last value
   const out: number[] = [];
-  for (const [v, n] of nodes) { const w = Math.max(-0x8000, Math.min(0x7eff, v * 2)) & 0xffff; out.push(w >> 8, w & 0xff, 0, n); }
+  for (const [v, n] of nodes) { const w = Math.max(-0x8000, Math.min(0x7eff, v * 2)) & 0xffff; out.push(w >> 8, w & 0xff, 0, n - 1); } // a node lasts length+1 ticks (mdsdrv.68k @do_peg)
   return [...out, 0x7f, Math.max(0, loopNode)];
 }
 

@@ -84,4 +84,9 @@ describe('furnaceToMds', () => {
     expect(hex).toMatch(/e0e8[0-9a-f]{2}/);
     expect(hex).not.toMatch(/e0e7/);
   });
+  it('Puyopuyo: a pitch macro of n one-tick steps writes node length 0 (the driver holds length+1 ticks, mdsdrv.68k @do_peg)', async () => {
+    // ins 2 pitch macro -117,-84,-50,0 (1/128 semitone) = -234,-168,-100,0 in 1/256 semitone; measured in MAME: nodes 2 ticks apart before the fix, 1 tick (Furnace) after.
+    const hex = Buffer.from((await convert('Puyopuyo~n_DopplegangerArle-TsuuStyle.fur')).seq).toString('hex');
+    expect(hex).toContain('ff160000ff580000ff9c000000000' + '0ff7f03');
+  });
 });
