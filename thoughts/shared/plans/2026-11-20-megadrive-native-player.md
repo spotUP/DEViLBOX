@@ -1639,3 +1639,17 @@ The seq sizes did not change (21154 / 63356). The golden_shit hex test passes.
 - newer_song_lol PSG2 32.35 s is not a rounding miss. It is 17.6 c (about 3 periods) on the first frame of a fast slide from note 29 to note 37 (trs -8, dtn 63, node -18). That points at the slide-step count or phase at the note, not the detune.
 - Solar_Man 33.383 s: at 33.375 s Furnace already writes one more descending slide step on FM4 (277.16), PSG1 (220.2) and PSG2 (440.4). MDSDRV still writes the previous step (293.82 / 233.0 / 466.1). Both sides agree again at 33.39 s (next row). The frame cadence matches there (VGM 56 Hz ticks, MAME frames), so the driver is one slide step behind on all three channels in the last tick before the row. This is likely ours (the slide's last step is dropped or late at the row edge), not an artifact. Unverified: the slide kind on each channel (E8 portaEnvelope or per-tick E4/E6).
 - Solar_Man FM4 20.883, 31.417, 85.717, 86.6 s were not investigated.
+
+## Phase 2y result (2026-11-21)
+
+No code change landed. Counts unchanged from 2x (Solar_Man seq 21154: FM1 1, FM4 5, FM5 2, PSG1 2, PSG2 2; newer_song_lol seq 63356: FM4 2 artifact, PSG2 3, FM6 artifact).
+
+**Solar_Man 33.383 s (FM4/PSG1/PSG2, one slide step behind on the last frame before the row): root cause found, not fixable with per-frame envelopes.**
+- Row o5 r52 (tick 1860) has E2 8f on channels 3/6/7. E2xy goes through portaEnvelope (03 (x*4) toward note -y), not pslideCmd.
+- The TL steps of the same row prove the driver ran a tick on every frame of that row. portaEnvelope cuts frame k at Furnace tick round((k + 1) * fpf) (fpf 0.933), which puts a zero-tick frame at k = 7. So the pitch holds two frames while Furnace and the driver's own volume slide step on.
+- Violated invariant: frame k of a slide envelope must hold the offset of the Furnace tick the driver runs on that frame.
+- Tried: cut frame k from the driver's real cadence (frameOfTick / last tick run per frame) in pslideCmd and portaEnvelope. It fixes 33.383 s on all three channels (PSG1/PSG2 to 0). But pass 2 of the body (77-94 s) breaks: FM1 1 -> 16-19, FM3 0 -> 15-17, FM4 5 -> 31-34, FM5 2 -> 17-20; seq 21154 -> 23412.
+- Second try: round the body's conductor so its tempo counter sum is a multiple of 128 (every pass the same driver frame phase). Still FM1 19 / FM3 17 / FM4 34 / FM5 20 on pass 2. So the driver side was not the only problem. The Furnace reference itself moves 27/128 frame per pass (56 Hz ticks on 60 Hz frames, body 4000 ticks). An envelope baked on one pass's phase can match only that pass. The uniform staircase is the best single envelope.
+- Real fix needs a per-tick slide in the driver (step on the tick, not the frame). That is a driver change, out of scope here. Attempt saved as scratch patch only (not kept).
+
+Not reached: newer_song_lol PSG2 32.35 / 19.417 / 31.283 s (task 2), Solar_Man FM4 20.883 / 31.417 / 85.717 / 86.6 s (task 3).
