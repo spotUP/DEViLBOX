@@ -485,7 +485,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           }
           if (e.type === 0x03 && (kind === 'psg' || kind === 'fm')) { portaXx = e.value; if (prate) { prate = 0; pChanged = true; } continue; } // 03 00 only stops the porta
           if ((e.type === 0x01 || e.type === 0x02) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
-            prate = (e.type === 0x01 ? 1 : -1) * e.value * pss; pChanged = true;
+            prate = (e.type === 0x01 ? 1 : -1) * e.value * pss; pChanged = true; portaXx = 0; // 01xx/02xx end a 03xx (playback.cpp: inPorta false)
             if (m.compatFlags.limitSlides) lossy.add('01xx/02xx with limitSlides (slide range not limited)');
             if (!Number.isInteger(2 * e.value * pss * tpf)) lossy.add('01xx/02xx at a fractional sequence-tick-per-frame rate (rounded per frame)');
             continue;
@@ -509,6 +509,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (dac && isNote) { curIns = ins; pcmOn = true; if (dacHdr !== curPcm) { curPcm = dacHdr; cmds.unshift(0xf0, dacHdr); } }
         else if (isNote) { pcmOn = false; curPcm = -1; }
         if (isNote) { poff = 0; curNv = nv; }
+        // 03xx without a note slides to the note already playing, so it ends on its first tick and targetResetsSlides drops it
+        // (playback.cpp NOTE_PORTA == 2): the next note keys on. shortcut: a 03xx row that retunes a slide still in flight is not kept.
+        else if (portaXx && m.compatFlags.targetResetsSlides) portaXx = 0;
         else if (pChanged && sounding && (prate || poff)) cmds.push(...pslideCmd());
         if (!isNote && vChanged && sounding) { cmds.push(...(vDepth ? vibCmd(tick + delay) : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
         if (isNote && ins !== curIns) { curIns = ins; cmds.unshift(...insCmd()); }

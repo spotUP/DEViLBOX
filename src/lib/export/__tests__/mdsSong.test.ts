@@ -157,6 +157,22 @@ describe('furnaceToMds', () => {
     expect(m.instruments[3].fm!.operators.map((o) => o.tl)).toEqual([0x1e, 0x1c, 0x10, 0x16]);
     expect(Buffer.from(furnaceToMds(m).seq).toString('hex')).toContain('1e1c1016');
   });
+  it('highscorefollin: FM4 03 08 on a row without a note (order 0 row 62) ends there, so the E3 + 01 04 at row 64 keys on and slides (measured 1:1 in MAME)', async () => {
+    // Furnace: 03xx with no note ports to the playing note, reaches it on the first tick, targetResetsSlides drops it. Before the fix the
+    // porta leaked into row 64: no key-on, a 03 slide from D#3. The row must convert exactly as if the 03 08 were not there.
+    const m = await parse('highscorefollin.fur');
+    const row62 = m.patterns.get(`0_3_${m.subsongs[0].orders[3][0]}`)!.rows[62]!;
+    expect(row62.effects).toEqual([{ type: 3, value: 8 }]);
+    const row64 = m.patterns.get(`0_3_${m.subsongs[0].orders[3][0]}`)!.rows[64]!;
+    const hex = () => Buffer.from(furnaceToMds(m).seq).toString('hex');
+    // Both with the row 64 01 04 (01xx ends a porta) and without it (the no-note 03xx ends on its own).
+    for (const fx64 of [row64.effects, []]) {
+      row64.effects = fx64; row62.effects = [{ type: 3, value: 8 }];
+      const withPorta = hex();
+      row62.effects = [];
+      expect(withPorta).toBe(hex());
+    }
+  });
   it('vibratoEnvelope: 04 47 is 16 one-frame nodes of 2 * ((7 * vibTable[pos] * 15) >> 4) / 15, first node at pos 4, looping to node 0', () => {
     const env = vibratoEnvelope(0, 4, 7);
     expect(env.length).toBe(16 * 6);
