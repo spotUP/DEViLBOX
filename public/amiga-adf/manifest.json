@@ -2,20 +2,20 @@
   "templates": {
     "AbyssHighestExperience": {
       "adf": "AbyssHighestExperience.adf",
-      "adfSha256": "bd12adfa8382f07272bf5b275e2080fa3a3bfe018b9f559fbc01550a88d1e6a8",
+      "adfSha256": "c375680464e3d9a572f0ae0e08c538066bc08f8ee457de24757db2193cfb1bd9",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 48680,
+        "diskOffset": 48692,
         "maxBytes": 65536
       },
       "moduleLengthWord": {
-        "diskOffset": 48676,
+        "diskOffset": 48688,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 525514,
+        "diskOffset": 525526,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -35,26 +35,26 @@
         "bytes": 26327
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "ce55646788639b86811063178613a5b31f783a325dbc60919cfc9596143d3db0"
       }
     },
     "Anders_0land": {
       "adf": "Anders_0land.adf",
-      "adfSha256": "7cf25c750e9351ba45e1b2870f3176595aff3982f692cc1c758dd5dfa0a23538",
+      "adfSha256": "c4b7b1f0b3e9811167857c0a6906049fa058119834c4b9b589c287ffa1505f2b",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 39764,
+        "diskOffset": 39776,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 39760,
+        "diskOffset": 39772,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 269626,
+        "diskOffset": 269638,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -74,26 +74,26 @@
         "bytes": 3036
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "3e58a705b80e61ceb42c2e17e7c4a1f95ae829125267b041fcd434877b416b0a"
       }
     },
     "CustomMade": {
       "adf": "CustomMade.adf",
-      "adfSha256": "3f567065053a5f43654412a9c1a4eacf318f47fe4a5e2f7d0f15a9ff338661d1",
+      "adfSha256": "ca286a836eddaf83487527aaf380c4682a26f71da0d484ddcbdab67be326a8f2",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 40152,
+        "diskOffset": 40164,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 40148,
+        "diskOffset": 40160,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 270012,
+        "diskOffset": 270024,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -113,26 +113,26 @@
         "bytes": 9759
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "170b379f48461877ddcee732338668f3a6c900eadfe08bee119f8fd2af161e49"
       }
     },
     "DIGI-Booster": {
       "adf": "DIGI-Booster.adf",
-      "adfSha256": "141a1857b86277697440ad0b60186af83e41b63f924782761394baf27cdd85b5",
+      "adfSha256": "db5971c114fc6b7bbae6466420638a343365326b6153561faa0dfacc88990f61",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 48016,
+        "diskOffset": 48028,
         "maxBytes": 524288
       },
       "moduleLengthWord": {
-        "diskOffset": 48012,
+        "diskOffset": 48024,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 572792,
+        "diskOffset": 572804,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -152,26 +152,26 @@
         "bytes": 521656
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "485b77266dba0b59f5f71de1beabde89c6396dc0e203f50ee38e068b9683f133"
       }
     },
     "EMS": {
       "adf": "EMS.adf",
-      "adfSha256": "060b0466d6770eef20714fae2e0ae3b806861f101202ec51d50cce4d2fb7fee9",
+      "adfSha256": "09794934c3219cc827eb2e13dbc961829c8fdb89128c15936b8880f350ff509d",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 39460,
+        "diskOffset": 39472,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 39456,
+        "diskOffset": 39468,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 269318,
+        "diskOffset": 269330,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -191,26 +191,26 @@
         "bytes": 46060
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "7803230a31cb7eca7525f741aba05ebd413166ab9f4398106eceaefe7c017472"
       }
     },
     "EMS-6": {
       "adf": "EMS-6.adf",
-      "adfSha256": "57df7eb466e1ca855eea0f044193293c7d1a796c4231cb6911369c0de439095e",
+      "adfSha256": "9ed51b3c59b57e4927d2a223080bc2885d59c2b91796214e852dd2364788b693",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 54884,
+        "diskOffset": 54896,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 54880,
+        "diskOffset": 54892,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 284744,
+        "diskOffset": 284756,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -230,7 +230,7 @@
         "bytes": 4094
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "40b48f7d514976d9e84585fd9a47b5075384caa0e27fe56ef537c4ee55710658"
       }
     },
@@ -275,20 +275,20 @@
     },
     "JamCracker": {
       "adf": "JamCracker.adf",
-      "adfSha256": "cbb59c9155e4072c04e3a16c2de94824e48569a6626cabb52f324fe5acac1db4",
+      "adfSha256": "5635bd4c4d69e88ee36a823ee930a922452b37f8940af35dbb9f4de650251bb6",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 40420,
+        "diskOffset": 40432,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 40416,
+        "diskOffset": 40428,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 270284,
+        "diskOffset": 270296,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -308,26 +308,26 @@
         "bytes": 48577
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "1686b55a62f7469096b84dc7769c4d71b73530d8e15b5b032a1d1a08795d4f5d"
       }
     },
     "MED": {
       "adf": "MED.adf",
-      "adfSha256": "4a29e2d4fd4d6b38aa91d2221ded57b7ae8d99bf2fa8f189b2438ab86b2f8ab1",
+      "adfSha256": "4374237c854b15522bc5add202d4f9ef41ba71e3413c112bab10258608c731c9",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 51032,
+        "diskOffset": 51044,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 51028,
+        "diskOffset": 51040,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 280910,
+        "diskOffset": 280922,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -347,27 +347,27 @@
         "bytes": 30474
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "fcaa3c81076b4814e90548fa474d11c36031a270560818c9b7ddfa3985a65199"
       }
     },
     "MED-A1200": {
       "player": "MED",
       "adf": "MED-A1200.adf",
-      "adfSha256": "75cd136492b71b0a6971e4f61316bd76783e5ea1d89b663d6ff738dc72e50cc1",
+      "adfSha256": "03651951911d616dc80fe3440ed594a00f08457aa9e9fa96e96438f3e1fb00d3",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 51032,
+        "diskOffset": 51044,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 51028,
+        "diskOffset": 51040,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 280898,
+        "diskOffset": 280910,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -387,26 +387,26 @@
         "bytes": 136168
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "fcaa3c81076b4814e90548fa474d11c36031a270560818c9b7ddfa3985a65199"
       }
     },
     "Mugician": {
       "adf": "Mugician.adf",
-      "adfSha256": "d376ef8fa17888c3afc08d0e8f64855f6326b6618f7357e87ccdd70a11111b48",
+      "adfSha256": "6f6db2144976c48d87eb604e4cf10c81481e93bc343dd2d30b985972c86cddff",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 44196,
+        "diskOffset": 44208,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 44192,
+        "diskOffset": 44204,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 274052,
+        "diskOffset": 274064,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -426,26 +426,26 @@
         "bytes": 10332
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "0f0da6015c69602f0b2eef3dc9e155c7a021b26194455bc0195c6e6c80ee1a04"
       }
     },
     "PTK-Prowiz": {
       "adf": "PTK-Prowiz.adf",
-      "adfSha256": "56dae9916347f05d14dd33988b9d0b446b57033d13d40cbb5b63eb516fb080ab",
+      "adfSha256": "66f96225f658835455a9e5267f7c36eaa72ef772b296727f324ae991e5828fc5",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 90716,
+        "diskOffset": 90728,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 90712,
+        "diskOffset": 90724,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 320584,
+        "diskOffset": 320596,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -465,26 +465,26 @@
         "bytes": 114154
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "cea8f553a382654d56d8d7e27ec26cf9374db54e3e9dcab5be9b4f092e57e9ca"
       }
     },
     "SUN-Tronic": {
       "adf": "SUN-Tronic.adf",
-      "adfSha256": "7965d3819182a95f994938fac6a9b2716b0ddaec818e4a6dafd15558b8b811ff",
+      "adfSha256": "331d7f54734e55d4815182b0dc21880b6b6dbc29c43e929a55b6bdd51165be31",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 37820,
+        "diskOffset": 37832,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 37816,
+        "diskOffset": 37828,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 267684,
+        "diskOffset": 267696,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -504,7 +504,7 @@
         "bytes": 4186
       },
       "sources": {
-        "tool": "46b331bf5f6e39ae53e34b279e68366917e173ccfe4011b107ad51816ecde379",
+        "tool": "b3f79b2c97d79daf61c44c983faedb6968ced71e7d663b44ffe47dc0ccd99a1f",
         "player": "2ab53b0fc75461d73518752864a64efce8266ef19b6015497d7b2bc546e3f1bd"
       }
     }
