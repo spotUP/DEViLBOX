@@ -429,10 +429,14 @@ def find_companions(module, limit=16, max_bytes=512 * 1024):
     # "WantedTeam.bin" (its shared routine) from the song directory whenever the
     # module's Format byte is negative; the name has nothing to do with the
     # module's. Without it UADE_FILE_COUNT is 0, ExtLoad fails and the disk is silent.
-    if module.lower().endswith('.jo'):
+    # Kris Hatlelid's .kh likewise loads its replay code from "songplay" (UADE asks
+    # /uade/songplay; without it the disk crashed ILLG at pc 4, measured 2026-11-21).
+    # Mirrors the named cases in DEViLBOX src/lib/import/companionResolver.ts.
+    fixed = {'.jo': 'wantedteam.bin', '.kh': 'songplay'}.get(os.path.splitext(module)[1].lower())
+    if fixed:
         for f in entries:
             fp = os.path.join(d, f)
-            if f.lower() == 'wantedteam.bin' and os.path.isfile(fp) and os.path.getsize(fp):
+            if f.lower() == fixed and os.path.isfile(fp) and os.path.getsize(fp):
                 out.append(fp)
                 total += os.path.getsize(fp)
     for f in entries:
