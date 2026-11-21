@@ -985,3 +985,30 @@ Other readers, not changed (outside MD path):
 - src/lib/import/formats/FurnaceParser.ts:621: creates `amiga` with `initSample: -1` when only a note map exists; Furnace default is 0.
 - src/lib/import/parsers/FurnaceToSong.ts:238: passes `furIns.amiga` through undefined; playback consumers then have no sample index.
 - src/lib/export/FurnaceInstrumentEncoder.ts:594-597 and FurnaceInstrumentParser.ts:1628: skip SM when `amiga` is undefined (round trip keeps Furnace's default, so likely fine), and `initSample ?? -1` writes -1 where Furnace default is 0.
+
+## Phase 1y results (2026-11-21)
+
+### Task 1: pitch macro and arp mtab rate
+
+- Driver: the pitch envelope (`@do_peg`, mdsdrv.68k ~2033) runs in the per-frame voice update, once per NTSC VINT. The macro table (`mds_update_mtab`) runs inside `mds_update_seq`, once per sequence tick (the `dbra d5` seq-step loop).
+- pitchEnvelope had the psgEnvelope bug: one node per Furnace tick. Fix: the resampling moved out of psgEnvelope into `framesOf` (mdsSong.ts), used by both. Node lengths are now frames.
+- arpTable (mtab) needs no resampling for songs whose `hz` is off-NTSC: sequence ticks already follow the song tick rate.
+- New finding, virtual tempo: Furnace runs macros once per engine tick at `s.hz`. Virtual tempo only moves the row counter (playback.cpp tempoAccum, dispatch->tick once per nextTick). d0c1a5315 passed `rate` (hz * vtN / vtD) to psgEnvelope, so virtual-tempo songs were resampled wrongly. Both envelopes now get `s.hz`.
+- Tests: mdsSong.test.ts "pitch macro rate" (56 Hz: 13-tick nodes play 14 frames; 60 Hz unchanged).
+
+### Task 2: second off-NTSC song (newer_song_lol, hz 60, virtual tempo 180/150 = 72 Hz rows)
+
+Fancy_Promenard (58 Hz) gives identical bytes before/after d0c1a5315 (no PSG volume or pitch macros on PSG). Plok_Beach does not convert (system bd), darkstar does not open in Furnace 0.6.8.3. So the measure used newer_song_lol. loud.py, 4 s windows, 0-40 s, MAME vs Furnace:
+
+- PSG4 before d0c1a5315: -0.04 -0.04 -0.02 -0.03 -0.01 -0.02 -0.03 -0.00 -0.01 -0.03.
+- PSG4 at d0c1a5315: -1.10 -1.10 -0.30 -0.67 -0.67 -0.66 -0.68 -0.31 -0.66 -0.70 (regression, noise envelope resampled to 72 Hz).
+- PSG4 after 1y (`s.hz`): same as before (bytes identical to pre-d0c1a5315).
+- PSG2 at d0c1a5315 drifted by up to 0.1 dB, back to before after 1y. PSG1, FM1-5 unchanged in all three (pre-existing FM2 -0.91 window 2, FM3 -0.76 last window).
+- Solar_Man (hz 56, no virtual tempo): bytes identical to d0c1a5315, so the 1x PSG4 numbers stand.
+- Listen ROM: ~/Desktop/md-roms/newer_song_lol-1y.bin.
+
+### Open items
+
+- Arp mtab on virtual-tempo songs: the driver steps it per sequence tick (72 Hz on newer_song_lol), Furnace per engine tick (60 Hz). It runs 20% fast. Not fixed, not flagged as lossy yet. Same check is due for other per-tick effects (vibrato, porta), which also count sequence ticks.
+- Task 3 (Solar_Man PSG4 -0.15 dB residual) not started; budget.
+- No unit test for the `s.hz` vs `rate` choice in insRef; no song with an off-NTSC pitch macro measured (pitch fix tested at unit level only).

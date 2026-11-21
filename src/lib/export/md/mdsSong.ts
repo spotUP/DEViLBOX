@@ -198,18 +198,24 @@ function fmVoice(ins: FurnaceInstrument | undefined, lossy: Lossy): number[] {
 }
 
 /**
+ * Per-tick macro values resampled to driver frames (MDSDRV steps PSG and pitch envelopes once per NTSC VINT, Furnace macros once per tick):
+ * frame f plays the tick at its midpoint, floor((f + 0.5) * tickHz / NTSC_HZ). Within the 0.5 Hz "on frame" band it stays one frame per tick.
+ */
+function framesOf(tv: { vals: number[]; loop: number }, tickHz: number): { vals: number[]; loop: number } {
+  const r = Math.abs(tickHz - NTSC_HZ) > 0.5 ? tickHz / NTSC_HZ : 1;
+  const vals = Array.from({ length: Math.max(1, Math.round(tv.vals.length / r)) }, (_, f) => tv.vals[Math.min(tv.vals.length - 1, Math.floor((f + 0.5) * r))]);
+  return { vals, loop: tv.loop >= 0 ? Math.min(vals.length - 1, Math.max(0, Math.ceil(tv.loop / r - 0.5))) : -1 };
+}
+
+/**
  * PSG envelope: `xy` nodes (x frames 1..15, y attenuation), `01` sustain + `00` end, or `02 pos` loop.
- * MDSDRV steps the envelope once per NTSC frame (mds_psg_update_env runs every VINT), Furnace once per tick, so the macro is resampled to
- * frames: frame f plays the tick at its midpoint, floor((f + 0.5) * tickHz / NTSC_HZ) (measured Solar_Man PSG4 at 56 Hz: -0.3 dB from a 7% fast decay).
+ * MDSDRV steps the envelope once per NTSC frame (mds_psg_update_env runs every VINT), so the macro goes through framesOf
+ * (measured Solar_Man PSG4 at 56 Hz: -0.3 dB from a 7% fast decay).
  */
 export function psgEnvelope(ins: FurnaceInstrument | undefined, version: number, lossy: Lossy, tickHz = NTSC_HZ): number[] {
   const m = macro(ins, MACRO_VOL, version);
   if (!m) return [0x10, 0x01, 0x00];
-  const tv = ticksOf(m, lossy, 'PSG volume');
-  // Within the 0.5 Hz "on frame" band the envelope stays one node per tick.
-  const r = Math.abs(tickHz - NTSC_HZ) > 0.5 ? tickHz / NTSC_HZ : 1;
-  const vals = Array.from({ length: Math.max(1, Math.round(tv.vals.length / r)) }, (_, f) => tv.vals[Math.min(tv.vals.length - 1, Math.floor((f + 0.5) * r))]);
-  const loop = tv.loop >= 0 ? Math.min(vals.length - 1, Math.max(0, Math.ceil(tv.loop / r - 0.5))) : -1;
+  const { vals, loop } = framesOf(ticksOf(m, lossy, 'PSG volume'), tickHz);
   const out: number[] = [];
   let loopPos = -1;
   for (let t = 0; t < vals.length;) {
@@ -223,10 +229,10 @@ export function psgEnvelope(ins: FurnaceInstrument | undefined, version: number,
 }
 
 /** Pitch envelope from an absolute pitch macro (1/128 semitone, Furnace linear pitch) in $100-per-semitone units. */
-function pitchEnvelope(m: FurnaceMacro, lossy: Lossy): number[] | undefined {
+export function pitchEnvelope(m: FurnaceMacro, lossy: Lossy, tickHz = NTSC_HZ): number[] | undefined {
   if (m.mode & 1) { lossy.add('relative pitch macro'); return undefined; }
-  const { vals, loop } = ticksOf(m, lossy, 'pitch');
-  const nodes: Array<[number, number]> = []; // [value, ticks]
+  const { vals, loop } = framesOf(ticksOf(m, lossy, 'pitch'), tickHz); // @do_peg runs in the per-frame voice update
+  const nodes: Array<[number, number]> = []; // [value, frames]
   for (let t = 0; t < vals.length; t++) {
     const last = nodes[nodes.length - 1];
     if (last && last[0] === vals[t] && last[1] < 256 && t !== loop) last[1]++; else nodes.push([vals[t], 1]);
@@ -234,7 +240,7 @@ function pitchEnvelope(m: FurnaceMacro, lossy: Lossy): number[] | undefined {
   const loopNode = loop < 0 ? nodes.length - 1 : nodes.findIndex((_, i) => nodes.slice(0, i).reduce((a, n) => a + n[1], 0) === loop);
   if (loop < 0) nodes[nodes.length - 1][1] = 256; // hold the last value
   const out: number[] = [];
-  for (const [v, n] of nodes) { const w = Math.max(-0x8000, Math.min(0x7eff, v * 2)) & 0xffff; out.push(w >> 8, w & 0xff, 0, n - 1); } // a node lasts length+1 ticks (mdsdrv.68k @do_peg)
+  for (const [v, n] of nodes) { const w = Math.max(-0x8000, Math.min(0x7eff, v * 2)) & 0xffff; out.push(w >> 8, w & 0xff, 0, n - 1); } // a node lasts length+1 frames (mdsdrv.68k @do_peg)
   return [...out, 0x7f, Math.max(0, loopNode)];
 }
 
@@ -364,9 +370,10 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     if (!v) {
       const ins = m.instruments[idx];
       const pm = macro(ins, MACRO_PITCH, m.version), am = macro(ins, MACRO_ARP, m.version);
-      const peg = pm && pitchEnvelope(pm, lossy), mt = am && arpTable(am, lossy);
+      // Furnace runs macros once per engine tick at s.hz; virtual tempo only moves the row counter (playback.cpp tempoAccum), so envelopes use s.hz, not `rate`.
+      const peg = pm && pitchEnvelope(pm, lossy, s.hz), mt = am && arpTable(am, lossy);
       if (kind === 'fm' && macro(ins, MACRO_VOL, m.version)) lossy.add('FM volume macro (ignored)');
-      v = { ins: item(kind === 'fm' ? fmVoice(ins, lossy) : psgEnvelope(ins, m.version, lossy, rate)), peg: peg ? item(peg) : -1, mtab: mt ? tbItem(mt) : -1 };
+      v = { ins: item(kind === 'fm' ? fmVoice(ins, lossy) : psgEnvelope(ins, m.version, lossy, s.hz)), peg: peg ? item(peg) : -1, mtab: mt ? tbItem(mt) : -1 };
       insCache.set(key, v);
     }
     return v;

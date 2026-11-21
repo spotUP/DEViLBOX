@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
+import { furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
@@ -77,6 +77,17 @@ describe('PSG envelope rate', () => {
     const env = psgEnvelope(ins, 184, new Lossy());
     expect(frames(env)).toBe(26);
     expect(env.slice(0, 4)).toEqual([0x30, 0x21, 0x22, 0x13]);
+  });
+});
+
+describe('pitch macro rate', () => {
+  // Absolute pitch macro 10 then 20 (1/128 semitone), 13 ticks each, looping from the start.
+  const pm = { code: 4, type: 0, mode: 0, length: 2, data: [10, 20], speed: 13, delay: 0, loop: 0, release: -1 } as unknown as Parameters<typeof pitchEnvelope>[0];
+  it('a 56 Hz macro is resampled to NTSC frames (@do_peg steps per VINT): 13 ticks play 14 frames', () => {
+    expect(pitchEnvelope(pm, new Lossy(), 56)).toEqual([0, 20, 0, 13, 0, 40, 0, 13, 0x7f, 0]);
+  });
+  it('an on-frame (60 Hz) macro keeps one frame per tick', () => {
+    expect(pitchEnvelope(pm, new Lossy())).toEqual([0, 20, 0, 12, 0, 40, 0, 12, 0x7f, 0]);
   });
 });
 
