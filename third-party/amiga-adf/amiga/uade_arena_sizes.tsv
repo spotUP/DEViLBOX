@@ -39,3 +39,4 @@ SoundMon2.2	0	0	40860	68000	testmod.bp3
 SynTracker	0	0	40860	68000	under the stars.synmod
 Synth	0	0	40092	68000	space_sound.syn
 TFMX-Pro	79792	264	122188	68000	mdat.karamalz-fitwie
+TFMX	79792	264	122188	68000	mdat.karamalz-fitwie (copied from TFMX-Pro, same engine; not measured)

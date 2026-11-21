@@ -634,6 +634,24 @@ def _truncated(s, limit=31):
     return (s or '')[:limit]
 
 
+def check_player(module, player_name, allow_reason, what):
+    """Hard error when uade123's content pick differs from the player we link.
+    Runs for explicit --player too (SonicArranger linked the wrong player that way);
+    a non-empty allow_reason (--allow-player-mismatch REASON) is the only way past."""
+    oracle = uade_lookup.cross_check(module, player_name)
+    if not oracle or oracle == player_name:
+        return
+    if allow_reason:
+        print(f"uade_stage: {what}: linking {player_name}, uade123 picks {oracle} "
+              f"(allowed: {allow_reason})")
+        return
+    raise SystemExit(
+        f"uade_stage: {what}: this build would link {player_name}, but uade123 -- "
+        f"which the maker PREVIEWS with -- picks {oracle}. Preview and Amiga would "
+        f"play different replayers. Link {oracle}, or pass a reason via "
+        f"--allow-player-mismatch (single) / song.allowPlayerMismatch (playlist).")
+
+
 def stage_songs(songs, outdir, uade_root, vendor_from=None, target_cpu=None,
                  start=0):
     """Stage a PLAYLIST: N modules, deduplicated players, ONE arena.
@@ -705,18 +723,8 @@ def stage_songs(songs, outdir, uade_root, vendor_from=None, target_cpu=None,
         # Skipped silently when uade123 is absent (cross_check returns None):
         # a host without it cannot answer, and refusing every song then would
         # make the build depend on a tool it does not need.
-        if not song.get("player"):          # an explicit override is the author's call
-            oracle = uade_lookup.cross_check(module, player_name)
-            if oracle and oracle != player_name:
-                raise SystemExit(
-                    f"uade_stage: song {i} ({os.path.basename(module)}): this "
-                    f"build would link {player_name}, but uade123 -- which is "
-                    f"what the maker PREVIEWS with -- picks {oracle}. Shipping "
-                    f"the disagreement means the preview and the Amiga play "
-                    f"different replayers, and on the device the wrong one "
-                    f"can freeze the demo with nothing reported. Set "
-                    f'"player": "{oracle}" on this song to override, or drop '
-                    f"it from the playlist.")
+        check_player(module, player_name, song.get('allowPlayerMismatch'),
+                     f'song {i} ({os.path.basename(module)})')
 
         need, why = min_cpu_for(player_name)
         if need and target_cpu and target_cpu in CPU_ORDER and need in CPU_ORDER \
@@ -954,6 +962,7 @@ def main():
                          'arena via stage_songs(), instead of a single '
                          '--module. Mutually exclusive with --module.')
     ap.add_argument('--player', default=None)
+    ap.add_argument('--allow-player-mismatch', metavar='REASON', default=None)
     ap.add_argument('--uade-root', default=uade_lookup.DEFAULT_ROOT)
     ap.add_argument('--outdir', default='out')
     ap.add_argument('--companion-slot-bytes', type=int, default=0,
@@ -1036,6 +1045,7 @@ def main():
         return
 
     entry = uade_lookup.lookup(args.module, args.uade_root, args.player)
+    check_player(args.module, entry['player'], args.allow_player_mismatch, os.path.basename(args.module))
     player = os.path.join(args.uade_root, 'players', entry['player'])
 
     # `custom` (Delitracker Custom) has NO player binary, and none is missing:
