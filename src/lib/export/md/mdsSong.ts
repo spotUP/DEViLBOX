@@ -134,13 +134,13 @@ function ticksOf(m: FurnaceMacro, lossy: Lossy, what: string): { vals: number[];
   return { vals, loop: m.loop >= 0 && m.loop < m.length && m.loop !== 255 ? m.loop * sp : -1 };
 }
 
-/** 30-byte FM voice in register order (op slots 1,3,2,4 = Furnace operators 0,2,1,3). */
+/** 30-byte FM voice in register order (+0,+4,+8,+C). Furnace operators are already stored in register order (genesis.cpp writes op[i] at opOffs[i] = 4*i), as MDSDRV reads them (mdsdrv.68k load inst data). */
 function fmVoice(ins: FurnaceInstrument | undefined, lossy: Lossy): number[] {
   const fm = ins?.fm;
   if (!fm || fm.operators.length < 4) { lossy.add('FM channel instrument without FM data (default voice)'); return [...Array<number>(24).fill(0), 0x7f, 0x7f, 0x7f, 0, 7, FM_TRANSPOSE]; }
   if ((fm.fms ?? 0) || (fm.ams ?? 0)) lossy.add('FM LFO sensitivity (FMS/AMS)');
   const DT = [7, 6, 5, 0, 1, 2, 3, 4];
-  const ops = [0, 2, 1, 3].map((i) => fm.operators[i]);
+  const ops = fm.operators.slice(0, 4);
   const row = (f: (o: (typeof ops)[number]) => number) => ops.map(f);
   return [
     ...row((o) => (DT[o.dt & 7] << 4) | (o.mult & 15)),

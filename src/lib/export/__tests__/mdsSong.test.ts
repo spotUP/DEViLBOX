@@ -8,13 +8,22 @@ import { furnaceToMds, portaEnvelope } from '../md/mdsSong';
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf9, 0xfb]);
 
-async function convert(name: string) {
+async function parse(name: string) {
   const fur = readFileSync(join(ROOT, 'public/data/songs/furnace/genesis', name));
-  return furnaceToMds(await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length)));
+  return parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
+}
+async function convert(name: string) { return furnaceToMds(await parse(name)); }
+
+/** Solar_Man (speed 5) with extra effects on channel 0, order 0, row 0 (a note, instrument 11, volume 116, 08 11). */
+async function solarManRow0(fx: Array<{ type: number; value: number }>) {
+  const m = await parse('Solar_Man.fur');
+  const cell = m.patterns.get(`0_0_${m.subsongs[0].orders[0][0]}`)!.rows[0]!;
+  cell.effects = [...(cell.effects ?? []), ...fx];
+  return furnaceToMds(m);
 }
 
 /** Test-only decoder: walks one pass of every track (subroutines followed, stops at the loop jump). */
-function decode(seq: Uint8Array): { ch: number; tick: number; n: number }[] {
+function decode(seq: Uint8Array, rests = false): { ch: number; tick: number; n: number }[] {
   const sd = seq.subarray(8);
   const w = (o: number) => (sd[o] << 8) | sd[o + 1];
   const bgm = (w(4) << 16) | w(6);
@@ -26,7 +35,7 @@ function decode(seq: Uint8Array): { ch: number; tick: number; n: number }[] {
     const walk = (p: number): boolean => {
       for (;;) {
         const c = sd[p++];
-        if (c < 0x80) tick += c + 1;
+        if (c < 0x80) { if (rests) out.push({ ch, tick, n: -1 }); tick += c + 1; }
         else if (c === 0x81) tick += sd[p++] + 1;
         else if (c >= 0x82 && c < 0xe0) { out.push({ ch, tick, n: c - 0x82 + trs }); tick += sd[p++] + 1; }
         else if (c === 0xfe) { if (!walk(tbase + ((w(tbase + sd[p++] * 2) << 16) >> 16))) return false; }
@@ -102,6 +111,34 @@ describe('furnaceToMds', () => {
     // 02 c0, pitchSlideSpeed 4, tpf 1: delta 2 * -768 = 0xfa00 per frame, 14 frames (len 0d), next node 1 holds at the key-0 limit 0xa800.
     const hex = Buffer.from((await convert('golden_shit.fur')).seq).toString('hex');
     expect(hex).toContain('0000fa000d01a800');
+  });
+  it('golden_shit: FM voice operators keep Furnace register order (+0,+4,+8,+C), as Furnace genesis.cpp and MDSDRV write them', async () => {
+    // FM2 voice, from Furnace's own VGM: DT/MUL 02 04 05 02, KS/AR 1b 1a 8d 18 (the [0,2,1,3] remap wrote 02 05 04 02 / 1b 8d 1a 18).
+    const hex = Buffer.from((await convert('golden_shit.fur')).seq).toString('hex');
+    expect(hex).toContain('020405021b1a8d18');
+    expect(hex).not.toContain('020504021b8d1a18');
+  });
+  it('0Axy: volume slides down one step per tick, row tick included, one E2 per changed tick (Solar_Man FM1, 0A 04)', async () => {
+    const s = await solarManRow0([{ type: 0x0a, value: 0x04 }]);
+    const hex = Buffer.from(s.seq).toString('hex');
+    expect(hex).toContain('e20d8100e20e8100e20f8100e2108100'); // ticks 1..4: volume 114..111 = E2 127-v as ties
+    expect(s.lossy.some((l) => l.startsWith('effect 0A'))).toBe(false);
+  });
+  it('ECxx: key-off xx ticks after the row starts (Solar_Man FM1, EC 02)', async () => {
+    const s = await solarManRow0([{ type: 0xec, value: 0x02 }]);
+    const ch0 = decode(s.seq, true).filter((e) => e.ch === 0);
+    expect(ch0[0]).toMatchObject({ tick: 0, n: s.keyOns[0].note });
+    expect(ch0[1]).toEqual({ ch: 0, tick: 2, n: -1 });
+    expect(s.lossy.some((l) => l.startsWith('effect EC'))).toBe(false);
+  });
+  it('EDxx: the row plays xx ticks late (Solar_Man FM1, ED 02)', async () => {
+    const base = await solarManRow0([]);
+    const s = await solarManRow0([{ type: 0xed, value: 0x02 }]);
+    const first = (k: { ch: number; tick: number }[]) => k.find((e) => e.ch === 0)!;
+    expect(first(base.keyOns).tick).toBe(0);
+    expect(first(s.keyOns).tick).toBe(2);
+    expect(first(decode(s.seq)).tick).toBe(2);
+    expect(s.lossy.some((l) => l.startsWith('effect ED'))).toBe(false);
   });
   it('portaEnvelope FM: 03 70 takes three steps of 182 Hz then holds the target, 03 20 three steps of 104 Hz (Furnace Fancy_Promenard FM4)', () => {
     const hz = (hex: string) => { // nodes of 4 bytes: signed 1/256 semitone, 0, length
