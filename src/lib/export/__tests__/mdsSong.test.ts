@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { furnaceToMds, mdsPsgPitch, furnaceDacGain, pcmDacAtt, pcmGain, portaEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
+import { furnaceToMds, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
@@ -271,11 +271,27 @@ describe('furnaceToMds', () => {
   });
 
   describe('FM6 DAC volume', () => {
-    it('maps Furnace dacVolTable to the nearest MDSDRV PCM gain', () => {
+    it('driver PCM step times the baked residual writes Furnace (data8 * dacVolTable[vol]) >> 7 within 1 LSB for every sample and volume', () => {
       expect(pcmDacAtt(127)).toBe(0);
       expect(pcmGain(pcmDacAtt(0))).toBe(0);
-      const db = (g: number) => 20 * Math.log10(g);
-      for (let v = 89; v <= 127; v++) expect(Math.abs(db(pcmGain(pcmDacAtt(v))) - db(furnaceDacGain(v)))).toBeLessThanOrEqual(1.2);
+      expect([furnaceDacTable(127), furnaceDacTable(120), furnaceDacTable(124), furnaceDacTable(0)]).toEqual([128, 69, 98, 0]);
+      for (let v = 1; v <= 127; v++) {
+        const sc = pcmDacScale(v), g = Math.round(pcmGain(pcmDacAtt(v)) * 256);
+        expect(sc).toBeLessThanOrEqual(1); // never clips
+        for (let s = -128; s < 128; s++) {
+          const baked = Math.max(-128, Math.min(127, Math.round(s * sc)));
+          // mdsdrv.68k volume table: high byte of (byte - 128) * gain
+          expect(Math.abs(((baked * g) >> 8) - ((s * furnaceDacTable(v)) >> 7))).toBeLessThanOrEqual(1);
+        }
+      }
+      expect(Math.abs(20 * Math.log10(pcmGain(pcmDacAtt(120)) * pcmDacScale(120)) - 20 * Math.log10(furnaceDacGain(120)))).toBeLessThan(0.15);
+    });
+    it('Solar_Man: the vol 120 and vol 127 Bass Drum hits get separate PCM copies (F0 headers), each scaled for its volume', async () => {
+      const m = await parse('Solar_Man.fur');
+      const scaled = furnaceToMds(m).pcm.length;
+      m.compatFlags.noOPN2Vol = true; // every hit at full volume: one copy per (sample, freq note)
+      const flat = furnaceToMds(m).pcm.length;
+      expect(scaled).toBeGreaterThan(flat); // Bass Drum 120/124/127 and Tom 124/127 each have their own copy
     });
   });
 });

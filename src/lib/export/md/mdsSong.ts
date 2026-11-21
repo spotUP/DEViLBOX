@@ -68,13 +68,20 @@ const PCM_LEVEL = [5, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 24, 64].flatMap((n,
 const PCM_GAIN = [256, 203, 161, 128, 102, 81, 64, 51, 40, 32, 26, 20, 16, 13, 10, 0];
 export const pcmGain = (a: number): number => PCM_GAIN[PCM_LEVEL[Math.max(0, Math.min(127, a))]] / 256;
 export const furnaceDacGain = (vol: number): number => (vol <= 0 ? 0 : 10 ** (-0.75 * (127 - Math.min(127, vol)) / 20));
-/** E2 attenuation whose driver PCM gain is nearest Furnace's DAC gain for FM6 volume `vol`. */
+/** genesis.cpp dacVolTable[vol]: unsigned char 128 * 10^(-0.75 (127 - vol) / 20), truncated; entry 0 is 0. */
+export const furnaceDacTable = (vol: number): number => (vol <= 0 ? 0 : Math.trunc(128 * furnaceDacGain(vol)));
+/** E2 attenuation with the smallest driver PCM gain not below Furnace's dacVolTable gain, so the baked residual (pcmDacScale) is <= 1. */
 export function pcmDacAtt(vol: number): number {
-  const want = furnaceDacGain(vol);
+  const want = furnaceDacTable(vol) / 128;
   let best = 0;
-  for (let a = 1; a < 128; a++) if (Math.abs(pcmGain(a) - want) < Math.abs(pcmGain(best) - want)) best = a;
+  for (let a = 1; a < 128; a++) if (pcmGain(a) >= want && pcmGain(a) < pcmGain(best)) best = a;
   return best;
 }
+/** Gain baked into the FM6 sample data so driver gain pcmGain(pcmDacAtt(vol)) times it is Furnace's dacVolTable[vol] / 128. */
+export const pcmDacScale = (vol: number): number => {
+  const g = pcmGain(pcmDacAtt(vol));
+  return g ? furnaceDacTable(vol) / 128 / g : 0;
+};
 
 export function psgFix(k: number): number {
   const want = Math.min(1023, Math.round(sndPeriod(k)));
@@ -321,15 +328,16 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   // each (sample, freq note) pair is resampled the same way to MDSDRV rate 8 and gets an 8-byte PCM header item (sdtop-relative).
   // shortcut: MDSDRV rate 8 taken as 8 * 2190 Hz (mdsseq.md "~2190 Hz steps"); upgrade if a measured Z80 loop rate differs.
   const PCM_HZ = 8 * 2190, pcm: number[] = [], pcmItems = new Map<string, number>();
-  const pcmRef = (smp: number, freqNote: number): number => {
-    const k = `${smp}:${freqNote}`;
+  // vol: the FM6 volume at note-on; its residual to the driver's 2 dB PCM step is baked into this copy of the sample (pcmDacScale).
+  const pcmRef = (smp: number, freqNote: number, vol: number): number => {
+    const k = `${smp}:${freqNote}:${vol}`, sc = pcmDacScale(vol);
     if (pcmItems.has(k)) return pcmItems.get(k)!;
     const sm = m.samples[smp];
     const src = sm.depth === 16 ? Array.from(sm.data, (v) => v >> 8) : Array.from(sm.data);
     if (sm.depth !== 8 && sm.depth !== 16) lossy.add(`FM6 sample depth ${sm.depth} (played as 8-bit data)`);
     if (sm.loop) lossy.add('FM6 sample loop (played once)');
     const step = (sm.c4Rate || 8363) * 2 ** ((freqNote - 108) / 12) / PCM_HZ;
-    const data = Array.from({ length: Math.max(1, Math.floor(src.length / step)) }, (_, j) => (src[Math.floor(j * step)] + 128) & 0xff);
+    const data = Array.from({ length: Math.max(1, Math.floor(src.length / step)) }, (_, j) => (Math.max(-128, Math.min(127, Math.round(src[Math.floor(j * step)] * sc))) + 128) & 0xff);
     // MDSDRV volume tables take unsigned samples (mdsdrv.68k: -128 + byte before the multiply); Furnace data is signed.
     // 2-channel mode at rate 8 reads 32-byte blocks (mdssub.z80 alignment table); keep each sample inside one 32 KiB bank when it fits.
     while (pcm.length & 31) pcm.push(0);
@@ -371,7 +379,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // The driver key (note byte + transpose) must stay in 0..MAX_NOTE (mds_get_fm_pitch indexes its octave/note tables with it), so a slide
     // past that holds at the driver's end key instead of Furnace's (measured: golden_shit FM1 kick 02 c0 wrapped to 4 kHz below key 0).
     // PSG: E2 $80|v gives attenuation 15-v, added to the envelope attenuation 15-macro and clamped, the same sum as Furnace VOL_SCALE_LOG.
-    // FM6 on a sample instrument: the driver turns E2 into one of 16 PCM gains (pcmDacAtt), so pick the one nearest Furnace's dacVolTable.
+    // FM6 on a sample instrument: the driver turns E2 into one of 16 PCM gains (pcmDacAtt, the step at or above Furnace's dacVolTable) and
+    // pcmRef bakes the rest into the sample. noOPN2Vol plays the DAC at full volume (genesis.cpp).
+    const dacVol = (v: number) => (m.compatFlags.noOPN2Vol ? 127 : v);
     // Furnace KVS (fmsharedbase.h KVS): an operator takes the channel volume when kvs is 1, or 2 on a carrier; MDSDRV adds it to the carriers
     // of mds_fm_op_table[alg] only (same carriers as Furnace isOutput). An operator whose KVS differs gets base TL tl + att*(kvs - carrier)
     // through EE (fmtl), restated after every E1 (which reloads the voice TLs) and every E2. kvsIns is the voice the driver holds.
@@ -389,7 +399,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       }
       return out;
     };
-    const volCmd = (v: number) => [0xe2, kind === 'fm' ? (ch === 5 && m.instruments[ins]?.type === 4 ? pcmDacAtt(v) : 127 - v) : 0x80 | Math.max(0, Math.min(15, v)), ...kvsCmd(v)];
+    const volCmd = (v: number) => [0xe2, kind === 'fm' ? (ch === 5 && m.instruments[ins]?.type === 4 ? pcmDacAtt(dacVol(v)) : 127 - v) : 0x80 | Math.max(0, Math.min(15, v)), ...kvsCmd(v)];
     let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0, dtnOut = 0;
     // PSG: E6 carries E5xx plus psgFix(key); each PSG chunk restates it, since a subroutine chunk can follow any detune.
     const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey))) : dtn;
@@ -517,17 +527,19 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (vs) cmds.push(...vs);
         // A sample instrument (DIV_INS_AMIGA = 4) on FM6 plays the DAC (genesis.cpp note-on): the note map (Furnace note = nv + 60)
         // picks sample and freq note, an unmapped note plays nothing. One F0 header per (sample, freq note) replaces drum mode.
-        // shortcut: DAC volume is the nearest of the driver's 2 dB PCM gains (pcmDacAtt, max error 1.2 dB) and a DAC volume macro is not
-        // applied; upgrade by baking the residual gain into the sample data if a song needs the exact dacVolTable step.
+        // DAC volume: driver PCM step (pcmDacAtt) times the residual baked per note-on volume (pcmRef) = dacVolTable[vol] >> 7.
+        // shortcut: a volume change mid-note moves only the driver step (sample keeps its note-on residual, under 2 dB), and a DAC volume
+        // macro is not applied; upgrade with a header per (sample, volume) at each change if a song needs it.
         const dac = nv >= 0 && nv < 253 && isDac(ins);
         let dacHdr = -1;
         if (dac) {
           const a = m.instruments[ins].amiga, fn = Math.max(0, Math.min(179, nv + 60));
           // No SM feature in the file means the DivInstrumentAmiga defaults (instrument.h: initSample 0, no note map).
           const smp = a?.useNoteMap ? a.noteMap?.[fn]?.map ?? -1 : a?.initSample ?? 0;
-          if (smp >= 0 && smp < m.samples.length && m.samples[smp].length > 0) dacHdr = pcmRef(smp, a?.useNoteMap ? a.noteMap?.[fn]?.freq ?? fn : fn);
+          if (smp >= 0 && smp < m.samples.length && m.samples[smp].length > 0) dacHdr = pcmRef(smp, a?.useNoteMap ? a.noteMap?.[fn]?.freq ?? fn : fn, dacVol(vol));
         }
         const isNote = nv >= 0 && nv < 253 && (!dac || dacHdr >= 0), isOff = (dac && dacHdr < 0) || nv >= 253 || (dacOff && !isNote);
+        if (pcmOn && !isNote && cell && cell.volume >= 0 && isDac(ins) && !m.compatFlags.noOPN2Vol) lossy.add('FM6 DAC volume change mid-note (driver 2 dB step only)');
         if (dac && isNote) { curIns = ins; pcmOn = true; if (dacHdr !== curPcm) { curPcm = dacHdr; cmds.unshift(0xf0, dacHdr); } }
         else if (isNote) { pcmOn = false; curPcm = -1; }
         if (isNote) { poff = 0; curNv = nv; }
