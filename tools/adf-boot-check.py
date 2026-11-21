@@ -102,7 +102,21 @@ def ref_delta(mono, sr, refpath):
     db = lambda x, y: round(20 * np.log10(max(x, 1e-9) / max(y, 1e-9)), 2)
     rms = lambda x: float(np.sqrt((x ** 2).mean()))
     return {"seconds": round(n / min(sr, rsr), 1), "rms_delta_db": db(rms(a), rms(b)),
-            "peak_delta_db": db(np.abs(a).max(), np.abs(b).max())}
+            "peak_delta_db": db(np.abs(a).max(), np.abs(b).max()), **env_corr(a, sr, b, rsr)}
+
+
+def env_corr(a, sr, b, rsr):
+    """Per-second Pearson corr of 10 ms RMS envelopes (onset aligned). None = silent in the reference: not judged."""
+    def env(x, f):
+        h = f // 100; k = len(x) // h
+        return np.sqrt((x[:k * h].reshape(k, h) ** 2).mean(1))
+    ea, eb = env(a, sr), env(b, rsr)
+    n = min(len(ea), len(eb))
+    cs = []
+    for s in range(0, n // 100):
+        x, y = ea[s * 100:(s + 1) * 100], eb[s * 100:(s + 1) * 100]
+        cs.append(round(float(np.corrcoef(x, y)[0, 1]), 3) if y.std() > 0 and x.std() > 0 else (0.0 if y.std() > 0 else None))
+    return {"corr_per_s": cs, "corr_overall": round(float(np.corrcoef(ea[:n], eb[:n])[0, 1]), 3)}
 
 
 def check(adf, purpose, target, ref, keep_wav, extra="", dump=None, dump_at=2.0):
@@ -158,7 +172,10 @@ def check(adf, purpose, target, ref, keep_wav, extra="", dump=None, dump_at=2.0)
             r["ref_delta"] = ref_delta(mono, sr, ref)
         dma = any(int(x, 16) & 0xF for x in r["dmaconr"])
         loud = len(per) >= 3 and all(s["peak"] > 200 for s in per[-3:])
-        r["verdict"] = "PASS" if (tplay and "crash" not in r and dma and loud) else "FAIL"
+        # With --ref the tune may end before the window: judge by per-second envelope corr (>= 0.95 wherever the reference has audio).
+        cs = [c for c in (r.get("ref_delta") or {}).get("corr_per_s", []) if c is not None]
+        ok = (bool(cs) and min(cs) >= 0.95) if ref else loud
+        r["verdict"] = "PASS" if (tplay and "crash" not in r and dma and ok) else "FAIL"
         if keep_wav:
             r["wav"] = wav
     except Exception as e:  # noqa: BLE001
@@ -206,6 +223,8 @@ def main():
         os.makedirs(os.path.dirname(RESULTS), exist_ok=True)
         json.dump(res, open(RESULTS, "w"), indent=1)
         print(json.dumps({k: v for k, v in r.items() if k != "peak_rms_per_s"}), flush=True)
+        if r.get("ref_delta"):
+            print("corr per s:", r["ref_delta"].get("corr_per_s"), "overall", r["ref_delta"].get("corr_overall"))
         print("peak/rms per s:", [(s["peak"], s["rms"]) for s in r.get("peak_rms_per_s", [])])
         print("VERDICT %s %s" % (name, r["verdict"]))
 
