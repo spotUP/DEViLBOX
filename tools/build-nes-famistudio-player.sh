@@ -34,7 +34,7 @@ for f in ['player.s', sys.argv[5], sys.argv[2], '../screen.chr']: h.update(open(
 # prgOffset = file offset of CPU $8000 (fs-fme7.cfg: file offset = 16 + CPU address)
 meta = {'musicAddr': music, 'musicCap': 0x6000 if fme7 else 0x4000, 'dpcmAddr': 0xC000, 'dpcmCap': 0x2000,
         'prgOffset': 16 + 0x8000 if fme7 else 16, 'tickAddr': lab['fs_tick'], 'titleAddr': lab['fs_title'], 'authorAddr': lab['fs_author'], 'textLen': 32,
-        'chipAddr': lab['fs_chip'], 'chipLen': 16, 'scrollAddr': lab['fs_scroll'], 'scrollLen': 128, 'nsubAddr': lab['fs_nsub'], 'nmiAddr': lab['fs_nmi'], 'sourceHash': h.hexdigest()}
+        'chipAddr': lab['fs_chip'], 'chipLen': 16, 'scrollAddr': lab['fs_scroll'], 'scrollLen': 128, 'nsubAddr': lab['fs_nsub'], 'nmiAddr': lab['fs_nmi'], 'taccAddr': lab['fs_tacc'], 'sourceHash': h.hexdigest()}
 meta['sourceHash'] = hashlib.sha1((meta['sourceHash'] + sys.argv[4]).encode()).hexdigest() if sys.argv[4] else meta['sourceHash']
 json.dump(meta, open(sys.argv[3], 'w'), indent=1)
 print(meta)

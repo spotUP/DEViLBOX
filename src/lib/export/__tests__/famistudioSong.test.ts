@@ -136,6 +136,18 @@ describe('furnaceToFamistudio', () => {
     expect(song.firstNoteFrames.slice(0, 2)).toEqual([0, 16]);
   });
 
+  it('puts every row of a fractional virtual tempo on the Furnace frame: whole tempo step, start accumulator (Byte-Sized Bop 155/112)', () => {
+    const song = furnaceToFamistudio(nesModule({ 0: { 0: { note: 0, octave: 4 } } }, { virtualTempo: 155, virtualTempoD: 112 }));
+    const step = song.music[7 + 5 * 2] | (song.music[8 + 5 * 2] << 8);
+    expect(step).toBe(2480); // 256 x 150 x 155 / 112 / 150 x q 7: whole, so no drift
+    const q = (0x600 + step - (song.tempoAcc ?? 0)) / 256;
+    expect(q).toBe(7);
+    // Engine: row n fires on the first frame k with k x step >= 256 (6 q n + q) - step; Furnace: first k with 155 (k + 1) >= 112 (6 n + 1).
+    for (let n = 1; n < 3000; n++) {
+      expect(Math.max(0, Math.ceil((256 * (6 * q * n + q) - step) / step))).toBe(Math.ceil(112 * (6 * n + 1) / 155) - 1);
+    }
+  });
+
   const A4 = { note: 9, octave: 4 };
   const fx = (type: number, value: number) => ({ effects: [{ type, value }] });
   const music = (cells: Record<number, Record<number, Partial<Cell>>>) => furnaceToFamistudio(nesModule(cells));

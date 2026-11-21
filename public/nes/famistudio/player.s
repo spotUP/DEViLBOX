@@ -156,6 +156,7 @@ fs_reset:
     jsr famistudio_init
     lda #0
     jsr famistudio_music_play
+    jsr fs_tacc_set
     lda #$ff                    ; OAM: every sprite off-screen but sprite 0 (the split marker), copied once by DMA;
     ldx #0                      ; rendering stays on from here, which keeps OAM refreshed
 :   sta $0200,x
@@ -818,6 +819,7 @@ fs_joypad:
     sta fs_tm+3
     lda fs_cur
     jsr famistudio_music_play   ; restarts the clock with the subsong
+    jsr fs_tacc_set
     inc fs_dirty
 @none:
     rts
@@ -862,6 +864,13 @@ fs_chip:   .byte "2A03"
 fs_scroll: .byte "UNTITLED - DEVILBOX"
            .res 109, $20
 fs_nsub:   .byte 1              ; subsong count (the exporter writes one subsong)
+fs_tacc:   .word $0600          ; initial FamiTracker tempo accumulator (8.8), exporter-patched: puts rows on Furnace's frames
+fs_tacc_set:                    ; after famistudio_music_play: replace the engine's fixed speed-6 start with fs_tacc
+    lda fs_tacc
+    sta famistudio_tempo_acc_lo
+    lda fs_tacc+1
+    sta famistudio_tempo_acc_hi
+    rts
 
 .ifdef FME7
 ; FME-7 commands 0-13: CHR 1 KB banks 0-7; PRG bank 3 (ROM, bit 6 clear) at $6000, 4 at $8000, 5 at $A000 = 24 KB of music

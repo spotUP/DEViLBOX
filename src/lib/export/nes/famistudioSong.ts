@@ -18,10 +18,10 @@ import type { FurnacePatternCell } from '../../import/formats/furnace/FurnacePat
 import { nesScreenText, nesScrollText, type NesScreenInfo } from './nesCartridge';
 import { convertFurnaceNoteValue } from '../../import/formats/furnace/FurnacePatternParser';
 
-export interface FamistudioMeta { musicAddr: number; musicCap: number; dpcmAddr: number; dpcmCap: number; prgOffset: number; tickAddr: number; titleAddr: number; authorAddr: number; textLen: number; chipAddr: number; chipLen: number; scrollAddr: number; scrollLen: number; nsubAddr: number; nmiAddr: number; sourceHash: string }
+export interface FamistudioMeta { musicAddr: number; musicCap: number; dpcmAddr: number; dpcmCap: number; prgOffset: number; tickAddr: number; titleAddr: number; authorAddr: number; textLen: number; chipAddr: number; chipLen: number; scrollAddr: number; scrollLen: number; nsubAddr: number; nmiAddr: number; sourceHash: string; /** Initial FamiTracker tempo accumulator word (player.s fs_tacc). */ taccAddr?: number }
 /** Frames (song start = 0) where the converter knows the pitch cannot match Furnace (a lossy slide), per channel. */
 export interface PitchLossySpan { ch: number; from: number; to: number }
-export interface FamistudioSong { music: Uint8Array; dpcm: Uint8Array; lossy: string[]; pitchLossy: PitchLossySpan[]; channelsWithNotes: boolean[]; firstNotes: number[]; firstNoteFrames: number[];
+export interface FamistudioSong { /** Initial tempo accumulator (8.8; 0x600 = engine default). */ tempoAcc?: number; music: Uint8Array; dpcm: Uint8Array; lossy: string[]; pitchLossy: PitchLossySpan[]; channelsWithNotes: boolean[]; firstNotes: number[]; firstNoteFrames: number[];
   /** Bytes of each music-area part: song header + instrument table, DPCM sample table, envelopes, and one entry per channel stream. */ sizes: { header: number; samples: number; envelopes: number; streams: number[] }
   /** The song carries the three VRC6 channels: it needs the mapper-24 player (player-vrc6.nes / .json). */ vrc6?: boolean
   /** Music past 16 KB, assembled for $6000: it needs the FME-7 player (player-fme7.nes / .json). */ fme7?: boolean
@@ -422,7 +422,6 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   // multiply tempo and every speed by the same integer so frames per row stay exact.
   const macroRate = (s.hz > 0 ? s.hz : 60) / 60;
   const tempoBase = FT_TEMPO * (s.hz > 0 ? s.hz : 60) / 60 / vtScale;
-  const spdMul = tempoBase < 32 ? Math.ceil(32 / tempoBase) : 1;
   const cellAt = (ch: number, o: number, r: number): FurnacePatternCell | undefined => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o]}`)?.rows[r];
 
   // Order lengths (0B/0D in any channel ends the order) and the loop target (last 0B, else order 0).
@@ -461,6 +460,18 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
       }
     }
   }
+  // The engine adds a 8.8 step of 256 x tempo / 150 per frame and starts a row when the integer part reaches the speed.
+  // A rounded step drifts a row by a frame every few hundred rows (virtual tempo 155/112: step 354.29), so speeds and
+  // tempo are scaled by the smallest q that makes the step whole (speed bit 7 = paused: speed x q <= 127).
+  const maxSpd = Math.max(1, ...rowSpeed.flat());
+  const qMin = tempoBase < 32 ? Math.ceil(32 / tempoBase) : 1;
+  const stepFits = (q: number): boolean => 256 * tempoBase * q / 150 < (256 - maxSpd * q) * 256;
+  let spdMul = qMin;
+  for (let q = qMin; q * maxSpd <= 127 && stepFits(q); q++) {
+    const st = 256 * tempoBase * q / 150;
+    if (Math.abs(st - Math.round(st)) < 1e-6) { spdMul = q; break; }
+  }
+  { const st = 256 * tempoBase * spdMul / 150; if (Math.abs(st - Math.round(st)) >= 1e-6) lossy.add(`virtual tempo ${s.virtualTempo}/${s.virtualTempoD}: FamiStudio tempo step not whole (rows drift)`); }
 
   // Instruments by first use; envelopes deduplicated by content.
   const insMap = new Map<number, number>();
@@ -884,11 +895,17 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   const hz = s.hz > 0 ? s.hz : 60;
   if (Math.abs(hz - 60) > 0.5) lossy.add(`tick rate ${hz} Hz approximated with FamiTracker tempo`);
   // FamiTracker tempo: frames per row = speed x 150 / tempo, so virtual tempo N/D scales tempo by N/D (engine range 32..255).
+  // The engine takes any 16-bit step; it only has to keep the 8-bit accumulator below 256 (speed x q - 1 + step / 256).
   const tempoRaw = tempoBase * spdMul;
-  const tempo = Math.max(32, Math.min(255, tempoRaw));
-  if (tempo !== tempoRaw) lossy.add(`virtual tempo ${s.virtualTempo}/${s.virtualTempoD} outside FamiTracker tempo 32..255 (clamped)`);
+  const stepNtsc = Math.round(256 * tempoRaw / 150);
+  const tempo = stepFits(spdMul) ? Math.max(32, tempoRaw) : 150 * (256 - maxSpd * spdMul) - 1;
+  if (tempo !== tempoRaw) lossy.add(`virtual tempo ${s.virtualTempo}/${s.virtualTempoD} outside the FamiStudio tempo step range (clamped)`);
   w16(5 + NCH * 2, Math.round(256 * tempo / (50 * 60 / 24)));
   w16(7 + NCH * 2, Math.round(256 * tempo / (60 * 60 / 24)));
+  // Furnace adds N to its tempo accumulator before the first tick (playback.cpp), so with N > D its first frame already
+  // holds part of the next tick: the player starts the accumulator at 6 x 256 - 256 q + step (6 x 256 when N = D), which
+  // puts every row on Furnace's frame. Other tick rates keep 6 x 256 (shortcut: hz != 60 is approximated anyway).
+  const tempoAcc = Math.abs(hz - 60) > 0.5 || tempo !== tempoRaw ? 0x600 : 0x600 - 256 * spdMul + stepNtsc;
   insEnvs.forEach((ids, i) => ids.forEach((id, k) => w16(insOff + i * 8 + k * 2, envAddr[id])));
   dpcmList.forEach((d, i) => {
     const at = sampleAt.get(d.sample)!;
@@ -902,7 +919,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     for (const [off, target] of fixups[c]) w16(at + off, streamAddr[c] + target);
     for (const [off, id] of envFixups[c]) w16(at + off, envAddr[id]);
   });
-  return { music, dpcm: Uint8Array.from(dpcm), sizes: { header: smpOff, samples: envOff - smpOff, envelopes: streamAddr[0] - base - envOff, streams: streams.map((st) => st.length) }, lossy: lossy.list(), pitchLossy, channelsWithNotes, firstNotes, firstNoteFrames, tuning: m.tuning, vrc6 };
+  return { music, dpcm: Uint8Array.from(dpcm), sizes: { header: smpOff, samples: envOff - smpOff, envelopes: streamAddr[0] - base - envOff, streams: streams.map((st) => st.length) }, lossy: lossy.list(), pitchLossy, tempoAcc, channelsWithNotes, firstNotes, firstNoteFrames, tuning: m.tuning, vrc6 };
 }
 
 /** On-screen text slot: uppercase ASCII 0x20-0x5F (the player font), space padded to `len`. */
@@ -927,6 +944,7 @@ export function buildFamistudioRom(player: Uint8Array, meta: FamistudioMeta, son
   if (text.chipName) rom.set(nesScreenText(text.chipName, meta.chipLen), at(meta.chipAddr));
   if (text.title || text.author || text.comments) rom.set(nesScrollText(text.title ?? '', text, meta.scrollLen), at(meta.scrollAddr));
   rom[at(meta.nsubAddr)] = subsongCount;
+  if (meta.taccAddr !== undefined && song.tempoAcc !== undefined) { rom[at(meta.taccAddr)] = song.tempoAcc & 0xff; rom[at(meta.taccAddr) + 1] = song.tempoAcc >> 8; }
   // Always rewrite: also saturates notes below A-1 at 2047 like Furnace (nes.cpp: if (freq>2047) freq=2047), where the
   // stock table's 12-bit periods wrap in $4003/$400B and sound high.
   retuneNoteTable(rom, song.tuning || 440);
