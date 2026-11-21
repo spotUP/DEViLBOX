@@ -672,14 +672,18 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       return [0xe8, extItem(env) + 1];
     };
     const out: Array<{ bytes: number[]; tieStart: boolean; head: number }> = [];
-    let wrap: number[] = [];
+    let wrap: number[] = [], mtabOn = false;
     for (const c of chunks) {
       // A slide still running at a chunk start keeps its envelope: E8 would restart it from the instrument's own one.
       const insCmd = (chunkStart = false) => {
         const r = insRef(kind, ins, envPh);
         const peg = (chunkStart ? sounding && (prate || poff) : prate) ? pslideCmd() : chunkStart && tick < slideEnd ? [] : [0xe8, r.peg + 1];
         kvsIns = ins;
-        return [0xe1, r.ins, ...peg, 0xeb, r.mtab + 1, ...kvsCmd(vol)];
+        // An arp table's `16 tt` steps write t_trs and EB 00 leaves the last one in force (Solar_Man FM5 47.3 s: an octave up after
+        // an 0/12 arp instrument), so an instrument without one restates the transpose; a chunk head can follow any table.
+        const tr = r.mtab < 0 && (chunkStart || mtabOn) ? [0xe4, (kind === 'noise' ? (Number.isNaN(trs) ? (trs = 0) : trs) : trsOut || 0) & 0xff] : [];
+        mtabOn = r.mtab >= 0;
+        return [0xe1, r.ins, ...peg, 0xeb, r.mtab + 1, ...tr, ...kvsCmd(vol)];
       };
       // FM6 with a sample instrument plays PCM (genesis.cpp: dacMode from the instrument type at each note-on); E1 would leave PCM mode.
       const isDac = (n: number) => kind === 'fm' && ch === 5 && m.instruments[n]?.type === 4;
@@ -718,7 +722,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       let i0 = false;
       c.rows.forEach((r, i) => {
         const cell = cellAt(ch, c.o, r);
-        const nv = cell ? convertFurnaceNoteValue(cell) : -1;
+        let nv = cell ? convertFurnaceNoteValue(cell) : -1, shY = 0, shX = 0, shFrom = NaN;
         if (cell && cell.instrument >= 0) ins = cell.instrument;
         const cmds: number[] = [];
         let pChanged = false, vChanged = false, dacOff = false;
@@ -757,6 +761,11 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (e.type === 0xe4) vFine = e.value; else { vDepth = e.value & 15; vRate = e.value >> 4; }
             vChanged = true; continue;
           }
+          // E1xy/E2xy: shortcut for 03 (x*4) toward note +-y (playback.cpp 0xe1); y 0 or x 0 never moves the pitch.
+          if ((e.type === 0xe1 || e.type === 0xe2) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
+            if (e.value & 15 && e.value >> 4) { shY = (e.type === 0xe1 ? 1 : -1) * (e.value & 15); shX = (e.value >> 4) * 4; }
+            continue;
+          }
           if (e.type === 0x03 && (kind === 'psg' || kind === 'fm')) { portaXx = e.value; if (!e.value) pXx = 0; if (prate) { prate = 0; pChanged = true; } continue; } // 03 00 only stops the porta
           if ((e.type === 0x01 || e.type === 0x02) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
             prate = (e.type === 0x01 ? 1 : -1) * e.value * pss; pChanged = true; portaXx = 0; sA = 0; pXx = 0; // 01xx/02xx end a 03xx (playback.cpp: inPorta false)
@@ -768,6 +777,13 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         }
         const vs = volStep();
         if (vs) cmds.push(...vs);
+        // With a note, Furnace keys the note on (shorthandPorta skips the porta commit) and slides from it to note +-y; without one
+        // it slides from the pitch playing to the current note +-y, as a 03xx slur. Both become a slide onto the target note.
+        // shortcut: a note-less E1/E2 on a keyed-off channel (Furnace slides the release tail) is dropped.
+        if (shY && !(kind === 'fm' && isDac(ins))) {
+          if (nv >= 0 && nv < 253) { shFrom = nv * 128; nv += shY; portaXx = shX; }
+          else if (sounding && prevKey >= 0 && nv < 0) { nv = prevKey + shY; portaXx = shX; }
+        }
         // A sample instrument (DIV_INS_AMIGA = 4) on FM6 plays the DAC (genesis.cpp note-on): the note map (Furnace note = nv + 60)
         // picks sample and freq note, an unmapped note plays nothing. One F0 header per (sample, freq note) replaces drum mode.
         // DAC volume: driver PCM step (pcmDacAtt) times the residual baked per note-on volume (pcmRef) = dacVolTable[vol] >> 7.
@@ -816,13 +832,13 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             // 03xx: slur into the note (no key-off, envelope keeps running) and slide from the previous key; E7 00 turns it off again.
             // 03xx on a keyed-off channel is a plain note-on in Furnace (playback.cpp keeps doNote, NOTE_ON sets baseFreq to the target): no slide, PSG too.
             // Pitch reached at the end of the previous Furnace tick: this tick's porta step runs after the row (playback.cpp nextTick).
-            const fNow = fTick(tick + delay), from = prevKey * 128 + slideOff(fNow - 1) + flyOff(fNow - 1);
+            const fNow = fTick(tick + delay), from = Number.isNaN(shFrom) ? prevKey * 128 + slideOff(fNow - 1) + flyOff(fNow - 1) : shFrom;
             // A retarget (no 03 on the row) still commits the note (doNote stays true), so it resets the vibrato phase (playback.cpp commit note on).
             const retarget = !portaXx && pXx > 0 && sounding && from !== prevKey * 128;
             if (retarget) portaXx = pXx;
-            const slide = (kind === 'psg' || kind === 'fm') && sounding && portaXx > 0 && prevKey >= 0 && from !== nv * 128;
+            const slide = (kind === 'psg' || kind === 'fm') && (Number.isNaN(shFrom) ? sounding && prevKey >= 0 : true) && portaXx > 0 && from !== nv * 128;
             // 03xx on a keyed-on channel is no note-on (playback.cpp: doNote=false), so the vibrato phase is not reset.
-            const portaSlur = portaXx > 0 && sounding;
+            const portaSlur = portaXx > 0 && sounding && Number.isNaN(shFrom);
             // E0 slurs every such note, also a PSG 03xx onto the note already reached (no slide): a key-on would restart the macros.
             if ((kind === 'fm' || kind === 'psg') && portaSlur) cmds.push(0xe0);
             sA = 0; fA = 0; pXx = slide && m.compatFlags.linearPitch ? portaXx : 0;

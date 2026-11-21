@@ -1438,3 +1438,30 @@ Still open: PSG2 note-change timing at 19.417 s and 32.35 s (not started). PSG1 
 
 Unit test: `vibOffsets + psgFix` row in src/lib/export/__tests__/mdsSong.test.ts.
 Listen ROM: ~/Desktop/md-roms/newer_song_lol-2o.bin.
+
+## Phase 2p result (2026-11-21): Solar_Man E1xy/E2xy and arp-table transpose leak
+
+Question: are the Solar_Man pitch counts (frames over 10 cents, best of lag -1..+1) real errors or a measurement artefact?
+
+Answer: both. Part is an artefact. The Solar_Man Furnace VGM has no loop and ends at 94.29 s, but MAME loops. Every frame after 94.29 s counts as an error, so measure Solar_Man at T=94.3, not 100. The rest are two real converter bugs:
+
+1. E1xy/E2xy (215 + 45 uses) were dropped and flagged lossy. Furnace (playback.cpp 0xe1/0xe2) sets portaNote = note +-y and portaSpeed = x*4. With a note on the row, the note keys on and slides to note +-y. Without a note, the effect slides from the playing pitch. The converter now emits both cases as a slide onto the target note, through the 03xx slide path (shFrom = the row note when a note is present). A note-less E1/E2 on a keyed-off channel is dropped (shortcut: Furnace slides the release tail).
+2. An MDSDRV mtab arp table writes t_trs absolutely (`16 tt`), and `EB 00` does not reset it. After instrument 15 "Impact Hit" (arp 0/12) at 45.7 s, FM5 played one octave up from 47.3 s to the end. insCmd now restates the transpose (E4) when an instrument without an arp table follows one that has a table, or at a chunk head.
+
+| Solar_Man, T=94.3 | FM1 | FM2 | FM3 | FM4 | FM5 | PSG1 | PSG2 | PSG3 |
+|---|---|---|---|---|---|---|---|---|
+| Before, as reported at 100 s | 688 | 171 | 745 | 1283 | 3156 | 423 | 428 | 0 |
+| Before, 94.5 s | 476 | 35 | 468 | 1060 | 2826 | 240 | 245 | 0 |
+| After (seq 20586) | 1 | 0 | 0 | 138 | 2 | 35 | 40 | 0 |
+
+| newer_song_lol, T=100 | FM1 | FM2 | FM3 | FM4 | FM5 | PSG1 | PSG2 | PSG3 |
+|---|---|---|---|---|---|---|---|---|
+| Before | 0 | 0 | 0 | 7 | 0 | 29 | 6 | 0 |
+| After (seq 61122) | 0 | 0 | 0 | 7 | 0 | 28 | 6 | 0 |
+
+Open items:
+- Solar_Man FM4: 138 frames, first at 19.367 s, worst 1200 cents at 34.3 s. An octave error, so probably another transpose or arp case. Not investigated.
+- Solar_Man PSG1/PSG2: about 35-40 frames each, from 25.7 s and 30.8 s (worst about 530 cents at 31.8 s). Not investigated.
+- Solar_Man FM5: 2 frames at 65.7 s (157 cents).
+- newer_song_lol FM4 96.217-96.267 s: extra MAME key-offs at 96.089 s and 96.17 s (Q2), not reached.
+- Listen ROM: ~/Desktop/md-roms/Solar_Man-2p.bin (human check pending).

@@ -448,11 +448,15 @@ describe('furnaceToMds', () => {
     }
     expect(worst).toBeLessThan(0.75);
   });
-  it('Solar_Man: unhandled vibrato direction (E3 01/02), 05xy, E1xy and E2xy flag lossy through the generic effect flag; E3 00 does not', async () => {
-    for (const [type, value, flag] of [[0xe3, 1, 'effect E3'], [0xe3, 2, 'effect E3'], [0x05, 0x01, 'effect 05'], [0xe1, 0x13, 'effect E1'], [0xe2, 0x13, 'effect E2']] as const) {
+  it('Solar_Man: unhandled vibrato direction (E3 01/02) and 05xy flag lossy through the generic effect flag; E3 00, E1xy and E2xy do not', async () => {
+    for (const [type, value, flag] of [[0xe3, 1, 'effect E3'], [0xe3, 2, 'effect E3'], [0x05, 0x01, 'effect 05']] as const) {
       expect((await solarManRow0([{ type, value }])).lossy.some((l) => l.startsWith(flag))).toBe(true);
     }
-    expect((await solarManRow0([{ type: 0xe3, value: 0 }])).lossy.some((l) => l.startsWith('effect E3'))).toBe(false);
+    for (const [type, value, flag] of [[0xe3, 0, 'effect E3'], [0xe1, 0x13, 'effect E1'], [0xe2, 0x13, 'effect E2']] as const) {
+      expect((await solarManRow0([{ type, value }])).lossy.some((l) => l.startsWith(flag))).toBe(false);
+    }
+    // E1xy/E2xy become a slide toward note +-y, so the sequence differs from the bare note (Phase 2p, MAME 1:1 on FM2/FM3).
+    expect((await solarManRow0([{ type: 0xe1, value: 0x13 }])).seq).not.toEqual((await solarManRow0([])).seq);
   });
   it('Solar_Man: 0D with no value (order 12 row 31) jumps to row 0, not row -1, so order 13 keys on at tick 4000 (measured 1:1 in MAME)', async () => {
     const s = await convert('Solar_Man.fur');
