@@ -703,6 +703,45 @@
         "player": "cea8f553a382654d56d8d7e27ec26cf9374db54e3e9dcab5be9b4f092e57e9ca"
       }
     },
+    "RiffRaff": {
+      "adf": "RiffRaff.adf",
+      "adfSha256": "f39ac9dc2846fba24cb259b1ac482bb3be7ad95f1e77bc8f43866d8b568b16ce",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 38696,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 38692,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 268564,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 400136,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x41C00",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC59C00",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x61B08",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "riffraff_smallest.riff",
+        "bytes": 20976
+      },
+      "sources": {
+        "tool": "039c208c1dd9159d39f50cd4def612cc44863b9c28163d0da785d2e286e71c3f",
+        "player": "807af51dcaa2424f33deaa783d92f56789a3b044ccf7446b5bf50a8e66d1679d"
+      }
+    },
     "SUN-Tronic": {
       "adf": "SUN-Tronic.adf",
       "adfSha256": "024628e2f53aa7cb9e041926afb0d33b90ca59cfcab664bbb43cd8eebfe12ec4",

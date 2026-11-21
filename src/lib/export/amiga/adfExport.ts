@@ -11,6 +11,7 @@ import { isMcmdFormat } from '../../import/formats/MCMDParser';
 import { isSpeedySystemFormat } from '../../import/formats/SpeedySystemParser';
 import { isAProSysFormat } from '../../import/formats/AProSysParser';
 import { isSoundImagesFormat } from '../../import/formats/SoundImagesParser';
+import { isRiffRaffFormat } from '../../import/formats/RiffRaffParser';
 
 export interface AdfTemplateEntry {
   adf: string;
@@ -68,6 +69,8 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   // AProSys has no magic: the importer detects it by file name only (aps.* / *.aps).
   if (isAProSysFormat(m, filename)) return 'AProSys';
   if (isSoundImagesFormat(m, filename)) return 'SoundImages';
+  // Last: the hunk scan for the RIFFRAFF magic is the loosest of the detect functions.
+  if (isRiffRaffFormat(m)) return 'RiffRaff';
   return null;
 }
 

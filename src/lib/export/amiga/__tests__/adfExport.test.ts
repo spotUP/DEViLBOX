@@ -36,6 +36,8 @@ const CASES: Array<[string, string]> = [
   ['formats/locomotion.dp', 'Tronic'],
   ['formats/krymini title.amc', 'AM-Composer'],
   ['formats/krymini jingle 1.amc', 'AM-Composer'],
+  ['formats/riffraff_smallest.riff', 'RiffRaff'],
+  ['formats/sidewinder2.riff', 'RiffRaff'],
 ];
 
 describe('adf slot patcher', () => {
