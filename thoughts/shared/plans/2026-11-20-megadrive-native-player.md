@@ -667,3 +667,56 @@ Unit test: src/lib/export/__tests__/fmOperatorRegisterOrder.test.ts (MULT 1,2,3,
 - FM4 slide/slur at 2.13 s (above).
 - Vibrato shapes, 05xy and vibratoDirection are unimplemented.
 - MDX/PMD exporters write no voice table, so SET_VOICE points at nothing. PMD's 0xFE register-write meaning is unverified.
+
+## Phase 1n results (2026-11-21)
+
+Fix commit: e24229fd9 "Dither MDSDRV tempo on a conductor track so ticks keep Furnace time".
+Listen ROM: ~/Desktop/md-roms/highscorefollin-1n.bin.
+
+### Q1: highscorefollin drift from 19.5 s (up to 701 cents)
+
+- **The drift came before the vibrato commit.** We built a ROM from e071fff1b^ (converter taken with `git show` into scratch). It drifts the same way: FM1 701.3 cents at 23.48 s and FM5 501 cents at 20.15 s.
+- **The cause is timing, not pitch.** Note frequencies match Furnace. The MAME key-on lag against Furnace grows in a straight line:
+
+  | Time | Lag |
+  |------|-----|
+  | 3.7 s | 4.8 ms |
+  | 14 s | 17.1 ms |
+  | 21 s | 28.1 ms |
+  | 31.6 s | 39.9 ms |
+
+  That slope is 0.129 percent, the same as 60 / 59.9227. The lag passes the 1-frame tolerance at about 19.5 s, so note edges then show as large cent errors.
+- **Root cause.** The MDSDRV tempo command F9 takes one byte and counts in 1/128 NTSC frames. A 60 Hz song must therefore pick either F9 7f (59.92 Hz) or F9 80 (60.39 Hz). The converter wrote the nearest value, F9 7f, on track 0, so the song slowly fell behind.
+- **Violated invariant.** Driver tick k must sound at Furnace time k / rate, within one frame, for the whole song and every loop pass.
+- **Fix, in the layer that had the bug** (`src/lib/export/md/mdsSong.ts`):
+  - A conductor track on dummy channel 0x0f now switches F9 between the two tempos on either side of the song rate. It does this in 128-tick blocks, sized so the running error stays under half a frame.
+  - The intro and the loop body are balanced separately, so the error does not build up over loop passes.
+  - The F9 on track 0 is removed.
+  - Rates outside NTSC/128 to 2 * NTSC are clamped and flagged lossy.
+  - The tempo lossy text now says ticks land up to 1 frame early or late.
+- **Test.** The highscorefollin conductor is on channel 0x0f. The worst running error is under 0.5 frame. Each span (intro and loop) is balanced to under 0.01 frame.
+
+### Before and after (MAME vs Furnace, 62 s capture, per-frame cents with plus or minus 1 frame lag)
+
+| Channel | Before (worst) | After (worst / frames over 10 cents) |
+|---------|----------------|--------------------------------------|
+| FM1 | 701.3 | 2.3 / 0 |
+| FM2 | drift | 2.4 / 0 |
+| FM3 | drift | 2.4 / 0 |
+| FM5 | 501 | 2.6 / 0 |
+| FM4 | drift | 20 frames over 10 cents: the known 2.13 s slur, plus 61.93 s at the capture edge |
+| PSG3 | 1200 | gone |
+| PSG1 | 693.8 | 38.9 worst, 248 frames over 10 cents from 17.4 s (open) |
+| FM6 | 1200 from 3.6 s | unchanged (open, not caused by timing) |
+
+### Q2: lossy flags for E3 shape, 05xy, vibratoDirection, E1 and E2
+
+- E1xy, E2xy, 05xy and E3 01/02 were already flagged by the generic `lossy.add('effect XX')` fallthrough. vibratoDirection is E3xx.
+- E3 00 was a false flag: it is Furnace's default direction, which vibratoEnvelope already plays. E3 00 is now skipped.
+- **Test.** On Solar_Man, E3 01/02, 05 01, E1 13 and E2 13 each flag 'effect XX'. E3 00 does not.
+
+### Open gaps
+
+- **FM6.** Furnace sends no FM6 KEYON on this song (likely DAC/PCM), but MDSDRV plays tones there.
+- **PSG1.** From 17.4 s the error is up to about 40 cents. The cause is not yet found; it may be PSG period rounding or a vibrato depth on PSG.
+- **FM4.** The 2.13 s slur (portamento/legato) is still open.
