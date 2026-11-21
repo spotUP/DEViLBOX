@@ -105,6 +105,17 @@ describe('adf slot patcher', () => {
     expect(() => patchAdfSlot(base, e, mdat, new Uint8Array(cs.maxBytes + 1).fill(1))).toThrow(AdfExportError);
   });
 
+  it('Maximum_Effect: routes MAX.* by name and writes SMP.set into the companion slot', () => {
+    const e = manifest.templates['Maximum_Effect'];
+    const mod = song('maximum-effect/MAX.DinosaurDetective jingle1');
+    expect(adfTemplateFor(mod, 'MAX.DinosaurDetective jingle1')).toBe('Maximum_Effect');
+    const smp = song('maximum-effect/SMP.set');
+    const r = patchAdfSlot(tpl(e.adf), e, mod, smp);
+    const cs = e.companionSlot!;
+    expect(new DataView(r.buffer).getUint32(e.companionLengthWord!.diskOffset, false)).toBe(smp.length);
+    expect(Array.from(r.subarray(cs.diskOffset, cs.diskOffset + smp.length))).toEqual(Array.from(smp));
+  });
+
   it('refuses a module larger than the slot, and does not modify the template', () => {
     const e = manifest.templates['AbyssHighestExperience'];
     const base = tpl(e.adf);

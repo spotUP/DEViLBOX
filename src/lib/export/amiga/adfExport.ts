@@ -52,6 +52,8 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   // Tronic (dp / trc / tro / tronic) and AM-Composer (amc) have no magic either: isTronicFormat accepts any buffer, so only the eagleplayer.conf prefixes can tell them.
   if (/^(dp|trc|tro|tronic)\./.test(base) || /\.(dp|trc|tro|tronic)$/.test(base)) return 'Tronic';
   if (base.startsWith('amc.') || base.endsWith('.amc')) return 'AM-Composer';
+  // Maximum Effect (MAX.<game> <tune>) has no magic either; the SMP.set file rides in the companion slot.
+  if (base.startsWith('max.')) return 'Maximum_Effect';
   if (ascii(m, 0, 'THX')) return 'AbyssHighestExperience';
   if (ascii(m, 0, 'FC14') || ascii(m, 0, 'SMOD') || ascii(m, 0, 'FC13')) return 'FutureComposer1.4';
   if (ascii(m, 0, 'BeEp')) return 'JamCracker';
