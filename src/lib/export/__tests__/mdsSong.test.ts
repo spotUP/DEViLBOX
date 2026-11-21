@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { arpTable, furnaceTickOf, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, psgOffsets, vibNodeOff, vibOffsets, vibratoEnvelope } from '../md/mdsSong';
+import { arpTable, frameTempos, furnaceTickOf, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, psgOffsets, vibNodeOff, vibOffsets, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
@@ -191,6 +191,31 @@ describe('pitch macro rate', () => {
 });
 
 describe('virtual tempo', () => {
+  // Driver frame of each sequence tick for per-tick F9 values (mdsdrv.68k request loop, as furnaceToMds frameOfTick models it).
+  const framesOf = (v: number[]) => {
+    const fr = [0];
+    for (let g = 1, c = 0; fr.length < v.length; g++) {
+      const d = v[fr.length - 1] + 1, k = (c + d) >> 7;
+      c = (c + d) & 127;
+      for (let j = 0; j < k; j++) fr.push(g);
+    }
+    return fr.slice(0, v.length);
+  };
+  const merged = (fr: number[]) => fr.flatMap((g, i) => (i && g === fr[i - 1] ? [i] : []));
+  it('frameTempos puts the NTSC merge on a frame where no channel changes, inside the 0.75-frame drift window (newer_song_lol 32.35 s, Phase 3a)', () => {
+    // 60 Hz ticks on 59.92 Hz frames: one merge in 800 ticks, nominally at tick ~388 (drift 0.5).
+    const plain = merged(framesOf(frameTempos(800, 1, 60)));
+    expect(plain).toHaveLength(1);
+    expect(Math.abs(plain[0] - 388)).toBeLessThan(3);
+    // Every frame busy: no quiet frame, the merge stays at the nominal point.
+    expect(merged(framesOf(frameTempos(800, 1, 60, new Uint8Array(800).fill(1))))).toEqual(plain);
+    // Only frame 500 quiet: the merge moves there (drift 0.64, under the 0.75 bound).
+    const busy = new Uint8Array(800).fill(1);
+    busy[500] = 0;
+    const fr = framesOf(frameTempos(800, 1, 60, busy));
+    expect(merged(fr)).toEqual([500]);
+    fr.forEach((g, t) => expect(Math.abs(g - (t * 59.922743) / 60)).toBeLessThan(0.75));
+  });
   // Furnace runs macros and per-tick effects at s.hz; virtual tempo only moves the row counter (playback.cpp tempoAccum).
   it('Solar_Man at 180/150: PSG envelopes stay resampled from s.hz (56 Hz), the same bytes as without virtual tempo', async () => {
     const m = await parse('Solar_Man.fur');
@@ -503,7 +528,7 @@ describe('furnaceToMds', () => {
       for (; k > 0 && t < n; k--, t++) worst = Math.max(worst, Math.abs(g / 59.922743 - furnaceTickOf(t, 5 / 6) / 60) * 60);
       g++;
     }
-    expect(worst).toBeLessThan(0.75);
+    expect(worst).toBeLessThan(1); // Phase 3a: a merge may move off its nominal point to a quiet frame, inside one NTSC frame of Furnace time
   });
   it('Solar_Man: unhandled vibrato direction (E3 01/02) and 05xy flag lossy through the generic effect flag; E3 00, E1xy and E2xy do not', async () => {
     for (const [type, value, flag] of [[0xe3, 1, 'effect E3'], [0xe3, 2, 'effect E3'], [0x05, 0x01, 'effect 05']] as const) {

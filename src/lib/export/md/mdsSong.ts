@@ -366,13 +366,31 @@ export const furnaceTickOf = (t: number, fpt: number): number => Math.ceil((t + 
  * the next frame's tempo. Frame 0 plays tick 0 at the header tempo 7f (counter back to 0). The counter is held at 64 so a frame can run
  * 0, 1 or 2 ticks. At 180/150 this gives Furnace's 1,1,1,1,2 ticks per frame instead of one fixed F9 (1.203125 ticks/frame, drifting).
  */
-export function frameTempos(n: number, fpt: number, hz: number): number[] {
+export function frameTempos(n: number, fpt: number, hz: number, busy?: ArrayLike<number>): number[] {
   // Furnace frame f -> NTSC frame D[f]. NTSC frames are longer, so now and then two Furnace frames share one; only merge two whose ticks
   // fit one driver frame (at most 2), else defer the merge a frame (a 2-tick frame next to any other would need 3).
-  const nF = furnaceTickOf(n - 1, fpt) + 1, cnt = new Array<number>(nF).fill(0), D = [0];
+  // A merge drops what Furnace frame f-1 played (the driver runs both ticks, then writes f), so with `busy` (per Furnace frame, how many
+  // channels change pitch or volume) each merge goes on the frame with the fewest changing channels (then nearest the nominal point)
+  // while the unmerged drift eu stays in (0, 0.75]: every frame keeps within 0.75 NTSC frame of Furnace time (loop-pass test bound). It stays on the nominal point
+  // (first eu > 0.5) unless that frame has more changing channels.
+  const nF = furnaceTickOf(n - 1, fpt) + 1, cnt = new Array<number>(nF).fill(0), D = [0], R = NTSC_HZ / hz;
   for (let t = 0; t < n; t++) cnt[furnaceTickOf(t, fpt)]++;
-  for (let f = 1, shared = cnt[0]; f < nF; f++) {
-    const merge = D[f - 1] + 1 > f * NTSC_HZ / hz + 0.5 && shared + cnt[f] <= 2;
+  for (let f = 1, shared = cnt[0], at = -1, open = false; f < nF; f++) {
+    const eu = (j: number) => D[f - 1] + 1 + (j - f) - j * R; // drift at j if nothing merges from f to j
+    if (busy && !open && eu(f) > 0) {
+      open = true; at = -1;
+      let nom = -1, best = Infinity;
+      for (let j = f; j < nF && eu(j) <= 0.75; j++) {
+        if ((j > f ? cnt[j - 1] : shared) + cnt[j] > 2) continue;
+        if (nom < 0 && eu(j) > 0.5) nom = j;
+        const score = busy[j] * 4 + Math.abs(eu(j) - 0.5);
+        if (score < best) [best, at] = [score, j];
+      }
+      if (nom < 0) at = -1; // nominal point past the song end: no merge needed
+        else if (busy[at] >= busy[nom]) at = nom;
+    }
+    const merge = at >= f ? f === at : eu(f) > 0.5 && shared + cnt[f] <= 2;
+    if (merge) open = false;
     D.push(merge ? D[f - 1] : D[f - 1] + 1);
     shared = merge ? shared + cnt[f] : cnt[f];
   }
@@ -533,7 +551,40 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     if (Math.abs(fF - Math.round(fF)) < 1e-6 && e < best - 1e-9) [best, K] = [e, k];
   }
   // One extra body after the loop so the block's last frame tempo leads into the next pass, not into silence.
-  const ft = useFt ? frameTempos(nIntro + (K + 1) * nBody, fpt, s.hz) : null;
+  const nFt = nIntro + (K + 1) * nBody, bits = (b: number) => { let c = 0; for (; b; b &= b - 1) c++; return c; };
+  // Furnace frames where some channel changes pitch or volume, from the cells: a row with data, a running 00/01/02/04/0A, a 03/E1/E2
+  // porta until the next note, an instrument vol/arp/pitch macro after its note. frameTempos keeps its NTSC merges off them (busy[f] = bitmask of changing channels).
+  // shortcut: a looped macro or a 03 porta counts as busy until the next note, FM operator macros are not read; a tighter model frees more frames.
+  const busy = new Uint16Array(useFt ? furnaceTickOf(nFt - 1, fpt) + 1 : 0);
+  for (let ch = 0; useFt && ch < nCh; ch++) {
+    const run = new Set<number>();
+    let t = 0, mac = 0, porta = false, insN = -1;
+    for (let ci = 0; ci >= 0 && t < nFt; ci = ci + 1 < chunks.length ? ci + 1 : loopChunk) {
+      const c = chunks[ci];
+      c.rows.forEach((r, i) => {
+        const cell = cellAt(ch, c.o, r), note = cell?.note ?? -1;
+        if (cell && cell.instrument >= 0) insN = cell.instrument;
+        if (note >= 0) { porta = false; mac = 0; }
+        if (note >= 0 && note < 180) {
+          const ins = m.instruments[insN];
+          for (const code of [MACRO_VOL, MACRO_ARP, MACRO_PITCH]) {
+            const mm = macro(ins, code, m.version);
+            const lp = mm && mm.loop >= 0 && mm.loop < mm.length && mm.loop !== 255 && new Set(mm.data.slice(mm.loop, mm.length)).size > 1;
+            if (mm) mac = Math.max(mac, lp ? Infinity : Math.ceil((mm.length * Math.max(1, mm.speed) + mm.delay) / fpt));
+          }
+        }
+        for (const e of cell?.effects ?? []) {
+          const k = e.type === 0x02 ? 0x01 : e.type;
+          if (k === 0x00 || k === 0x01 || k === 0x04 || k === 0x0a) { if (e.value > 0) run.add(k); else run.delete(k); }
+          if (e.type === 0x03 || e.type === 0xe1 || e.type === 0xe2) { porta = e.value > 0; run.delete(0x01); }
+        }
+        const lit = run.size > 0 || porta, ed = cell?.effects?.some((e) => e.type === 0xed && e.value > 0);
+        if (cell && (note >= 0 || cell.volume >= 0 || cell.effects?.some((e) => e.type >= 0))) busy[furnaceTickOf(t, fpt)] |= 1 << ch;
+        for (let q = 0; q < c.ticks[i]; q++, t++, mac--) if (lit || ed || mac > 0) busy[furnaceTickOf(t, fpt)] |= 1 << ch;
+      });
+    }
+  }
+  const ft = useFt ? frameTempos(nFt, fpt, s.hz, Array.from(busy, bits)) : null;
   const span = (a: number, n: number) => (ft ? encodeTempos(ft.slice(a, a + n)) : conduct(n));
   // Driver frame of each first-pass sequence tick (mdsdrv.68k request loop, as frameTempos models it): frame 0 plays tick 0, then each
   // frame adds the last run tick's F9 + 1 to the counter and runs one tick per 128. PSG envelopes are cut per hit against it.
