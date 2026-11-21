@@ -244,7 +244,9 @@ for (const name of names) {
     const got = apuStates(gotWrites);
     const gotD = dpcmFrames(run.writes);
     // Frame 0 = first frame any channel starts sounding (tone or DPCM start) on each side; the constant difference is the printed offset.
-    const firstOn = (st: ChState[][], d: DpcmFrame[]): number => { const a = st.findIndex((x) => x.some(Boolean)), b = d.findIndex((x) => x.start); return a < 0 ? b : b < 0 ? a : Math.min(a, b); };
+    // A DPCM start with length register 0 (one byte) is not a sound: Furnace writes one on a note-off / 18xx row before the first
+    // sample (one_sided_love row 0), which shifted the whole compare by two rows.
+    const firstOn = (st: ChState[][], d: DpcmFrame[]): number => { const a = st.findIndex((x) => x.some(Boolean)), b = d.findIndex((x) => x.start && x.len > 0); return a < 0 ? b : b < 0 ? a : Math.min(a, b); };
     const lag = firstOn(got, gotD) - firstOn(ref, refD);
     const channels = lockstep(ref, got, refD, gotD, lag, FURNACE_CLOCK[Number(/clockSel=(\d)/.exec(m.chipFlags?.[0] ?? '')?.[1] ?? 0)] ?? CPU_NTSC, rowOf);
     labelChannels(channels, song);
