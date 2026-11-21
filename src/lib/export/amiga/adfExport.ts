@@ -54,6 +54,8 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   if (base.startsWith('amc.') || base.endsWith('.amc')) return 'AM-Composer';
   // Maximum Effect (MAX.<game> <tune>) has no magic either; the SMP.set file rides in the companion slot.
   if (base.startsWith('max.')) return 'Maximum_Effect';
+  // Sound-FX: 'SONG' tag at $3c (the .sfx / sfx.* name alone is not enough, DefleMask sfx.dmf shares the prefix).
+  if (ascii(m, 60, 'SONG') && (base.endsWith('.sfx') || base.startsWith('sfx.'))) return 'Sound-FX';
   if (ascii(m, 0, 'THX')) return 'AbyssHighestExperience';
   if (ascii(m, 0, 'FC14') || ascii(m, 0, 'SMOD') || ascii(m, 0, 'FC13')) return 'FutureComposer1.4';
   if (ascii(m, 0, 'BeEp')) return 'JamCracker';
@@ -129,9 +131,14 @@ export function patchAdfSlot(template: Uint8Array, entry: AdfTemplateEntry, modu
   return out;
 }
 
+/** Prefix-named Amiga files (MAX.song, mdat.song) carry the format in the prefix: the whole name is the song name, nothing to strip. */
+export function adfSongName(baseName: string): string {
+  return /^(aam|amc|dp|trc|tro|tronic|max|sfx|mdat|smpl|smp)\./i.test(baseName) ? baseName : baseName.replace(/\.[^.]*$/, '');
+}
+
 /** The file name without extension as `bytes` printable ASCII (the screen font's 0x20-0x7e), space padded. */
 export function adfTitleBytes(baseName: string, bytes: number): Uint8Array {
-  const text = baseName.replace(/\.[^.]*$/, '').replace(/[^\x20-\x7e]/g, '?').slice(0, bytes);
+  const text = adfSongName(baseName).replace(/[^\x20-\x7e]/g, '?').slice(0, bytes);
   const out = new Uint8Array(bytes).fill(0x20);
   for (let i = 0; i < text.length; i++) out[i] = text.charCodeAt(i);
   return out;
@@ -148,7 +155,7 @@ export async function buildAdf(
   if (!name || !entry) throw new AdfExportError('No Amiga disk player exists for this format yet.');
   const data = patchAdfSlot(await loadTemplate(entry.adf), entry, module, companion);
   data.set(adfTitleBytes(baseName, entry.titleSlot.bytes), entry.titleSlot.diskOffset);
-  return { data, filename: `${baseName.replace(/\.[^.]*$/, '') || 'song'}.adf`, warnings: [], template: name, machine: MACHINE_NAME[entry.target] };
+  return { data, filename: `${adfSongName(baseName) || 'song'}.adf`, warnings: [], template: name, machine: MACHINE_NAME[entry.target] };
 }
 
 /** The live song as a bootable disk, through the same native export the Export dialog and the MCP tool use. Null when there is no native export. */

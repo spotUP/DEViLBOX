@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { adfTemplateFor, patchAdfSlot, buildAdf, AdfExportError, type AdfManifest } from '../adfExport';
+import { adfTemplateFor, adfSongName, patchAdfSlot, buildAdf, AdfExportError, type AdfManifest } from '../adfExport';
 
 const SONGS = 'public/data/songs/';
 const manifest = JSON.parse(readFileSync('public/amiga-adf/manifest.json', 'utf8')) as AdfManifest;
@@ -114,6 +114,22 @@ describe('adf slot patcher', () => {
     const cs = e.companionSlot!;
     expect(new DataView(r.buffer).getUint32(e.companionLengthWord!.diskOffset, false)).toBe(smp.length);
     expect(Array.from(r.subarray(cs.diskOffset, cs.diskOffset + smp.length))).toEqual(Array.from(smp));
+  });
+
+  it('Sound-FX: routes .sfx by name and tag, patches the slot', () => {
+    const e = manifest.templates['Sound-FX'];
+    const mod = song('soundfx/batdance.sfx');
+    expect(adfTemplateFor(mod, 'batdance.sfx')).toBe('Sound-FX');
+    expect(adfTemplateFor(mod, 'batdance.mod')).not.toBe('Sound-FX');
+    const r = patchAdfSlot(tpl(e.adf), e, mod);
+    expect(Array.from(r.subarray(e.moduleSlot.diskOffset, e.moduleSlot.diskOffset + mod.length))).toEqual(Array.from(mod));
+  });
+
+  it('names the export after the whole file for prefix-named files, strips the extension for suffix-named', async () => {
+    expect(adfSongName('MAX.DinosaurDetective jingle1')).toBe('MAX.DinosaurDetective jingle1');
+    expect(adfSongName('mdat.song')).toBe('mdat.song');
+    expect(adfSongName('crystal.dp')).toBe('crystal');
+    expect(adfSongName('song.mod')).toBe('song');
   });
 
   it('refuses a module larger than the slot, and does not modify the template', () => {

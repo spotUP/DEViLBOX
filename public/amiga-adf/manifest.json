@@ -1063,6 +1063,45 @@
         "player": "43b079b94aabbbd54a2dd4f2c0a39890d8f7cf2730fd46f46cebea025c3218ff"
       }
     },
+    "Sound-FX": {
+      "adf": "Sound-FX.adf",
+      "adfSha256": "1feb35a354abf608d781e0aa7636bf1d87c2421554f938ec4c938afc224973da",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 40604,
+        "maxBytes": 180224
+      },
+      "moduleLengthWord": {
+        "diskOffset": 40600,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 221310,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 310532,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x36400",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC4E400",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4BD04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "batdance.sfx",
+        "bytes": 174460
+      },
+      "sources": {
+        "tool": "6ad98888fc563b650cafa95616adbead9544588a94fc3756f182df5436a1cfb2",
+        "player": "5317864b73d15d4c50dcbd613c4319ec3b62ab48f58935b00e33aec676cf632e"
+      }
+    },
     "SoundImages": {
       "adf": "SoundImages.adf",
       "adfSha256": "613487a45266fed52ae3d02d157dcb01cd91077ba73d0a888de772e7c7d2e4eb",
