@@ -187,4 +187,14 @@ describe('furnaceToMds', () => {
     }
     expect((await solarManRow0([{ type: 0xe3, value: 0 }])).lossy.some((l) => l.startsWith('effect E3'))).toBe(false);
   });
+  it('Solar_Man: 0D with no value (order 12 row 31) jumps to row 0, not row -1, so order 13 keys on at tick 4000 (measured 1:1 in MAME)', async () => {
+    const s = await convert('Solar_Man.fur');
+    expect(s.keyOns.some((k) => k.tick === 4000)).toBe(true);
+    expect(s.keyOns.some((k) => k.tick === 4005)).toBe(false);
+  });
+  it('highscorefollin: a sample instrument on FM6 (Furnace DAC) is silenced and flagged lossy, never an FM voice', async () => {
+    const s = await convert('highscorefollin.fur');
+    expect(s.keyOns.some((k) => k.ch === 5)).toBe(false);
+    expect(s.lossy.some((l) => l.startsWith('FM6 sample instrument'))).toBe(true);
+  });
 });

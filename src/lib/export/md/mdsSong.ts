@@ -236,7 +236,11 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   if (Math.abs(rate - NTSC_HZ) > 0.5) lossy.add(`tick rate ${rate.toFixed(2)} Hz: ticks land on NTSC frames (up to 1 frame early or late)`);
   if (rate * 128 / NTSC_HZ < 1 || rate * 128 / NTSC_HZ > 256) lossy.add(`tick rate ${rate.toFixed(2)} Hz outside the driver's ${(NTSC_HZ / 128).toFixed(2)}-${(2 * NTSC_HZ).toFixed(2)} Hz range (clamped)`);
   if (Math.abs((m.tuning || 440) - 440) > 0.5) lossy.add(`tuning ${m.tuning} Hz: played at 440 Hz`);
-  const cellAt = (ch: number, o: number, r: number) => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o]}`)?.rows[r];
+  // An effect with no value plays as value 0 (playback.cpp: effectVal==-1 -> 0); the parser keeps -1 (0D with no value meant row -1).
+  const cellAt = (ch: number, o: number, r: number) => {
+    const c = m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o]}`)?.rows[r];
+    return c?.effects?.some((e) => e.type >= 0 && e.value < 0) ? { ...c, effects: c.effects.map((e) => (e.type >= 0 && e.value < 0 ? { ...e, value: 0 } : e)) } : c;
+  };
 
   // 1. Order flow: (order, start row) pairs until one repeats (the loop target) or FFxx stops the song.
   const speeds = s.speedPattern?.length ? [...s.speedPattern] : [s.speed1, s.speed2];
@@ -426,7 +430,11 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         }
         const vs = volStep();
         if (vs) cmds.push(...vs);
-        const isNote = nv >= 0 && nv < 253, isOff = nv >= 253;
+        // A sample instrument (DIV_INS_AMIGA = 4) on FM6 plays the DAC in Furnace (genesis.cpp dacMode=1), never an FM voice.
+        // shortcut: the note is silenced and flagged lossy; upgrade to MDSDRV PCM (f0/f1 + pcm table) when the sample blob and drum mode are wired.
+        const dac = kind === 'fm' && ch === 5 && nv >= 0 && nv < 253 && m.instruments[ins]?.type === 4;
+        if (dac) lossy.add('FM6 sample instrument (DAC PCM): silenced');
+        const isNote = !dac && nv >= 0 && nv < 253, isOff = dac || nv >= 253;
         if (isNote) { poff = 0; curNv = nv; }
         else if (pChanged && sounding && (prate || poff)) cmds.push(...pslideCmd());
         if (!isNote && vChanged && sounding) { cmds.push(...(vDepth ? vibCmd(tick + delay) : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
