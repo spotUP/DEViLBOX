@@ -1372,3 +1372,69 @@ FM6 is DAC. The metric does not apply, and the result is unchanged.
 - The ECxx note cut path (playback.cpp:2569-2591) also schedules a slide reset. Not measured.
 - FM4 at 10.87 s (3 frames, 21 c) and at 96.02 s: not started.
 - PSG1/PSG2 over-10-cent frames: not part of 2m.
+
+## Phase 2n results (2026-11-21, commit 018471dac)
+
+**Question.** newer_song_lol PSG1 69 / PSG2 13 / PSG3 0 frames over 10 cents (first 100 s).
+
+**Source lines.**
+- MDSDRV: `third-party/mdsdrv/src/mdsdrv.68k:1911-1945` (`mds_psg_freq_tab`, `mds_get_psg_pitch`). Octave-0 period table 1710..855, linear interpolation over the 8-bit fraction, then `lsr` by octave (truncates). Pitch = note + trs + dtn (E6) + E8 node.
+- Furnace: period = round(clock / f / 32) (`engine.cpp` calcFreq, `sms.cpp` toneDivider 64, as cited in the `mdsSong.ts` header; modelled by `sndPeriod`). Per-tick vibrato offsets come from `playback.cpp` vibrato table (mirrored by `VIB_TABLE` / `vibratoEnvelope`).
+
+**Invariant.** On every vibrato offset the driver plays, the MDSDRV period equals Furnace's round(sndPeriod(key + off/128)).
+
+**Cause (measured).** Every bad PSG1 frame was a one-period difference during 04xy vibrato (dN histogram: -1 x57, +1 x12). For example, at 42.267-42.300 s Furnace holds period 169 and MAME writes 168 at the vibrato peak. `psgFix` chose the per-key E6 detune by scoring a uniform +-64/128 semitone window, not the offsets the vibrato actually reaches.
+
+**Fix.**
+- `vibOffsets(rate, depth, fine)` lists the reachable offsets.
+- `psgFix(k, offs)` scores the detune on exactly those offsets (memo keyed per offset set).
+- `vibCmd` restates E6 when a 04xy change moves the detune, unless a slide owns E6.
+- A first attempt corrected each E8 node per key. It needed 290 song-table items against MDSDRV's 256 limit, so it was dropped.
+
+**Before / after, newer_song_lol, 100 s, frames over 10 cents (worst):**
+
+| Channel | HEAD 2b98bf169 | 018471dac |
+|---|---|---|
+| PSG1 | 69 (24.2 c) | 28 (25.0 c at 48.417) |
+| PSG2 | 13 | 6 |
+| PSG3 | 0 | 0 |
+| FM1 / FM2 / FM3 / FM5 | 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 |
+| FM4 | 13 (22.2 c at 96.017) | 13 (22.2 c at 96.017) |
+
+**Regression, Solar_Man 100 s:** all 8 channels identical to HEAD (FM1 688, FM2 171, FM3 745, FM4 1283, FM5 3156, PSG1 423, PSG2 428, PSG3 0; these are pre-existing counts, not from this change).
+
+**Limits / open.**
+- PSG1 has 28 remaining frames: still one-period misses (-1 x25, +1 x3). They are isolated transition frames (11.500 s, repeated keys at 13.167 / 16.667 / 18.333 s). One detune per key cannot hit every offset. Exact needs per-node correction, which the 256-item table limit blocks unless envelopes are shared across keys.
+- PSG2 residual (19.417, 32.35 s) is on note-change frames: timing/lag, not rounding.
+- FM4 at 10.87 s and 96.02 s: not started.
+- Listen ROM: `~/Desktop/md-roms/newer_song_lol-2n.bin`.
+
+## Phase 2o result (2026-11-21): FM4 04xy vibrato on a keyed-off channel
+
+Goal: newer_song_lol FM4 had 13 frames over 10 cents in 100 s (10.87 s and 96.02 s).
+
+Root cause (exporter, mdsSong.ts): Furnace runs 04xy vibrato every tick on every channel whatever the key state, and MDSDRV
+`mds_pitch_update` (mdsdrv.68k:1988) also writes pitch on a resting channel. The exporter dropped this in two places:
+1. A 04xy without a note was gated on `any` (channel has played a note), so the E8 before the first note was lost (10.87 s).
+2. The loop chunk's head restated first-pass state, and the chunk-head vibCmd was gated on `sounding`, so the loop pass
+   (96.0 s) lost the vibrato running on the release tail.
+
+Fix:
+- 04xy without a note always emits vibCmd / peg reset.
+- Chunk heads gate vibCmd on `any`, not `sounding`.
+- The FA loop marker now sits after the loop chunk's head. Each track ends with a wrap head built from song-end state before FB 00, so the
+  loop pass resumes the song-end vibrato.
+
+Measured (lagcmp, frames over 10 c in 100 s), before -> after:
+- newer_song_lol: FM1-FM3, FM5 0 -> 0; FM4 13 -> 7; PSG1 29 -> 29; PSG2 6 -> 6; PSG3 0 -> 0.
+- Solar_Man (regression): unchanged at FM1 688, FM2 171, FM3 745, FM4 1283, FM5 3156, PSG1 423, PSG2 428, PSG3 0.
+
+FM4 frames left:
+- 10.967 and 10.983 s (6643 c): MDSDRV note-0 pitch underflow when vibrato goes below 0 on a channel never keyed on. Register only, inaudible.
+- 96.217-96.267 s (4 frames): MAME has extra KEYOFFs at 96.089 and 96.17 that Furnace lacks. The rest at 96.17 restarts the
+  vibrato phase (MAME 104.34 rising, Furnace 104.34 falling). The next step is to find which rest command restates the peg in the loop chunk.
+
+Still open: PSG2 note-change timing at 19.417 s and 32.35 s (not started). PSG1 29 frames.
+
+Unit test: `vibOffsets + psgFix` row in src/lib/export/__tests__/mdsSong.test.ts.
+Listen ROM: ~/Desktop/md-roms/newer_song_lol-2o.bin.

@@ -539,7 +539,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
 
   // 3. Per channel, per chunk: standalone command bytes.
   const keyOns: MdsKeyOn[] = [];
-  const tracks: Array<{ ch: number; chunks: Array<{ bytes: number[]; tieStart: boolean }> }> = [];
+  const tracks: Array<{ ch: number; chunks: Array<{ bytes: number[]; tieStart: boolean; head: number }>; wrap: number[] }> = [];
   for (let ch = 0; ch < nCh; ch++) {
     const kind = KIND[ch];
     let envPh: HitPhase | undefined, trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0, slideEnd = 0, prevKey = -1, pegDirty = false, portaXx = 0;
@@ -671,7 +671,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       }
       return [0xe8, extItem(env) + 1];
     };
-    const out: Array<{ bytes: number[]; tieStart: boolean }> = [];
+    const out: Array<{ bytes: number[]; tieStart: boolean; head: number }> = [];
+    let wrap: number[] = [];
     for (const c of chunks) {
       // A slide still running at a chunk start keeps its envelope: E8 would restart it from the instrument's own one.
       const insCmd = (chunkStart = false) => {
@@ -684,7 +685,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       const isDac = (n: number) => kind === 'fm' && ch === 5 && m.instruments[n]?.type === 4;
       let curPcm = -1, pcmOn = false;
       baked = false; arpT0 = tick; // insCmd(true) restates EB, which restarts the instrument's arp table
-      const bytes: number[] = [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && sounding ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(sA && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
+      // Chunk head: the channel state a chunk starts from. The loop chunk's head plays once; the wrap restates it from the song-end state.
+      const head = (): number[] => [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && any ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(sA && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
+      const bytes = head(), headLen = bytes.length;
       // One sequence tick's mid-row commands: 0Axy volume step and the per-tick slide.
       const tickPre = (t: number): number[] | null => { const v = volStep(), sl = sA && (sounding || fTick(t) <= sTail) ? slideCmd(t) : []; return v || sl.length ? [...(v ?? []), ...sl] : null; };
       let curIns = ins;
@@ -788,8 +791,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         else if (portaXx && m.compatFlags.targetResetsSlides) portaXx = 0;
         else if (pChanged && sounding && (prate || poff)) cmds.push(...pslideCmd());
         if (!isNote && sounding && (sA || trsOut)) cmds.push(...slideCmd(tick + delay));
-        // 04xy on a keyed-off channel still retunes the release tail (Furnace runs vibrato per tick whatever the key state; FM4/FM5 newer_song_lol 10.9 s).
-        if (!isNote && vChanged && any) { cmds.push(...(vDepth ? vibCmd(tick + delay) : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
+        // 04xy without a note retunes the vibrato whatever the key state, also before the first note: Furnace runs vibrato per tick on
+        // every channel, and a loop back into this chunk replays it on a release tail (FM4 newer_song_lol o2 r2, 10.83 s and 96.0 s).
+        if (!isNote && vChanged) { cmds.push(...(vDepth ? vibCmd(tick + delay) : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
         const hitPh = isNote && kind !== 'fm' && fpt === 1 ? phaseOf(tick + delay) : undefined;
         if (isNote && (ins !== curIns || (hitPh && insRef(kind, ins, hitPh).ins !== insRef(kind, ins, envPh).ins))) { curIns = ins; envPh = hitPh; cmds.unshift(...insCmd()); }
         if (isNote || isOff || cmds.length || i === 0) {
@@ -861,9 +865,10 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         tick += c.ticks[i];
       });
       if (tok.length) emit(tok.pop()!);
-      out.push({ bytes, tieStart });
+      out.push({ bytes, tieStart, head: headLen });
+      if (loopChunk >= 0 && c === chunks[chunks.length - 1]) wrap = head();
     }
-    if (any) tracks.push({ ch, chunks: out });
+    if (any) tracks.push({ ch, chunks: out, wrap });
   }
 
   // 4. Subroutines: repeated chunk bytes, only where neither this chunk nor the next starts with a tie
@@ -875,7 +880,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const streams = tracks.map((t) => {
     const b: number[] = [];
     t.chunks.forEach((c, i) => {
-      if (i === loopChunk) b.push(0xfa);
+      // FA after the loop chunk's head: the loop pass enters with the song-end state (t.wrap), not the first pass's (FM4 newer_song_lol 96.0 s).
+      if (i === loopChunk) { b.push(...c.bytes.slice(0, c.head), 0xfa, ...c.bytes.slice(c.head)); return; }
       const k = key(c.bytes);
       const nextTie = t.chunks[(i + 1) % t.chunks.length]?.tieStart ?? false;
       if (c.bytes.length > 2 && (uses.get(k) ?? 0) > 1 && !c.tieStart && !nextTie && items.length < 255) {
@@ -884,7 +890,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       } else b.push(...c.bytes);
     });
     // shortcut: a loop chunk that starts with a tie loses its legato at the wrap; Furnace songs rarely do this.
-    b.push(...(loopChunk >= 0 ? [0xfb, 0x00] : []), 0xff);
+    b.push(...(loopChunk >= 0 ? [...t.wrap, 0xfb, 0x00] : []), 0xff);
     return b;
   });
   if (items.length > 256) throw new Error(`MDSDRV song table holds 256 items; this song needs ${items.length}`);

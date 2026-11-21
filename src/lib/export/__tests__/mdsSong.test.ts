@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { arpTable, furnaceTickOf, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
+import { arpTable, furnaceTickOf, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, vibOffsets, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
@@ -97,6 +97,17 @@ describe('PSG period rounding', () => {
     const edge = (k: number) => { for (let a = 0; a <= 128; a++) for (const d of a ? [-a, a] : [0]) if (mdsPsgPitch(k * 256 + d) === per(k)) return d; return 0; };
     const miss = (fix: (k: number) => number) => { let n = 0; for (let k = 24; k <= 72; k++) for (const w of nodes) if (mdsPsgPitch(k * 256 + fix(k) + w) !== per(k + w / 256)) n++; return n; };
     expect({ before: miss(edge), after: miss(psgFix) }).toEqual({ before: 810, after: 72 });
+  });
+  it('vibOffsets + psgFix: scoring on the 04xy offsets never misses more vibrato periods than the half-semitone default', () => {
+    const per = (nv: number) => Math.round(3579545 / (27.5 * 2 ** ((nv + 3) / 12)) / 64);
+    const offs = vibOffsets(5, 5);
+    expect(offs).toContain(0);
+    expect(Math.max(...offs.map(Math.abs))).toBeLessThanOrEqual(64);
+    const miss = (k: number, d: number) => offs.filter((o) => mdsPsgPitch(k * 256 + d + 2 * o) !== per(k + o / 128)).length;
+    for (let k = 24; k <= 72; k++) {
+      expect(mdsPsgPitch(k * 256 + psgFix(k, offs)), `key ${k}`).toBe(per(k));
+      expect(miss(k, psgFix(k, offs)), `key ${k}`).toBeLessThanOrEqual(miss(k, psgFix(k)));
+    }
   });
 });
 
