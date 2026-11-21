@@ -22,6 +22,8 @@ const CASES: Array<[string, string]> = [
   ['formats/ballade.song.ems', 'EMS'],
   ['formats/universal monsters - dracula.mmd0', 'MED'],
   ['formats/funky nightmare.mmd1', 'MED-A1200'],
+  ['formats/hybris.fp', 'FuturePlayer'],
+  ['formats/imploder_drums.fp', 'FuturePlayer'],
 ];
 
 describe('adf slot patcher', () => {

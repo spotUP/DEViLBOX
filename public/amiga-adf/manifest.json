@@ -273,6 +273,45 @@
         "player": "507e430c3cf08c3e324820111ba49ef25125ce80fd5bd7d787ebb3d83a9552e3"
       }
     },
+    "FuturePlayer": {
+      "adf": "FuturePlayer.adf",
+      "adfSha256": "cfa00d2b4fa8f2ea2ed801a98eaab25bf362fb8e8889888f5777d987cde78afd",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 41168,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 41164,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 271022,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 396360,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42600",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5A600",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x60C48",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "hybris.fp",
+        "bytes": 22716
+      },
+      "sources": {
+        "tool": "039c208c1dd9159d39f50cd4def612cc44863b9c28163d0da785d2e286e71c3f",
+        "player": "4d00b5fbd586cd0638303939fa490a5ff29f1da9ccd54042f6910c42b2e75227"
+      }
+    },
     "JamCracker": {
       "adf": "JamCracker.adf",
       "adfSha256": "c51f8eb2a4789187949bd83d077c9752f748bbecdc006b503c32889a39cce0ae",

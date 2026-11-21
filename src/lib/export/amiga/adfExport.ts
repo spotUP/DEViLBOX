@@ -5,6 +5,7 @@
  */
 
 import { isEMSFormat } from '../../import/formats/EMSParser';
+import { isFuturePlayerFormat } from '../../import/formats/FuturePlayerParser';
 
 export interface AdfTemplateEntry {
   adf: string;
@@ -48,6 +49,7 @@ export function adfTemplateFor(m: Uint8Array): string | null {
   // isEMSFormat is the same header check the player runs. Built with --target a1200 it does not boot (measured 2026-11-20).
   if (ascii(m, 0, 'E.M.S. V6')) return 'EMS-6';
   if (isEMSFormat(m)) return 'EMS';
+  if (isFuturePlayerFormat(m)) return 'FuturePlayer';
   return null;
 }
 
