@@ -768,7 +768,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         else if (portaXx && m.compatFlags.targetResetsSlides) portaXx = 0;
         else if (pChanged && sounding && (prate || poff)) cmds.push(...pslideCmd());
         if (!isNote && sounding && (sA || trsOut)) cmds.push(...slideCmd(tick + delay));
-        if (!isNote && vChanged && sounding) { cmds.push(...(vDepth ? vibCmd(tick + delay) : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
+        // 04xy on a keyed-off channel still retunes the release tail (Furnace runs vibrato per tick whatever the key state; FM4/FM5 newer_song_lol 10.9 s).
+        if (!isNote && vChanged && any) { cmds.push(...(vDepth ? vibCmd(tick + delay) : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
         const hitPh = isNote && kind !== 'fm' && fpt === 1 ? phaseOf(tick + delay) : undefined;
         if (isNote && (ins !== curIns || (hitPh && insRef(kind, ins, hitPh).ins !== insRef(kind, ins, envPh).ins))) { curIns = ins; envPh = hitPh; cmds.unshift(...insCmd()); }
         if (isNote || isOff || cmds.length || i === 0) {

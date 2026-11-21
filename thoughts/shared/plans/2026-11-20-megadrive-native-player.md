@@ -1305,3 +1305,31 @@ newer_song_lol: `fpt < 1`, so per-hit tables are off. The sequence is byte-ident
 Open: Task 2 (newer_song_lol FM residual: FM1-3 31 cents at 22.8 s, FM5 50 cents at 11.0 s, FM4 21 cents at 10.9 s) was not started (budget).
 
 Listen ROM: `~/Desktop/md-roms/Solar_Man-2k.bin`.
+
+## Phase 2l results (2026-11-21)
+
+**Question.** Why do FM channels in newer_song_lol still drift in pitch against Furnace?
+
+**Violated invariant.** Furnace runs 04xy vibrato and 03xx portamento on every tick, whatever the key state. Only a note-off with noteOffResetsSlides and an active porta schedules a porta stop (scheduledSlideReset, applied on the next tick). The MD export gated pitch effects on `sounding` in `src/lib/export/md/mdsSong.ts`. A 04xy change on a keyed-off channel was dropped, so the release tail kept the old vibrato.
+
+**Fix.** A 04xy change with no note now emits E8 when the channel has played (`any`), not only while keyed on (`sounding`).
+
+| Channel | Frames over 10 cents, before | After | Worst, before | Worst, after |
+|---|---|---|---|---|
+| FM1 | 3 | 3 | 31.3 c at 22.817 | 31.3 c (open) |
+| FM2 | 3 | 3 | 31.3 c | 31.3 c (open) |
+| FM3 | 3 | 3 | 31.3 c at 22.9 | 31.3 c (open) |
+| FM4 | 3 | 3 | 21.0 c at 10.883 | 21.0 c (open) |
+| FM5 | 5 | 0 | 50.4 c at 11.067 | 2.8 c |
+| PSG1 | 15 | 15 | 15.0 c | 15.0 c (not analysed) |
+| PSG2 | 13 | 13 | 17.6 c | 17.6 c (not analysed) |
+| PSG3 | 0 | 0 | 0 | 0 |
+
+Solar_Man: byte-identical seq (18090 bytes). All lagcmp counts unchanged, so no regression. Its large existing residuals belong to earlier open work, not this phase. The 2j/2k songs were not re-run (budget).
+
+**Open.**
+- FM1-3 at 22.75 s: row o4 r15 has 03:22 under a running 04xy (sA slide via E4/E6). Row r17 is a note-off. Furnace finishes the porta on the target (165.61) one tick after the note-off, then keeps the vibrato. The export stops the slide steps at key-off (`tickPre` and the line after `pslideCmd` are gated on `sounding`). MAME freezes at the slide offset, about 23-31 cents sharp. Fix direction: keep the sA slide running after key-off until Furnace's scheduledSlideReset tick (one tick after the note-off when noteOffResetsSlides and inPorta are set). First confirm the porta-step-versus-reset order in playback.cpp nextTick.
+- FM4 at 10.87 s: note-off at o2 r0, 08:10 at r1, 04:44 at r2. The new E8 now reaches the channel, but 3 frames stay over 10 cents. Probably the vibrato phase (vPos) at the 04 change differs from Furnace on a keyed-off channel. Not measured.
+- PSG1/PSG2: not analysed.
+
+Listen ROM: `~/Desktop/md-roms/newer_song_lol-2l.bin`.
