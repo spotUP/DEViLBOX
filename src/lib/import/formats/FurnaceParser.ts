@@ -38,7 +38,7 @@ export class FurnaceParser {
 
   private static parseNewFormat(reader: BinaryReader, magic: string): { name: string; config: FurnaceConfig } {
     if (magic === 'INS2') reader.skip(4);
-    reader.skip(2); // version
+    const version = reader.readUint16();
 
     const chipType = reader.readUint16(); // Furnace writes the instrument type as 16 bits
     const config: FurnaceConfig = {
@@ -69,7 +69,7 @@ export class FurnaceParser {
             name = reader.readString(featSize);
             break;
           case 'FM':
-            this.readFMFeature(reader, config);
+            this.readFMFeature(reader, config, version);
             break;
           case 'MA':
             this.readMAFeature(reader, config);
@@ -156,7 +156,7 @@ export class FurnaceParser {
   // FM feature (byte-packed operator data)
   // ---------------------------------------------------------------------------
 
-  private static readFMFeature(reader: BinaryReader, config: FurnaceConfig): void {
+  private static readFMFeature(reader: BinaryReader, config: FurnaceConfig, version: number): void {
     const flags = reader.readUint8();
     const opCount = flags & 0x0F;
     const opEnabled = (flags >> 4) & 0x0F;
@@ -175,9 +175,8 @@ export class FurnaceParser {
     config.ops = (presetByte & 32) ? 4 : 2;
     config.opllPreset = presetByte & 31;
 
-    // Block byte — always read in new format
-    const blockByte = reader.readUint8();
-    config.block = blockByte & 0x0F;
+    // Furnace instrument.cpp readFeatureFM: the block byte exists only from version 224
+    if (version >= 224) config.block = reader.readUint8() & 0x0F;
 
     config.operators = [];
     for (let i = 0; i < opCount; i++) {

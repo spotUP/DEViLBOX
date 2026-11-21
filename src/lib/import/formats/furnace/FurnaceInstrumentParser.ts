@@ -155,7 +155,7 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           inst.name = readString(reader);
           break;
         case 'FM':
-          inst.fm = parseFMData(reader);
+          inst.fm = parseFMData(reader, ver);
           break;
         case 'MA':
           parseMacroData(reader, inst, featEnd);
@@ -1254,7 +1254,7 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
 /**
  * Parse FM data (new format)
  */
-export function parseFMData(reader: BinaryReader): FurnaceConfig {
+export function parseFMData(reader: BinaryReader, version: number): FurnaceConfig {
   const config: FurnaceConfig = {
     ...DEFAULT_FURNACE,
     operators: [],
@@ -1286,9 +1286,8 @@ export function parseFMData(reader: BinaryReader): FurnaceConfig {
   // ops is set from flags byte above (opCount), this byte has a 4/2 mode flag at bit 5
   config.opllPreset = llPatchAm2 & 0x1F;
 
-  // Reference: instrument.cpp:1766-1769 — block field (v224+, always present in new format writer)
-  const blockByte = reader.readUint8();
-  config.block = blockByte & 0x0F;
+  // Reference: instrument.cpp readFeatureFM — the block byte exists only from version 224; older files go straight to the operators
+  if (version >= 224) config.block = reader.readUint8() & 0x0F;
 
   // Read operators
   for (let i = 0; i < opCount; i++) {

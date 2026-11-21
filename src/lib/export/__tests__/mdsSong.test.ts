@@ -151,6 +151,12 @@ describe('furnaceToMds', () => {
     expect(hex).toContain('020405021b1a8d18');
     expect(hex).not.toContain('020504021b8d1a18');
   });
+  it('highscorefollin (Furnace version < 224): FM operators parse without the v224 block byte, so the Wurlitzer voice writes TL 1e 1c 10 16 like Furnace', async () => {
+    // Raw FM feature: f4 47 00 20 | 52 1e df 07 ... The extra block byte read shifted every operator one byte (TL 5f 5f 19 19, -14 dB on FM1).
+    const m = await parse('highscorefollin.fur');
+    expect(m.instruments[3].fm!.operators.map((o) => o.tl)).toEqual([0x1e, 0x1c, 0x10, 0x16]);
+    expect(Buffer.from(furnaceToMds(m).seq).toString('hex')).toContain('1e1c1016');
+  });
   it('vibratoEnvelope: 04 47 is 16 one-frame nodes of 2 * ((7 * vibTable[pos] * 15) >> 4) / 15, first node at pos 4, looping to node 0', () => {
     const env = vibratoEnvelope(0, 4, 7);
     expect(env.length).toBe(16 * 6);
