@@ -7,7 +7,7 @@
 Per ADF: starts ONLY the fork /Users/spot/Code/Emulators/amiberry/build/Amiberry.app (headless, small
 window, never /Applications, never fs-uae), finds its IPC socket by that pid, proves the disk is inserted
 with `lsof -p <pid> | grep -i adf`, then reads over IPC:
-  - the stage crumb at chip $400 (4 ASCII bytes; "PLAY" when the player runs; "ADRE"/"BUSE" = crash),
+  - the stage crumb at chip $400 (4 ASCII bytes; "PLAY" when the player runs; "ADRE"/"BUSE"/"ILLG"/... = crash, see CRASH_CRUMBS),
   - DMACONR ($DFF002) 6 x 0.7 s starting 8 s after PLAY (audio DMA bits 0-3),
 and records the Paula mix with AUDIO_RECORD, giving per-second peak and RMS.
 --ref <wav> (e.g. `npx tsx tools/uade-audit/render-devilbox.ts <song> ref.wav`): onset-aligned whole-file
@@ -124,6 +124,10 @@ def env_corr(a, sr, b, rsr):
     return {"corr_per_s": cs, "corr_overall": round(float(np.corrcoef(ea[:n], eb[:n])[0, 1]), 3)}
 
 
+# every exception crumb uade_probe.s writes; all of them spin, so waiting 90 s only hides the PC
+CRASH_CRUMBS = (b"ADRE", b"BUSE", b"PRIV", b"CHK ", b"TRPV", b"TRCE", b"UNIN", b"SPUR", b"ILVL", b"ILLG", b"DIV0", b"LINA")
+
+
 def check(adf, purpose, target, ref, keep_wav, extra="", dump=None, dump_at=2.0):
     work = tempfile.mkdtemp(prefix="adfbc-")
     name = os.path.basename(adf)
@@ -148,7 +152,7 @@ def check(adf, purpose, target, ref, keep_wav, extra="", dump=None, dump_at=2.0)
             c = rd(sock, 0x400, 4).to_bytes(4, "big")
             if c != crumb:
                 crumb = c; print("%.1f s crumb %r" % (time.time() - t0, c), flush=True)
-            if c in (b"ADRE", b"BUSE"):
+            if c in CRASH_CRUMBS:
                 r["crash"] = c.decode(); r["crash_pc"] = "%08x" % rd(sock, 0x40E, 4); break
             if c == b"PLAY" and tplay is None:
                 tplay = time.time(); r["play_s"] = round(tplay - t0, 1)
@@ -156,8 +160,8 @@ def check(adf, purpose, target, ref, keep_wav, extra="", dump=None, dump_at=2.0)
                 break
             time.sleep(0.2)
         r["dmaconr"] = []
-        if tplay and dump:
-            time.sleep(max(0, tplay + dump_at - time.time()))
+        if dump and (tplay or "crash" in r):  # a crash dump shows uade_regs / the stack at the fault
+            time.sleep(max(0, (tplay or time.time()) + dump_at - time.time()))
             ipc(sock, "PAUSE")
             for spec in dump.split(","):
                 addr, ln = (int(x, 0) for x in spec.split(":"))
