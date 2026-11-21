@@ -6,6 +6,8 @@
 
 import { isEMSFormat } from '../../import/formats/EMSParser';
 import { isFuturePlayerFormat } from '../../import/formats/FuturePlayerParser';
+import { isBeathovenSynthesizerFormat } from '../../import/formats/BeathovenSynthesizerParser';
+import { isMcmdFormat } from '../../import/formats/MCMDParser';
 
 export interface AdfTemplateEntry {
   adf: string;
@@ -50,6 +52,8 @@ export function adfTemplateFor(m: Uint8Array): string | null {
   if (ascii(m, 0, 'E.M.S. V6')) return 'EMS-6';
   if (isEMSFormat(m)) return 'EMS';
   if (isFuturePlayerFormat(m)) return 'FuturePlayer';
+  if (isMcmdFormat(m)) return 'MCMD';
+  if (isBeathovenSynthesizerFormat(m)) return 'BeathovenSynthesizer';
   return null;
 }
 
