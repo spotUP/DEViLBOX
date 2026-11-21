@@ -57,6 +57,14 @@ describe('adf slot patcher', () => {
     expect(await at('x'.repeat(60) + '.ems')).toBe('x'.repeat(e.titleSlot.bytes));
   });
 
+  it('every template records a 29 byte title slot inside the image, outside the module slot', () => {
+    for (const [k, e] of Object.entries(manifest.templates)) {
+      expect(e.titleSlot.bytes, k).toBe(29);
+      const t = e.titleSlot.diskOffset;
+      expect(t + 29 <= e.moduleSlot.diskOffset || t >= e.moduleSlot.diskOffset + e.moduleSlot.maxBytes, k).toBe(true);
+    }
+  });
+
   it('refuses a module larger than the slot, and does not modify the template', () => {
     const e = manifest.templates['AbyssHighestExperience'];
     const base = tpl(e.adf);

@@ -248,7 +248,7 @@ SECTIONS {{
         'target': target,
         'moduleSlot': {'diskOffset': slot_off, 'maxBytes': slot_bytes},
         'moduleLengthWord': {'diskOffset': len_off, 'bytes': 4, 'endian': 'big'},
-        'titleSlot': {'diskOffset': title_off, 'bytes': TITLE_BYTES, 'note': 'ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)'},
+        'titleSlot': {'diskOffset': title_off, 'bytes': TITLE_BYTES, 'note': 'ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)'},
         'bootblock': {'diskOffset': 0, 'bytes': 1024, 'checksumOffset': 4,
                       'note': 'the slot is outside the bootblock, so patching it keeps the checksum valid'},
         'memory': {k: f'0x{v:X}' for k, v in defs.items()},

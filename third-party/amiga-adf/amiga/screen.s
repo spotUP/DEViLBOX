@@ -99,17 +99,13 @@ _screen_init:
         dbf     d0,.ts
         lea     _uade_module_src,a0
         ; Per-format text fields (the MOD layout below only fits MOD-family files).
-        ; title and msg stay blank for a format without text fields (FC).
+        ; title is the adf_title file name for a format without text fields (FC); msg stays blank.
         move.l  (a0),d0
         moveq   #0,d7
         moveq   #21,d5                  ; name length - 1 (msg holds 31 names of 22 + space)
         ifd     NOTEXT
         ; EMS: no magic, no text fields (builder defines NOTEXT). The title is the file name the browser wrote into adf_title.
-        lea     adf_title,a2
-        moveq   #TW-1,d1
-.at:    move.b  (a2)+,(a1)+
-        dbf     d1,.at
-        bra.w   .nomsg
+        bra.w   .ntitle
         endif
         cmp.l   #'DIGI',d0
         beq.w   .digi
@@ -118,24 +114,24 @@ _screen_init:
         cmp.l   #' MUG',d0
         beq.w   .dmu
         cmp.l   #'FC14',d0
-        beq.w   .nomsg
+        beq.w   .ntitle
         ; SUN-Tronic (movem.l d0-d7/a0-a6 prologue) and CustomMade (jmp abs.l table): compiled 68k
         ; modules with no text fields.
         cmp.l   #$48e7fffe,d0
-        beq.w   .nomsg
+        beq.w   .ntitle
         swap    d0
         cmp.w   #$4ef9,d0
-        beq.w   .nomsg
+        beq.w   .ntitle
         swap    d0
         ; Anders 0land ("mpl1"/"mpl2" + compiled player): only a credit string, no song fields.
         cmp.w   #'mp',(a0)
         bne.b   .nhot
         cmp.b   #'l',2(a0)
-        beq.w   .nomsg
+        beq.w   .ntitle
 .nhot:  cmp.l   #'SMOD',d0
-        beq.w   .nomsg
+        beq.w   .ntitle
         cmp.l   #'FC13',d0
-        beq.w   .nomsg
+        beq.w   .ntitle
         ; AHX/THX: bytes 0-19 are a header, not a title. Name list at BE16(4):
         ; song name, then one name per instrument (byte 12), all NUL-terminated.
         move.l  (a0),d0
@@ -184,13 +180,17 @@ _screen_init:
 .digi:  lea     title,a1
         lea     610(a0),a2
         moveq   #TW-1,d0
-        bsr.b   .fld
+        bsr.w   .fld
         lea     642(a0),a2
         moveq   #30,d6
         moveq   #30,d7
         bra.b   .names
         ; JamCracker: no song name; NOI at 4, then NOI x 40 bytes starting with a 31 byte name
-.jam:   lea     6(a0),a2
+.jam:   lea     adf_title,a2
+        moveq   #TW-1,d1
+.jt:    move.b  (a2)+,(a1)+
+        dbf     d1,.jt
+        lea     6(a0),a2
         moveq   #40,d6
         move.w  4(a0),d7
         cmp.w   #31,d7
@@ -203,17 +203,21 @@ _screen_init:
 .dmu:   lea     title,a1
         lea     80(a0),a2
         moveq   #11,d0
-        bsr.b   .fld
+        bsr.w   .fld
         lea     96(a0),a2
         moveq   #16,d6
         moveq   #6,d7
         bra.b   .names
+.ntitle: lea     adf_title,a2            ; formats with no title of their own: the exported file name
+        moveq   #TW-1,d1
+.at:    move.b  (a2)+,(a1)+
+        dbf     d1,.at
 .nomsg: moveq   #-1,d7
 .names: lea     msg,a1
         tst.w   d7
         bmi.b   .nend
 .nl:    move.w  d5,d0
-        bsr.b   .fld
+        bsr.w   .fld
         cmp.l   a4,a1
         beq.b   .nx
         move.b  #' ',(a1)+
