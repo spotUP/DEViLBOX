@@ -168,11 +168,11 @@ export async function exportLiveSongAdf(): Promise<AdfResult | null> {
   if (!native) return null;
   // TFMX: the native export is the mdat only; the smpl file the importer kept goes in the companion slot.
   let companion: Uint8Array | undefined;
-  const fromNative = native.companions?.find((c) => /^(smpl|smp)\./i.test(c.name));
+  const fromNative = native.companions?.find((c) => /^(smpl|smp)\.|^wantedteam\.bin$/i.test(c.name));
   if (fromNative) companion = fromNative.data;
   else {
     const { useFormatStore } = await import('@/stores/useFormatStore');
-    for (const [n, buf] of useFormatStore.getState().uadeCompanionFiles ?? []) if (/^(smpl|smp)\./i.test(n.split('/').pop() ?? '')) companion = new Uint8Array(buf);
+    for (const [n, buf] of useFormatStore.getState().uadeCompanionFiles ?? []) if (/^(smpl|smp)\.|^wantedteam\.bin$/i.test(n.split('/').pop() ?? '')) companion = new Uint8Array(buf);
   }
   const base = `${import.meta.env.BASE_URL}amiga-adf/`;
   const manifest = await (await fetch(`${base}manifest.json`)).json() as AdfManifest;

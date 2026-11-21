@@ -423,6 +423,16 @@ def find_companions(module, limit=16, max_bytes=512 * 1024):
         if stem_of(f) in tune_stems:
             continue                      # it is another tune's samples
         shared.append(fp)
+    # A FIXED-NAME COMPANION. The Wanted Team Jesper Olsen player requests
+    # "WantedTeam.bin" (its shared routine) from the song directory whenever the
+    # module's Format byte is negative; the name has nothing to do with the
+    # module's. Without it UADE_FILE_COUNT is 0, ExtLoad fails and the disk is silent.
+    if module.lower().endswith('.jo'):
+        for f in entries:
+            fp = os.path.join(d, f)
+            if f.lower() == 'wantedteam.bin' and os.path.isfile(fp) and os.path.getsize(fp):
+                out.append(fp)
+                total += os.path.getsize(fp)
     for f in entries:
         fp = os.path.join(d, f)
         if os.path.abspath(fp) == os.path.abspath(module) or not os.path.isfile(fp):
