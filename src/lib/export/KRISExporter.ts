@@ -126,16 +126,14 @@ function extractSample(inst: TrackerSong['instruments'][number]): SampleInfo | n
  * Since we don't use transpose in the track ref table (all zero),
  * we reverse as: rawNote = xmNote - 25, noteByte = rawNote * 2 + 0x18
  *
- * The encoder (KRISEncoder) uses: noteIdx = xmNote - 37, noteByte = noteIdx * 2 + 0x18
- * which means it assumes a transpose offset of 12 (37 - 25 = 12).
- * We use the same mapping as the encoder for consistency.
+ * The encoder (KRISEncoder) uses the same mapping (noteIdx = xmNote - 25).
  */
 function xmNoteToKRIS(xmNote: number): number {
   if (xmNote <= 0 || xmNote > 96) return 0xA8; // empty
   if (xmNote === 97) return 0xA8; // note-off → empty (KRIS has no note-off)
 
-  // Match the encoder: noteIdx = xmNote - 37
-  const noteIdx = xmNote - 37;
+  // Inverse of the parser with transpose 0 (and of encodeKRISCell): noteIdx = xmNote - 25
+  const noteIdx = xmNote - 25;
   if (noteIdx < 0) return 0xA8;
 
   const noteByte = noteIdx * 2 + 0x18;
