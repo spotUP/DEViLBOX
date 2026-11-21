@@ -139,6 +139,8 @@ def main():
     asm = ASM + (['-DUADE_NO_SONG_END=1'] if {'broken_song_end', 'no_ep_end_detect'} & set(entry.get('flags', [])) else [])
     # EMS / EMS-6 modules have no magic and no text fields: screen.s must not print the MOD layout.
     asm += ['-DNOTEXT=1'] if player in ('EMS', 'EMS-6') else []
+    # EMS-6 (software mixer, A1200) ticks from a real level-3 VBL like the demo; other players stay polled.
+    asm += ['-DPLAY_IN_IRQ=1'] if player == 'EMS-6' else []
     needs_020 = {l.split('\t')[0] for l in open(MIN_CPU_TSV) if l.strip() and not l.startswith('#')}
     target = a.target or ('a1200' if player in needs_020 else 'a500')
     t = TARGETS[target]

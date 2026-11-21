@@ -357,11 +357,13 @@ UADE_SWITCH_PERIOD      equ     250             ; ~5 s at 50 Hz
         else
         bsr     _music_select_pump
         endc
+        ifnd    PLAY_IN_IRQ
 	tst.b	_screen_paused
 	bne.b	.scr_skip
         bsr     _music_play1
         bsr     _music_play2
 .scr_skip:
+        endc
 	bsr	_screen_frame
         btst    #6,$bfe001              ; CIA-A PRA bit 6 = left mouse button
         bne     .mainloop
@@ -401,6 +403,19 @@ uade_getvbr:
 uade_vbl:
         move.w  #$0020,$dff09c          ; ack VERTB
         addq.l  #1,UADE_PROBE_VBL       ; see UADE_PROBE_VBL -- an ISR clock
+        ifd     PLAY_IN_IRQ
+        ; Like the demo's _Interrupt: the player ticks from a real level-3 VBL, so the
+        ; software mixer is not delayed by the polled main loop (screen redraw).
+        tst.b   _cinter_ready           ; set by _music_init; nothing to play before it
+        beq.b   .irq_done
+        tst.b   _screen_paused
+        bne.b   .irq_done
+        movem.l d0-d7/a0-a6,-(sp)
+        bsr     _music_play1
+        bsr     _music_play2
+        movem.l (sp)+,d0-d7/a0-a6
+.irq_done:
+        endc
         rte
 
 ; The crash oracle.
