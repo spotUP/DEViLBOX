@@ -851,6 +851,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
   // Key: "pattern-start-length-transpose-speed"
   const patternMap = new Map<string, number>();
   const patterns: Pattern[] = [];
+  const patternSources: Array<{ pattern: number; start: number; transpose: number }> = []; // per grid pattern: its raw event block
   const sequence: number[]  = [];
 
   // First pass: collect the first seen speed in patterns for initialSpeed
@@ -880,6 +881,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
       if (!patternMap.has(key)) {
         const patIdx = patterns.length;
         patternMap.set(key, patIdx);
+        patternSources[patIdx] = { pattern: pos.pattern, start: pos.start, transpose: effectiveTranspose };
 
         // Build the pattern
         const numRows   = pos.length;
@@ -1065,18 +1067,16 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
       cell.cutoff = inst;   // raw inst byte
       return cell;
     },
+    // The events are RLE-packed in the file, so a cell has no byte of its own there: this is the cell's byte offset in
+    // the unpacked event stream (the same id for every grid pattern that shows the event; -1 for a row outside the stream).
     getCellFileOffset(pattern: number, row: number, channel: number): number {
-      // Look up which raw pattern block this TrackerSong pattern came from.
-      // The pattern's importMetadata or the patternMap key encodes this.
-      // Since patterns are built from symPositions, we need the position info.
-      // We stored positions in the sequence; each unique key maps to a pattern.
-      // For simplicity, compute from the raw event array using the pattern's
-      // source data. The event index = rawPatIdx * patternSize + srcRow * numChannels + ch.
-      // We can't easily reverse this without storing extra metadata per pattern.
-      // Use a simple linear scan: pattern * patternSize + row * numChannels + ch * 4.
-      // This works for patterns that map 1:1 to raw pattern blocks at row offset 0.
-      return patternEventsFileOffset + (pattern * patternSize + row * numChannels + channel) * 4;
+      const src = patternSources[pattern];
+      if (!src) return -1;
+      return ((src.pattern * patternSize + (src.start + row) * numChannels + channel) * 4);
     },
+    noteOffset: (pattern: number): number => patternSources[pattern]?.transpose ?? 0,
+    propagateSharedCells: true,
+    positionBoundFields: (row: number, channel: number) => (row === 0 && channel === 0 ? ['effTyp', 'eff'] : []),
   };
 
   return {

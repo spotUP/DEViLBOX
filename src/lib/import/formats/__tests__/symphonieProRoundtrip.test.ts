@@ -40,7 +40,9 @@ describe('SymphoniePro pattern codec', () => {
     for (let p = 0; p < layout.numPatterns; p++) {
       for (let r = 0; r < layout.rowsPerPattern; r++) {
         for (let c = 0; c < layout.numChannels; c++) {
-          const off = layout.getCellFileOffset(p, r, c);
+          const rel = layout.getCellFileOffset(p, r, c);
+          // getCellFileOffset is a position in the unpacked event stream; this fixture stores the events unpacked, so add the chunk base
+          const off = rel < 0 ? -1 : layout.patternDataFileOffset + rel;
           if (off < 0 || off + layout.bytesPerCell > raw.length) continue;
           const orig = raw.subarray(off, off + layout.bytesPerCell);
           const cmd = orig[0];

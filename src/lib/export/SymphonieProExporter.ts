@@ -35,6 +35,9 @@ const CMD_PITCH_DOWN    = 4;
 const CMD_SET_SPEED     = 9;
 const CMD_VIBRATO       = 13;
 const CMD_RETRIG        = 16;
+const CMD_REPLAY_FROM   = 5;
+const CMD_TREMOLO       = 12;
+const CMD_ADD_HALFTONE  = 18;
 
 // ── RLE packer ─────────────────────────────────────────────────────────────
 
@@ -162,7 +165,7 @@ function writePackedChunk(data: Uint8Array): Uint8Array {
  *
  * Reverse of _convertEvent() in the parser.
  */
-function encodeSymEvent(cell: TrackerCell, transpose = 0): Uint8Array {
+function encodeSymEvent(cell: TrackerCell, transpose = 0): Uint8Array | null {
   const out = new Uint8Array(4);
   // Note byte is a SIGNED int8: the parser treats note < 0 as "no note" and only
   // reads a note (and its instrument) when 0 <= note <= 84. An all-zero event is
@@ -234,9 +237,21 @@ function encodeSymEvent(cell: TrackerCell, transpose = 0): Uint8Array {
         out[0] = CMD_RETRIG;
         out[3] = Math.max(0, (eff & 0x0F) - 1);
         break;
-      default:
-        // Unknown effect — keep as key-on with note/instrument only
+      case 0x07: // Tremolo
+        out[0] = CMD_TREMOLO;
+        out[2] = (eff & 0x0F) << 3;
+        out[3] = ((eff >> 4) & 0x0F) << 3;
         break;
+      case 0x09: // Sample offset (replay from)
+        out[0] = CMD_REPLAY_FROM;
+        out[2] = eff;
+        break;
+      case 0x03: // Half-tone portamento: the parser only shows it with a note
+        if (note <= 0) return null;
+        out[0] = CMD_ADD_HALFTONE;
+        break;
+      default:
+        return null; // no SymEvent for this effect: the caller keeps the source event
     }
   }
 
@@ -436,8 +451,12 @@ export function exportSymphonieProFile(song: TrackerSong): Uint8Array {
                   && (cell.volume ?? 0) === shown.volume && (cell.effTyp ?? 0) === shown.effTyp
                   && (cell.eff ?? 0) === shown.eff) continue;
               }
-              changed = true;
               const encoded = encodeSymEvent(cellToEncode, effectiveTranspose);
+              if (!encoded) {
+                console.warn(`[SymphonieProExporter] effect ${(cell.effTyp ?? 0).toString(16)}${(cell.eff ?? 0).toString(16).padStart(2, '0')} has no Symphonie event; source event kept`);
+                continue;
+              }
+              changed = true;
 
               if (byteOffset + 4 <= newEvents.length) {
                 newEvents[byteOffset] = encoded[0];
