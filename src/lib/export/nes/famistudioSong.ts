@@ -266,9 +266,8 @@ function pcmToDpcm(levels: number[]): number[] {
 
 /** NES DPCM rates (Hz, NTSC) for pitch index 0..15. */
 const DPCM_RATES = [4181.71, 4709.93, 5264.04, 5593.04, 6257.95, 7046.35, 7919.35, 8363.42, 9419.86, 11186.1, 12604, 13982, 16884.6, 21306.8, 24858, 33143.9];
-/** 2A03 pulse period of FamiStudio note n (index 46 = A-4); the triangle period is half. */
-const pulsePeriodRaw = (n: number): number => 1789773 / (16 * 440 * 2 ** ((n - 46) / 12));
-const pulsePeriod = (n: number): number => Math.max(1, Math.round(pulsePeriodRaw(n)) - 1);
+/** 2A03 pulse period of FamiStudio note n (index 46 = A-4 at `a4` Hz); the triangle period is half. */
+const periodRawAt = (n: number, a4: number): number => 1789773 / (16 * a4 * 2 ** ((n - 46) / 12));
 const SLIDE_FX = new Set([0x01, 0x02, 0x03, 0xe1, 0xe2]);
 const clamp8 = (v: number): number => Math.max(-127, Math.min(127, Math.round(v)));
 /** Furnace VOL_SCALE_LINEAR_BROKEN (dispatch.h): channel volume x macro volume. Default floors; FamiStudio's volume table
@@ -404,6 +403,10 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   const lossy = new Lossy();
   const pitchLossy: PitchLossySpan[] = [];
   const s = m.subsongs[subsong];
+  // Period offsets (fine pitch, vibrato, pitch macro, slides) are taken against the note table buildFamistudioRom
+  // retunes to the song's A-4, so they use the same tuning (one_sided_love, A-4 = 445: offsets were 1 off at 440).
+  const pulsePeriodRaw = (n: number): number => periodRawAt(n, m.tuning || 440);
+  const pulsePeriod = (n: number): number => Math.max(1, Math.round(pulsePeriodRaw(n)) - 1);
   // Virtual tempo N/D advances the row counter N/D per engine tick: rows scale by D/N, effects and macros still run at hz.
   const vtScale = s.virtualTempo > 0 && s.virtualTempoD > 0 ? s.virtualTempoD / s.virtualTempo : 1;
   // Linear pitch (Furnace default): slides move in 1/128 semitone x pitchSlideSpeed per tick, not in period units.
@@ -959,7 +962,7 @@ export function buildFamistudioRom(player: Uint8Array, meta: FamistudioMeta, son
 }
 
 /** FamiStudio NTSC note table entry n (index 46 = A-4 at `a4` Hz), as NoteTables/famistudio_note_table_*.bin holds it. */
-const noteTablePeriod = (n: number, a4: number): number => (n === 0 ? 0 : Math.round(1789773 / (16 * a4 * 2 ** ((n - 46) / 12))) - 1);
+const noteTablePeriod = (n: number, a4: number): number => (n === 0 ? 0 : Math.round(periodRawAt(n, a4)) - 1);
 
 /** FamiStudio has no song tuning: the engine plays one A-440 table (97 LSBs, then 97 MSBs). Furnace's A-4 tuning
  *  (song.tuning, e.g. 433 or 392) moves every note, so rewrite that table in the ROM for the song's A-4. */

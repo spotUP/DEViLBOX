@@ -186,6 +186,21 @@ describe('furnaceToFamistudio', () => {
     const zero = music({ 0: { 0: { ...A4, ...fx(0x04, 0) }, 12: fx(0x04, 0x88) } });
     expect(Array.from(bare.music)).toEqual(Array.from(zero.music));
   });
+  it('takes vibrato period offsets against the song tuning the note table is retuned to (one_sided_love, A-4 = 445)', () => {
+    // Furnace 0.6.8.3 calcFreq (linear pitch): round(clock / fbase / 16) - 1, vibrato pitch = ((y * (short)(127 sin) * 15) >> 4) / 15.
+    // Cell A-4 plays FamiStudio note 58 (an octave above table index 46).
+    const vib = (a4: number): number[] => Array.from({ length: 32 }, (_, i) => {
+      const X = 1789772.727 / (16 * a4 * 2), P = Math.round(X) - 1;
+      const u = Math.trunc(((3 * Math.trunc(127 * Math.sin(2 * Math.PI * ((6 * (i + 1)) & 63) / 64)) * 15) >> 4) / 15);
+      return Math.round(X * 2 ** (-u / 1536)) - 1 - P;
+    });
+    expect(vib(445)).not.toEqual(vib(440)); // the tuning moves the rounding at this note
+    const mod = nesModule({ 0: { 0: { ...A4, ...fx(0x04, 0x63) } } });
+    (mod as { tuning?: number }).tuning = 445;
+    const music = furnaceToFamistudio(mod).music;
+    expect(has(music, encodeEnvelope(vib(445), 0, -1, 'pitch'))).toBe(true);
+    expect(has(music, encodeEnvelope(vib(440), 0, -1, 'pitch'))).toBe(false);
+  });
   it('adds 04 vibrato to the instrument pitch macro in one relative envelope (Furnace sums pitch and pitch2)', () => {
     const notes: string[] = [];
     const vib = [0, 5, 0, -5];
