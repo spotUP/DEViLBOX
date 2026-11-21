@@ -1012,3 +1012,43 @@ Fancy_Promenard (58 Hz) gives identical bytes before/after d0c1a5315 (no PSG vol
 - Arp mtab on virtual-tempo songs: the driver steps it per sequence tick (72 Hz on newer_song_lol), Furnace per engine tick (60 Hz). It runs 20% fast. Not fixed, not flagged as lossy yet. Same check is due for other per-tick effects (vibrato, porta), which also count sequence ticks.
 - Task 3 (Solar_Man PSG4 -0.15 dB residual) not started; budget.
 - No unit test for the `s.hz` vs `rate` choice in insRef; no song with an off-NTSC pitch macro measured (pitch fix tested at unit level only).
+
+## Phase 1z results (2026-11-21)
+
+Commit 2669fd49e (src/lib/export/md/mdsSong.ts, src/lib/export/__tests__/mdsSong.test.ts).
+
+Root cause: Furnace 0.6.8.3 runs macros and per-tick effects once per engine tick at `s.hz`. Virtual tempo only moves the row counter (playback.cpp tempoAccum). The export set the MDSDRV sequence tick rate to `hz * vt / vtD`. It also stepped the arp mtab (EB), vibrato phase, porta slides and volume slides per sequence tick. A 180/150 song therefore ran them 20% fast: the arp ran at 72 Hz instead of 60 Hz on newer_song_lol.
+
+Fix:
+- `fpt = s.hz / rate` is Furnace ticks per sequence tick (1 without virtual tempo, 5/6 at 180/150). `fpf = tpf * fpt` is Furnace ticks per frame.
+- `arpTable(..., spt)` spaces the holds by `1 / fpt` on a running total. The total restarts each loop pass.
+- Vibrato (vibCmd, vSync phase) and porta (pslideCmd, portaEnvelope, the 01xx integrality check) use `fpf`/`fpt`.
+- Volume slides step through a Furnace-tick accumulator.
+- Without virtual tempo `fpt` is exactly 1, so those exports are byte-identical.
+
+Test rows (describe 'virtual tempo'):
+- Solar_Man at 180/150 keeps the PSG envelope bytes resampled from s.hz (56 Hz).
+- arpTable holds follow `spt`.
+
+newer_song_lol, 0-40 s. lagcmp frames over 10 cents, before (1y, HEAD 7c9e0f09f) -> after:
+- FM1: 456 -> 511
+- FM2: 416 -> 437
+- FM3: 508 -> 504
+- FM4: 403 -> 415
+- FM5: 685 -> 343
+- PSG1: 940 -> 793
+- PSG2: 1353 -> 1235
+- First 4 s windows: FM5 window 0 goes 101 -> 0, PSG1 window 1 goes 81 -> 12, PSG2 window 1 goes 85 -> 19.
+
+loud.py (4 s windows, dB MAME minus Furnace), 1y -> 1z:
+- PSG4: -1.10/-1.10/-0.30/-0.67/-0.67/-0.66/-0.68/-0.31/-0.66/-0.70 -> -0.04/-0.04/-0.02/-0.03/-0.01/-0.02/-0.02/-0.00/-0.01/-0.03
+- PSG2: windows 3-10 go from up to 0.10 dB to at most 0.03 dB.
+- PSG1 window 1-2: +0.01/+0.03 -> -0.00/-0.01.
+- FM1-FM5 are unchanged. FM6/DAC ±89 is the same as in 1y: the DAC is tapped on the FM6 row, so this is a measurement artefact.
+
+Open:
+- The vibrato period now matches Furnace (16 frames on FM1, was about 13). FM1's vibrato start phase is still about 4-5 frames off at a new note (frame 75 onward). The FM1 count rising 456 -> 511 comes from this. Suspects: the vSync rounding `Math.round((t - vAt) * fpt)`, `vAt = tick + delay` counted in sequence ticks, and the `off(Math.round(n * tpf))` phase in vibratoEnvelope.
+- The EDxx/ECxx delay and cut effects still count sequence ticks under virtual tempo. They are not converted to Furnace ticks.
+- Tempo quantisation drift: 154/128*60 = 72.19 Hz vs 72 Hz. It is flagged lossy. Key timing on 72 Hz rows is quantised to NTSC frames. That causes the large errors common to all channels (worst 874 cents at 21.433 s).
+- Task 3 is not started: the Solar_Man PSG4 -0.15 dB residual (the first 3-frame node is sometimes 2 frames; key-on vs envelope phase).
+- Listen ROM: ~/Desktop/md-roms/newer_song_lol-1z.bin.
