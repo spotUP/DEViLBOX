@@ -847,3 +847,46 @@ Listen ROM: ~/Desktop/md-roms/highscorefollin-1r.bin (sign fix; vol 127 song so 
 Open: PSG3 noise-rate gap (silent-tone period differs while noise uses PSG3 rate, e.g. 13982 Hz Furnace vs 6214 Hz MAME near 34.13 s).
 
 Next: (a) bake residual DAC gain into sample data or measure volume against a Furnace audio render; (b) PSG3 noise-rate gap; (c) task 4 dense-drum key-on taps.
+
+## Phase 1s results (2026-11-21)
+
+### Task 1: PSG3 noise rate gap at 34.13 s (highscorefollin) - PASS, commit 54018fdd2
+
+- Root cause (converter). Crash Cymbal instruments 16 and 17 have arp macro [-5,-3,-2,-1,0] in PSG3-rate noise mode (duty 3, notes nv 9 and 10). Two faults:
+  1. The MDSDRV macro table command `16 tt` sets channel variable $16 = `t_trs` (mdsdrv.lst: t_trs E:00000016), the same byte that E4 writes. The arp therefore overwrote the noise E4 transpose absolutely.
+  2. Furnace easy noise (sms.cpp snCalcFreq) steps the PSG3 period down by one per semitone, which is linear. The MDSDRV tone table is exponential, so semitone steps give different periods.
+  Furnace writes periods 8,6,5,4,3. MAME wrote 18,16,15,14,...
+- Fix: a noise arp in PSG3-rate mode emits its own table with tt = noiseKey(nv + step) - note (cached per table content), and sets trs to NaN so the next note re-emits E4.
+- Measured (MAME vs Furnace VGM, lagcmp best of lag -1..+1 frames): PSG3 frames over 10 cents 229 -> 0 over 0-38 s and 0-40 s (baseline worst 2666.9 c at 34.217 s). PSG1 0. PSG2 0 up to 38 s (worst 9.7 c).
+- Known artifact, not a converter bug: PSG2 has 69 frames over 10 cents at 38.4 s. Furnace sets ATT 15 and stops writing FREQ. MDSDRV keeps writing FREQ at ATT 15 (silent). Same in the baseline. The compare tool must skip frames at ATT 15.
+- Unit test: `highscorefollin: a noise arp in PSG3-rate mode steps the PSG3 period like Furnace easy noise (crash 8,6,5,4,3)` in mdsSong.test.ts (22/22 pass). Not checked that the test fails on the pre-fix code.
+- Listen ROM: ~/Desktop/md-roms/highscorefollin-1s.bin.
+
+### Task 2: +1.46 dB in the first 4 s - NOT DONE (budget)
+
+The stop point of about 40 tool calls was reached on task 1. Next: per-channel RMS over 0-4 s (FM1-6 key-on/TL from tap events, DAC from the 0x2A stream), Furnace VGM vs MAME. Find the channel first, then check its first-note volume/TL (an initial volume macro or the first 0Axy might be missed before the first E2).
+
+### Task 3: dense-drum PCM key-on taps on a second song - NOT DONE (budget)
+
+Needs a 68k write tap on 0xA00E02-0xA00E0F plus a Z80 tap on 0x0E08, aligned to the first FM key-on, as in 1q.
+
+## Phase 1t results (2026-11-21)
+
+### Task 1: highscorefollin loudness
+
+- The "+1.46 dB in 0-4 s" from 1r is not reproduced. A per-channel register loudness over 4 s windows on the 42 s capture (FM = carrier TL sum while keyed, PSG = ATT, DAC = time-held power of the 2A bytes, VGM streams simulated) gave a different picture. DAC was -0.08..-0.10 dB in every window. The real faults were on FM: FM1 -14.3 dB, FM3/FM4 -4.8 dB, FM5 -19.5 dB.
+- Root cause was in the import layer, not in mdsSong.ts. `parseFMData` (src/lib/import/formats/furnace/FurnaceInstrumentParser.ts) and `FurnaceParser.readFMFeature` always read a block byte after the 4 FM header bytes. Furnace `instrument.cpp readFeatureFM` reads that byte only when `version >= 224`. highscorefollin is older, so every operator shifted by one byte. Wurlitzer parsed as TL 5f 5f 19 19 / MULT 14; the raw values are TL 1e 1c 10 16, and those are the values Furnace's VGM writes. This bug hits every FM instrument in pre-224 files, DEViLBOX playback included, not only the MD export. golden_shit (>= 224) was never affected, which is why 1l looked clean.
+- Fix: both readers gate the block byte on the version.
+- After: FM1-FM5 are within +-0.1 dB in every window, except two tail-window outliers (FM2 -0.98, FM3 -2.10 in 36-40 s). DAC is at -0.09 dB. Test: `highscorefollin (Furnace version < 224): FM operators parse without the v224 block byte ...`.
+- PSG4 showed +0.9..+8 dB in loud.py. That is a loud.py artifact: it samples PSG state only on YM writes. A time-held noise power from the ATT writes gives -0.03..-0.23 dB per window. The noise ATT stream is identical in MAME, about 10 ms later. PSG1/PSG2 +0.9..+1.5 dB in 32-40 s is likely the same artifact (unverified).
+- Listen ROM: ~/Desktop/md-roms/highscorefollin-1t.bin (md1n tap shell + PCM blob, TEMPO $7F).
+
+### Task 2: dense FM6 PCM drum key-on tap on a second song
+
+Not done (budget). The harness has the Z80 0x0E02-0F tap (P lines) and the 68k A00E02-0F tap (Q lines) ready to port.
+
+### Task 3: lagcmp ATT-15 skip
+
+- lagcmp.py now skips a frame when either side has ATT 15 at f-1, f or f+1. The PSG2 38.4 s false flag is gone: PSG1-3 show 0 frames over 10 c (worst 9.7 c at 34.25 s on PSG2).
+- New real flag: FM4 at 2.133-2.25 s, 19 frames, worst 87.5 c. Furnace keys a new note at 2.133 (166.01 Hz) and slides up 1.22 Hz/frame to 174.55. MAME keeps the old note (no key-on), slides from 155.65 at 2.24 Hz/frame, and keys 174.55 at 2.268. It looks like a note+slide row (E1xy/E2xy or 01xx with a note) being converted as a slide from the previous pitch. Identify the cell next.
+- Note: scripts using awk on these .ev files need LC_ALL=C. The sv locale parses "2.133" as 2.
