@@ -929,3 +929,27 @@ Listen ROMs: `~/Desktop/md-roms/highscorefollin-1v.bin`, `~/Desktop/md-roms/Sola
 - Solar_Man DAC level -0.6 .. -1.5 dB per window vs Furnace (loud.py). Known `pcmDacAtt` 2 dB-step shortcut; -1.54 dB exceeds the stated 1.2 dB max error, so check the 120-volume hits against `dacVolTable` before baking residual gain into the sample data.
 - Solar_Man PSG4 -0.3 dB flat (highscorefollin -0.03..-0.23). Not investigated.
 - Parser: `amiga` undefined for a sample instrument without SM; other consumers of `instrument.amiga` may need the same Furnace default. Not checked.
+
+## Phase 1w results (2026-11-21)
+
+### Task 1: Solar_Man DAC level (done, 0dd040011)
+
+- Root cause: Furnace scales DAC output by `dacVolTable[vol]` (genesis.cpp, 0.75 dB steps, truncated to 8 bits). MDSDRV PCM_LEVEL only has 2 dB steps, so the export picked the nearest step and missed by up to 0.66 dB (vol 120) / +0.30 dB (vol 124).
+- Fix: `pcmDacAtt` picks the smallest driver gain still >= the Furnace gain, and `pcmRef` bakes the residual (`pcmDacScale`, always <= 1, never clips) into a per-volume copy of the sample. `noOPN2Vol` keeps the old unscaled path.
+- Measured (MAME, 42 s, per-hit cluster means vs wanted): Bass Drum -5.35/-5.36, -2.35/-2.32, -0.13/0; Snare -0.09/0; Tom -2.17/-2.32, +0.10/0. All within 0.3 dB.
+- loud.py's DAC row still reads about -0.7..-1.45 dB because the Furnace VGM 0x95 streams carry raw samples with no DAC volume applied. That row is not a valid reference for DAC volume.
+- Known lossy case (flagged): a DAC volume change mid-note can only use the driver's 2 dB step.
+- Listen ROM: ~/Desktop/md-roms/Solar_Man-1w.bin.
+
+### Task 2: Solar_Man PSG4 noise -0.3 dB (diagnosed, not fixed)
+
+- loud.py PSG4 reads -0.29..-0.33 dB in every window.
+- The ATT sequence comparison (Furnace vs MAME) shows two differences:
+  1. The first envelope node is one frame shorter on MDSDRV. Furnace gives 1,1,1,2,2,3,3 and MAME gives 1,1,2,2,3,3.
+  2. Some re-hits do not restart the envelope on MDSDRV. Furnace restarts the macro at frame 7 (att 4), while MAME keeps decaying until frame 12.
+- Driver reading: a note command ($82..$df) sets nf_key_off unless nf_slur is set (mdsdrv.68k @cmd_note). The PSG envelope restarts only when nf_key_off is set. So a plain note retriggers. A missed re-hit therefore means the export emitted a tie or a slurred note there, or an mtab (cf_mtab_carry) path is involved.
+- Next step: dump the noise track tokens around the frame-7 re-hit (mdsSong.ts tok builder, lines 453-604). Check whether the hit becomes `tie` (same note, no instrument change) or is slurred. Then check the `$1f` pos/delay init on key-on for the short first node.
+
+### Task 3: sample-0 fallback for SM-less sample instruments (not started)
+
+- Budget ran out. Still to do: grep the readers of `instrument.amiga` and the sample-index fallbacks in src/lib/import and src/lib/export. Fix the MD path only and list the others.
