@@ -1711,6 +1711,21 @@ nostopintfunc2	move.l	a0,dtg_StopInt(a5)
 	lea	intuition_lib_base(pc),a0
 	move.l	a0,dtg_IntuitionBase(a5)
 
+;*--- PORT: players read the PAL bit from dtg_GfxBase->DisplayFlags ($ce). Upstream
+;     leaves dtg_GfxBase 0, so they read byte $cf = the low byte of score's own
+;     exception vector $cc: PAL or NTSC by link-address accident. Oktalyzer picks
+;     its CIA latch from it (PAL 14211, NTSC 14318): UADE happened to land on PAL,
+;     the disk on NTSC (49.54 Hz instead of 49.92, measured ADF agent 46). A PAL
+;     Amiga sets bit 2, so hand over a base with DisplayFlags from the $124 flag.
+	ifd	UADE_NATIVE
+	lea	gfx_lib_base(pc),a0
+	move	#4,$ce(a0)		* PAL
+	tst.l	$124.w
+	beq.b	.gfx_pal
+	move	#1,$ce(a0)		* NTSC
+.gfx_pal	move.l	a0,dtg_GfxBase(a5)
+	endc
+
 	lea	enpp_amplifier_int(pc),a0
 	move	jmpcom(pc),ENPP_Amplifier(a5)
 	move.l	a0,ENPP_Amplifier+2(a5)
@@ -4567,6 +4582,13 @@ uade_lib_base
 	dcb.b	$400,0
 intuition_lib_base
 	dcb.b	$200,0
+
+	ifd	UADE_NATIVE
+* graphics.library (DisplayFlags only, see init_base)
+	dcb.b	$400,0
+gfx_lib_base
+	dcb.b	$200,0
+	endc
 
 * icon.library
 	dcb.b	108,0		* LVO table: see vectors in icon_lib.i
