@@ -15,6 +15,7 @@ import { isRiffRaffFormat } from '../../import/formats/RiffRaffParser';
 import { isJochenHippel7VFormat } from '../../import/formats/JochenHippel7VParser';
 import { isSonicArrangerFormat } from '../../import/formats/SonicArrangerParser';
 import { isDeltaMusic2Format } from '../../import/formats/DeltaMusic2Parser';
+import { isSoundMasterFormat } from '../../import/formats/SoundMasterParser';
 import { isTFMXFile } from '../../import/formats/TFMXParser';
 import { isSidMon1Format } from '../../import/formats/SidMon1Parser';
 
@@ -83,6 +84,8 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   // AProSys has no magic: the importer detects it by file name only (aps.* / *.aps).
   if (isAProSysFormat(m, filename)) return 'AProSys';
   if (isSoundImagesFormat(m, filename)) return 'SoundImages';
+  // Sound Master: three BRA.W words; only the .sm extension is proven on the disk (rackney'sisland 4.sm, envelope corr >= 0.97 per second). Needs a filename.
+  if (filename && /\.sm$/i.test(filename) && isSoundMasterFormat(m.buffer.slice(m.byteOffset, m.byteOffset + m.byteLength) as ArrayBuffer, filename)) return 'SoundMaster';
   // Path A of the 7V check accepts any $6000 loader stub, so it comes after every magic-based test.
   if (isJochenHippel7VFormat(m)) return 'JochenHippel-7V';
   // DeltaMusic2 checks the ".FNL" tag at $bc6; SonicArranger's SOARV1.0 magic is exact but its 4EFA player-binary path is loose, so both come after the exact magics.

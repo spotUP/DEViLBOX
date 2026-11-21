@@ -125,6 +125,14 @@ describe('adf slot patcher', () => {
     expect(Array.from(r.subarray(e.moduleSlot.diskOffset, e.moduleSlot.diskOffset + mod.length))).toEqual(Array.from(mod));
   });
 
+  it('SoundMaster: routes .sm by name and header, patches the slot', () => {
+    const e = manifest.templates['SoundMaster'];
+    const mod = song("sound-master/rackney'sisland 4.sm");
+    expect(adfTemplateFor(mod, "rackney'sisland 4.sm")).toBe('SoundMaster');
+    const r = patchAdfSlot(tpl(e.adf), e, mod);
+    expect(Array.from(r.subarray(e.moduleSlot.diskOffset, e.moduleSlot.diskOffset + mod.length))).toEqual(Array.from(mod));
+  });
+
   it('names the export after the whole file for prefix-named files, strips the extension for suffix-named', async () => {
     expect(adfSongName('MAX.DinosaurDetective jingle1')).toBe('MAX.DinosaurDetective jingle1');
     expect(adfSongName('mdat.song')).toBe('mdat.song');

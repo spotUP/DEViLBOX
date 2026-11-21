@@ -95,6 +95,11 @@ def onset(m, thr=300):
 def ref_delta(mono, sr, refpath):
     ref, rsr, _ = load_mono(refpath)
     a, b = mono[onset(mono):], ref[onset(ref):]
+    if sr == rsr:  # threshold onsets differ by ~1 ms between emulators; the 10 ms envelope bins need sample alignment, so refine by waveform lag (gate unchanged)
+        x = a[sr:3 * sr]
+        if len(x) == 2 * sr and x.std() > 0 and len(b) > 3 * sr + 300:
+            lag = max(range(-300, 301), key=lambda l: float(np.dot(x, b[sr + l:3 * sr + l])))
+            b = b[max(lag, 0):] if lag >= 0 else np.concatenate([np.zeros(-lag), b])
     n = int(min(len(a) / sr, len(b) / rsr) * min(sr, rsr))
     if n <= 0:
         return None

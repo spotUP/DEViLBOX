@@ -1141,6 +1141,45 @@
         "player": "d4f4119e7da53c7cca58430af97854d394865426f4a54bbb80815645a5f1c29c"
       }
     },
+    "SoundMaster": {
+      "adf": "SoundMaster.adf",
+      "adfSha256": "f9fb4a0f484b3d867da34af932ce616a75d9cf56d2b259991646d40f33025383",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 38804,
+        "maxBytes": 49152
+      },
+      "moduleLengthWord": {
+        "diskOffset": 38800,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 88446,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 178436,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x15C00",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC2DC00",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x2B904",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "rackney'sisland 4.sm",
+        "bytes": 36702
+      },
+      "sources": {
+        "tool": "6ad98888fc563b650cafa95616adbead9544588a94fc3756f182df5436a1cfb2",
+        "player": "5333b44d3e5f26198d81c5acc5a2ab66738f2f1579e8e479ab469a2642b23c0f"
+      }
+    },
     "SpeedySystem": {
       "adf": "SpeedySystem.adf",
       "adfSha256": "c27e7d33aa6ddb6a6b7f239194d0a458b7301c34d04b0545257ba7a60b812f9d",
