@@ -436,6 +436,12 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // such a slide the slur note gets its own table (arpBake): arp value + slide transpose per sequence tick, and E4 stays out.
     let sA = 0, sStep = 0, sF0 = 0, trsOut = 0, arpT0 = 0, baked = false;
     const slideOff = (f: number) => (sA ? Math.sign(sA) * Math.max(0, Math.abs(sA) - sStep * (f - sF0 + 1)) : 0);
+    // Furnace keeps inPorta after a 03xx note until the slide reaches its target (targetResetsSlides), 03 00, 01xx/02xx or a note off:
+    // a note in between without 03 only retargets the slide (playback.cpp commit note on: inPorta && keyOn -> portaNote = note, no
+    // NOTE_ON), so it slides on from the pitch reached, macros not restarted. fA/fF0: the linear E8 slide in flight, as sA above;
+    // pXx: the 03xx speed it runs at (0 = no porta in flight). shortcut: non-linear-pitch slides are not retargeted (fresh note-on).
+    let fA = 0, fF0 = 0, pXx = 0;
+    const flyOff = (f: number) => (fA ? Math.sign(fA) * Math.max(0, Math.abs(fA) - pXx * pss * (f - fF0 + 1)) : 0);
     const slideCmd = (t: number): number[] => {
       const off = slideOff(fTick(t)), o = 2 * off + effDtn(), tr = Math.floor((o + 128) / 256), d = o - 256 * tr, out: number[] = [];
       if (!off) sA = 0;
@@ -588,9 +594,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (e.type === 0xe4) vFine = e.value; else { vDepth = e.value & 15; vRate = e.value >> 4; }
             vChanged = true; continue;
           }
-          if (e.type === 0x03 && (kind === 'psg' || kind === 'fm')) { portaXx = e.value; if (prate) { prate = 0; pChanged = true; } continue; } // 03 00 only stops the porta
+          if (e.type === 0x03 && (kind === 'psg' || kind === 'fm')) { portaXx = e.value; if (!e.value) pXx = 0; if (prate) { prate = 0; pChanged = true; } continue; } // 03 00 only stops the porta
           if ((e.type === 0x01 || e.type === 0x02) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
-            prate = (e.type === 0x01 ? 1 : -1) * e.value * pss; pChanged = true; portaXx = 0; sA = 0; // 01xx/02xx end a 03xx (playback.cpp: inPorta false)
+            prate = (e.type === 0x01 ? 1 : -1) * e.value * pss; pChanged = true; portaXx = 0; sA = 0; pXx = 0; // 01xx/02xx end a 03xx (playback.cpp: inPorta false)
             if (m.compatFlags.limitSlides) lossy.add('01xx/02xx with limitSlides (slide range not limited)');
             if (!Number.isInteger(2 * e.value * pss * fpf)) lossy.add('01xx/02xx at a fractional sequence-tick-per-frame rate (rounded per frame)');
             continue;
@@ -643,20 +649,23 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (kind === 'psg' && effDtn() !== dtnOut) { dtnOut = effDtn(); cmds.push(0xe6, dtnOut & 0xff); }
             // 03xx: slur into the note (no key-off, envelope keeps running) and slide from the previous key; E7 00 turns it off again.
             // 03xx on a keyed-off channel is a plain note-on in Furnace (playback.cpp keeps doNote, NOTE_ON sets baseFreq to the target): no slide, PSG too.
-            const slide = (kind === 'psg' || kind === 'fm') && sounding && portaXx > 0 && prevKey >= 0 && prevKey !== nv;
+            // Pitch reached at the end of the previous Furnace tick: this tick's porta step runs after the row (playback.cpp nextTick).
+            const fNow = fTick(tick + delay), from = prevKey * 128 + slideOff(fNow - 1) + flyOff(fNow - 1);
+            if (!portaXx && pXx && sounding && from !== prevKey * 128) portaXx = pXx;
+            const slide = (kind === 'psg' || kind === 'fm') && sounding && portaXx > 0 && prevKey >= 0 && from !== nv * 128;
             // 03xx on a keyed-on channel is no note-on (playback.cpp: doNote=false), so the vibrato phase is not reset.
             const portaSlur = portaXx > 0 && sounding;
-            if (kind === 'fm' && portaXx > 0 && sounding) cmds.push(0xe0);
-            const from = prevKey * 128 + slideOff(fTick(tick + delay));
-            sA = 0;
+            // E0 slurs every such note, also a PSG 03xx onto the note already reached (no slide): a key-on would restart the macros.
+            if ((kind === 'fm' || kind === 'psg') && portaSlur) cmds.push(0xe0);
+            sA = 0; fA = 0; pXx = slide && m.compatFlags.linearPitch ? portaXx : 0;
             if (slide && vDepth && m.compatFlags.linearPitch) {
-              if (kind === 'psg') cmds.push(0xe0);
               sA = from - nv * 128; sStep = portaXx * pss; sF0 = fTick(tick + delay);
               const bt = arpBake(tick + delay);
               if (bt !== undefined) { cmds.push(0xeb, bt + 1); baked = true; }
             } else if (slide) {
-              const env = portaEnvelope(prevKey, nv, portaXx, kind === 'fm', m.compatFlags.linearPitch ? portaXx * (Number(m.compatFlags.pitchSlideSpeed) || 1) : 0, fpf);
-              if (kind === 'psg') cmds.push(0xe0);
+              const lin = !!m.compatFlags.linearPitch;
+              if (lin) { fA = from - nv * 128; fF0 = fNow; }
+              const env = portaEnvelope(lin ? from / 128 : prevKey, nv, portaXx, kind === 'fm', m.compatFlags.linearPitch ? portaXx * (Number(m.compatFlags.pitchSlideSpeed) || 1) : 0, fpf);
               cmds.push(0xe8, slideItem(env) + 1); slideEnd = tick + Math.round((env[env.length - 1] + 1) * (tempo + 1) / 128);
             }
             else if (prate) { if (pChanged || pInit || !pegDirty) cmds.push(...pslideCmd()); }

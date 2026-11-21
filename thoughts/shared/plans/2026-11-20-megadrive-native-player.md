@@ -1155,3 +1155,32 @@ Test: `03xx under 04xy on an arp-macro instrument ...` in mdsSong.test.ts (fails
 - PSG2 (139 frames, worst 26 cents at 21.73 s; first bad 4.75 s and 8.15 s) is not classified yet.
 - The Solar_Man PSG4 -0.15 dB level check (loud.py) was not done (budget).
 - Listen ROM: ~/Desktop/md-roms/newer_song_lol-2d.bin.
+
+## Phase 2e results (2026-11-21)
+
+Song: newer_song_lol (linearPitch 2, pitchSlideSpeed 4, 72 Hz ticks). Measured with tools/md-phase0/lagcmp.py, frames over 10 cents in the first 40 s (best lag -1..+1 frame).
+
+Causes found and fixed in `src/lib/export/md/mdsSong.ts`:
+
+1. PSG1 408 cents at 22.18 s (order 4 rows 9-10, ins 10 SustainedLead). Row 9 slides 03 12 from note 42 to 47; row 10 brings note 49 without 03 before the slide reaches its target. Furnace keeps `inPorta` until the target is reached, 03 00, 01xx/02xx or a note off; a note in between only sets `portaNote` (playback.cpp commit note on: `inPorta && keyOn && !shorthandPorta`), no NOTE_ON, so the pitch slides on (reference 940 -> 1107 Hz) and macros do not restart. The exporter cleared the porta after every note, so row 10 was a fresh key-on with the arp macro [1, 0, ...] restarted (1190 Hz). Fix: track the linear slide in flight (fA/fF0/pXx, `flyOff`); a later note on a sounding channel retargets from the pitch reached. The slide now starts from the pitch at the end of the previous Furnace tick (the porta step runs after the row). Non-linear-pitch songs keep the old behaviour (shortcut comment in code).
+2. PSG1 -100 cent dips at 20.1-20.4 s (order 3 rows 47-53): 03 12 onto the note already playing. Furnace sends no note-on; the export keyed on and restarted the arp macro. Fix: E0 slur for every FM/PSG note under 03xx on a sounding channel, also when no slide is needed.
+
+Regression test: `newer_song_lol PSG1: a note under a 03xx still in flight retargets the slide ...` in `mdsSong.test.ts` (fails on the old exporter). The test decoder gained `slurs` and `onlyCh` arguments; it does not walk this song's conductor track to its end (overrun past the sequence, not investigated).
+
+| Channel | 2d | 2e |
+|---------|----|----|
+| FM1 | 11 | 11 |
+| FM2 | 11 | 11 |
+| FM3 | 15 | 15 |
+| FM4 | 5 | 5 |
+| FM5 | 9 | 9 |
+| PSG1 | 349 (worst 408) | 347 (worst 51.6) |
+| PSG2 | 139 | 139 |
+| PSG3 | 0 | 0 |
+
+Open:
+- PSG1 bulk (most of the 347 frames, 11-39 s): during vibrato the export is 1 PSG period (about 11 cents) off. Reference wobble looks one-sided below the note (750.7 -> 726.4 Hz), export tops at 755.8 Hz (symmetric). Vibrato shape/centre or period rounding class; not fixed.
+- PSG1 22.333 s: export ends the retargeted slide 2 PSG periods high (1129.9 vs 1107.5/1096.7 Hz). Not explained.
+- PSG2 139 frames, classified, not fixed: 4.75 s note-on edge frame (10.4 cents, 72 Hz tick phase); 21.73 s export one frame late across a note change; 8.15-8.25 s rising slide lags, up to 33 cents (slide/vibrato shape).
+- Solar_Man PSG4 -0.15 dB level check (loud.py): not started.
+- Listen ROM: ~/Desktop/md-roms/newer_song_lol-2e.bin.
