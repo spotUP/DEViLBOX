@@ -105,11 +105,11 @@ def ref_delta(mono, sr, refpath):
             "peak_delta_db": db(np.abs(a).max(), np.abs(b).max())}
 
 
-def check(adf, purpose, target, ref, keep_wav):
+def check(adf, purpose, target, ref, keep_wav, extra="", dump=None, dump_at=2.0):
     work = tempfile.mkdtemp(prefix="adfbc-")
     name = os.path.basename(adf)
     cfg, wav = os.path.join(work, "run.uae"), os.path.join(work, "rec.wav")
-    open(cfg, "w").write("config_description=%s\nfloppy0=%s\n" % (purpose, os.path.abspath(adf)) + COMMON + CFG[target])
+    open(cfg, "w").write("config_description=%s\nfloppy0=%s\n" % (purpose, os.path.abspath(adf)) + COMMON + CFG[target] + "".join(kv + "\n" for kv in extra.split(";") if kv))
     p = subprocess.Popen([FORK, "-f", cfg, "-G"], stdout=open(wav + ".log", "w"), stderr=subprocess.STDOUT)
     r = {"adf": name, "target": target, "pid": p.pid, "time": time.strftime("%Y-%m-%d %H:%M:%S")}
     try:
@@ -137,6 +137,17 @@ def check(adf, purpose, target, ref, keep_wav):
                 break
             time.sleep(0.2)
         r["dmaconr"] = []
+        if tplay and dump:
+            time.sleep(max(0, tplay + dump_at - time.time()))
+            ipc(sock, "PAUSE")
+            for spec in dump.split(","):
+                addr, ln = (int(x, 0) for x in spec.split(":"))
+                out = os.path.join(os.path.dirname(wav), "dump_%x_%x.bin" % (addr, ln))
+                with open(out, "wb") as fh:
+                    for o in range(0, ln, 4):
+                        fh.write(rd(sock, addr + o, 4).to_bytes(4, "big"))
+                print("dump", out, flush=True); r.setdefault("dumps", []).append(out)
+            ipc(sock, "RESUME")
         if tplay:
             for _ in range(6):
                 r["dmaconr"].append("%04X" % rd(sock, 0xDFF002, 2)); time.sleep(0.7)
@@ -158,7 +169,7 @@ def check(adf, purpose, target, ref, keep_wav):
             p.wait(5)
         except subprocess.TimeoutExpired:
             p.kill(); p.wait()
-        if not keep_wav and os.path.exists(wav):
+        if not keep_wav and not dump and os.path.exists(wav):
             os.remove(wav)
     return r
 
@@ -171,6 +182,9 @@ def main():
     ap.add_argument("--ref", help="UADE.wasm reference WAV (single ADF)")
     ap.add_argument("--only", help="ADF base name (with or without .adf)")
     ap.add_argument("--failed", action="store_true", help="re-run only rows that are not PASS")
+    ap.add_argument("--cfg-extra", default="", help="extra uae config lines, ';'-separated, appended last (e.g. cycle_exact=false)")
+    ap.add_argument("--dump", help="addr:len[,addr:len] chip/fast RAM to save (hex ok) at PLAY+--dump-at s, emulator paused; files kept next to the WAV")
+    ap.add_argument("--dump-at", type=float, default=2.0)
     ap.add_argument("--keep-wav", action="store_true")
     a = ap.parse_args()
     res = json.load(open(RESULTS)) if os.path.exists(RESULTS) else {}
@@ -187,7 +201,7 @@ def main():
         if not a.only and not a.failed and old == "PASS":
             print("skip %s (PASS recorded)" % name); continue
         target = a.target or man.get(name, "a500")
-        r = check(adf, a.purpose, target, a.ref, a.keep_wav)
+        r = check(adf, a.purpose, target, a.ref, a.keep_wav, a.cfg_extra, a.dump, a.dump_at)
         res[name] = r
         os.makedirs(os.path.dirname(RESULTS), exist_ok=True)
         json.dump(res, open(RESULTS, "w"), indent=1)
