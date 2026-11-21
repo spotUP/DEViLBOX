@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { furnaceToMds, mdsPsgPitch, portaEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
+import { furnaceToMds, mdsPsgPitch, furnaceDacGain, pcmDacAtt, pcmGain, portaEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
@@ -210,4 +210,14 @@ describe('furnaceToMds', () => {
     // MAME phase 1q: 160 of 160 Furnace 0x95 starts in 40 s get a z_pcm1_key_on request, median +8 ms, so PCM is not lossy.
     expect(s.lossy.some((l) => l.startsWith('FM6'))).toBe(false);
   });
+
+  describe('FM6 DAC volume', () => {
+    it('maps Furnace dacVolTable to the nearest MDSDRV PCM gain', () => {
+      expect(pcmDacAtt(127)).toBe(0);
+      expect(pcmGain(pcmDacAtt(0))).toBe(0);
+      const db = (g: number) => 20 * Math.log10(g);
+      for (let v = 89; v <= 127; v++) expect(Math.abs(db(pcmGain(pcmDacAtt(v))) - db(furnaceDacGain(v)))).toBeLessThanOrEqual(1.2);
+    });
+  });
 });
+
