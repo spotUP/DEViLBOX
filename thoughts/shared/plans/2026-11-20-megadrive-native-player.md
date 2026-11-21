@@ -1052,3 +1052,35 @@ Open:
 - Tempo quantisation drift: 154/128*60 = 72.19 Hz vs 72 Hz. It is flagged lossy. Key timing on 72 Hz rows is quantised to NTSC frames. That causes the large errors common to all channels (worst 874 cents at 21.433 s).
 - Task 3 is not started: the Solar_Man PSG4 -0.15 dB residual (the first 3-frame node is sometimes 2 frames; key-on vs envelope phase).
 - Listen ROM: ~/Desktop/md-roms/newer_song_lol-1z.bin.
+
+## Phase 2a results (2026-11-21)
+
+Root causes fixed in `src/lib/export/md/mdsSong.ts`:
+
+1. **Vibrato phase reset on 03xx notes.** In Furnace `playback.cpp`, a note with 03xx (or E-shorthand porta) on a channel that is still keyed on sets `doNote = false`. The vibrato position is reset only when `doNote` is true, so the phase carries over the slur. The exporter reset `vPos` on every note. newer_song_lol FM1 rows 2 and 15 are `note + 03 44` after `04 44` on row 1. Fix: `portaSlur = portaXx > 0 && sounding` skips the reset.
+2. **Vibrato phase counted in sequence ticks, not engine ticks.** Under virtual tempo, sequence tick t runs on Furnace tick `ceil(t * fpt)` (tempoAccum adds N per engine tick, the row counter drops per D). Phase now advances by `(fTick(t) - fTick(vAt)) * rate`, counted absolutely so carried phase does not drift.
+3. **EDxx / ECxx counted sequence ticks.** Both count Furnace engine ticks at s.hz. They now map `fTick(row) + xx` back to the nearest sequence tick. ECxx is clamped to at least the delayed key-on + 1. Without virtual tempo fpt = 1, so those exports are unchanged.
+
+Tests (`mdsSong.test.ts`): "EDxx/ECxx count Furnace engine ticks under virtual tempo" (180/150: ED 03 key-on at tick 4, EC 03 rest at tick 4) and "04xy: a 03xx note on a keyed-on channel keeps the vibrato phase" (expects the phase-8 envelope from row 2). Both fail with the fix disabled.
+
+newer_song_lol, 0-40 s, lagcmp frames over 10 cents (1z -> 2a):
+
+| Channel | 1z | 2a |
+|---|---|---|
+| FM1 | 511 | 61 |
+| FM2 | 437 | 62 |
+| FM3 | 504 | 61 |
+| FM4 | 415 | 35 |
+| FM5 | 343 | 42 |
+| PSG1 | 793 | 414 |
+| PSG2 | 1235 | 282 |
+
+FM1 per 4 s window after fix: [8,6,9,8,0,21,0,1,1,7]. The 20-24 s residue is on every channel (tempo quantisation drift, 72.19 Hz MDSDRV timer). loud.py unchanged against 1z (FM equal, PSG4 -0.04..0.00 dB, FM6/DAC +-89 is the known artefact). Sequence grows 40752 -> 52866 bytes (more distinct vibrato envelopes). Listen ROM: `~/Desktop/md-roms/newer_song_lol-2a.bin`.
+
+Open:
+- PSG1/PSG2 residue (414 / 282 frames) not analysed.
+- 20-24 s tempo drift shared by all channels.
+- Unverified: PSG porta on a non-sounding channel still slides in the export; Furnace keys it on.
+- Split of the gain between fix 1 and fix 2 not measured.
+- Task 3 (Solar_Man PSG4 -0.15 dB) not started.
+- EDxx/ECxx are not used in newer_song_lol; proof is the unit test only.

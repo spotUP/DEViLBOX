@@ -15,8 +15,9 @@ async function parse(name: string) {
 async function convert(name: string) { return furnaceToMds(await parse(name)); }
 
 /** Solar_Man (speed 5) with extra effects on channel 0, order 0, row 0 (a note, instrument 11, volume 116, 08 11). */
-async function solarManRow0(fx: Array<{ type: number; value: number }>) {
+async function solarManRow0(fx: Array<{ type: number; value: number }>, vt?: [number, number]) {
   const m = await parse('Solar_Man.fur');
+  if (vt) [m.subsongs[0].virtualTempo, m.subsongs[0].virtualTempoD] = vt;
   const cell = m.patterns.get(`0_0_${m.subsongs[0].orders[0][0]}`)!.rows[0]!;
   cell.effects = [...(cell.effects ?? []), ...fx];
   return furnaceToMds(m);
@@ -243,6 +244,14 @@ describe('furnaceToMds', () => {
     expect(env.slice(7 * 6, 7 * 6 + 2)).toEqual([0, 0]); // node 7 = pos 32: vibTable 0
     expect(env.slice(11 * 6, 11 * 6 + 2)).toEqual([0xff, 0x92]); // node 11 = pos 48: vibTable -127, (7*-127*15)>>4 = -834, /15 = -55
   });
+  it('04xy: a 03xx note on a keyed-on channel keeps the vibrato phase (playback.cpp doNote=false), newer_song_lol FM1 row 2', async () => {
+    // 180/150 at 60 Hz: 72 Hz sequence ticks, driver tempo round(72 * 128 / NTSC) - 1, fpf = tpf * 5/6 Furnace ticks per frame.
+    const fpf = Math.round(72 * 128 / 59.922743) / 128 * 5 / 6;
+    const hex = Buffer.from((await convert('newer_song_lol.fur')).seq).toString('hex');
+    // Row 1 (sequence tick 6 = Furnace tick 5) starts 04 44; row 2 (tick 12 = Furnace tick 10) is a note with 03 44 on the sounding note:
+    // the phase runs on from pos (10 - 5) * 4 = 20 instead of restarting at 0.
+    expect(hex).toContain(Buffer.from(vibratoEnvelope(8, 4, 4, 15, fpf)).toString('hex'));
+  });
   it('highscorefollin: mid-note 04 66 on FM2 (order 0 row 32) is an E8 extended vibrato envelope from pos 0, not lossy', async () => {
     const s = await convert('highscorefollin.fur');
     expect(Buffer.from(s.seq).toString('hex')).toContain(Buffer.from(vibratoEnvelope(0, 6, 6)).toString('hex'));
@@ -269,6 +278,12 @@ describe('furnaceToMds', () => {
     expect(first(s.keyOns).tick).toBe(2);
     expect(first(decode(s.seq)).tick).toBe(2);
     expect(s.lossy.some((l) => l.startsWith('effect ED'))).toBe(false);
+  });
+  it('EDxx/ECxx count Furnace engine ticks under virtual tempo: at 180/150 (1.2 sequence ticks per engine tick) ED 03 and EC 03 land on tick 4', async () => {
+    const d = await solarManRow0([{ type: 0xed, value: 0x03 }], [180, 150]);
+    expect(d.keyOns.find((e) => e.ch === 0)!.tick).toBe(4);
+    const c = await solarManRow0([{ type: 0xec, value: 0x03 }], [180, 150]);
+    expect(decode(c.seq, true).filter((e) => e.ch === 0)[1]).toEqual({ ch: 0, tick: 4, n: -1 });
   });
   it('portaEnvelope FM: 03 70 takes three steps of 182 Hz then holds the target, 03 20 three steps of 104 Hz (Furnace Fancy_Promenard FM4)', () => {
     const hz = (hex: string) => { // nodes of 4 bytes: signed 1/256 semitone, 0, length

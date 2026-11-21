@@ -428,7 +428,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey))) : dtn;
     // 04xy state: pos was `vPos` at tick `vAt` and advances by vRate per tick while vDepth > 0 (playback.cpp).
     let vDepth = 0, vRate = 0, vPos = 0, vAt = 0, vFine = 15;
-    const vSync = (t: number) => { if (vDepth) vPos = (vPos + Math.round((t - vAt) * fpt) * vRate) % 64; vAt = t; };
+    // Sequence tick t runs on Furnace tick ceil(t * fpt) (tempoAccum counts N per engine tick); counted absolutely so carried phase does not drift.
+    const fTick = (t: number) => Math.ceil(t * fpt - 1e-9);
+    const vSync = (t: number) => { if (vDepth) vPos = (vPos + (fTick(t) - fTick(vAt)) * vRate) % 64; vAt = t; };
     const vibCmd = (t: number): number[] => { vSync(t); return [0xe8, extItem(vibratoEnvelope(vPos, vRate, vDepth, vFine, fpf)) + 1]; };
     // 0Axy: Furnace keeps volume in 1/256 steps and adds x*64 (or -y*64) every tick, the row's first tick included, until it clamps at
     // 0 or the channel maximum (playback.cpp per-tick volume slides); the driver gets an E2 on every tick where volume>>8 changes.
@@ -513,10 +515,12 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         const cmds: number[] = [];
         let pChanged = false, vChanged = false, dacOff = false;
         // EDxx runs the whole row xx ticks late; ECxx keys off xx ticks after the row runs (playback.cpp rowDelay / cut, delayBehavior 2).
+        // Both count Furnace engine ticks (s.hz), so under virtual tempo they land on the nearest sequence tick.
         const fxv = (t: number) => cell?.effects?.find((e) => e.type === t && e.value > 0)?.value ?? 0;
-        let delay = fxv(0xed), cutAt = fxv(0xec);
+        const seqAt = (f: number) => Math.round(f / fpt) - tick, edF = fTick(tick) + fxv(0xed);
+        let delay = fxv(0xed) ? Math.max(0, seqAt(edF)) : 0, cutAt = fxv(0xec);
         if (delay >= c.ticks[i]) { lossy.add('EDxx delay not shorter than the row (played on the row)'); delay = 0; }
-        cutAt = cutAt ? delay + cutAt : 0;
+        cutAt = cutAt ? Math.max(delay + 1, seqAt((fxv(0xed) ? edF : fTick(tick)) + cutAt)) : 0;
         if (cutAt >= c.ticks[i]) { lossy.add('ECxx cut not inside the row (ignored)'); cutAt = 0; }
         i0 = i === 0;
         for (let k = 0; k < delay; k++) addTick(volStep());
@@ -599,6 +603,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (kind === 'psg' && effDtn() !== dtnOut) { dtnOut = effDtn(); cmds.push(0xe6, dtnOut & 0xff); }
             // 03xx: slur into the note (no key-off, envelope keeps running) and slide from the previous key; E7 00 turns it off again.
             const slide = (kind === 'psg' || (kind === 'fm' && sounding)) && portaXx > 0 && prevKey >= 0 && prevKey !== nv;
+            // 03xx on a keyed-on channel is no note-on (playback.cpp: doNote=false), so the vibrato phase is not reset.
+            const portaSlur = portaXx > 0 && sounding;
             if (kind === 'fm' && portaXx > 0 && sounding) cmds.push(0xe0);
             if (slide) {
               const env = portaEnvelope(prevKey, nv, portaXx, kind === 'fm', m.compatFlags.linearPitch ? portaXx * (Number(m.compatFlags.pitchSlideSpeed) || 1) : 0, fpf);
@@ -608,7 +614,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             else if (prate) { if (pChanged || pInit || !pegDirty) cmds.push(...pslideCmd()); }
             else if (pegDirty) cmds.push(0xe8, insRef(kind, ins).peg + 1);
             pegDirty = slide || prate !== 0; portaXx = 0;
-            if (!m.compatFlags.continuousVibrato) { vPos = 0; vAt = tick + delay; }
+            if (!m.compatFlags.continuousVibrato && !portaSlur) { vPos = 0; vAt = tick + delay; }
             if (vDepth) {
               if (slide || prate || insRef(kind, ins).peg >= 0) lossy.add('04xy with a pitch slide or pitch macro (vibrato replaces it)');
               cmds.push(...vibCmd(tick + delay)); pegDirty = true;
