@@ -2756,7 +2756,22 @@ dos_loadseg	push	d1-d7/a0-a6
 	move.l	moduleptr(pc),a0
 	bra.b	myloadseg_noloading
 myloadseg_loadfile
-	lea	loadfilemsg(pc),a0
+;*--- PORT: SELF-LOADSEG. A player that LoadSeg()s its own module (DaveLowe,
+;     FuturePlayer, FredGray, CoreDesign) would get a second copy of a file
+;     already resident at moduleptr; on a 512 KB A500 that copy pushes the
+;     chip arena past chip RAM (incredibleshrinkingsphere.dl, 120 KB). Relocate
+;     from moduleptr instead, as the empty-name branch above does.
+	lea	loadedmodname(pc),a1
+	bsr	strcmp
+	tst.l	d0
+	beq.b	.self
+	lea	filearray(pc),a1
+	bsr	strcmp
+	tst.l	d0
+	bne.b	.copy
+.self	move.l	moduleptr(pc),a0
+	bra.b	myloadseg_noloading
+.copy	lea	loadfilemsg(pc),a0
 	move.l	d1,4(a0)
 	move.l	chippoint(pc),8(a0)
 	move.l	#loadfilemsge-loadfilemsg,d0

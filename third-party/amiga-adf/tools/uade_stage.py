@@ -152,9 +152,9 @@ def loadseg_bytes(module_path):
         head = fh.read(4)
     if len(head) < 4 or hunkdump.read32(head, 0) != hunkdump.HUNK_HEADER:
         return 0
-    size = os.path.getsize(module_path)
-    # score's own rounding after the copy: (chippoint + len) & -16, then +16.
-    return ((size + 15) & ~15) + 16 + relocated_size(module_path)
+    # Only the relocated hunks: score's dos_loadseg relocates a LoadSeg of the
+    # module's own name straight from moduleptr (PORT: SELF-LOADSEG), no file copy.
+    return relocated_size(module_path)
 
 
 DTP_EXTLOAD = 0x8000445D
