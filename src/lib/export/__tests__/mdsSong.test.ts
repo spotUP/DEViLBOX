@@ -63,6 +63,15 @@ describe('PSG period rounding', () => {
     expect(mdsPsgPitch(51 * 256 + psgFix(51))).toBe(90);
     for (let k = 9; k <= 84; k++) expect(mdsPsgPitch(k * 256 + psgFix(k)), `key ${k}`).toBe(Math.round(3579545 / (27.5 * 2 ** ((k + 3) / 12)) / 64));
   });
+  it('newer_song_lol PSG1 04 55: psgFix keeps the vibrato nodes on the rounded Furnace period, not one period high', () => {
+    const per = (nv: number) => Math.round(3579545 / (27.5 * 2 ** ((nv + 3) / 12)) / 64);
+    const env = vibratoEnvelope(0, 5, 5);
+    const nodes = Array.from({ length: env.length / 6 }, (_, i) => (((env[i * 6] << 8) | env[i * 6 + 1]) << 16) >> 16);
+    // Old rule (smallest |detune| that hits the key's period) as the baseline: one PSG period high on many nodes.
+    const edge = (k: number) => { for (let a = 0; a <= 128; a++) for (const d of a ? [-a, a] : [0]) if (mdsPsgPitch(k * 256 + d) === per(k)) return d; return 0; };
+    const miss = (fix: (k: number) => number) => { let n = 0; for (let k = 24; k <= 72; k++) for (const w of nodes) if (mdsPsgPitch(k * 256 + fix(k) + w) !== per(k + w / 256)) n++; return n; };
+    expect({ before: miss(edge), after: miss(psgFix) }).toEqual({ before: 810, after: 72 });
+  });
 });
 
 describe('PSG envelope rate', () => {

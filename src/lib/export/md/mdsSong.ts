@@ -58,8 +58,10 @@ export function mdsPsgPitch(p: number): number {
   return (a - Math.floor(((a - b) * f) / 256)) >> Math.floor(k / 12);
 }
 /**
- * Smallest detune (1/256 semitone) that makes the driver write Furnace's rounded period for PSG key k (measured highscorefollin PSG1
- * note 54: Furnace 76, MDSDRV 75 at detune 0). shortcut: corrects the base key only (arp macro steps keep the truncated period), and keys
+ * Detune (1/256 semitone) that makes the driver write Furnace's rounded period for PSG key k (measured highscorefollin PSG1
+ * note 54: Furnace 76, MDSDRV 75 at detune 0). Of the detunes that hit the key, take the one that also hits Furnace's period for
+ * the most pitch offsets within half a semitone, so 04xy vibrato and slides stay on the rounded period (newer_song_lol PSG1: the
+ * smallest-|d| edge detune sat one period high on 810 of the 04 55 nodes over keys 24..72). shortcut: corrects the base key only (arp macro steps keep the truncated period), and keys
  * 85+ (period under 13, over 8 kHz) would need a detune past one byte, so they stay one period high; upgrade with a note-byte borrow.
  */
 // MDSDRV PCM volume: mds_z80_get_vol maps E2 attenuation a (0.75 dB units) through mds_psg_vol_table to level L (2 dB steps),
@@ -83,10 +85,22 @@ export const pcmDacScale = (vol: number): number => {
   return g ? furnaceDacTable(vol) / 128 / g : 0;
 };
 
+const psgFixMemo = new Map<number, number>();
 export function psgFix(k: number): number {
-  const want = Math.min(1023, Math.round(sndPeriod(k)));
-  for (let a = 0; a <= 128; a++) for (const d of a ? [-a, a] : [0]) if (d <= 127 && k * 256 + d >= 0 && mdsPsgPitch(k * 256 + d) === want) return d;
-  return 0;
+  const hit = psgFixMemo.get(k); if (hit !== undefined) return hit;
+  const per = (o: number) => Math.min(1023, Math.round(sndPeriod(k + o / 128)));
+  // Of the detunes that write Furnace's period at the key, take the one that also writes it for most offsets within a half
+  // semitone: the driver interpolates linearly and truncates where Furnace rounds, so the edge detune put 04xy vibrato and slide
+  // offsets one period high (newer_song_lol PSG1). Ties go to the detune nearest 0.
+  let best = 0, bestMiss = Infinity;
+  for (let a = 0; a <= 128; a++) for (const d of a ? [-a, a] : [0]) {
+    if (d > 127 || k * 256 + d < 0 || mdsPsgPitch(k * 256 + d) !== per(0)) continue;
+    let miss = 0;
+    for (let o = -64; o <= 64; o++) if (k * 256 + d + 2 * o >= 0 && mdsPsgPitch(k * 256 + d + 2 * o) !== per(o)) miss++;
+    if (miss < bestMiss) { best = d; bestMiss = miss; }
+  }
+  psgFixMemo.set(k, best);
+  return best;
 }
 
 /**

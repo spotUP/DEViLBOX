@@ -1184,3 +1184,19 @@ Open:
 - PSG2 139 frames, classified, not fixed: 4.75 s note-on edge frame (10.4 cents, 72 Hz tick phase); 21.73 s export one frame late across a note change; 8.15-8.25 s rising slide lags, up to 33 cents (slide/vibrato shape).
 - Solar_Man PSG4 -0.15 dB level check (loud.py): not started.
 - Listen ROM: ~/Desktop/md-roms/newer_song_lol-2e.bin.
+
+## Phase 2f results (2026-11-21)
+
+**Cause (PSG vibrato one period high).** Furnace rounds the PSG period (`round(clock/fbase/divider)`); MDSDRV `mds_get_psg_pitch` interpolates and truncates (`lsr` by octave). `psgFix(k)` corrected the base key with the smallest-|d| detune that hit Furnace's period. That detune sits on the edge of the hit window, so every positive vibrato/slide offset landed one PSG period high (about 11 cents). Over the `04 55` vibrato nodes on keys 24..72 the edge rule misses 810 times.
+
+**Fix.** `psgFix` now takes, among the detunes that hit the key, the one that also hits Furnace's period for the most offsets in -64..64 (1/128 semitone); ties go nearest 0; memoised. Misses drop 810 -> 72. Regression test: `mdsSong.test.ts` "newer_song_lol PSG1 04 55". A per-key vibrato envelope was tried first and rejected: the song table needs 349 items, MDSDRV holds 256.
+
+**Frames over 10 cents, newer_song_lol first 40 s (2e baseline -> 2f):** FM1 11 -> 11, FM2 11 -> 11, FM3 15 -> 15, FM4 5 -> 5, FM5 9 -> 9, PSG1 347 -> 55, PSG2 139 -> 67, PSG3 0 -> 0.
+
+**Open.**
+- PSG1 22.333 s retargeted slide end still 51.6 cents high (2 periods); not investigated.
+- PSG2 worst 40.8 cents at 24.7 s: fast slide edge frame near 1300 Hz (1 period about 20 cents); plus note-on edge frame and 8.15-8.25 s slide lag; not investigated.
+- Test decoder overrun on conductor track 0; not investigated.
+- Solar_Man PSG4 -0.15 dB; not investigated.
+
+Listen ROM: `~/Desktop/md-roms/newer_song_lol-2f.bin`.
