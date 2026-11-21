@@ -98,6 +98,11 @@ describe('furnaceToMds', () => {
     const hex = Buffer.from((await convert('Puyopuyo~n_DopplegangerArle-TsuuStyle.fur')).seq).toString('hex');
     expect(hex).toContain('ff160000ff580000ff9c000000000' + '0ff7f03');
   });
+  it('golden_shit: linear-pitch 02xx is an extended pitch envelope (slide node, then hold at the clamp), measured 1:1 in MAME', async () => {
+    // 02 c0, pitchSlideSpeed 4, tpf 1: delta 2 * -768 = 0xfa00 per frame, 14 frames (len 0d), next node 1 holds at the key-0 limit 0xa800.
+    const hex = Buffer.from((await convert('golden_shit.fur')).seq).toString('hex');
+    expect(hex).toContain('0000fa000d01a800');
+  });
   it('portaEnvelope FM: 03 70 takes three steps of 182 Hz then holds the target, 03 20 three steps of 104 Hz (Furnace Fancy_Promenard FM4)', () => {
     const hz = (hex: string) => { // nodes of 4 bytes: signed 1/256 semitone, 0, length
       const b = Buffer.from(hex, 'hex'); const out: number[] = [];

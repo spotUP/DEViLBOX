@@ -256,6 +256,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const tbItem = (bytes: number[]): number => { const i = item(bytes); tbaseRel.add(i); return i; };
   const slideItems = new Map<string, number>();
   const slideItem = (b: number[]) => { const k = b.join(','); if (!slideItems.has(k)) slideItems.set(k, item(b)); return slideItems.get(k)!; };
+  // Extended pitch envelopes (mdsseq.md: entry has bit 15 set, 6-byte nodes with a word delta) for 01xx/02xx.
+  const extRel = new Set<number>();
+  const extItem = (b: number[]) => { const i = slideItem(b); extRel.add(i); return i; };
   const insCache = new Map<string, { ins: number; peg: number; mtab: number }>();
   const insRef = (kind: Kind, idx: number) => {
     const key = `${kind === 'fm' ? 'fm' : 'psg'}:${idx}`;
@@ -277,12 +280,41 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   for (let ch = 0; ch < nCh; ch++) {
     const kind = KIND[ch];
     let trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0, slideEnd = 0, prevKey = -1, pegDirty = false, portaXx = 0;
+    // 01xx/02xx (linear pitch): rate in 1/128 semitone per Furnace tick, poff = offset after the last tick so far. Furnace keeps the slide
+    // running across notes and note offs (playback.cpp 0x01/0x02 leave inPorta false; NOTE_ON resets baseFreq, the slide goes on), so each
+    // key-on restarts the envelope from 0 and only 01 00 / 02 00 / 03xx stop it, holding the reached offset until the next note.
+    // The slide stops at Furnace's target (01: note 179, 02: note 0, genesis.cpp NOTE_PORTA clamps baseFreq) and targetResetsSlides
+    // then clears portaSpeed (playback.cpp per-tick porta), so later notes do not slide. Furnace note = converter note + 60.
+    // shortcut: limitSlides (156 / dispatch porta floor) and offsets past the driver's signed 16-bit range are clamped, lossy.
+    // The driver key (note byte + transpose) must stay in 0..MAX_NOTE (mds_get_fm_pitch indexes its octave/note tables with it), so a slide
+    // past that holds at the driver's end key instead of Furnace's (measured: golden_shit FM1 kick 02 c0 wrapped to 4 kHz below key 0).
+    let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0;
+    const pss = Number(m.compatFlags.pitchSlideSpeed) || 1, tpf = (tempo + 1) / 128;
+    const pLimit = () => (prate > 0 ? Math.min(119 - curNv, MAX_NOTE - curKey) : -Math.min(curNv + 60, curKey)) * 128;
+    // MDSDRV extended node: frame k of a node is init + (k+1)*delta, held len+1 frames (mdsdrv.68k @extended).
+    // Node 0 runs the slide up to the frame before the target, node 1 holds the target.
+    const pslideCmd = (): number[] => {
+      const w = (v: number) => { const c = Math.max(-0x8000, Math.min(0x7fff, Math.round(v))); if (c !== Math.round(v)) lossy.add('01xx/02xx offset beyond 128 semitones (clamped)'); return c & 0xffff; };
+      const node = (v: number, dv: number, len: number, next: number) => { const a = w(v), d = w(dv); return [a >> 8, a & 0xff, d >> 8, d & 0xff, len, next]; };
+      pInit = poff !== 0; pegDirty = true;
+      let env: number[];
+      if (!prate) env = node(2 * poff, 0, 255, 0);
+      else {
+        const lim = pLimit(), d = 2 * prate * tpf, j = Math.ceil((2 * (lim - poff)) / d) - 1;
+        env = j >= 1 ? [...node(2 * poff, d, Math.min(254, j - 1), 1), ...node(2 * lim, 0, 255, 1)] : node(2 * lim, 0, 255, 0);
+      }
+      return [0xe8, extItem(env) + 1];
+    };
     const out: Array<{ bytes: number[]; tieStart: boolean }> = [];
     for (const c of chunks) {
       // PSG: E2 $80|v gives attenuation 15-v, added to the envelope attenuation 15-macro and clamped, the same sum as Furnace VOL_SCALE_LOG.
       const volCmd = (v: number) => [0xe2, kind === 'fm' ? 127 - v : 0x80 | Math.max(0, Math.min(15, v))];
       // A slide still running at a chunk start keeps its envelope: E8 would restart it from the instrument's own one.
-      const insCmd = (chunkStart = false) => { const r = insRef(kind, ins); return [0xe1, r.ins, ...(chunkStart && tick < slideEnd ? [] : [0xe8, r.peg + 1]), 0xeb, r.mtab + 1]; };
+      const insCmd = (chunkStart = false) => {
+        const r = insRef(kind, ins);
+        const peg = (chunkStart ? sounding && (prate || poff) : prate) ? pslideCmd() : chunkStart && tick < slideEnd ? [] : [0xe8, r.peg + 1];
+        return [0xe1, r.ins, ...peg, 0xeb, r.mtab + 1];
+      };
       const bytes: number[] = [...insCmd(true), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(dtn ? [0xe6, dtn & 0xff] : [])];
       let curIns = ins;
       type Tok = { cmd: 'note' | 'tie' | 'rest'; n: number; t: number; pre: number[] };
@@ -304,6 +336,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         const nv = cell ? convertFurnaceNoteValue(cell) : -1;
         if (cell && cell.instrument >= 0) ins = cell.instrument;
         const cmds: number[] = [];
+        let pChanged = false;
         if (cell && cell.volume >= 0) { vol = cell.volume; cmds.push(...volCmd(vol)); }
         for (const e of cell?.effects ?? []) {
           if (e.type < 0 || FX_FLOW.has(e.type)) continue;
@@ -319,10 +352,18 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (!(noise & 2)) lossy.add('noise fixed-rate mode (20xy, x=0)');
             cmds.push(0xea, NOISE_EA[noise]); continue;
           }
-          if (e.type === 0x03 && (kind === 'psg' || kind === 'fm')) { portaXx = e.value; continue; } // 03 00 only stops the porta
+          if (e.type === 0x03 && (kind === 'psg' || kind === 'fm')) { portaXx = e.value; if (prate) { prate = 0; pChanged = true; } continue; } // 03 00 only stops the porta
+          if ((e.type === 0x01 || e.type === 0x02) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
+            prate = (e.type === 0x01 ? 1 : -1) * e.value * pss; pChanged = true;
+            if (m.compatFlags.limitSlides) lossy.add('01xx/02xx with limitSlides (slide range not limited)');
+            if (!Number.isInteger(2 * e.value * pss * tpf)) lossy.add('01xx/02xx at a fractional sequence-tick-per-frame rate (rounded per frame)');
+            continue;
+          }
           lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}`);
         }
         const isNote = nv >= 0 && nv < 253, isOff = nv >= 253;
+        if (isNote) { poff = 0; curNv = nv; }
+        else if (pChanged && sounding && (prate || poff)) cmds.push(...pslideCmd());
         if (isNote && ins !== curIns) { curIns = ins; cmds.unshift(...insCmd()); }
         if (isNote || isOff || cmds.length || i === 0) {
           if (tok.length) emit(tok.pop()!);
@@ -332,6 +373,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (kind === 'noise' && (n - trs < 0 || n - trs > MAX_NOTE)) { trs = n > MAX_NOTE ? n - MAX_NOTE : 0; cmds.push(0xe4, trs); }
             n -= trs;
             if (n < 0 || n > MAX_NOTE) { lossy.add(`${kind.toUpperCase()} note out of range (clamped)`); n = Math.max(0, Math.min(MAX_NOTE, n)); }
+            curKey = n + trs;
             // 03xx: slur into the note (no key-off, envelope keeps running) and slide from the previous key; E7 00 turns it off again.
             const slide = (kind === 'psg' || (kind === 'fm' && sounding)) && portaXx > 0 && prevKey >= 0 && prevKey !== nv;
             if (kind === 'fm' && portaXx > 0 && sounding) cmds.push(0xe0);
@@ -340,14 +382,23 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
               if (kind === 'psg') cmds.push(0xe0);
               cmds.push(0xe8, slideItem(env) + 1); slideEnd = tick + Math.round((env[env.length - 1] + 1) * (tempo + 1) / 128);
             }
+            else if (prate) { if (pChanged || pInit || !pegDirty) cmds.push(...pslideCmd()); }
             else if (pegDirty) cmds.push(0xe8, insRef(kind, ins).peg + 1);
-            pegDirty = slide; portaXx = 0; prevKey = kind === 'psg' || kind === 'fm' ? nv : -1;
+            pegDirty = slide || prate !== 0; portaXx = 0; prevKey = kind === 'psg' || kind === 'fm' ? nv : -1;
             tok.push({ cmd: 'note', n, t: 0, pre: cmds }); sounding = true; any = true;
             keyOns.push({ tick, ch, note: nv });
           } else if (isOff) { tok.push({ cmd: 'rest', n: 0, t: 0, pre: cmds }); sounding = false; }
           else { tok.push({ cmd: sounding ? 'tie' : 'rest', n: 0, t: 0, pre: cmds }); if (i === 0) tieStart = sounding; }
         }
         tok[tok.length - 1].t += c.ticks[i];
+        if (prate && curNv >= 0) {
+          const lim = pLimit();
+          poff += prate * c.ticks[i];
+          if (prate > 0 ? poff >= lim : poff <= lim) {
+            if (lim !== (prate > 0 ? 119 - curNv : -(curNv + 60)) * 128) lossy.add('01xx/02xx past the driver key range (held at the end key)');
+            poff = lim; if (m.compatFlags.targetResetsSlides) prate = 0;
+          }
+        }
         tick += c.ticks[i];
       });
       if (tok.length) emit(tok.pop()!);
@@ -389,7 +440,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const trackHdr = sd.length;
   tracks.forEach(() => sd.push(0, 0, 0, 0));
   const tbase = sd.length;
-  itemOff.forEach((a, i) => sd.push(...be16(tbaseRel.has(i) ? a - tbase : a)));
+  if (itemOff.some((a, i) => extRel.has(i) && a >= 0x8000)) throw new Error('MDSDRV extended pitch envelope beyond 32 KiB of song data');
+  itemOff.forEach((a, i) => sd.push(...be16(tbaseRel.has(i) ? a - tbase : extRel.has(i) ? a | 0x8000 : a)));
   tracks.forEach((t, i) => {
     const pos = sd.length - tbase;
     sd.splice(trackHdr + i * 4, 4, MDS_CHAN[t.ch], 0, ...be16(pos));
