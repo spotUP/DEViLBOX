@@ -1493,6 +1493,45 @@
         "player": "9a557c331989c1ff462f6f706d67aaa6089d7c6f7043164b7f1bf989440d26db"
       }
     },
+    "TCB_Tracker": {
+      "adf": "TCB_Tracker.adf",
+      "adfSha256": "07c8bc4e07dda68dbd0b8bf67575e91748f6c44b794a032346f05292db79f618",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 41268,
+        "maxBytes": 262144
+      },
+      "moduleLengthWord": {
+        "diskOffset": 41264,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 303898,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 392452,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x4A600",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC62600",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x5FD04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "cannonfodder.tcb",
+        "bytes": 246519
+      },
+      "sources": {
+        "tool": "ac79e2ed0964b364258e0645d83b308e877b7e453e01730d5fb90504db62846d",
+        "player": "62043dab5c4c1c88ee998a2e3d17a7d4b9b04f1e5181d7e04fe90f5b9a9ad4ec"
+      }
+    },
     "TFMX-Pro": {
       "player": "TFMX",
       "adf": "TFMX-Pro.adf",
