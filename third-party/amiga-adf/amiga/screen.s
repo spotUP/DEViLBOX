@@ -103,6 +103,9 @@ _screen_init:
         move.l  (a0),d0
         moveq   #0,d7
         moveq   #21,d5                  ; name length - 1 (msg holds 31 names of 22 + space)
+        ifd     NOTEXT
+        bra.w   .nomsg                  ; EMS: no magic, no text fields (builder defines NOTEXT)
+        endif
         cmp.l   #'DIGI',d0
         beq.w   .digi
         cmp.l   #'BeEp',d0

@@ -137,6 +137,8 @@ def main():
     player = entry['player']
     # UADE ignores the end report of these players (SONG_END_NOT_POSSIBLE -> $12C = 0); match it.
     asm = ASM + (['-DUADE_NO_SONG_END=1'] if {'broken_song_end', 'no_ep_end_detect'} & set(entry.get('flags', [])) else [])
+    # EMS / EMS-6 modules have no magic and no text fields: screen.s must not print the MOD layout.
+    asm += ['-DNOTEXT=1'] if player in ('EMS', 'EMS-6') else []
     needs_020 = {l.split('\t')[0] for l in open(MIN_CPU_TSV) if l.strip() and not l.startswith('#')}
     target = a.target or ('a1200' if player in needs_020 else 'a500')
     t = TARGETS[target]
