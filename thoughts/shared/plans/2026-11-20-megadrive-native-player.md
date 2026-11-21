@@ -953,3 +953,35 @@ Listen ROMs: `~/Desktop/md-roms/highscorefollin-1v.bin`, `~/Desktop/md-roms/Sola
 ### Task 3: sample-0 fallback for SM-less sample instruments (not started)
 
 - Budget ran out. Still to do: grep the readers of `instrument.amiga` and the sample-index fallbacks in src/lib/import and src/lib/export. Fix the MD path only and list the others.
+
+## Phase 1x results (2026-11-21)
+
+Commit d0c1a5315 (src/lib/export/md/mdsSong.ts, src/lib/export/__tests__/mdsSong.test.ts). Listen ROM: ~/Desktop/md-roms/Solar_Man-1x.bin.
+
+### Task 1: Solar_Man PSG4 noise -0.3 dB
+
+- The 1w "re-hit does not restart the envelope" diagnosis was wrong. Furnace's attenuation at frame 7 (4, 5, 5) is the same hi-hat envelope still decaying, not a new hit. Real hits come every ~10.7 frames (rows every 2 at speed 5, 56 Hz), alternating volume 14/11. MAME re-hits at the same frames (1, 12, 22, 33, 44 ...). No tie or slur problem.
+- Root cause: envelope rate. MDSDRV steps the PSG envelope once per NTSC VINT (mds_psg_update_env), while Furnace steps the volume macro once per tick. The export wrote one node per tick, so at 56 Hz every PSG envelope ran 7% fast and decayed early.
+- Fix: psgEnvelope resamples the macro to driver frames. Frame f plays tick floor((f + 0.5) * tickHz / NTSC_HZ). Songs within 0.5 Hz of NTSC keep one node per tick (bytes unchanged). Sampling at frame start (floor(f * r)) overshot to +0.33 dB; the midpoint is the right phase.
+- loud.py, Solar_Man, 4 s windows, MAME vs Furnace:
+  - PSG4 before: -0.29 .. -0.33 dB.
+  - PSG4 after: -0.19 -0.15 -0.15 -0.17 -0.18 -0.16 -0.13 -0.16 -0.16 -0.15.
+  - PSG1 unchanged (-0.03 / -0.00 / -0.01 / +0.07). PSG2 last window +0.06 to +0.07. PSG3 empty. FM rows unchanged.
+- Not within 0.1 dB yet. Residual: in MAME the first node (3 frames at 15) sometimes plays only 2 frames (cycles at frames 1, 12, 33, 44, 55). Key-ons land up to one frame after Furnace's tick time, but the node-2 step sometimes stays at the Furnace absolute time. Next: dump the noise-track tokens and the driver envelope counter at key-on to see if key-on resets the envelope sub-counter.
+- Tests: "PSG envelope rate" (56 Hz hat macro plays 28 frames, first node 0x30; 60 Hz bytes unchanged).
+
+### Open items
+
+- Same per-frame vs per-tick rate question likely applies to pitchEnvelope (PSG/FM pitch macros) and the arp mtab. Not checked.
+- PSG4 residual -0.15 dB (first-node phase), see above.
+- `npm run type-check` fails only in src/lib/export/amiga/__tests__/adfExport.test.ts (adfSongName undefined, uncommitted ADF work, not touched here). mdsSong files are clean.
+
+### Task 2: instruments without an SM feature (Furnace initSample 0)
+
+MD export path: only src/lib/export/md/mdsSong.ts (FM6 sample, `m.instruments[ins].amiga`) reads it, fixed in e044a8377. No other MD reader.
+
+Other readers, not changed (outside MD path):
+- src/lib/import/formats/furnace/FurnaceInstrumentParser.ts:173: `if (initSample >= 0) inst.samples.push(initSample)` only runs when SM exists, so a no-SM sample instrument lists no sample.
+- src/lib/import/formats/FurnaceParser.ts:621: creates `amiga` with `initSample: -1` when only a note map exists; Furnace default is 0.
+- src/lib/import/parsers/FurnaceToSong.ts:238: passes `furIns.amiga` through undefined; playback consumers then have no sample index.
+- src/lib/export/FurnaceInstrumentEncoder.ts:594-597 and FurnaceInstrumentParser.ts:1628: skip SM when `amiga` is undefined (round trip keeps Furnace's default, so likely fine), and `initSample ?? -1` writes -1 where Furnace default is 0.
