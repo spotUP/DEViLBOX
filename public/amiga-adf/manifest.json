@@ -507,6 +507,45 @@
         "player": "1686b55a62f7469096b84dc7769c4d71b73530d8e15b5b032a1d1a08795d4f5d"
       }
     },
+    "JochenHippel-7V": {
+      "adf": "JochenHippel-7V.adf",
+      "adfSha256": "3c135e339a7ef656869b7afea3becaf65c8d47ca86bd1c195876e45dc3e0948c",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 44924,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 44920,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 274794,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 383236,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x43400",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5B400",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x5D904",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "ghostbattle_gameover.hip7",
+        "bytes": 45394
+      },
+      "sources": {
+        "tool": "039c208c1dd9159d39f50cd4def612cc44863b9c28163d0da785d2e286e71c3f",
+        "player": "91f90a57be47174a401fe51ff20fdbe55d5f10dc8bd2f12b4bbfb182f8789b41"
+      }
+    },
     "JochenHippel-CoSo": {
       "adf": "JochenHippel-CoSo.adf",
       "adfSha256": "7bdcd3e9890c01e87bda477e3b645941fb3180847643cf496cd7b5d75aad8e25",
@@ -701,6 +740,45 @@
       "sources": {
         "tool": "039c208c1dd9159d39f50cd4def612cc44863b9c28163d0da785d2e286e71c3f",
         "player": "0f0da6015c69602f0b2eef3dc9e155c7a021b26194455bc0195c6e6c80ee1a04"
+      }
+    },
+    "Oktalyzer": {
+      "adf": "Oktalyzer.adf",
+      "adfSha256": "64a5f736bcee9c8aab5ac40ee5166bd4a0378234590bd08193d5b82ffc73e3a6",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 44032,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 44028,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 273902,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 369924,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x43000",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5B000",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x5A504",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "les granges brulees.okta",
+        "bytes": 218296
+      },
+      "sources": {
+        "tool": "039c208c1dd9159d39f50cd4def612cc44863b9c28163d0da785d2e286e71c3f",
+        "player": "c0abc75d756f56eec22b3e191c56f272ff74a28001a53f56153e3cfea4fdd636"
       }
     },
     "PTK-Prowiz": {

@@ -12,6 +12,7 @@ import { isSpeedySystemFormat } from '../../import/formats/SpeedySystemParser';
 import { isAProSysFormat } from '../../import/formats/AProSysParser';
 import { isSoundImagesFormat } from '../../import/formats/SoundImagesParser';
 import { isRiffRaffFormat } from '../../import/formats/RiffRaffParser';
+import { isJochenHippel7VFormat } from '../../import/formats/JochenHippel7VParser';
 
 export interface AdfTemplateEntry {
   adf: string;
@@ -47,6 +48,7 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   if (ascii(m, 0, 'THX')) return 'AbyssHighestExperience';
   if (ascii(m, 0, 'FC14') || ascii(m, 0, 'SMOD') || ascii(m, 0, 'FC13')) return 'FutureComposer1.4';
   if (ascii(m, 0, 'BeEp')) return 'JamCracker';
+  if (ascii(m, 0, 'OKTASONG')) return 'Oktalyzer';
   if (ascii(m, 0, 'COSO')) return 'JochenHippel-CoSo';
   if (ascii(m, 0, ' MUGICIAN/SOFTEYES 1990')) return 'Mugician';
   if (ascii(m, 0, 'DIGI Booster module')) return 'DIGI-Booster';
@@ -70,6 +72,8 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   // AProSys has no magic: the importer detects it by file name only (aps.* / *.aps).
   if (isAProSysFormat(m, filename)) return 'AProSys';
   if (isSoundImagesFormat(m, filename)) return 'SoundImages';
+  // Path A of the 7V check accepts any $6000 loader stub, so it comes after every magic-based test.
+  if (isJochenHippel7VFormat(m)) return 'JochenHippel-7V';
   // Last: the hunk scan for the RIFFRAFF magic is the loosest of the detect functions.
   if (isRiffRaffFormat(m)) return 'RiffRaff';
   return null;

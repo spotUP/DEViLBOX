@@ -39,6 +39,9 @@ const CASES: Array<[string, string]> = [
   ['formats/riffraff_smallest.riff', 'RiffRaff'],
   ['formats/sidewinder2.riff', 'RiffRaff'],
   ['formats/prehistoric_tale.hipc', 'JochenHippel-CoSo'],
+  ['oktalyzer/les granges brulees.okta', 'Oktalyzer'],
+  ['formats/ghostbattle_gameover.hip7', 'JochenHippel-7V'],
+  ['hippel-7v/lethalxcess-intro.hip7', 'JochenHippel-7V'],
 ];
 
 describe('adf slot patcher', () => {
