@@ -1063,6 +1063,45 @@
         "player": "cea8f553a382654d56d8d7e27ec26cf9374db54e3e9dcab5be9b4f092e57e9ca"
       }
     },
+    "PeterVerswyvelen": {
+      "adf": "PeterVerswyvelen.adf",
+      "adfSha256": "7da1470a093c3ae8a516f9d33007151a9fb5e0ac5229c871021e6088bfe606e6",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 41216,
+        "maxBytes": 131072
+      },
+      "moduleLengthWord": {
+        "diskOffset": 41212,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 172778,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 261380,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x2A600",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC42600",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x3FD04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "zarathrusta title.pvp",
+        "bytes": 114686
+      },
+      "sources": {
+        "tool": "ac79e2ed0964b364258e0645d83b308e877b7e453e01730d5fb90504db62846d",
+        "player": "908e7582da066a05f8ae9500c63629f1d022554503c145cd478edf5bc9147807"
+      }
+    },
     "PierreAdane": {
       "adf": "PierreAdane.adf",
       "adfSha256": "5e71d4c5905e6befcc644015dc31500531d54fdcad748ffd7487903ddd51ec70",
