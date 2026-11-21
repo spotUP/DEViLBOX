@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { furnaceToMds, portaEnvelope, vibratoEnvelope } from '../md/mdsSong';
+import { furnaceToMds, mdsPsgPitch, portaEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
@@ -52,6 +52,15 @@ function decode(seq: Uint8Array, rests = false): { ch: number; tick: number; n: 
 }
 
 const key = (k: { ch: number; tick: number; n: number }) => `${k.tick}:${k.ch}:${k.n}`;
+
+describe('PSG period rounding', () => {
+  it('psgFix makes the driver write the rounded Furnace period (highscorefollin PSG1 note 54: 76, not 75)', () => {
+    expect(mdsPsgPitch(54 * 256)).toBe(75);
+    expect(mdsPsgPitch(54 * 256 + psgFix(54))).toBe(76);
+    expect(mdsPsgPitch(51 * 256 + psgFix(51))).toBe(90);
+    for (let k = 9; k <= 84; k++) expect(mdsPsgPitch(k * 256 + psgFix(k)), `key ${k}`).toBe(Math.round(3579545 / (27.5 * 2 ** ((k + 3) / 12)) / 64));
+  });
+});
 
 describe('furnaceToMds', () => {
   for (const name of ['Fancy_Promenard.fur', 'Puyopuyo~n_DopplegangerArle-TsuuStyle.fur']) {

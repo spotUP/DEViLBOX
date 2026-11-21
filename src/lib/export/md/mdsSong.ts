@@ -37,8 +37,9 @@ const MDS_CHAN: number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 const KIND: Kind[] = ['fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'psg', 'psg', 'psg', 'noise'];
 /**
  * With voice transpose $30 the FM note equals the Furnace note value. PSG key k writes period PSG_TAB[k%12] >> (k/12)
- * (key 0 = 1710), which is the period Furnace 0.6.8.3 writes for note value k (sms.cpp, toneDivider 64), so the PSG
- * key is the note value with no offset.
+ * (key 0 = 1710), the period Furnace 0.6.8.3 writes for note value k truncated instead of rounded: Furnace writes
+ * round(clock / f / 32) (engine.cpp calcFreq, sms.cpp toneDivider 64), so the PSG key is the note value with no offset
+ * and psgFix() adds a per-key detune where the driver's truncation lands one period high.
  */
 const FM_TRANSPOSE = 0x30;
 const MAX_NOTE = 0xdf - 0x82;
@@ -51,6 +52,21 @@ const NOISE_EA = [0, 0, 0xe3, 0xe7];
 /** MDSDRV PSG period at keycode k with fine pitch 0: mds_psg_freq_tab >> octave (mdsdrv.68k mds_get_psg_pitch). */
 const PSG_TAB = [1710, 1614, 1524, 1438, 1357, 1281, 1209, 1141, 1077, 1017, 960, 906];
 const psgPeriod = (k: number): number => PSG_TAB[k % 12] >> Math.floor(k / 12);
+/** mds_get_psg_pitch for pitch p = key * 256 + fraction: table interpolation, then `lsr` by octave (truncates). */
+export function mdsPsgPitch(p: number): number {
+  const k = p >> 8, f = p & 255, n = k % 12, a = PSG_TAB[n], b = n === 11 ? 855 : PSG_TAB[n + 1];
+  return (a - Math.floor(((a - b) * f) / 256)) >> Math.floor(k / 12);
+}
+/**
+ * Smallest detune (1/256 semitone) that makes the driver write Furnace's rounded period for PSG key k (measured highscorefollin PSG1
+ * note 54: Furnace 76, MDSDRV 75 at detune 0). shortcut: corrects the base key only (arp macro steps keep the truncated period), and keys
+ * 85+ (period under 13, over 8 kHz) would need a detune past one byte, so they stay one period high; upgrade with a note-byte borrow.
+ */
+export function psgFix(k: number): number {
+  const want = Math.min(1023, Math.round(sndPeriod(k)));
+  for (let a = 0; a <= 128; a++) for (const d of a ? [-a, a] : [0]) if (d <= 127 && k * 256 + d >= 0 && mdsPsgPitch(k * 256 + d) === want) return d;
+  return 0;
+}
 
 /**
  * Furnace 03xx on an SN tone channel steps the period by xx per tick until it reaches the target period (sms.cpp, linear in period).
@@ -337,7 +353,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // past that holds at the driver's end key instead of Furnace's (measured: golden_shit FM1 kick 02 c0 wrapped to 4 kHz below key 0).
     // PSG: E2 $80|v gives attenuation 15-v, added to the envelope attenuation 15-macro and clamped, the same sum as Furnace VOL_SCALE_LOG.
     const volCmd = (v: number) => [0xe2, kind === 'fm' ? 127 - v : 0x80 | Math.max(0, Math.min(15, v))];
-    let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0;
+    let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0, dtnOut = 0;
+    // PSG: E6 carries E5xx plus psgFix(key); each PSG chunk restates it, since a subroutine chunk can follow any detune.
+    const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey))) : dtn;
     // 04xy state: pos was `vPos` at tick `vAt` and advances by vRate per tick while vDepth > 0 (playback.cpp).
     let vDepth = 0, vRate = 0, vPos = 0, vAt = 0, vFine = 15;
     const vSync = (t: number) => { if (vDepth) vPos = (vPos + (t - vAt) * vRate) % 64; vAt = t; };
@@ -382,7 +400,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       // FM6 with a sample instrument plays PCM (genesis.cpp: dacMode from the instrument type at each note-on); E1 would leave PCM mode.
       const isDac = (n: number) => kind === 'fm' && ch === 5 && m.instruments[n]?.type === 4;
       let curPcm = -1, pcmOn = false;
-      const bytes: number[] = [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && sounding ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(dtn ? [0xe6, dtn & 0xff] : [])];
+      const bytes: number[] = [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && sounding ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, dtn & 0xff] : [])];
       let curIns = ins;
       type Tok = { cmd: 'note' | 'tie' | 'rest'; n: number; t: number; pre: number[] };
       const tok: Tok[] = [];
@@ -431,7 +449,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           if (e.type === 0xe5) {
             const d = (e.value - 0x80) * 2;
             if (d < -128 || d > 127) lossy.add('E5xx beyond 1/2 semitone (clamped)');
-            dtn = Math.max(-128, Math.min(127, d)); cmds.push(0xe6, dtn & 0xff); continue;
+            dtn = Math.max(-128, Math.min(127, d)); dtnOut = effDtn(); cmds.push(0xe6, dtnOut & 0xff); continue;
           }
           if (e.type === 0x20 && kind === 'noise') {
             noise = ((e.value >> 4) & 1) << 1 | (e.value & 1);
@@ -485,6 +503,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             n -= trs;
             if (n < 0 || n > MAX_NOTE) { lossy.add(`${kind.toUpperCase()} note out of range (clamped)`); n = Math.max(0, Math.min(MAX_NOTE, n)); }
             curKey = n + trs;
+            if (kind === 'psg' && effDtn() !== dtnOut) { dtnOut = effDtn(); cmds.push(0xe6, dtnOut & 0xff); }
             // 03xx: slur into the note (no key-off, envelope keeps running) and slide from the previous key; E7 00 turns it off again.
             const slide = (kind === 'psg' || (kind === 'fm' && sounding)) && portaXx > 0 && prevKey >= 0 && prevKey !== nv;
             if (kind === 'fm' && portaXx > 0 && sounding) cmds.push(0xe0);
