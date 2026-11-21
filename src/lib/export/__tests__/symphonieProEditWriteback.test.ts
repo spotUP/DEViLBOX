@@ -66,8 +66,8 @@ describe('SymphoniePro export keeps the module', () => {
     const song = (await load(new Uint8Array(readFileSync(FIXTURE))))!;
     const a = song.patterns[0].channels[1].rows[3];
     const b = song.patterns[0].channels[2].rows[5];
-    Object.assign(a, { note: 40, instrument: 1, volume: 0, effTyp: 0x07, eff: 0x38 });
-    Object.assign(b, { note: 41, instrument: 1, volume: 0, effTyp: 0x09, eff: 0x20 });
+    Object.assign(a, { effTyp: 0x07, eff: 0x38 });
+    Object.assign(b, { effTyp: 0x09, eff: 0x20 });
     const back = (await load(exportSymphonieProFile(song)))!;
     const [ba, bb] = [back.patterns[0].channels[1].rows[3], back.patterns[0].channels[2].rows[5]];
     expect([ba.effTyp, ba.eff]).toEqual([0x07, 0x38]);
@@ -90,6 +90,15 @@ describe('SymphoniePro export keeps the module', () => {
     const cell = song.patterns[2].channels[6].rows[1]; // a volume slide in the fixture
     expect(cell.effTyp).toBe(0x0A);
     Object.assign(cell, { note: 50, instrument: 2, effTyp: 0x0C, eff: 0x40 });
+    const back = (await load(exportSymphonieProFile(song)))!;
+    const bc = back.patterns[2].channels[6].rows[1];
+    expect([bc.note, bc.instrument, bc.effTyp]).toEqual([50, 2, 0]);
+  });
+
+  it('a note edit on a cell with an encodable effect lands; the effect is dropped', async () => {
+    const song = (await load(new Uint8Array(readFileSync(FIXTURE))))!;
+    const cell = song.patterns[2].channels[6].rows[1];
+    Object.assign(cell, { note: 50, instrument: 2, effTyp: 0x0F, eff: 0x05 });
     const back = (await load(exportSymphonieProFile(song)))!;
     const bc = back.patterns[2].channels[6].rows[1];
     expect([bc.note, bc.instrument, bc.effTyp]).toEqual([50, 2, 0]);

@@ -455,6 +455,11 @@ export function exportSymphonieProFile(song: TrackerSong): Uint8Array {
                 if (!noteEdited && (cell.effTyp ?? 0) === shown.effTyp
                   && (cell.eff ?? 0) === shown.eff) continue;
               }
+              // A key-on edit wins over any effect in the cell, encodable or not: the effect is dropped and reported.
+              if (noteEdited && cellToEncode.note && ((cellToEncode.effTyp ?? 0) || (cellToEncode.eff ?? 0))) {
+                dropped.add(`${(cellToEncode.effTyp ?? 0).toString(16)}${(cellToEncode.eff ?? 0).toString(16).padStart(2, '0')}`.toUpperCase());
+                cellToEncode = { ...cellToEncode, effTyp: 0, eff: 0 };
+              }
               let encoded = encodeSymEvent(cellToEncode, effectiveTranspose);
               if (!encoded) {
                 // One event is a key-on OR a command, so a note edit and an unencodable effect cannot both land: the edit wins.
