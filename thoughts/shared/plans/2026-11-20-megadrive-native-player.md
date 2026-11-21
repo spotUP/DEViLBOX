@@ -890,3 +890,18 @@ Not done (budget). The harness has the Z80 0x0E02-0F tap (P lines) and the 68k A
 - lagcmp.py now skips a frame when either side has ATT 15 at f-1, f or f+1. The PSG2 38.4 s false flag is gone: PSG1-3 show 0 frames over 10 c (worst 9.7 c at 34.25 s on PSG2).
 - New real flag: FM4 at 2.133-2.25 s, 19 frames, worst 87.5 c. Furnace keys a new note at 2.133 (166.01 Hz) and slides up 1.22 Hz/frame to 174.55. MAME keeps the old note (no key-on), slides from 155.65 at 2.24 Hz/frame, and keys 174.55 at 2.268. It looks like a note+slide row (E1xy/E2xy or 01xx with a note) being converted as a slide from the previous pitch. Identify the cell next.
 - Note: scripts using awk on these .ev files need LC_ALL=C. The sv locale parses "2.133" as 2.
+
+## Phase 1u results (2026-11-21)
+
+**FM4 2.133-2.25 s (highscorefollin), fixed in 83e1c87a1.** Order 0 row 62 on FM4 holds a bare `03 08` (porta with no note). Furnace slides to the note already playing, reaches it on the first tick, and with `targetResetsSlides` drops the porta (playback.cpp NOTE_PORTA returns 2: portaSpeed 0, inPorta false). Row 64 (`E3`, `01 04`) then keys a new note. The export kept the 03 alive, so row 64 became an E0 slur plus a 03 slide from D#3. `mdsSong.ts` now ends a 03xx on a row without a note when `targetResetsSlides` is set, and 01xx/02xx also end a 03xx (inPorta false). Test in `mdsSong.test.ts`: seq bytes with row 62 = `03 08` equal the bytes with row 62 empty. The test covers the no-note reset; the 01xx/02xx clear has no test of its own yet.
+- lagcmp 0-40 s, FM4: 19 frames over 10 cents (worst 87.5 c at 2.25 s) -> 0 frames (worst 2.4 c). MAME keys FM4 on at 2.135 s, same as Furnace. FM1-5 / PSG1-3 unchanged (FM 0 frames; PSG2 worst 9.7 c at 34.25 s).
+
+**Sibling check of 011b67f0d (FM block byte only from instrument version 224).** Ran furnaceRegisterLockstep, furnaceInsTypeNeoGeo, furnaceOldInstAyPlusOne, furnaceParserSnesFeature, furnaceInstrumentFiles, furnaceInstrumentSave, furnaceLoadInstrument: 23 of 24 pass. The one failure is the new owner-WIP row `Drifting in Colour.fur` (AY-3-8910) in furnaceRegisterLockstep: `command 3: Furnace HINT_PORTA(-1, 0), ours HINT_PORTA(0, 0)`. Not caused by 011b67f0d: the song is version 165, none of its 43 instruments carry FM data, so readFMFeature/parseFMData never run. Open: porta command-hint value on that row.
+
+**loud.py time-held power, e7f91a7a3.** Register state is now weighted by how long it holds (both chips), not sampled on YM writes. fix.vgm vs fix.tap, 4 s windows, 0-40 s:
+- PSG1 32-40 s: +0.92/+1.49 -> -0.04/+0.01. PSG2: +1.03/+1.23 -> -0.05/+0.01. PSG4: +0.92..+8.22 -> -0.03..-0.23. These were sampling artifacts.
+- FM2 last window -0.98 -> -0.98; FM3 -2.10 -> -2.08. The gap is real. First look: in 36-40 s the FM3 TL sequences differ by operator (Furnace fades TL3 22..33, MAME fades TL2 16..27; FM2 similar on TL0/TL2 at section start). Open: check operator-to-register order / carrier mapping for the instrument used there, and the fade start time.
+
+**Not done:** task 4 (PCM key-on lag tap on a second Genesis .fur with dense FM6 drums), out of budget.
+
+Listen ROM: `~/Desktop/md-roms/highscorefollin-1u.bin` (md1u fix.rom, 1t tap shell + PCM blob).
