@@ -85,9 +85,21 @@ export const pcmDacScale = (vol: number): number => {
   return g ? furnaceDacTable(vol) / 128 / g : 0;
 };
 
-const psgFixMemo = new Map<number, number>();
-export function psgFix(k: number): number {
-  const hit = psgFixMemo.get(k); if (hit !== undefined) return hit;
+const psgFixMemo = new Map<number | string, number>();
+const OFFS_HALF = Array.from({ length: 129 }, (_, i) => i - 64);
+/** Offsets (1/128 semitone) a 04xy vibrato plays: positions reachable from 0 in steps of rate (vibratoEnvelope off()). */
+export function vibOffsets(rate: number, depth: number, fine = 15): number[] {
+  const out = new Set<number>([0]);
+  for (let p = 0; p < 64; p++) out.add(Math.trunc(((depth * VIB_TABLE[(p * rate) % 64] * fine) >> 4) / 15));
+  return [...out];
+}
+/**
+ * offs: the pitch offsets the note plays (vibOffsets under 04xy). Without them the detune is scored over every offset within half a
+ * semitone; with them it is scored on exactly the vibrato's offsets, which leaves fewer one-period misses (newer_song_lol PSG1 04 55).
+ */
+export function psgFix(k: number, offs?: number[]): number {
+  const mk = offs ? `${k}:${offs.join(',')}` : k;
+  const hit = psgFixMemo.get(mk); if (hit !== undefined) return hit;
   const per = (o: number) => Math.min(1023, Math.round(sndPeriod(k + o / 128)));
   // Of the detunes that write Furnace's period at the key, take the one that also writes it for most offsets within a half
   // semitone: the driver interpolates linearly and truncates where Furnace rounds, so the edge detune put 04xy vibrato and slide
@@ -96,10 +108,10 @@ export function psgFix(k: number): number {
   for (let a = 0; a <= 128; a++) for (const d of a ? [-a, a] : [0]) {
     if (d > 127 || k * 256 + d < 0 || mdsPsgPitch(k * 256 + d) !== per(0)) continue;
     let miss = 0;
-    for (let o = -64; o <= 64; o++) if (k * 256 + d + 2 * o >= 0 && mdsPsgPitch(k * 256 + d + 2 * o) !== per(o)) miss++;
+    for (const o of offs ?? OFFS_HALF) if (k * 256 + d + 2 * o >= 0 && mdsPsgPitch(k * 256 + d + 2 * o) !== per(o)) miss++;
     if (miss < bestMiss) { best = d; bestMiss = miss; }
   }
-  psgFixMemo.set(k, best);
+  psgFixMemo.set(mk, best);
   return best;
 }
 
@@ -567,7 +579,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     const fTick = (t: number) => furnaceTickOf(t, fpt);
     let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0, dtnOut = 0;
     // PSG: E6 carries E5xx plus psgFix(key); each PSG chunk restates it, since a subroutine chunk can follow any detune.
-    const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey))) : dtn;
+    const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey, vDepth ? vibOffsets(vRate, vDepth, vFine) : undefined))) : dtn;
     // 03xx under a running 04xy: MDSDRV has one pitch envelope (E8, the vibrato), so the linear slide goes out per sequence tick as
     // E4 transpose + E6 detune, which mds_pitch_update adds before the envelope (pitch = note + trs + dtn, then + E8 output).
     // sA: slide offset from the target at the note (1/128 semitone, 0 = none), stepped sStep per Furnace tick from Furnace tick sF0.
@@ -616,7 +628,12 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       if (!noiseArps.has(key)) noiseArps.set(key, tbItem(out));
       return noiseArps.get(key)!;
     };
-    const vibCmd = (t: number): number[] => { vSync(t); return [0xe8, extItem(vibratoEnvelope(vPos, vRate, vDepth, vFine, fpf)) + 1]; };
+    const vibCmd = (t: number): number[] => {
+      vSync(t);
+      // The PSG detune depends on the vibrato (psgFix offsets), so a 04xy change restates E6; a slide in flight owns E6 (slideCmd).
+      const d = kind === 'psg' && !sA && effDtn() !== dtnOut ? [0xe6, (dtnOut = effDtn()) & 0xff] : [];
+      return [...d, 0xe8, extItem(vibratoEnvelope(vPos, vRate, vDepth, vFine, fpf)) + 1];
+    };
     // 0Axy: Furnace keeps volume in 1/256 steps and adds x*64 (or -y*64) every tick, the row's first tick included, until it clamps at
     // 0 or the channel maximum (playback.cpp per-tick volume slides); the driver gets an E2 on every tick where volume>>8 changes.
     const vmax = kind === 'fm' ? 127 : 15;
