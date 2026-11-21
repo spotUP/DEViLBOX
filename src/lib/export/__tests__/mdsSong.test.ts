@@ -236,6 +236,26 @@ describe('furnaceToMds', () => {
       expect(withPorta).toBe(hex());
     }
   });
+  it('Fancy_Promenard PSG: 03xx after a note-off is a plain note-on (Furnace playback.cpp keeps doNote), so it converts as if the 03 were not there', async () => {
+    // PSG = the last four channels (PSG3 tone, noise excluded). Before the fix the PSG export slid from the last key even with the channel keyed off; FM already required a sounding channel.
+    const m = await parse('Fancy_Promenard.fur');
+    const sub = m.subsongs[0];
+    let hit: { rows: NonNullable<ReturnType<typeof m.patterns.get>>['rows']; r: number } | null = null;
+    for (let ch = sub.orders.length - 4; ch < sub.orders.length - 1; ch++) for (const p of new Set(sub.orders[ch])) {
+      const rows = m.patterns.get(`0_${ch}_${p}`)?.rows;
+      if (!hit && rows) for (let r = 1; r < rows.length; r++) {
+        const c = rows[r], b = rows[r - 1];
+        if (c && !(c.note === 0 && c.octave === 0) && c.note < 100 && c.effects?.some((e) => e.type === 3 && e.value > 0) && (!b || b.note < 100)) { hit = { rows, r }; break; }
+      }
+    }
+    expect(hit).not.toBeNull();
+    const { rows, r } = hit!;
+    rows[r - 1] = { ...(rows[r - 1] ?? rows[r]!), note: 100, octave: 0, effects: [] };
+    const fx = rows[r]!.effects, hex = () => Buffer.from(furnaceToMds(m).seq).toString('hex');
+    const withPorta = hex();
+    rows[r]!.effects = fx.filter((e) => e.type !== 3);
+    expect(withPorta).toBe(hex());
+  });
   it('vibratoEnvelope: 04 47 is 16 one-frame nodes of 2 * ((7 * vibTable[pos] * 15) >> 4) / 15, first node at pos 4, looping to node 0', () => {
     const env = vibratoEnvelope(0, 4, 7);
     expect(env.length).toBe(16 * 6);

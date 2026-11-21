@@ -1084,3 +1084,25 @@ Open:
 - Split of the gain between fix 1 and fix 2 not measured.
 - Task 3 (Solar_Man PSG4 -0.15 dB) not started.
 - EDxx/ECxx are not used in newer_song_lol; proof is the unit test only.
+
+## Phase 2b results (2026-11-21)
+
+### 1. newer_song_lol PSG residue: root cause found, not fixed
+
+- Cause: 03xx portamento together with a running 04xy vibrato. MDSDRV has one pitch-envelope slot (E8), so the export writes the vibrato envelope and drops the linear slide (flagged lossy "04xy with a pitch slide or pitch macro (vibrato replaces it)", 1255 hits). Furnace moves baseFreq per tick (sms.cpp NOTE_PORTA) and adds the vibrato on top.
+- Proof: PSG1 frames 675-678 (11.25 s): Furnace 750, 766, 787, 804, 816 Hz; MAME jumps to 834 Hz and shows only the vibrato. Same at frames 710-713. PSG1 has 106 x 03xx / 11 x 04xx, PSG2 638 x 03xx / 4 x 04xx.
+- Tried: one combined extended envelope per (slide, vibrato phase) (`slideVibratoEnvelope`, porta nodes + vibrato offset, then loop the plain vibrato). Shape correct, but the song table goes 215 -> 355 items (ext 91 -> 333, subroutines 14 -> 0) and MDSDRV holds 256 (E8 argument is index+1 in one byte). Reverted; patch kept in session scratch only.
+- Next design (not built): write the porta as per-tick E4 (transpose) + E6 (detune, 1/256 semitone) offsets in the sequence via the existing per-tick command path (addTick), and keep the plain shared vibrato E8 item. No new items. Must handle psgFix / effDtn interplay. Driver pitch = (t_note & 0xff00) + t_trs + dtn (mds_pitch_update).
+- Numbers unchanged by this phase (lagcmp, frames over 10 cents in 40 s): FM1 61->63, FM2 62->64, FM3 61->63, FM4 35->35, FM5 42->43, PSG1 414->417, PSG2 282->284, PSG3 0->0. The +1..+3 also appear on FM channels that the 2b change cannot reach, so treat them as run-to-run lag noise (unverified).
+
+### 2. PSG 03xx on a keyed-off channel: fixed
+
+- Furnace playback.cpp 03xx: `if (chan[i].keyOn) doNote=false`, so on a keyed-off channel the note-on runs and sms.cpp NOTE_ON sets baseFreq to the target; NOTE_PORTA then has nothing to slide. The export required a sounding channel for FM only, so PSG slid from the last key after a note-off.
+- Fix: `slide` needs `sounding` for PSG too (mdsSong.ts). Test row: "Fancy_Promenard PSG: 03xx after a note-off is a plain note-on" (puts an OFF before a PSG 03xx note and expects the same bytes as without the 03). Fails before the fix, passes after.
+- Listen ROM: ~/Desktop/md-roms/newer_song_lol-2b.bin.
+
+### 3. Sequence growth 40752 -> 52866 bytes: no cheap dedupe
+
+- Equal slide envelopes are already shared (slideItems Map keyed on the bytes; extItem the same). The growth is distinct vibrato phases (91 extended envelopes) and fewer subroutines (14; subroutines are only added while items < 255). Nothing cheap left without changing playback.
+
+### 4. Solar_Man PSG4 -0.15 dB: not started (budget).

@@ -602,7 +602,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             }
             if (kind === 'psg' && effDtn() !== dtnOut) { dtnOut = effDtn(); cmds.push(0xe6, dtnOut & 0xff); }
             // 03xx: slur into the note (no key-off, envelope keeps running) and slide from the previous key; E7 00 turns it off again.
-            const slide = (kind === 'psg' || (kind === 'fm' && sounding)) && portaXx > 0 && prevKey >= 0 && prevKey !== nv;
+            // 03xx on a keyed-off channel is a plain note-on in Furnace (playback.cpp keeps doNote, NOTE_ON sets baseFreq to the target): no slide, PSG too.
+            const slide = (kind === 'psg' || kind === 'fm') && sounding && portaXx > 0 && prevKey >= 0 && prevKey !== nv;
             // 03xx on a keyed-on channel is no note-on (playback.cpp: doNote=false), so the vibrato phase is not reset.
             const portaSlur = portaXx > 0 && sounding;
             if (kind === 'fm' && portaXx > 0 && sounding) cmds.push(0xe0);
