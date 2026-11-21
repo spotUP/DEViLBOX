@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseKRISFile } from '@/lib/import/formats/KRISParser';
 import { exportKRIS } from '../KRISExporter';
+import { encodeStoredCell } from '@/engine/uade/UADEPatternEncoder';
 
 const FIXTURE = 'public/data/songs/chiptracker/chuck rock - chuckrock.mod';
 
@@ -41,5 +42,23 @@ describe('KRIS export keeps the module', () => {
     expect(diffs.every((i) => i >= row1Off && i < row1Off + 4)).toBe(true);
     const back = (await load(out)).patterns[0].channels[0].rows[1];
     expect([back.note, back.instrument]).toEqual([cell.note, 3]);
+  });
+
+  it('an edit on a track with transpose != 12 encodes the same bytes live and in the export, and reads back as the edit', async () => {
+    // The fixture's orders all carry transpose 12, so give order 0 / channel 0 transpose 7 (table entry byte 1 at 958).
+    const raw = new Uint8Array(readFileSync(FIXTURE));
+    raw[958 + 1] = 7;
+    const song = await load(raw);
+    const layout = song.uadePatternLayout!;
+    expect(layout.noteOffset!(0, 0, 0)).toBe(7);
+    const [o, row, ch] = [0, 0, 0];
+    const cell = song.patterns[o].channels[ch].rows[row];
+    cell.note = 60;
+    const live = encodeStoredCell(layout, o, row, ch, cell)!;
+    expect(live).not.toBeNull();
+    const out = await save(song);
+    const off = layout.getCellFileOffset!(o, row, ch);
+    expect([...out.subarray(off, off + 4)].map((b, i) => (i === 2 ? b & 0x0F : b))).toEqual([...live].map((b, i) => (i === 2 ? b & 0x0F : b)));
+    expect((await load(out)).patterns[o].channels[ch].rows[row].note).toBe(cell.note);
   });
 });

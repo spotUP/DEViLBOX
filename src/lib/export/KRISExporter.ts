@@ -25,6 +25,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { encodeStoredCell } from '@/engine/uade/UADEPatternEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -220,9 +221,8 @@ function patchKRIS(song: TrackerSong, src: ArrayBuffer): { data: Uint8Array<Arra
         const note = cell.note ?? 0;
         if (note === krisShownNote(out[off], transpose) && (cell.instrument ?? 0) === out[off + 1]
           && (cell.effTyp ?? 0) === (out[off + 2] & 0x0F) && (cell.eff ?? 0) === out[off + 3]) continue;
-        const raw = note - 25 - transpose;
-        const noteByte = note === 0 || note > 96 ? 0xA8 : raw * 2 + 0x18;
-        if (noteByte !== 0xA8 && (raw < 0 || noteByte > 0x9E)) {
+        const bytes = encodeStoredCell(layout, o, row, ch, cell);
+        if (!bytes) {
           warnings.push(`Pattern ${o} row ${row} channel ${ch + 1}: note is outside the track's range and was not saved.`);
           continue;
         }
@@ -231,10 +231,10 @@ function patchKRIS(song: TrackerSong, src: ArrayBuffer): { data: Uint8Array<Arra
           continue;
         }
         written.add(off);
-        out[off] = noteByte;
-        out[off + 1] = (cell.instrument ?? 0) & 0xFF;
-        out[off + 2] = (out[off + 2] & 0xF0) | ((cell.effTyp ?? 0) & 0x0F);
-        out[off + 3] = (cell.eff ?? 0) & 0xFF;
+        out[off] = bytes[0];
+        out[off + 1] = bytes[1];
+        out[off + 2] = (out[off + 2] & 0xF0) | (bytes[2] & 0x0F);
+        out[off + 3] = bytes[3];
       }
     });
   });

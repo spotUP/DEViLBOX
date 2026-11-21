@@ -374,6 +374,7 @@ export async function parseKRISFile(
 
       return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
     },
+    noteOffset: (pattern: number, _row: number, channel: number): number => trackRefs[pattern]?.[channel]?.transpose ?? 0,
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const refs = trackRefs[pattern];
       if (!refs) return 0;

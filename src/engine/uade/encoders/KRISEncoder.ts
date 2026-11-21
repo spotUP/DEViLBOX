@@ -8,8 +8,9 @@
  *   byte[3]: effect parameter
  *
  * Note mapping:
- *   Parser: (noteByte - 0x18) / 2 → 0-based index, then apply transpose and map to XM
- *   Reverse: noteIdx = xmNote - 37 (same as Amiga mapping), noteByte = noteIdx * 2 + 0x18
+ *   Parser: note = 25 + (noteByte - 0x18) / 2 + the order's transpose.
+ *   This encoder is the inverse of the layout's decodeCell (stored note, no transpose); the layout's noteOffset
+ *   carries the transpose, and encodeStoredCell takes the grid note back through it.
  */
 
 import type { TrackerCell } from '@/types';
@@ -20,8 +21,8 @@ function encodeKRISCell(cell: TrackerCell): Uint8Array {
   const note = cell.note ?? 0;
 
   // Byte 0: noteByte
-  if (note > 0 && note >= 37) {
-    const noteIdx = note - 37;
+  if (note >= 25) {
+    const noteIdx = note - 25;
     const noteByte = noteIdx * 2 + 0x18;
     out[0] = Math.min(0x9E, noteByte) & 0xFF;
   } else {
