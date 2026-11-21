@@ -109,7 +109,7 @@ const fmHz = (nv: number): number => 27.5 * 2 ** ((nv - 9) / 12);
  * as note<<7 and steps it by xx * pitchSlideSpeed per tick on every chip (genesis.cpp / sms.cpp DIV_CMD_NOTE_PORTA, playback.cpp
  * portaSpeedMultiplier), so the slide is linear in pitch; pass that step as `linStep` (1/128 semitone) and the nodes are exact.
  * MDSDRV steps a pitch envelope once per frame, not once per sequence tick (measured djtBMX FM1 at F9 ff: 36 nodes of 0.31 semitone over
- * a 72-tick slide), so `tpf` (sequence ticks per frame, (tempo + 1) / 128) picks the Furnace tick each frame node lands on.
+ * a 72-tick slide), so `tpf` (Furnace ticks per frame: (tempo + 1) / 128 sequence ticks times s.hz / rate) picks the Furnace tick each frame node lands on.
  */
 export function portaEnvelope(fromNv: number, toNv: number, xx: number, fm = false, linStep = 0, tpf = 1): number[] {
   const lin = linStep > 0;
@@ -244,14 +244,19 @@ export function pitchEnvelope(m: FurnaceMacro, lossy: Lossy, tickHz = NTSC_HZ): 
   return [...out, 0x7f, Math.max(0, loopNode)];
 }
 
-/** Macro table for a relative arpeggio: `16 tt` set transpose, `81 nn` hold nn+1 ticks, `80 nn` jump / `80 00` end. */
-function arpTable(m: FurnaceMacro, lossy: Lossy, step = (v: number) => v): number[] | undefined {
+/**
+ * Macro table for a relative arpeggio: `16 tt` set transpose, `81 nn` hold nn+1 ticks, `80 nn` jump / `80 00` end.
+ * The driver steps it per sequence tick, Furnace per engine tick at s.hz, so `spt` (sequence ticks per Furnace tick, rate / s.hz) scales the holds.
+ * shortcut: holds round per step on a running total that restarts at each loop pass, so a looped fractional arp drifts under 1 tick per pass.
+ */
+export function arpTable(m: FurnaceMacro, lossy: Lossy, step = (v: number) => v, spt = 1): number[] | undefined {
   if (m.data.slice(0, m.length).some(arpIsFixed)) { lossy.add('fixed arpeggio macro'); return undefined; }
   const sp = Math.max(1, m.speed);
   const out: number[] = [];
   const loop = m.loop >= 0 && m.loop < m.length && m.loop !== 255 ? m.loop : -1;
   if (m.delay > 0) lossy.add('arpeggio macro delay (ignored)');
-  m.data.slice(0, m.length).forEach((v) => out.push(0x16, step((v << 2) >> 2) & 0xff, 0x81, sp - 1));
+  const at = (i: number) => Math.round(i * sp * spt);
+  m.data.slice(0, m.length).forEach((v, i) => out.push(0x16, step((v << 2) >> 2) & 0xff, 0x81, Math.max(0, Math.min(255, at(i + 1) - at(i) - 1))));
   const after = out.length / 2 + 1; // node position after the jump
   out.push(0x80, loop < 0 ? 0 : (loop * 2 - after) & 0xff);
   return out;
@@ -264,7 +269,7 @@ const VIB_TABLE = Array.from({ length: 64 }, (_, i) => Math.trunc(127 * Math.sin
  * Furnace 04xy (linear pitch, sine shape): every tick, after the row runs, pos += x (mod 64) and the pitch offset is
  * ((y * vibTable[pos] * fine) >> 4) / 15 in 1/128 semitone (playback.cpp per-tick vibrato; fine = E4xx, default 15), so the
  * first tick after `pos0` already plays pos0 + x. Written as an extended pitch envelope, one 1/256-semitone node per driver
- * frame, looping over the 64/gcd(64, x)-tick cycle; `tpf` (sequence ticks per frame) picks the Furnace tick each node lands on.
+ * frame, looping over the 64/gcd(64, x)-tick cycle; `tpf` (Furnace ticks per frame, see portaEnvelope) picks the Furnace tick each node lands on.
  */
 export function vibratoEnvelope(pos0: number, rate: number, depth: number, fine = 15, tpf = 1): number[] {
   const off = (t: number) => Math.trunc(((depth * VIB_TABLE[(pos0 + (t + 1) * rate) % 64] * fine) >> 4) / 15);
@@ -289,6 +294,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   // Driver: each NTSC VINT adds tempo+1 to a counter and steps one tick per 128 (Phase 0), so ticks/s = (dd+1)*NTSC/128.
   const rate = s.hz * (s.virtualTempo || 1) / (s.virtualTempoD || 1);
   const tempo = Math.max(0, Math.min(255, Math.round(rate * 128 / NTSC_HZ) - 1));
+  // Furnace runs per-tick effects and macros at s.hz; virtual tempo only moves the row counter (playback.cpp tempoAccum), so a sequence
+  // tick holds fpt Furnace ticks (1 without virtual tempo; 5/6 at 180/150).
+  const fpt = s.hz / rate;
   if (Math.abs(rate - NTSC_HZ) > 0.5) lossy.add(`tick rate ${rate.toFixed(2)} Hz: ticks land on NTSC frames (up to 1 frame early or late)`);
   if (rate * 128 / NTSC_HZ < 1 || rate * 128 / NTSC_HZ > 256) lossy.add(`tick rate ${rate.toFixed(2)} Hz outside the driver's ${(NTSC_HZ / 128).toFixed(2)}-${(2 * NTSC_HZ).toFixed(2)} Hz range (clamped)`);
   if (Math.abs((m.tuning || 440) - 440) > 0.5) lossy.add(`tuning ${m.tuning} Hz: played at 440 Hz`);
@@ -371,7 +379,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       const ins = m.instruments[idx];
       const pm = macro(ins, MACRO_PITCH, m.version), am = macro(ins, MACRO_ARP, m.version);
       // Furnace runs macros once per engine tick at s.hz; virtual tempo only moves the row counter (playback.cpp tempoAccum), so envelopes use s.hz, not `rate`.
-      const peg = pm && pitchEnvelope(pm, lossy, s.hz), mt = am && arpTable(am, lossy);
+      const peg = pm && pitchEnvelope(pm, lossy, s.hz), mt = am && arpTable(am, lossy, undefined, 1 / fpt);
       if (kind === 'fm' && macro(ins, MACRO_VOL, m.version)) lossy.add('FM volume macro (ignored)');
       v = { ins: item(kind === 'fm' ? fmVoice(ins, lossy) : psgEnvelope(ins, m.version, lossy, s.hz)), peg: peg ? item(peg) : -1, mtab: mt ? tbItem(mt) : -1 };
       insCache.set(key, v);
@@ -420,13 +428,20 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     const effDtn = () => kind === 'psg' ? Math.max(-128, Math.min(127, dtn + psgFix(curKey))) : dtn;
     // 04xy state: pos was `vPos` at tick `vAt` and advances by vRate per tick while vDepth > 0 (playback.cpp).
     let vDepth = 0, vRate = 0, vPos = 0, vAt = 0, vFine = 15;
-    const vSync = (t: number) => { if (vDepth) vPos = (vPos + (t - vAt) * vRate) % 64; vAt = t; };
-    const vibCmd = (t: number): number[] => { vSync(t); return [0xe8, extItem(vibratoEnvelope(vPos, vRate, vDepth, vFine, tpf)) + 1]; };
+    const vSync = (t: number) => { if (vDepth) vPos = (vPos + Math.round((t - vAt) * fpt) * vRate) % 64; vAt = t; };
+    const vibCmd = (t: number): number[] => { vSync(t); return [0xe8, extItem(vibratoEnvelope(vPos, vRate, vDepth, vFine, fpf)) + 1]; };
     // 0Axy: Furnace keeps volume in 1/256 steps and adds x*64 (or -y*64) every tick, the row's first tick included, until it clamps at
     // 0 or the channel maximum (playback.cpp per-tick volume slides); the driver gets an E2 on every tick where volume>>8 changes.
     const vmax = kind === 'fm' ? 127 : 15;
     let vol256 = vol << 8, vspeed = 0;
+    // volStep runs once per sequence tick and steps the slide once per Furnace tick that falls in it (fpt per sequence tick).
+    let fAcc = 0;
     const volStep = (): number[] | null => {
+      let cmd: number[] | null = null;
+      for (fAcc += fpt; fAcc >= 1 - 1e-9; fAcc -= 1) cmd = volStep1() ?? cmd;
+      return cmd;
+    };
+    const volStep1 = (): number[] | null => {
       if (!vspeed) return null;
       const before = vol;
       vol256 += vspeed;
@@ -435,7 +450,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       vol = vol256 >> 8;
       return vol !== before ? volCmd(vol) : null;
     };
-    const pss = Number(m.compatFlags.pitchSlideSpeed) || 1, tpf = (tempo + 1) / 128;
+    // tpf: sequence ticks per frame; fpf: Furnace ticks per frame (what per-frame pitch envelopes step through).
+    const pss = Number(m.compatFlags.pitchSlideSpeed) || 1, tpf = (tempo + 1) / 128, fpf = tpf * fpt;
     const pLimit = () => (prate > 0 ? Math.min(119 - curNv, MAX_NOTE - curKey) : -Math.min(curNv + 60, curKey)) * 128;
     // MDSDRV extended node: frame k of a node is init + (k+1)*delta, held len+1 frames (mdsdrv.68k @extended).
     // Node 0 runs the slide up to the frame before the target, node 1 holds the target.
@@ -446,7 +462,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       let env: number[];
       if (!prate) env = node(2 * poff, 0, 255, 0);
       else {
-        const lim = pLimit(), d = 2 * prate * tpf, j = Math.ceil((2 * (lim - poff)) / d) - 1;
+        const lim = pLimit(), d = 2 * prate * fpf, j = Math.ceil((2 * (lim - poff)) / d) - 1;
         env = j >= 1 ? [...node(2 * poff, d, Math.min(254, j - 1), 1), ...node(2 * lim, 0, 255, 1)] : node(2 * lim, 0, 255, 0);
       }
       return [0xe8, extItem(env) + 1];
@@ -533,7 +549,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           if ((e.type === 0x01 || e.type === 0x02) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
             prate = (e.type === 0x01 ? 1 : -1) * e.value * pss; pChanged = true; portaXx = 0; // 01xx/02xx end a 03xx (playback.cpp: inPorta false)
             if (m.compatFlags.limitSlides) lossy.add('01xx/02xx with limitSlides (slide range not limited)');
-            if (!Number.isInteger(2 * e.value * pss * tpf)) lossy.add('01xx/02xx at a fractional sequence-tick-per-frame rate (rounded per frame)');
+            if (!Number.isInteger(2 * e.value * pss * fpf)) lossy.add('01xx/02xx at a fractional sequence-tick-per-frame rate (rounded per frame)');
             continue;
           }
           lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}`);
@@ -577,7 +593,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             // tone-table transpose. The table's `16 tt` writes t_trs (the E4 transpose), so tt is absolute and trs is unknown after.
             const am = kind === 'noise' && noise & 2 ? macro(m.instruments[ins], MACRO_ARP, m.version) : undefined;
             if (am && insRef(kind, ins).mtab >= 0) {
-              const nb = n, t = arpTable(am, lossy, (v) => noiseKey(m, nv + v, lossy) - nb);
+              const nb = n, t = arpTable(am, lossy, (v) => noiseKey(m, nv + v, lossy) - nb, 1 / fpt);
               if (t) { const k = t.join(','); if (!noiseArps.has(k)) noiseArps.set(k, tbItem(t)); cmds.push(0xeb, noiseArps.get(k)! + 1); trs = NaN; }
             }
             if (kind === 'psg' && effDtn() !== dtnOut) { dtnOut = effDtn(); cmds.push(0xe6, dtnOut & 0xff); }
@@ -585,7 +601,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             const slide = (kind === 'psg' || (kind === 'fm' && sounding)) && portaXx > 0 && prevKey >= 0 && prevKey !== nv;
             if (kind === 'fm' && portaXx > 0 && sounding) cmds.push(0xe0);
             if (slide) {
-              const env = portaEnvelope(prevKey, nv, portaXx, kind === 'fm', m.compatFlags.linearPitch ? portaXx * (Number(m.compatFlags.pitchSlideSpeed) || 1) : 0, (tempo + 1) / 128);
+              const env = portaEnvelope(prevKey, nv, portaXx, kind === 'fm', m.compatFlags.linearPitch ? portaXx * (Number(m.compatFlags.pitchSlideSpeed) || 1) : 0, fpf);
               if (kind === 'psg') cmds.push(0xe0);
               cmds.push(0xe8, slideItem(env) + 1); slideEnd = tick + Math.round((env[env.length - 1] + 1) * (tempo + 1) / 128);
             }
@@ -607,7 +623,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         for (let k = delay + 1; k < c.ticks[i]; k++) addTick(volStep(), k === cutAt);
         if (prate && curNv >= 0) {
           const lim = pLimit();
-          poff += prate * c.ticks[i];
+          poff += prate * c.ticks[i] * fpt;
           if (prate > 0 ? poff >= lim : poff <= lim) {
             if (lim !== (prate > 0 ? 119 - curNv : -(curNv + 60)) * 128) lossy.add('01xx/02xx past the driver key range (held at the end key)');
             poff = lim; if (m.compatFlags.targetResetsSlides) prate = 0;

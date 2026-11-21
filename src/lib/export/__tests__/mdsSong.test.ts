@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
+import { arpTable, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
@@ -88,6 +88,26 @@ describe('pitch macro rate', () => {
   });
   it('an on-frame (60 Hz) macro keeps one frame per tick', () => {
     expect(pitchEnvelope(pm, new Lossy())).toEqual([0, 20, 0, 12, 0, 40, 0, 12, 0x7f, 0]);
+  });
+});
+
+describe('virtual tempo', () => {
+  // Furnace runs macros and per-tick effects at s.hz; virtual tempo only moves the row counter (playback.cpp tempoAccum).
+  it('Solar_Man at 180/150: PSG envelopes stay resampled from s.hz (56 Hz), the same bytes as without virtual tempo', async () => {
+    const m = await parse('Solar_Man.fur');
+    const envs = m.instruments.map((ins) => Buffer.from(psgEnvelope(ins, m.version, new Lossy(), m.subsongs[0].hz)).toString('hex'));
+    const base = Buffer.from(furnaceToMds(m).seq).toString('hex');
+    const used = envs.filter((e) => e.length > 6 && base.includes(e));
+    expect(used.length).toBeGreaterThan(0);
+    m.subsongs[0].virtualTempo = 180; m.subsongs[0].virtualTempoD = 150;
+    const vt = Buffer.from(furnaceToMds(m).seq).toString('hex');
+    for (const e of used) expect(vt).toContain(e);
+  });
+  it('arp mtab holds count sequence ticks: at 72 Hz rows on a 60 Hz engine (spt 1.2) one-tick steps hold 1,1,2,1,1 ticks', () => {
+    const am = { code: 1, type: 0, mode: 0, length: 5, data: [0, 12, 7, 0, 12], speed: 1, delay: 0, loop: -1, release: -1 } as unknown as Parameters<typeof arpTable>[0];
+    const holds = (t: number[]) => t.filter((_, i) => i % 4 === 3 && i < t.length - 2);
+    expect(holds(arpTable(am, new Lossy(), undefined, 1.2)!)).toEqual([0, 0, 1, 0, 0]);
+    expect(holds(arpTable(am, new Lossy())!)).toEqual([0, 0, 0, 0, 0]);
   });
 });
 
