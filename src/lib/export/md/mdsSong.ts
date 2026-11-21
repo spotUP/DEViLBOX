@@ -763,7 +763,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           }
           // E1xy/E2xy: shortcut for 03 (x*4) toward note +-y (playback.cpp 0xe1); y 0 or x 0 never moves the pitch.
           if ((e.type === 0xe1 || e.type === 0xe2) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
-            if (e.value & 15 && e.value >> 4) { shY = (e.type === 0xe1 ? 1 : -1) * (e.value & 15); shX = (e.value >> 4) * 4; }
+            // E1/E2 set portaNote/portaSpeed, the fields 01xx/02xx slide on, so they end a running 01xx/02xx (Solar_Man FM4 o3 r25).
+            if (e.value & 15 && e.value >> 4) { shY = (e.type === 0xe1 ? 1 : -1) * (e.value & 15); shX = (e.value >> 4) * 4; if (prate) { prate = 0; pChanged = true; } }
             continue;
           }
           if (e.type === 0x03 && (kind === 'psg' || kind === 'fm')) { portaXx = e.value; if (!e.value) pXx = 0; if (prate) { prate = 0; pChanged = true; } continue; } // 03 00 only stops the porta
@@ -801,6 +802,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (pcmOn && !isNote && cell && cell.volume >= 0 && isDac(ins) && !m.compatFlags.noOPN2Vol) lossy.add('FM6 DAC volume change mid-note (driver 2 dB step only)');
         if (dac && isNote) { curIns = ins; pcmOn = true; if (dacHdr !== curPcm) { curPcm = dacHdr; cmds.unshift(0xf0, dacHdr); } }
         else if (isNote) { pcmOn = false; curPcm = -1; }
+        const rowPoff = poff; // 01xx/02xx offset reached so far: a slide from the playing pitch starts there (baseFreq holds it)
         if (isNote) { poff = 0; curNv = nv; }
         // 03xx without a note slides to the note already playing, so it ends on its first tick and targetResetsSlides drops it
         // (playback.cpp NOTE_PORTA == 2): the next note keys on. shortcut: a 03xx row that retunes a slide still in flight is not kept.
@@ -832,7 +834,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             // 03xx: slur into the note (no key-off, envelope keeps running) and slide from the previous key; E7 00 turns it off again.
             // 03xx on a keyed-off channel is a plain note-on in Furnace (playback.cpp keeps doNote, NOTE_ON sets baseFreq to the target): no slide, PSG too.
             // Pitch reached at the end of the previous Furnace tick: this tick's porta step runs after the row (playback.cpp nextTick).
-            const fNow = fTick(tick + delay), from = Number.isNaN(shFrom) ? prevKey * 128 + slideOff(fNow - 1) + flyOff(fNow - 1) : shFrom;
+            const fNow = fTick(tick + delay), from = Number.isNaN(shFrom) ? prevKey * 128 + slideOff(fNow - 1) + flyOff(fNow - 1) + rowPoff : shFrom;
             // A retarget (no 03 on the row) still commits the note (doNote stays true), so it resets the vibrato phase (playback.cpp commit note on).
             const retarget = !portaXx && pXx > 0 && sounding && from !== prevKey * 128;
             if (retarget) portaXx = pXx;

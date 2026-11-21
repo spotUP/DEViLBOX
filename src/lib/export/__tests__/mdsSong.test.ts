@@ -458,6 +458,19 @@ describe('furnaceToMds', () => {
     // E1xy/E2xy become a slide toward note +-y, so the sequence differs from the bare note (Phase 2p, MAME 1:1 on FM2/FM3).
     expect((await solarManRow0([{ type: 0xe1, value: 0x13 }])).seq).not.toEqual((await solarManRow0([])).seq);
   });
+  it('Solar_Man: E1xy after 01xx ends the 01xx and slides from the pitch 01xx reached (FM4 o3 r24-r25, Phase 2q)', async () => {
+    // E1/E2 overwrite portaNote/portaSpeed, the 01xx fields (playback.cpp 0xe1), so 01 03 then E1 11 plays as 01 03 then 01 00 + E1 11.
+    const run = async (r1: Array<{ type: number; value: number }>) => {
+      const m = await parse('Solar_Man.fur');
+      const rows = m.patterns.get(`0_0_${m.subsongs[0].orders[0][0]}`)!.rows;
+      rows[0]!.effects = [...(rows[0]!.effects ?? []), { type: 0x01, value: 0x03 }];
+      rows[1]!.effects = [...(rows[1]!.effects ?? []), ...r1];
+      return furnaceToMds(m).seq;
+    };
+    const e1 = await run([{ type: 0xe1, value: 0x11 }]);
+    expect(e1).toEqual(await run([{ type: 0x01, value: 0 }, { type: 0xe1, value: 0x11 }]));
+    expect(e1).not.toEqual(await run([{ type: 0x01, value: 0 }]));
+  });
   it('Solar_Man: 0D with no value (order 12 row 31) jumps to row 0, not row -1, so order 13 keys on at tick 4000 (measured 1:1 in MAME)', async () => {
     const s = await convert('Solar_Man.fur');
     expect(s.keyOns.some((k) => k.tick === 4000)).toBe(true);

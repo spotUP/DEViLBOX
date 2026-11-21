@@ -1465,3 +1465,37 @@ Open items:
 - Solar_Man FM5: 2 frames at 65.7 s (157 cents).
 - newer_song_lol FM4 96.217-96.267 s: extra MAME key-offs at 96.089 s and 96.17 s (Q2), not reached.
 - Listen ROM: ~/Desktop/md-roms/Solar_Man-2p.bin (human check pending).
+
+## Phase 2q result (2026-11-21): E1xy after 01xx
+
+Root cause (exporter, mdsSong.ts): Furnace E1xy/E2xy write portaNote/portaSpeed, the same fields 01xx/02xx slide on (playback.cpp 0xe1),
+so an E1/E2 ends a running 01xx/02xx and slides on from the pitch 01xx reached (baseFreq holds it). The converter kept `prate` running
+and started the E1 slide from the bare note. Solar_Man FM4 o3 r24 `01 03` + r25 `E1 11`: MAME dropped back to the note and slid again
+(19.37 s); the stale prate then blocked the E8 reset under the next notes, so the r40 `04 8A` vibrato kept running past r42 `04 00`
+(20.9-21.4 s, 32.3-32.8 s, 92.3-92.9 s) and the 01xx restarted on later notes. PSG1/PSG2 had the same pattern.
+
+Fix: E1/E2 with a speed and a step clear prate (pChanged); a slide from the playing pitch (03xx, note-less E1/E2) adds the 01xx/02xx
+offset reached so far (`rowPoff`).
+
+| Solar_Man, T=94.3 | FM1 | FM2 | FM3 | FM4 | FM5 | PSG1 | PSG2 | PSG3 |
+|---|---|---|---|---|---|---|---|---|
+| Before (seq 20586) | 1 | 0 | 0 | 138 | 2 | 35 | 40 | 0 |
+| After (seq 20630) | 1 | 0 | 0 | 16 | 2 | 2 | 6 | 0 |
+
+newer_song_lol (T=100): sequence byte-identical to before (cmp), counts FM1-3 0, FM4 7, FM5 0, PSG1 29, PSG2 6, PSG3 0. PSG1 reads 29
+here and 28 in Phase 2p on the same bytes: measurement noise, not a change.
+
+Open items:
+- Solar_Man FM4 68.77-68.92 s (10 frames, 50 c): r2 `02 20` + `0A 05`. The Furnace VGM writes FREQ only twice in 10 ticks (493.77 at 68.82,
+  369.82 at 68.91) while MAME slides a semitone per frame. Not investigated: check what Furnace's FM freq write does there.
+- Solar_Man FM4 34.3 s (1 frame, 1200 c): a note-off (r0 `180`, `00 00`) on instrument 21 (arp table). MDSDRV cmd_rest2 runs
+  mds_update_mtab, so the rest steps the arp table once on the release tail. Register-level, release tail only.
+- Solar_Man FM4 single frames 20.883, 31.417, 33.383 s; PSG1 33.37 s and PSG2 25.73, 27.53, 31.6, 33.27-33.38 s (about 100 c): not investigated.
+- newer_song_lol FM4 96.217-96.267 s: the extra MAME KEYOFFs are the rests of loop-chunk o2 r1 (`08 10` -> E9 + rest, 96.089 s) and r2
+  (`04 44` -> E8 + rest, 96.17 s). Every MDSDRV rest writes key-off ($28) even on a keyed-off channel; that write is inaudible. The audible
+  part is the E8 at r2: its phase is baked from the first pass (vibrato pos 0), while Furnace's loop pass continues the song-end
+  vibrato pos. One byte stream cannot carry both phases. Fix shape: per track, put the FA after the loop chunk's rows before its first
+  note and replay those rows in the wrap section with song-end state. Not done (release tail only, 4 frames).
+
+Unit test: `E1xy after 01xx` row in src/lib/export/__tests__/mdsSong.test.ts (fails without the fix).
+Listen ROM: ~/Desktop/md-roms/Solar_Man-2q.bin (newer_song_lol unchanged, no new ROM).
