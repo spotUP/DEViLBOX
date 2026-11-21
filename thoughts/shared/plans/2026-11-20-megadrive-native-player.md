@@ -1499,3 +1499,25 @@ Open items:
 
 Unit test: `E1xy after 01xx` row in src/lib/export/__tests__/mdsSong.test.ts (fails without the fix).
 Listen ROM: ~/Desktop/md-roms/Solar_Man-2q.bin (newer_song_lol unchanged, no new ROM).
+
+## Phase 2r result
+
+Measured with tools/md-phase0/lagcmp.py (frames over 10 cents per channel, MAME vs Furnace VGM). Solar_Man at T=94.3 s, newer_song_lol at T=100 s.
+
+| Song / channel | Before 2r | After Q1 |
+|---|---|---|
+| newer_song_lol FM4 | 7 | 2 (10.967/10.983 s, known note-0 underflow) |
+| newer_song_lol PSG1 | 28 | 28 |
+| newer_song_lol PSG2 | 6 | 6 |
+| Solar_Man FM4 | 16 | 16 |
+| Solar_Man FM5 / PSG1 / PSG2 | 2 / 2 / 6 | 2 / 2 / 6 |
+
+Sequence size: Solar_Man 20630 -> 20640 bytes, newer_song_lol 61122 -> 61140 bytes.
+
+- Q1 (fixed): the FA loop marker sat at the start of the loop chunk, so the loop pass replayed the leading rests and the note-less 04xy row with the first pass's E8 vibrato phase. Furnace continues from the song-end phase. The converter now places FA at each track's first note of the loop chunk. The rows before that note are emitted again in the wrap (song-end state) before FB 00. Test: "loop point sits at each track's first note of the loop chunk".
+- Q2 (diagnosed, not fixed): all 28 PSG1 frames have MAME period one unit lower (dN = -1, 10-25 cents). They fall on note-on attack frames of instrument 10 "SustainedLead", where the period moves every frame (136 -> 142 -> 149). Cause: MDSDRV interpolates the PSG table linearly and truncates, Furnace rounds the period of an exponential frequency. psgFix picks one detune per key and scores only vibrato offsets or +-half a semitone. Next step: read instrument 10's pitch/arp macros and add their offsets to the psgFix scoring set.
+- Q3 (not started): Solar_Man FM4 68.77-68.92 s, 10 frames at about 50 cents, row with 02 20 + 0A 05; the Furnace VGM writes FREQ only twice in those 10 ticks.
+- Q4 (not started): Solar_Man FM4 34.3 s, a rest on instrument 21 steps the arp table once on the release tail (MDSDRV cmd_rest2 runs mds_update_mtab).
+- Open: Solar_Man track 6 enters the loop on a rest after the Q1 change (cause not checked; no measured regression on any channel).
+
+Listen ROMs: ~/Desktop/md-roms/newer_song_lol-2r.bin, ~/Desktop/md-roms/Solar_Man-2r.bin.

@@ -673,7 +673,13 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     };
     const out: Array<{ bytes: number[]; tieStart: boolean; head: number }> = [];
     let wrap: number[] = [], mtabOn = false;
-    for (const c of chunks) {
+    // The loop point sits at the track's first note in the loop chunk: the rows before it (rests, 04xy on the release tail) replay in
+    // the wrap with song-end state, so a vibrato E8 there continues Furnace's song-end phase (newer_song_lol FM4 96.17 s).
+    const lc = chunks[loopChunk];
+    const firstNote = lc ? lc.rows.findIndex((r) => { const cell = cellAt(ch, lc.o, r); const v = cell ? convertFurnaceNoteValue(cell) : -1; return v >= 0 && v < 253; }) : -1;
+    for (const [ci, c] of (lc ? [...chunks, lc] : chunks).entries()) {
+      const wrapPass = ci === chunks.length;
+      let faAt = -1;
       // A slide still running at a chunk start keeps its envelope: E8 would restart it from the instrument's own one.
       const insCmd = (chunkStart = false) => {
         const r = insRef(kind, ins, envPh);
@@ -721,6 +727,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       };
       let i0 = false;
       c.rows.forEach((r, i) => {
+        if ((ci === loopChunk || wrapPass) && i === firstNote) { if (tok.length) emit(tok.pop()!); faAt = bytes.length; }
+        if (wrapPass && faAt >= 0) return;
         const cell = cellAt(ch, c.o, r);
         let nv = cell ? convertFurnaceNoteValue(cell) : -1, shY = 0, shX = 0, shFrom = NaN;
         if (cell && cell.instrument >= 0) ins = cell.instrument;
@@ -883,8 +891,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         tick += c.ticks[i];
       });
       if (tok.length) emit(tok.pop()!);
-      out.push({ bytes, tieStart, head: headLen });
-      if (loopChunk >= 0 && c === chunks[chunks.length - 1]) wrap = head();
+      if (wrapPass) wrap = bytes;
+      else out.push({ bytes, tieStart, head: ci === loopChunk ? (faAt >= 0 ? faAt : bytes.length) : headLen });
     }
     if (any) tracks.push({ ch, chunks: out, wrap });
   }
@@ -898,7 +906,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const streams = tracks.map((t) => {
     const b: number[] = [];
     t.chunks.forEach((c, i) => {
-      // FA after the loop chunk's head: the loop pass enters with the song-end state (t.wrap), not the first pass's (FM4 newer_song_lol 96.0 s).
+      // FA at the loop chunk's first note (c.head): the loop pass enters with the song-end state (t.wrap), not the first pass's.
       if (i === loopChunk) { b.push(...c.bytes.slice(0, c.head), 0xfa, ...c.bytes.slice(c.head)); return; }
       const k = key(c.bytes);
       const nextTie = t.chunks[(i + 1) % t.chunks.length]?.tieStart ?? false;

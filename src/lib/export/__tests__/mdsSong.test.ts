@@ -471,6 +471,30 @@ describe('furnaceToMds', () => {
     expect(e1).toEqual(await run([{ type: 0x01, value: 0 }, { type: 0xe1, value: 0x11 }]));
     expect(e1).not.toEqual(await run([{ type: 0x01, value: 0 }]));
   });
+  it('loop point sits at each track\'s first note of the loop chunk, so leading rests and 04xy replay with song-end state (newer_song_lol FM4 96.17 s, Phase 2r)', async () => {
+    for (const name of ['newer_song_lol.fur']) { // Solar_Man track 6 enters the loop on a rest (cause not checked yet, Phase 2r open item)
+      const sd = (await convert(name)).seq.subarray(8);
+      const w = (o: number) => (sd[o] << 8) | sd[o + 1];
+      const bgm = (w(4) << 16) | w(6), tbase = bgm + w(bgm);
+      for (let i = 0; i < sd[bgm + 3]; i++) {
+        if (sd[bgm + 4 + i * 4] === 0x0f) continue; // conductor
+        let fa = false, first = '';
+        const walk = (p: number): boolean => {
+          for (;;) {
+            const c = sd[p++];
+            if (c < 0x80 || c === 0x81) { if (fa && !first) first = 'rest'; p += c === 0x81 ? 1 : 0; }
+            else if (c >= 0x82 && c < 0xe0) { if (fa && !first) first = 'note'; p++; }
+            else if (c === 0xfe) { if (!walk(tbase + ((w(tbase + sd[p++] * 2) << 16) >> 16))) return false; }
+            else if (c === 0xfa) fa = true;
+            else if (c === 0xfb || c === 0xff) return c === 0xff;
+            else if (ARG1.has(c)) p++;
+          }
+        };
+        walk(tbase + ((w(bgm + 6 + i * 4) << 16) >> 16));
+        if (fa) expect(`${name} track ${i}: ${first || 'note'}`).toBe(`${name} track ${i}: note`);
+      }
+    }
+  });
   it('Solar_Man: 0D with no value (order 12 row 31) jumps to row 0, not row -1, so order 13 keys on at tick 4000 (measured 1:1 in MAME)', async () => {
     const s = await convert('Solar_Man.fur');
     expect(s.keyOns.some((k) => k.tick === 4000)).toBe(true);
