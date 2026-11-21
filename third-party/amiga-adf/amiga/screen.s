@@ -15,7 +15,8 @@
 ; (SUN-Tronic: `movem.l / lea data(pc),a6` header), into `trap #15 / index`;
 ; hook_trap performs the same store and, when the address is AUDxVOL or its
 ; low byte, records the value (hookvol). Immediate source, (An) indirect, abs.l
-; and software mixers (EMS-6: voice volume in RAM) are not seen.
+; and software mixers are not seen, except EMS-6 (EMS6_VOICES: track note-on
+; stores in RAM, see .voice in hook_trap).
 ; shortcut: channel volume, not a sample envelope; a held or one-shot sample
 ; keeps its bar up. Upgrade: read Paula AUDxDAT or the sample position.
 
@@ -567,7 +568,11 @@ hook_trap:
         move.l  a1,d0
         sub.l   #$dff0a6,d0
         cmp.l   #$33,d0
+        ifd     EMS6_VOICES
+        bhi.b   .voice
+        else
         bhi.b   .out
+        endc
         move.w  d0,d1
         and.w   #$f,d1
         beq.b   .period
@@ -579,6 +584,24 @@ hook_trap:
         move.b  d4,(a2,d0.w)
         st      volwrites               ; a real volume store: period fallback off
         bra.b   .out
+        ifd     EMS6_VOICES
+; EMS-6 mixes in software: byte 8 of each 60-byte track record (32 of them at
+; player +$2bea) takes the note index on note-on (+$35b0, +$3ab8). Count that
+; store as a note-on, like the AUDxPER fallback; draw_bars decays it.
+; shortcut: 32 tracks fold onto 4 bars as track&3; the mixer voice a track
+; lands on (28-byte records at +$281a) is not traced. Upgrade: map through it.
+.voice: move.l  a1,d0
+        subq.l  #8,d0
+        sub.l   _uade_reloc_base,d0
+        sub.l   #$2bea,d0
+        cmp.l   #32*60,d0
+        bhs.b   .out
+        divu.w  #60,d0
+        and.w   #3,d0
+        lea     hookvol,a2
+        move.b  #64,(a2,d0.w)
+        bra.b   .out
+        endc
 .period:
         tst.b   volwrites
         bne.b   .out

@@ -143,6 +143,8 @@ def main():
     asm += ['-DNOTEXT=1'] if player in ('EMS', 'EMS-6') else []
     # EMS-6 (software mixer, A1200) ticks from a real level-3 VBL like the demo; other players stay polled.
     asm += ['-DPLAY_IN_IRQ=1'] if player == 'EMS-6' else []
+    # EMS-6 bars: the software mixer never rewrites AUDxVOL; screen.s reads the track note-on stores.
+    asm += ['-DEMS6_VOICES=1'] if player == 'EMS-6' else []
     needs_020 = {l.split('\t')[0] for l in open(MIN_CPU_TSV) if l.strip() and not l.startswith('#')}
     target = a.target or ('a1200' if player in needs_020 else 'a500')
     t = TARGETS[target]
