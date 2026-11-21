@@ -1200,3 +1200,14 @@ Open:
 - Solar_Man PSG4 -0.15 dB; not investigated.
 
 Listen ROM: `~/Desktop/md-roms/newer_song_lol-2f.bin`.
+
+## Phase 2g results (2026-11-21)
+
+newer_song_lol, frames > 10 cents in first 40 s (before -> after): FM1 11->11, FM2 11->11, FM3 15->15, FM4 5->5, FM5 9->9, PSG1 55->46, PSG2 67->67, PSG3 0->0. No regression.
+
+- **PSG1 22.333 s retarget 51.6 cents high: fixed.** A note under a 03xx still in flight (no 03 on the row) retargets portaNote but still runs the `if (chan[i].doNote)` commit (playback.cpp ~1662; only a row carrying 03 sets doNote=false, lines 1153/1229). That commit resets vibratoPos (unless continuousVibrato). The exporter kept the 04 44 phase running, so the hold sat half a vibrato cycle off: Furnace wrote periods 101,101,102 on the target (key 49, p101), MAME 100,100,100,99. mdsSong.ts now resets vPos on a retarget too. Remaining PSG1 worst: 27.7 cents at 22.167 s, the retarget start frame (MAME holds 887.8 Hz for 2 frames).
+- **PSG2: classified, not fixed (open).** Furnace VGM writes land exactly on 60 Hz frames, so the measure tool sees every Furnace value: no sampling artefact. MAME plays values Furnace never writes: 8.14-8.16 s 510.8/522.7 Hz (slide lag); 24.698 s 1300.7 Hz (p86) where Furnace goes p135, p105, p84 and MAME p?, p106, p86, p84 one frame late (worst 40.8 cents). Real export errors of 1-2 periods / 1 frame. Suspect: per-sequence-tick (72/s) E4/E6 or E8 node placement against 60 Hz frames (fTick ceil vs MDSDRV tempo accumulator phase), or fast-slide start offset. Not confirmed.
+- **Test decoder past end of conductor track: fixed.** `decode()` read the track pos as unsigned; streams placed before tbase (signed negative pos, >32 KiB songs) were walked from a wrong address. Now sign-extended. The retarget test no longer needs the PSG1-only workaround.
+- Tests: retarget E8 item equals the from-pos-0 note's item (fails before fix); decode walks every newer_song_lol track (fails before fix).
+- Solar_Man PSG4 -0.15 dB: not started (budget).
+- Listen ROM: ~/Desktop/md-roms/newer_song_lol-2g.bin.

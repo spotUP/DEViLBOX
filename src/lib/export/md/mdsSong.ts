@@ -665,7 +665,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             // 03xx on a keyed-off channel is a plain note-on in Furnace (playback.cpp keeps doNote, NOTE_ON sets baseFreq to the target): no slide, PSG too.
             // Pitch reached at the end of the previous Furnace tick: this tick's porta step runs after the row (playback.cpp nextTick).
             const fNow = fTick(tick + delay), from = prevKey * 128 + slideOff(fNow - 1) + flyOff(fNow - 1);
-            if (!portaXx && pXx && sounding && from !== prevKey * 128) portaXx = pXx;
+            // A retarget (no 03 on the row) still commits the note (doNote stays true), so it resets the vibrato phase (playback.cpp commit note on).
+            const retarget = !portaXx && pXx > 0 && sounding && from !== prevKey * 128;
+            if (retarget) portaXx = pXx;
             const slide = (kind === 'psg' || kind === 'fm') && sounding && portaXx > 0 && prevKey >= 0 && from !== nv * 128;
             // 03xx on a keyed-on channel is no note-on (playback.cpp: doNote=false), so the vibrato phase is not reset.
             const portaSlur = portaXx > 0 && sounding;
@@ -686,7 +688,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             else if (pegDirty) cmds.push(0xe8, insRef(kind, ins).peg + 1);
             if (trsOut || sA || (kind === 'fm' && dtnOut !== effDtn())) cmds.push(...slideCmd(tick + delay));
             pegDirty = slide || prate !== 0; portaXx = 0;
-            if (!m.compatFlags.continuousVibrato && !portaSlur) { vPos = 0; vAt = tick + delay; }
+            if (!m.compatFlags.continuousVibrato && (!portaSlur || retarget)) { vPos = 0; vAt = tick + delay; }
             if (!portaSlur) { arpT0 = tick + delay; if (baked && insRef(kind, ins).mtab >= 0) cmds.push(0xeb, insRef(kind, ins).mtab + 1); baked = false; }
             if (vDepth) {
               if ((slide && !sA) || prate || insRef(kind, ins).peg >= 0) lossy.add('04xy with a pitch slide or pitch macro (vibrato replaces it)');

@@ -24,32 +24,33 @@ async function solarManRow0(fx: Array<{ type: number; value: number }>, vt?: [nu
 }
 
 /** Test-only decoder: walks one pass of every track (subroutines followed, stops at the loop jump). */
-function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1): { ch: number; tick: number; n: number; s?: 1 }[] {
+function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1): { ch: number; tick: number; n: number; s?: 1; peg?: number }[] {
   const sd = seq.subarray(8);
   const w = (o: number) => (sd[o] << 8) | sd[o + 1];
   const bgm = (w(4) << 16) | w(6);
   const tbase = bgm + w(bgm);
-  const out: { ch: number; tick: number; n: number; s?: 1 }[] = [];
+  const out: { ch: number; tick: number; n: number; s?: 1; peg?: number }[] = [];
   for (let i = 0; i < sd[bgm + 3]; i++) {
     const ch = sd[bgm + 4 + i * 4];
     if (onlyCh >= 0 && ch !== onlyCh) continue;
-    let tick = 0, trs = 0, slur = false;
+    let tick = 0, trs = 0, slur = false, peg = 0;
     const walk = (p: number): boolean => {
       for (;;) {
         const c = sd[p++];
         if (c < 0x80) { if (rests) out.push({ ch, tick, n: -1 }); tick += c + 1; }
         else if (c === 0x81) tick += sd[p++] + 1;
-        else if (c >= 0x82 && c < 0xe0) { out.push({ ch, tick, n: c - 0x82 + trs, ...(slurs && slur ? { s: 1 as const } : {}) }); slur = false; tick += sd[p++] + 1; }
+        else if (c >= 0x82 && c < 0xe0) { out.push({ ch, tick, n: c - 0x82 + trs, ...(slurs && slur ? { s: 1 as const } : {}), ...(slurs ? { peg } : {}) }); slur = false; tick += sd[p++] + 1; }
         else if (c === 0xfe) { if (!walk(tbase + ((w(tbase + sd[p++] * 2) << 16) >> 16))) return false; }
         else if (c === 0xfb || c === 0xff) return c === 0xff;
         else if (c === 0xe0) slur = true; // E0: the next note slurs (no key-on)
         else if (c === 0xfa) continue;
         else if (c === 0xe4) trs = (sd[p++] << 24) >> 24;
+        else if (c === 0xe8) peg = sd[p++]; // slurs: the E8 pitch envelope the note plays
         else if (ARG1.has(c)) p++;
         else throw new Error(`unknown command ${c?.toString(16)} on track ${i}`);
       }
     };
-    walk(tbase + w(bgm + 6 + i * 4));
+    walk(tbase + ((w(bgm + 6 + i * 4) << 16) >> 16)); // pos is a signed word: streams before the track table sit below tbase
   }
   return out;
 }
@@ -300,11 +301,17 @@ describe('furnaceToMds', () => {
   it('newer_song_lol PSG1: a note under a 03xx still in flight retargets the slide, and 03xx onto the reached note is no key-on (both slur, playback.cpp inPorta)', async () => {
     // Order 4 row 9 (tick 1590) slides 03 12; row 10 (tick 1596) is a plain note before the target: Furnace keeps sliding (measured 940 -> 1107 Hz).
     // Order 3 row 49 (tick 1446) is 03 12 onto the note already playing: no NOTE_ON, so the arp macro does not restart (was a -100 cent dip).
-    // Only the PSG1 track (MDSDRV channel 6): the decoder does not walk this song's conductor track (track 0) to its end.
     const d = decode((await convert('newer_song_lol.fur')).seq, false, true, 6);
     expect(d.find((e) => e.tick === 1590)).toMatchObject({ s: 1 });
     expect(d.find((e) => e.tick === 1596)).toMatchObject({ s: 1 });
     expect(d.find((e) => e.tick === 1446)).toMatchObject({ s: 1 });
+    // The retarget keeps doNote, so Furnace resets the 04 44 vibrato phase (playback.cpp commit note on): same E8 item as the
+    // order 4 row 0 note (tick 1536, 04 44 from pos 0). Was mid-phase, half a cycle off (22.33 s 51.6 cents high).
+    expect(d.find((e) => e.tick === 1596)!.peg).toBe(d.find((e) => e.tick === 1536)!.peg);
+  });
+  it('decode walks every track of newer_song_lol to its end (streams placed before the track table have a negative pos)', async () => {
+    const d = decode((await convert('newer_song_lol.fur')).seq);
+    expect(new Set(d.map((e) => e.ch)).size).toBeGreaterThanOrEqual(8);
   });
   it('highscorefollin: mid-note 04 66 on FM2 (order 0 row 32) is an E8 extended vibrato envelope from pos 0, not lossy', async () => {
     const s = await convert('highscorefollin.fur');
