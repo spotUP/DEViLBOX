@@ -1,0 +1,49 @@
+; Minimal Mega Drive shell for the MDSDRV Phase 0 proof (vasmm68k_mot -Fbin -spaces).
+; Calls mds_init once, requests sound 1 (prio 3), then mds_update every VINT.
+; -DTEMPO=<byte> sets the sequence tempo (F9 dd); mdsdrv.bin must be in the cwd.
+WORK	equ	$FF0000			; WSIZE = $3EC (w_track $4C + TSIZE $3A * 16)
+FRAMES	equ	$FF1000
+	dc.l	$00FFF800,start
+	dcb.l	28,idle
+	dc.l	vint			; vector 30 ($78) = level 6 VINT
+	dcb.l	33,idle
+	dc.b	"SEGA MEGA DRIVE "
+	dcb.b	224,' '
+	dc.b	"JUE             "
+start:
+	move.w	#$2700,sr
+	move.b	$A10001,d0
+	andi.b	#$0F,d0
+	beq.s	.notmss
+	move.l	#'SEGA',$A14000
+.notmss:
+	lea	$FF0000,a0
+	move.w	#$1FFF,d0
+.clr:	clr.l	(a0)+
+	dbf	d0,.clr
+	move.w	#$8004,$C00004
+	lea	WORK,a0
+	lea	seq,a1
+	lea	pcm,a2
+	jsr	drv
+	lea	WORK,a0
+	moveq	#1,d0
+	moveq	#3,d1
+	jsr	drv+8
+	move.w	#$8174,$C00004
+	move.w	#$2300,sr
+.loop:	bra.s	.loop
+vint:	movem.l	d0-a6,-(sp)
+	lea	WORK,a0
+	jsr	drv+4
+	addq.l	#1,FRAMES
+	movem.l	(sp)+,d0-a6
+idle:	rte
+	cnop	0,2
+drv:	incbin	"mdsdrv.bin"
+	cnop	0,2
+	even
+seq:	incbin	"seq.bin"
+	even
+	cnop	0,32768
+pcm:	incbin	"pcm.bin"

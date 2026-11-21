@@ -1,0 +1,10 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { parseFurnaceSong } from '/Users/spot/Code/DEViLBOX/src/lib/import/formats/FurnaceSongParser';
+import { furnaceToMds } from '/Users/spot/Code/DEViLBOX/src/lib/export/md/mdsSong';
+const [fur, out, pcmOut] = process.argv.slice(2);
+const b = readFileSync(fur);
+const m = await parseFurnaceSong(b.buffer.slice(b.byteOffset, b.byteOffset + b.length));
+const r = furnaceToMds(m);
+writeFileSync(out, r.seq);
+writeFileSync(pcmOut, r.pcm.length ? r.pcm : new Uint8Array(256));
+console.log('RESULT seq', r.seq.length, 'pcm', r.pcm.length, 'lossy', JSON.stringify(r.lossy));
