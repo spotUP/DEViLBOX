@@ -195,6 +195,45 @@
         "player": "c89661bc4b22bb5c05ae8f69321da6bdb54d59d21ae87453689ca3f056ed36ae"
       }
     },
+    "Ashley_Hogg": {
+      "adf": "Ashley_Hogg.adf",
+      "adfSha256": "6caac3d3148bbdfffe63607f304aebe1b289d6616c82b4ceb1c3c714a8f9bea4",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 41116,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 41112,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 270984,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 358660,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42600",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5A600",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x57904",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "ash.nobby_the_aardvark",
+        "bytes": 38444
+      },
+      "sources": {
+        "tool": "8a0f9af8f17b9b236b64f1375f4e30f4a43b894b98f7f15b6f3db7ca1dc9b789",
+        "player": "80949d8cbfea483bf1b7e37d9fcc0d01189cd7e16e17cf09bf2173bd5c869443"
+      }
+    },
     "BeathovenSynthesizer": {
       "adf": "BeathovenSynthesizer.adf",
       "adfSha256": "d87c0ec2d85004fe6f2d1f3c6141d899d6d1972f22db7a5bddf2b359e52ccb73",
@@ -781,6 +820,45 @@
         "player": "fcaa3c81076b4814e90548fa474d11c36031a270560818c9b7ddfa3985a65199"
       }
     },
+    "MMDC": {
+      "adf": "MMDC.adf",
+      "adfSha256": "9a1ad2474064fae6c1c4547e4bb64dd88bb57d13eb4d8618398a9d618e0aa67d",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 42256,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 42252,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 272148,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 310532,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42A00",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5AA00",
+        "BSS_LEN": "0x8808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4BD04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "captain planet and the planeteers - title.mmdc",
+        "bytes": 48088
+      },
+      "sources": {
+        "tool": "8a0f9af8f17b9b236b64f1375f4e30f4a43b894b98f7f15b6f3db7ca1dc9b789",
+        "player": "a35544d53e1fcab7f97580e476ddd342ef95e8d5ccce4738bbf280381231b6e6"
+      }
+    },
     "Maximum_Effect": {
       "adf": "Maximum_Effect.adf",
       "adfSha256": "4dacced005a6abf7ee34e9eac2c6f39097bdcfcb7748cfa6907dab34172d0311",
@@ -868,6 +946,45 @@
         "player": "0f0da6015c69602f0b2eef3dc9e155c7a021b26194455bc0195c6e6c80ee1a04"
       }
     },
+    "MultiMedia_Sound": {
+      "adf": "MultiMedia_Sound.adf",
+      "adfSha256": "c919cb1ce0f127147f8909a6ed2b8d906d908b4e95ba4fb52399ec780f1f8d6c",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 42392,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 42388,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 272254,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 359684,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42A00",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5AA00",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x57D04",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "bottle popper.mms",
+        "bytes": 84914
+      },
+      "sources": {
+        "tool": "8a0f9af8f17b9b236b64f1375f4e30f4a43b894b98f7f15b6f3db7ca1dc9b789",
+        "player": "cf73a1c31c1da1b8a85d714b98a87dd67fad0c69bd396027f6ec1e1f0ebeb513"
+      }
+    },
     "Oktalyzer": {
       "adf": "Oktalyzer.adf",
       "adfSha256": "ff8b1c03c56f561d4d064c091c12dd7ecf4f1e29a196f9be637366b18185fde7",
@@ -944,6 +1061,45 @@
       "sources": {
         "tool": "31ef8ad896dc5de4abf5c0823451fc4adac44fdcb38c952b00c36f60cb4619df",
         "player": "cea8f553a382654d56d8d7e27ec26cf9374db54e3e9dcab5be9b4f092e57e9ca"
+      }
+    },
+    "PierreAdane": {
+      "adf": "PierreAdane.adf",
+      "adfSha256": "5e71d4c5905e6befcc644015dc31500531d54fdcad748ffd7487903ddd51ec70",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 41396,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 41392,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 291894,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 380292,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x47600",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5F600",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x5CD84",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "Ivanhoe_ivanhoe - hiscore.pap",
+        "bytes": 2014
+      },
+      "sources": {
+        "tool": "8a0f9af8f17b9b236b64f1375f4e30f4a43b894b98f7f15b6f3db7ca1dc9b789",
+        "player": "803f830e56676b0abd8b25075860764db266e35dbea9258163e99814db2705bc"
       }
     },
     "QuadraComposer": {
