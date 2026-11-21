@@ -1275,3 +1275,33 @@ Listen ROM: `~/Desktop/md-roms/newer_song_lol-2i.bin`.
 4. Add a test row with the per-hit phase for Solar_Man noise.
 
 **Item 3: residual FM error in newer_song_lol (not investigated).** FM1-3 31 cents at 22.8 s, FM5 50 cents at 11.0 s, FM4 21 cents at 10.9 s. These are unchanged by 2j. The first differing register write has not been found yet.
+
+## Phase 2k results
+
+Solar_Man PSG4 (noise hi-hat / crash) envelope phase, measured with the MAME-vs-Furnace-VGM harness (`loud.py` window 4, T 12, three windows):
+
+| Build | PSG4 dB |
+|-------|---------|
+| HEAD (one anchored table per instrument) | -0.19 / -0.15 / -0.15 |
+| per-hit table, `floor((f0+f+0.5)*r) - k` (plan 2j formula) | -0.25 / -0.25 / -0.26 |
+| per-hit, f0 offset -1 / +1 / +2 frames | +0.35 / -0.99 / -1.90 |
+| per-hit, `floor((f0+f)*r) - k` (landed) | +0.07 / +0.09 / +0.03 |
+
+FM1-5 on Solar_Man stay within 0.04 dB.
+
+What landed in `mdsSong.ts`:
+- The conductor block moves ahead of the channel loop. `frameOfTick` replays the F9 stream through the driver's 128-tick accumulator, so each sequence tick knows the driver frame it plays on.
+- `framesOf` takes an optional `HitPhase {f0, k}` (driver frame, Furnace engine tick). It builds a one-shot table that starts on the macro tick the hit lands on. Looping macros keep the anchored table.
+- `insRef` dedups tables by content (`envItems`). A PSG note re-sends its instrument only when its phase table differs from the one in force.
+- The plan 2j formula carried a half-frame `+0.5` rounding. That rounding is wrong here: the hit frame f0 starts on Furnace tick k exactly.
+
+Limits (shortcut, commented in code):
+- Per-hit tables apply only when `fpt === 1` (no virtual tempo). Under virtual tempo, Solar_Man at 180/150 needed 370 song-table items against MDSDRV's 256.
+- No new table is allocated once 224 items are in use.
+- Upgrade path: share one table across phases whose bytes are close.
+
+newer_song_lol: `fpt < 1`, so per-hit tables are off. The sequence is byte-identical to HEAD (60314 bytes), so the first-40 s over-10-cent counts cannot regress.
+
+Open: Task 2 (newer_song_lol FM residual: FM1-3 31 cents at 22.8 s, FM5 50 cents at 11.0 s, FM4 21 cents at 10.9 s) was not started (budget).
+
+Listen ROM: `~/Desktop/md-roms/Solar_Man-2k.bin`.

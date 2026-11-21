@@ -111,6 +111,10 @@ describe('PSG envelope rate', () => {
     expect(env[0]).toBe(0x30);
     expect(env.slice(-2)).toEqual([0x01, 0x00]);
   });
+  it('a per-hit phase starts the table on the Furnace tick the hit lands on (hit at driver frame f0 = Furnace tick k)', () => {
+    expect(psgEnvelope(ins, 184, new Lossy(), 56, { f0: 0, k: 0 })[0]).toBe(0x40);
+    expect(psgEnvelope(ins, 184, new Lossy(), 56, { f0: 11, k: 10 })[0]).toBe(0x30);
+  });
   it('an on-frame (60 Hz) macro keeps one node per tick', () => {
     const env = psgEnvelope(ins, 184, new Lossy());
     expect(frames(env)).toBe(26);

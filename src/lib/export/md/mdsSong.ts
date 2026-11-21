@@ -215,8 +215,22 @@ function fmVoice(ins: FurnaceInstrument | undefined, lossy: Lossy): number[] {
  * Per-tick macro values resampled to driver frames (MDSDRV steps PSG and pitch envelopes once per NTSC VINT, Furnace macros once per tick):
  * frame f plays the tick at its midpoint, floor((f + 0.5) * tickHz / NTSC_HZ). Within the 0.5 Hz "on frame" band it stays one frame per tick.
  */
-function framesOf(tv: { vals: number[]; loop: number }, tickHz: number): { vals: number[]; loop: number } {
+/** A PSG key-on: driver frame f0 it plays on, Furnace engine tick k it stands for. */
+export type HitPhase = { f0: number; k: number };
+
+function framesOf(tv: { vals: number[]; loop: number }, tickHz: number, phase?: HitPhase): { vals: number[]; loop: number } {
   const r = Math.abs(tickHz - NTSC_HZ) > 0.5 ? tickHz / NTSC_HZ : 1;
+  // Per hit: key-on on driver frame f0 at Furnace tick k, so driver frame f0 + f plays the Furnace tick live at its midpoint, minus k.
+  // shortcut: a looping macro keeps the key-on-anchored table (its loop would need one phase per pass); cut it per hit if a song needs it.
+  if (phase && r !== 1 && tv.loop < 0) {
+    const vals: number[] = [];
+    for (let f = 0; ; f++) {
+      const j = Math.floor((phase.f0 + f) * r) - phase.k; // hit frame f0 starts on Furnace tick k: no half-frame rounding (2k: +0.5 cost 0.25 dB on Solar_Man PSG4)
+      if (j >= tv.vals.length && vals.length) break;
+      vals.push(tv.vals[Math.max(0, Math.min(tv.vals.length - 1, j))]);
+    }
+    return { vals, loop: -1 };
+  }
   const vals = Array.from({ length: Math.max(1, Math.round(tv.vals.length / r)) }, (_, f) => tv.vals[Math.min(tv.vals.length - 1, Math.floor((f + 0.5) * r))]);
   return { vals, loop: tv.loop >= 0 ? Math.min(vals.length - 1, Math.max(0, Math.ceil(tv.loop / r - 0.5))) : -1 };
 }
@@ -226,10 +240,10 @@ function framesOf(tv: { vals: number[]; loop: number }, tickHz: number): { vals:
  * MDSDRV steps the envelope once per NTSC frame (mds_psg_update_env runs every VINT), so the macro goes through framesOf
  * (measured Solar_Man PSG4 at 56 Hz: -0.3 dB from a 7% fast decay).
  */
-export function psgEnvelope(ins: FurnaceInstrument | undefined, version: number, lossy: Lossy, tickHz = NTSC_HZ): number[] {
+export function psgEnvelope(ins: FurnaceInstrument | undefined, version: number, lossy: Lossy, tickHz = NTSC_HZ, phase?: HitPhase): number[] {
   const m = macro(ins, MACRO_VOL, version);
   if (!m) return [0x10, 0x01, 0x00];
-  const { vals, loop } = framesOf(ticksOf(m, lossy, 'PSG volume'), tickHz);
+  const { vals, loop } = framesOf(ticksOf(m, lossy, 'PSG volume'), tickHz, phase);
   const out: number[] = [];
   let loopPos = -1;
   for (let t = 0; t < vals.length;) {
@@ -445,9 +459,53 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     pcmItems.set(k, i);
     return i;
   };
+  // Conductor track on dummy channel 0f. F9 is one byte in 1/128 NTSC frames, so 60 Hz falls between 7f (59.92 Hz) and 80 (60.39 Hz);
+  // one fixed value drifts 0.13 percent (measured: highscorefollin 40 ms late at 31.6 s). Dither both per 128-tick block so tick k
+  // stays at Furnace's k / rate seconds; each span (intro, loop body) is balanced on its own so loop passes do not accumulate.
+  const fIdeal = NTSC_HZ / rate, lo = Math.max(0, Math.min(254, Math.floor(rate * 128 / NTSC_HZ) - 1)), fLo = 128 / (lo + 1), fHi = 128 / (lo + 2);
+  const conduct = (n: number): number[] => {
+    const nHi = Math.max(0, Math.min(n, Math.round((n * (fLo - fIdeal)) / (fLo - fHi)))), out: number[] = [];
+    for (let a = 0; a < n; a += 128) {
+      const e = Math.min(n, a + 128), h = Math.round((e * nHi) / n) - Math.round((a * nHi) / n);
+      if (h) out.push(0xf9, lo + 1, h - 1);
+      if (e - a - h) out.push(0xf9, lo, e - a - h - 1);
+    }
+    return out;
+  };
+  const spanTicks = (from: number, to: number) => chunks.slice(from, to).reduce((n, c) => n + c.ticks.reduce((x, y) => x + y, 0), 0);
+  const introEnd = loopChunk >= 0 ? loopChunk : chunks.length;
+  const nIntro = spanTicks(0, introEnd), nBody = loopChunk >= 0 ? spanTicks(loopChunk, chunks.length) : 0;
+  // Virtual tempo above the engine rate: Furnace runs 1 or 2 ticks per engine frame (tempoAccum), so the conductor sets each frame's
+  // tick count. One conductor loop holds K bodies: K * nBody ticks is a whole number of Furnace frames (tempoAccum phase repeats) and
+  // the fewest whole NTSC frames off per pass, so loop passes keep Furnace's frame phase (measured newer_song_lol: one body, 6399 ticks
+  // = 5332.5 Furnace frames, drifted 0.41 NTSC frames per pass). Channel tracks loop on their own, so a longer conductor loop is fine.
+  const useFt = fpt < 1 - 1e-9 && rate >= NTSC_HZ;
+  let K = 1;
+  for (let k = 1, best = Infinity; useFt && nBody && k <= 8; k++) {
+    const fF = k * nBody * fpt, x = (fF * NTSC_HZ) / s.hz, e = Math.abs(x - Math.round(x)) / k;
+    if (Math.abs(fF - Math.round(fF)) < 1e-6 && e < best - 1e-9) [best, K] = [e, k];
+  }
+  // One extra body after the loop so the block's last frame tempo leads into the next pass, not into silence.
+  const ft = useFt ? frameTempos(nIntro + (K + 1) * nBody, fpt, s.hz) : null;
+  const span = (a: number, n: number) => (ft ? encodeTempos(ft.slice(a, a + n)) : conduct(n));
+  // Driver frame of each first-pass sequence tick (mdsdrv.68k request loop, as frameTempos models it): frame 0 plays tick 0, then each
+  // frame adds the last run tick's F9 + 1 to the counter and runs one tick per 128. PSG envelopes are cut per hit against it.
+  const tempoTicks = ft ?? [];
+  if (!ft) {
+    const cb = [...span(0, nIntro), ...(loopChunk >= 0 ? span(nIntro, K * nBody) : [])]; // conduct(): only F9 vv ll triples
+    for (let j = 0; j < cb.length; j += 3) for (let q = 0; q <= cb[j + 2]; q++) tempoTicks.push(cb[j + 1]);
+  }
+  const frameOfTick = [0];
+  for (let g = 1, c = 0; frameOfTick.length < tempoTicks.length + 1; g++) {
+    const d = (tempoTicks[frameOfTick.length - 1] ?? 0x7f) + 1, k = (c + d) >> 7;
+    c = (c + d) & 127;
+    for (let j = 0; j < k; j++) frameOfTick.push(g);
+  }
+  const phaseOf = (t: number) => ({ f0: frameOfTick[Math.min(t, frameOfTick.length - 1)], k: furnaceTickOf(t, fpt) });
   const noiseArps = new Map<string, number>();
   const insCache = new Map<string, { ins: number; peg: number; mtab: number }>();
-  const insRef = (kind: Kind, idx: number) => {
+  const envItems = new Map<string, number>();
+  const insRef = (kind: Kind, idx: number, phase?: HitPhase) => {
     const key = `${kind === 'fm' ? 'fm' : 'psg'}:${idx}`;
     let v = insCache.get(key);
     if (!v) {
@@ -459,7 +517,12 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       v = { ins: item(kind === 'fm' ? fmVoice(ins, lossy) : psgEnvelope(ins, m.version, lossy, s.hz)), peg: peg ? item(peg) : -1, mtab: mt ? tbItem(mt) : -1 };
       insCache.set(key, v);
     }
-    return v;
+    if (kind === 'fm' || !phase || items.length >= 224) return v; // shortcut: per-hit tables only without virtual tempo and while the 256-item table has room; upgrade by sharing tables across close phases
+    // Each hit gets the envelope cut for its own tick phase; hits with the same table share one item (keyed on content).
+    const env = psgEnvelope(m.instruments[idx], m.version, new Lossy(), s.hz, phase), ek = env.join();
+    let e = envItems.get(ek);
+    if (e === undefined) envItems.set(ek, (e = ek === items[v.ins].join() ? v.ins : item(env)));
+    return { ...v, ins: e };
   };
 
   // 3. Per channel, per chunk: standalone command bytes.
@@ -467,7 +530,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const tracks: Array<{ ch: number; chunks: Array<{ bytes: number[]; tieStart: boolean }> }> = [];
   for (let ch = 0; ch < nCh; ch++) {
     const kind = KIND[ch];
-    let trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0, slideEnd = 0, prevKey = -1, pegDirty = false, portaXx = 0;
+    let envPh: HitPhase | undefined, trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0, slideEnd = 0, prevKey = -1, pegDirty = false, portaXx = 0;
     // 01xx/02xx (linear pitch): rate in 1/128 semitone per Furnace tick, poff = offset after the last tick so far. Furnace keeps the slide
     // running across notes and note offs (playback.cpp 0x01/0x02 leave inPorta false; NOTE_ON resets baseFreq, the slide goes on), so each
     // key-on restarts the envelope from 0 and only 01 00 / 02 00 / 03xx stop it, holding the reached offset until the next note.
@@ -592,7 +655,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     for (const c of chunks) {
       // A slide still running at a chunk start keeps its envelope: E8 would restart it from the instrument's own one.
       const insCmd = (chunkStart = false) => {
-        const r = insRef(kind, ins);
+        const r = insRef(kind, ins, envPh);
         const peg = (chunkStart ? sounding && (prate || poff) : prate) ? pslideCmd() : chunkStart && tick < slideEnd ? [] : [0xe8, r.peg + 1];
         kvsIns = ins;
         return [0xe1, r.ins, ...peg, 0xeb, r.mtab + 1, ...kvsCmd(vol)];
@@ -706,7 +769,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         else if (pChanged && sounding && (prate || poff)) cmds.push(...pslideCmd());
         if (!isNote && sounding && (sA || trsOut)) cmds.push(...slideCmd(tick + delay));
         if (!isNote && vChanged && sounding) { cmds.push(...(vDepth ? vibCmd(tick + delay) : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
-        if (isNote && ins !== curIns) { curIns = ins; cmds.unshift(...insCmd()); }
+        const hitPh = isNote && kind !== 'fm' && fpt === 1 ? phaseOf(tick + delay) : undefined;
+        if (isNote && (ins !== curIns || (hitPh && insRef(kind, ins, hitPh).ins !== insRef(kind, ins, envPh).ins))) { curIns = ins; envPh = hitPh; cmds.unshift(...insCmd()); }
         if (isNote || isOff || cmds.length || i === 0) {
           if (tok.length) emit(tok.pop()!);
           if (isNote) {
@@ -803,35 +867,6 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     return b;
   });
   if (items.length > 256) throw new Error(`MDSDRV song table holds 256 items; this song needs ${items.length}`);
-  // Conductor track on dummy channel 0f. F9 is one byte in 1/128 NTSC frames, so 60 Hz falls between 7f (59.92 Hz) and 80 (60.39 Hz);
-  // one fixed value drifts 0.13 percent (measured: highscorefollin 40 ms late at 31.6 s). Dither both per 128-tick block so tick k
-  // stays at Furnace's k / rate seconds; each span (intro, loop body) is balanced on its own so loop passes do not accumulate.
-  const fIdeal = NTSC_HZ / rate, lo = Math.max(0, Math.min(254, Math.floor(rate * 128 / NTSC_HZ) - 1)), fLo = 128 / (lo + 1), fHi = 128 / (lo + 2);
-  const conduct = (n: number): number[] => {
-    const nHi = Math.max(0, Math.min(n, Math.round((n * (fLo - fIdeal)) / (fLo - fHi)))), out: number[] = [];
-    for (let a = 0; a < n; a += 128) {
-      const e = Math.min(n, a + 128), h = Math.round((e * nHi) / n) - Math.round((a * nHi) / n);
-      if (h) out.push(0xf9, lo + 1, h - 1);
-      if (e - a - h) out.push(0xf9, lo, e - a - h - 1);
-    }
-    return out;
-  };
-  const spanTicks = (from: number, to: number) => chunks.slice(from, to).reduce((n, c) => n + c.ticks.reduce((x, y) => x + y, 0), 0);
-  const introEnd = loopChunk >= 0 ? loopChunk : chunks.length;
-  const nIntro = spanTicks(0, introEnd), nBody = loopChunk >= 0 ? spanTicks(loopChunk, chunks.length) : 0;
-  // Virtual tempo above the engine rate: Furnace runs 1 or 2 ticks per engine frame (tempoAccum), so the conductor sets each frame's
-  // tick count. One conductor loop holds K bodies: K * nBody ticks is a whole number of Furnace frames (tempoAccum phase repeats) and
-  // the fewest whole NTSC frames off per pass, so loop passes keep Furnace's frame phase (measured newer_song_lol: one body, 6399 ticks
-  // = 5332.5 Furnace frames, drifted 0.41 NTSC frames per pass). Channel tracks loop on their own, so a longer conductor loop is fine.
-  const useFt = fpt < 1 - 1e-9 && rate >= NTSC_HZ;
-  let K = 1;
-  for (let k = 1, best = Infinity; useFt && nBody && k <= 8; k++) {
-    const fF = k * nBody * fpt, x = (fF * NTSC_HZ) / s.hz, e = Math.abs(x - Math.round(x)) / k;
-    if (Math.abs(fF - Math.round(fF)) < 1e-6 && e < best - 1e-9) [best, K] = [e, k];
-  }
-  // One extra body after the loop so the block's last frame tempo leads into the next pass, not into silence.
-  const ft = useFt ? frameTempos(nIntro + (K + 1) * nBody, fpt, s.hz) : null;
-  const span = (a: number, n: number) => (ft ? encodeTempos(ft.slice(a, a + n)) : conduct(n));
   streams.push([...span(0, nIntro), ...(loopChunk >= 0 ? [0xfa, ...span(nIntro, K * nBody), 0xfb, 0x00] : []), 0xff]);
   const chanIds = [...tracks.map((t) => MDS_CHAN[t.ch]), 0x0f];
 
