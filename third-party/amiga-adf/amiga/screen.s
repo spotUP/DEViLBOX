@@ -104,7 +104,12 @@ _screen_init:
         moveq   #0,d7
         moveq   #21,d5                  ; name length - 1 (msg holds 31 names of 22 + space)
         ifd     NOTEXT
-        bra.w   .nomsg                  ; EMS: no magic, no text fields (builder defines NOTEXT)
+        ; EMS: no magic, no text fields (builder defines NOTEXT). The title is the file name the browser wrote into adf_title.
+        lea     adf_title,a2
+        moveq   #TW-1,d1
+.at:    move.b  (a2)+,(a1)+
+        dbf     d1,.at
+        bra.w   .nomsg
         endif
         cmp.l   #'DIGI',d0
         beq.w   .digi
@@ -972,6 +977,10 @@ lv:             dc.w 0,0,0,0
 cap:            dc.w 0,0,0,0
 hold:           dc.w 0,0,0,0
 title:          ds.b TW+1
+        xdef    _adf_title
+_adf_title:                             ; TW printable ASCII bytes, space padded; buildAdf patches it (manifest titleSlot)
+adf_title:      dcb.b TW,' '
+        even
 msg:            ds.b 31*23+2
 timestr:        dc.b '{ 00:00',0
         even

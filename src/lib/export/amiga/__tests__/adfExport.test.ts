@@ -40,9 +40,21 @@ describe('adf slot patcher', () => {
     for (let i = 0; i < base.length; i++) {
       const inSlot = i >= diskOffset && i < diskOffset + maxBytes;
       const inLen = i >= lw && i < lw + 4;
-      if (!inSlot && !inLen && r.data[i] !== base[i]) throw new Error(`byte ${i} changed outside the slot`);
+      const inTitle = i >= e.titleSlot.diskOffset && i < e.titleSlot.diskOffset + e.titleSlot.bytes;
+      if (!inSlot && !inLen && !inTitle && r.data[i] !== base[i]) throw new Error(`byte ${i} changed outside the slot`);
     }
     expect(r.filename.endsWith('.adf')).toBe(true);
+  });
+
+  it('writes the file name without extension, sanitized and space padded, at the manifest title slot', async () => {
+    const e = manifest.templates['EMS'];
+    const base = tpl(e.adf);
+    const mod = song('formats/je taime.ems');
+    const at = (n: string) => buildAdf(mod, n, manifest, async () => base).then((r) =>
+      String.fromCharCode(...r.data.subarray(e.titleSlot.diskOffset, e.titleSlot.diskOffset + e.titleSlot.bytes)));
+    expect(await at('je taime.ems')).toBe('je taime'.padEnd(e.titleSlot.bytes, ' '));
+    expect(await at('caf\u00e9.ems')).toBe('caf?'.padEnd(e.titleSlot.bytes, ' '));
+    expect(await at('x'.repeat(60) + '.ems')).toBe('x'.repeat(e.titleSlot.bytes));
   });
 
   it('refuses a module larger than the slot, and does not modify the template', () => {

@@ -2,7 +2,7 @@
   "templates": {
     "AbyssHighestExperience": {
       "adf": "AbyssHighestExperience.adf",
-      "adfSha256": "fda9a25aaef64dbefe85f4b98842706be4035199e84f1275e0ec98655cef0e0c",
+      "adfSha256": "4955c34e3a4d05ce9885800582f986dbff3d1f82403bae6f853153c623ec4117",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
@@ -13,6 +13,11 @@
         "diskOffset": 48640,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 525478,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 157460,
       "memory": {
@@ -30,13 +35,13 @@
         "bytes": 26327
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "ce55646788639b86811063178613a5b31f783a325dbc60919cfc9596143d3db0"
       }
     },
     "Anders_0land": {
       "adf": "Anders_0land.adf",
-      "adfSha256": "3f508b418192d9f2043a65eba9e0c7dd28a250f4f6c9e1a50caddb01791b0af9",
+      "adfSha256": "d855955722f517cb7252bddad8e165f0cf412a53a00a229061195b37c4783c31",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
@@ -47,6 +52,11 @@
         "diskOffset": 39724,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 269590,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 359684,
       "memory": {
@@ -64,13 +74,13 @@
         "bytes": 3036
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "3e58a705b80e61ceb42c2e17e7c4a1f95ae829125267b041fcd434877b416b0a"
       }
     },
     "CustomMade": {
       "adf": "CustomMade.adf",
-      "adfSha256": "ed0d399c522f547e7b00d59487d2c639a3dc54f952a55714d9a6012be0509c2e",
+      "adfSha256": "43e48b4c369faff2a9d1c29bdfcb8792204fa9ad1ac4481d7719011eb03b49bb",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
@@ -81,6 +91,11 @@
         "diskOffset": 40112,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 269976,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 310532,
       "memory": {
@@ -98,13 +113,13 @@
         "bytes": 9759
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "170b379f48461877ddcee732338668f3a6c900eadfe08bee119f8fd2af161e49"
       }
     },
     "DIGI-Booster": {
       "adf": "DIGI-Booster.adf",
-      "adfSha256": "4a25444da18ddfd19be554557170780383fdb7a35b87f1f84cacee97b5a96748",
+      "adfSha256": "3f848542879cc25949d700b2d24056cd1affe6b1b32438e776f9b0feb08caec6",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
@@ -115,6 +130,11 @@
         "diskOffset": 47976,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 572756,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 845060,
       "memory": {
@@ -132,23 +152,28 @@
         "bytes": 521656
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "485b77266dba0b59f5f71de1beabde89c6396dc0e203f50ee38e068b9683f133"
       }
     },
     "EMS": {
       "adf": "EMS.adf",
-      "adfSha256": "5c863a48b694c403fb3d005e7ff4f78f4e873316dfc85357d536433eb714235a",
+      "adfSha256": "0907dcf3cf9fc9952114a39062a11d59fdd978d10c361723fc404ef8561099a5",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 39424,
+        "diskOffset": 39440,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 39420,
+        "diskOffset": 39436,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 269298,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 358660,
       "memory": {
@@ -166,23 +191,28 @@
         "bytes": 46060
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "7803230a31cb7eca7525f741aba05ebd413166ab9f4398106eceaefe7c017472"
       }
     },
     "EMS-6": {
       "adf": "EMS-6.adf",
-      "adfSha256": "b99cc4eefd480a560df33616ae29a279e95667635d4445b97bd2094196917065",
+      "adfSha256": "ba3341b68e81276c2b08a29a312c1fccf8f2490c70f0e7241a819b78056852b9",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 54848,
+        "diskOffset": 54864,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 54844,
+        "diskOffset": 54860,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 284724,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 375044,
       "memory": {
@@ -200,13 +230,13 @@
         "bytes": 4094
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "40b48f7d514976d9e84585fd9a47b5075384caa0e27fe56ef537c4ee55710658"
       }
     },
     "FutureComposer1.4": {
       "adf": "FutureComposer1.4.adf",
-      "adfSha256": "dc8d09935aca2c61851519365ac57bd32b54c4bd264a75b28c4db4247c0c2c94",
+      "adfSha256": "a6dcadff04b81cb2f891f01124514d1c8ff981cd2ae9270e603b6033a5b224af",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
@@ -217,6 +247,11 @@
         "diskOffset": 41132,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 270992,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 311556,
       "memory": {
@@ -234,13 +269,13 @@
         "bytes": 13724
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "507e430c3cf08c3e324820111ba49ef25125ce80fd5bd7d787ebb3d83a9552e3"
       }
     },
     "JamCracker": {
       "adf": "JamCracker.adf",
-      "adfSha256": "8f07546a58b62d9841fba7c6a7b2dc6ba6b64b9a8e861937062662cf1a348429",
+      "adfSha256": "b97b24c2bd9714273ba48372bf338bad72713ada5de2320d3f8a56841ef9e0c4",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
@@ -251,6 +286,11 @@
         "diskOffset": 40380,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 270248,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 310532,
       "memory": {
@@ -268,13 +308,13 @@
         "bytes": 48577
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "1686b55a62f7469096b84dc7769c4d71b73530d8e15b5b032a1d1a08795d4f5d"
       }
     },
     "MED": {
       "adf": "MED.adf",
-      "adfSha256": "61566659777dc264c9423062d09e14c1b333734fc72c21cace44bed6dc5b02fb",
+      "adfSha256": "edb21a46ff69b65859bef1dd273347bdebbe79e944da16cc7642818653b283c7",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
@@ -285,6 +325,11 @@
         "diskOffset": 50992,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 280874,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 376068,
       "memory": {
@@ -302,14 +347,14 @@
         "bytes": 30474
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "fcaa3c81076b4814e90548fa474d11c36031a270560818c9b7ddfa3985a65199"
       }
     },
     "MED-A1200": {
       "player": "MED",
       "adf": "MED-A1200.adf",
-      "adfSha256": "3157e6877fcdf18b8609dc76bdd1c29705a39e4d95ce7935bced7d19b359092f",
+      "adfSha256": "875b5db9f68a89c37c0febe65f5b67756bf2d5a08e4d9f51502cb30ff7a35cc9",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
@@ -320,6 +365,11 @@
         "diskOffset": 50992,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 280862,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 376068,
       "memory": {
@@ -337,13 +387,13 @@
         "bytes": 136168
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "fcaa3c81076b4814e90548fa474d11c36031a270560818c9b7ddfa3985a65199"
       }
     },
     "Mugician": {
       "adf": "Mugician.adf",
-      "adfSha256": "a9ae36e21a16bd83530c4c76ecdba3a9ca483391ba6f1758563216500b1e3f74",
+      "adfSha256": "21949c6e213df77b3b81b69ed87e486253f92eb188cbabb9a7c31ee9b4b6cecf",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
@@ -354,6 +404,11 @@
         "diskOffset": 44156,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 274016,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 314628,
       "memory": {
@@ -371,13 +426,13 @@
         "bytes": 10332
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "0f0da6015c69602f0b2eef3dc9e155c7a021b26194455bc0195c6e6c80ee1a04"
       }
     },
     "PTK-Prowiz": {
       "adf": "PTK-Prowiz.adf",
-      "adfSha256": "bf93cc4bedaa5b2419d2352272cbdb93d09b87eaabea6a5d6a031f69ce97f3a8",
+      "adfSha256": "96f25bf5773e4ed55f5515a5ac8dca2666b044cd050d0da0b33620ef6c5b0ae2",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
@@ -388,6 +443,11 @@
         "diskOffset": 90676,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 320548,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 405764,
       "memory": {
@@ -405,13 +465,13 @@
         "bytes": 114154
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "cea8f553a382654d56d8d7e27ec26cf9374db54e3e9dcab5be9b4f092e57e9ca"
       }
     },
     "SUN-Tronic": {
       "adf": "SUN-Tronic.adf",
-      "adfSha256": "a9e7eb53f146119f9527795735f27657c16f8a32e6ec3412b2836e83e85650b7",
+      "adfSha256": "d373e9654b89b01139308ce8dbbebab88c1c6a1abf705b21f655eee5f77f75c8",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
@@ -422,6 +482,11 @@
         "diskOffset": 37780,
         "bytes": 4,
         "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 267648,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)"
       },
       "chipArenaBytes": 309508,
       "memory": {
@@ -439,7 +504,7 @@
         "bytes": 4186
       },
       "sources": {
-        "tool": "aa713c047399d18893ba000c33fa2f5378648a90f20c417b2ee9396b8266b690",
+        "tool": "528fe8c5c929f38f48070bd656327e946ed7ecb59430e99c89347f28ef92c859",
         "player": "2ab53b0fc75461d73518752864a64efce8266ef19b6015497d7b2bc546e3f1bd"
       }
     }

@@ -30,6 +30,7 @@ MIN_CPU_TSV = os.path.join(HERE, 'amiga', 'uade_player_min_cpu.tsv')
 SLOT_BYTES = 224 * 1024       # default max module size; the chip arena is sized for it
 POOL_BYTES = 65536            # for players uade_arena_sizes.tsv has not measured (PTK-Prowiz)
 ANY_BYTES = 65536
+TITLE_BYTES = 29              # screen.s TW
 ASM = ['vasmm68k_mot', '-Fvobj', '-nowarn=62', '-quiet', '-no-opt', '-m68000',
        '-DAMIGA=1', '-DUADE_NATIVE=1', '-DUADE_PROBE=1']
 
@@ -110,6 +111,7 @@ def publish(adf_path, layout, pub_dir, name=None):
         'cpu': '68020' if layout['target'] == 'a1200' else '68000',
         'moduleSlot': layout['moduleSlot'],
         'moduleLengthWord': layout['moduleLengthWord'],
+        'titleSlot': layout['titleSlot'],
         'chipArenaBytes': int(mem['CHIP_LEN'], 16),
         'memory': mem,
         'provenWith': layout['stagedModule'],
@@ -198,7 +200,7 @@ SECTIONS {{
     sym = {}
     for m in re.finditer(r'0x([0-9a-fA-F]+)\s+(\w+)', open(mapf).read()):
         sym.setdefault(m.group(2), int(m.group(1), 16))
-    need = ('_start', '_uade_module_len', '_uade_module_src', '_img_end', '_bss_end', '_chip_end')
+    need = ('_start', '_uade_module_len', '_uade_module_src', '_adf_title', '_img_end', '_bss_end', '_chip_end')
     miss = [k for k in need if k not in sym]
     if miss:
         sys.exit(f'map lacks {miss}; see {mapf}')
@@ -239,12 +241,14 @@ SECTIONS {{
     len_off = IMG_DISK + sym['_uade_module_len'] - IMG_BASE
     assert adf[slot_off:slot_off + len(mod)] == mod
     assert int.from_bytes(adf[len_off:len_off + 4], 'big') == len(mod)
+    title_off = IMG_DISK + sym['_adf_title'] - IMG_BASE
     layout = {
         'adfBytes': ADF_SIZE,
         'player': player,
         'target': target,
         'moduleSlot': {'diskOffset': slot_off, 'maxBytes': slot_bytes},
         'moduleLengthWord': {'diskOffset': len_off, 'bytes': 4, 'endian': 'big'},
+        'titleSlot': {'diskOffset': title_off, 'bytes': TITLE_BYTES, 'note': 'ASCII, space padded; shown as the title by EMS/EMS-6 (NOTEXT)'},
         'bootblock': {'diskOffset': 0, 'bytes': 1024, 'checksumOffset': 4,
                       'note': 'the slot is outside the bootblock, so patching it keeps the checksum valid'},
         'memory': {k: f'0x{v:X}' for k, v in defs.items()},

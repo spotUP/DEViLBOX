@@ -12,6 +12,8 @@ export interface AdfTemplateEntry {
   cpu: string;
   moduleSlot: { diskOffset: number; maxBytes: number };
   moduleLengthWord: { diskOffset: number; bytes: 4; endian: 'big' };
+  /** Fixed ASCII title field on the disk; the EMS / EMS-6 screens show it as the title. */
+  titleSlot: { diskOffset: number; bytes: number };
   /** Chip RAM the player needs from CHIP_BASE up, with the slot at its maximum size. */
   chipArenaBytes: number;
   memory: { CHIP_BASE: string };
@@ -74,6 +76,14 @@ export function patchAdfSlot(template: Uint8Array, entry: AdfTemplateEntry, modu
   return out;
 }
 
+/** The file name without extension as `bytes` printable ASCII (the screen font's 0x20-0x7e), space padded. */
+export function adfTitleBytes(baseName: string, bytes: number): Uint8Array {
+  const text = baseName.replace(/\.[^.]*$/, '').replace(/[^\x20-\x7e]/g, '?').slice(0, bytes);
+  const out = new Uint8Array(bytes).fill(0x20);
+  for (let i = 0; i < text.length; i++) out[i] = text.charCodeAt(i);
+  return out;
+}
+
 export interface AdfResult { data: Uint8Array; filename: string; warnings: string[]; template: string; machine: string }
 
 /** Pure part: manifest + template loader + module in, disk out. */
@@ -84,6 +94,7 @@ export async function buildAdf(
   const entry = name ? manifest.templates[name] : undefined;
   if (!name || !entry) throw new AdfExportError('No Amiga disk player exists for this format yet.');
   const data = patchAdfSlot(await loadTemplate(entry.adf), entry, module);
+  data.set(adfTitleBytes(baseName, entry.titleSlot.bytes), entry.titleSlot.diskOffset);
   return { data, filename: `${baseName.replace(/\.[^.]*$/, '') || 'song'}.adf`, warnings: [], template: name, machine: MACHINE_NAME[entry.target] };
 }
 
