@@ -27,12 +27,14 @@ const CASES: Array<[string, string]> = [
   ['formats/ep-trmonsterbusiness.mcmd', 'MCMD'],
   ['formats/beathoven_smallest.bss', 'BeathovenSynthesizer'],
   ['formats/tristar_cracktro.bss', 'BeathovenSynthesizer'],
+  ['formats/pauker_rap_2.ss', 'SpeedySystem'],
+  ['formats/action.aps', 'AProSys'],
 ];
 
 describe('adf slot patcher', () => {
   it.each(CASES)('%s picks %s and patches only its slot and length word', async (path, name) => {
     const mod = song(path);
-    expect(adfTemplateFor(mod)).toBe(name);
+    expect(adfTemplateFor(mod, path)).toBe(name);
     const e = manifest.templates[name];
     const base = tpl(e.adf);
     const r = await buildAdf(mod, path.split('/').pop()!, manifest, async () => base);

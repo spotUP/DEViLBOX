@@ -8,6 +8,8 @@ import { isEMSFormat } from '../../import/formats/EMSParser';
 import { isFuturePlayerFormat } from '../../import/formats/FuturePlayerParser';
 import { isBeathovenSynthesizerFormat } from '../../import/formats/BeathovenSynthesizerParser';
 import { isMcmdFormat } from '../../import/formats/MCMDParser';
+import { isSpeedySystemFormat } from '../../import/formats/SpeedySystemParser';
+import { isAProSysFormat } from '../../import/formats/AProSysParser';
 
 export interface AdfTemplateEntry {
   adf: string;
@@ -32,7 +34,7 @@ const ascii = (b: Uint8Array, at: number, s: string): boolean =>
 const be32 = (b: Uint8Array, at: number): number => ((b[at] << 24) | (b[at + 1] << 16) | (b[at + 2] << 8) | b[at + 3]) >>> 0;
 
 /** The template name for a module, from the same magic tests the on-disk screen code uses; null when no player is on a disk. */
-export function adfTemplateFor(m: Uint8Array): string | null {
+export function adfTemplateFor(m: Uint8Array, filename?: string): string | null {
   if (ascii(m, 0, 'THX')) return 'AbyssHighestExperience';
   if (ascii(m, 0, 'FC14') || ascii(m, 0, 'SMOD') || ascii(m, 0, 'FC13')) return 'FutureComposer1.4';
   if (ascii(m, 0, 'BeEp')) return 'JamCracker';
@@ -54,6 +56,9 @@ export function adfTemplateFor(m: Uint8Array): string | null {
   if (isFuturePlayerFormat(m)) return 'FuturePlayer';
   if (isMcmdFormat(m)) return 'MCMD';
   if (isBeathovenSynthesizerFormat(m)) return 'BeathovenSynthesizer';
+  if (isSpeedySystemFormat(m.buffer.slice(m.byteOffset, m.byteOffset + m.byteLength) as ArrayBuffer)) return 'SpeedySystem';
+  // AProSys has no magic: the importer detects it by file name only (aps.* / *.aps).
+  if (isAProSysFormat(m, filename)) return 'AProSys';
   return null;
 }
 
@@ -96,7 +101,7 @@ export interface AdfResult { data: Uint8Array; filename: string; warnings: strin
 export async function buildAdf(
   module: Uint8Array, baseName: string, manifest: AdfManifest, loadTemplate: (file: string) => Promise<Uint8Array>,
 ): Promise<AdfResult> {
-  const name = adfTemplateFor(module);
+  const name = adfTemplateFor(module, baseName);
   const entry = name ? manifest.templates[name] : undefined;
   if (!name || !entry) throw new AdfExportError('No Amiga disk player exists for this format yet.');
   const data = patchAdfSlot(await loadTemplate(entry.adf), entry, module);
