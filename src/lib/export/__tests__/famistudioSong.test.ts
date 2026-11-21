@@ -76,7 +76,7 @@ type Cell = { note: number; octave: number; instrument: number; volume: number; 
 const empty = (): Cell => ({ note: 0, octave: 0, instrument: -1, volume: -1, effects: [] });
 
 /** One-order NES module, 16 rows; `cells[ch][row]` overrides empty cells. */
-function nesModule(cells: Record<number, Record<number, Partial<Cell>>>, subsong: Record<string, number> = {}): FurnaceModule {
+function nesModule(cells: Record<number, Record<number, Partial<Cell>>>, subsong: Record<string, number | number[][]> = {}): FurnaceModule {
   const patterns = new Map<string, { rows: Cell[] }>();
   for (let ch = 0; ch < 5; ch++) patterns.set(`0_${ch}_0`, { rows: Array.from({ length: 16 }, (_, r) => ({ ...empty(), ...cells[ch]?.[r] })) });
   return {
@@ -271,6 +271,21 @@ describe('furnaceToFamistudio', () => {
     // Order 0 is the loop target: 0400 at its row 0 must stop a vibrato left running at the song end (Sky Sanctuary pulse1).
     const out = music({ 0: { 0: { ...A4, ...fx(0x04, 0x00) }, 4: { ...A4, ...fx(0x04, 0x31) } } }).music;
     expect(has(out, [0x4a])).toBe(true);
+  });
+  it('sends the instrument again at the loop target (the loop enters with the end-of-song instrument)', () => {
+    // Fur_Nes noise: 0B04 loops to a kick that follows a kick on the first pass, but follows the open hi-hat at the song end.
+    // Noise arp macros go out as 0x4b overrides, which (unlike 0x4a / 0x4c) do not force the instrument byte.
+    const m = nesModule({ 3: { 0: { ...A4, instrument: 0 } } }, { ordersLen: 2, orders: [[0, 0], [0, 0], [0, 0], [0, 1], [0, 0]] });
+    (m.patterns as unknown as Map<string, { rows: Cell[] }>).set('0_3_1', { rows: Array.from({ length: 16 }, (_, r) => ({ ...empty(), ...(r === 0 ? { ...A4, instrument: 0 } : r === 8 ? { ...A4, instrument: 1 } : r === 15 ? fx(0x0b, 1) : {}) })) });
+    const arp = { code: 1, type: 0, mode: 0, speed: 1, delay: 0, length: 1, loop: 255, release: 255, data: [0] };
+    Object.assign(m, { instruments: [0, 1].map(() => ({ type: 34, macros: [arp], amiga: { initSample: 0 } })) });
+    const song = furnaceToFamistudio(m);
+    const start = song.sizes.header + song.sizes.samples + song.sizes.envelopes + song.sizes.streams.slice(0, 3).reduce((x, y) => x + y, 0);
+    const st = song.music.slice(start, start + song.sizes.streams[3]);
+    let i = st[st.length - 2] + 256 * st[st.length - 1] - 0x8000 - start; // trailing 0x42 jump to the loop target
+    if (st[i] === 0x41) i = st[i + 2] + 256 * st[i + 3] - 0x8000 - start; // the loop row is a reference to an earlier chunk
+    if (st[i] === 0x4b) i += 3; // arp override sent again at the loop
+    expect(st[i] >= 0x80 && (st[i] & 1) === 0).toBe(true); // instrument change byte (famistudio_ca65.s @instrument_change)
   });
   it('reports a dpcmMode=false song sample note as PCM played as DPCM until an NES-type note switches Furnace to DPCM', () => {
     const pcmLossy = (insType: number): boolean => {

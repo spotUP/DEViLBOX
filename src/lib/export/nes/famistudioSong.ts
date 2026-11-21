@@ -569,7 +569,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     const flush = (): void => { if (empty > 0) { out.push(0x81 | ((empty - 1) << 1)); empty = 0; ev.push(out.length); } };
     let ri = 0;
     for (let o = 0; o < endOrder; o++) {
-      if (o === loopOrder) { flush(); loopAt = out.length; }
+      // The loop target is entered with the end-of-song instrument, not the first pass's: send the instrument again.
+      if (o === loopOrder) { flush(); loopAt = out.length; lastIns = -1; }
       for (let r = 0; r < orderLen[o]; r++, ri++) {
         const cell = cellAt(ch, o, r);
         const ops: Array<number | { env: number }> = [];
