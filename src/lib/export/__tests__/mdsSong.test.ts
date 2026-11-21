@@ -6,7 +6,7 @@ import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
 import { furnaceToMds, portaEnvelope, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
-const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf9, 0xfb]);
+const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
 
 async function parse(name: string) {
   const fur = readFileSync(join(ROOT, 'public/data/songs/furnace/genesis', name));
@@ -192,9 +192,11 @@ describe('furnaceToMds', () => {
     expect(s.keyOns.some((k) => k.tick === 4000)).toBe(true);
     expect(s.keyOns.some((k) => k.tick === 4005)).toBe(false);
   });
-  it('highscorefollin: a sample instrument on FM6 (Furnace DAC) is silenced and flagged lossy, never an FM voice', async () => {
+  it('highscorefollin: the FM6 drum kit map plays MDSDRV PCM (F0 header per sample, signed 8-bit blob at rate 8)', async () => {
     const s = await convert('highscorefollin.fur');
-    expect(s.keyOns.some((k) => k.ch === 5)).toBe(false);
-    expect(s.lossy.some((l) => l.startsWith('FM6 sample instrument'))).toBe(true);
+    expect(s.keyOns.some((k) => k.ch === 5)).toBe(true);
+    // Kit map C-3 / C#-3 -> bassdrum_thud (5569 @ 22050 Hz) / JK_SNR_01 (6993 @ 26633 Hz), resampled to 17520 Hz, 32-byte aligned.
+    expect(s.pcm.length).toBe(Math.ceil((4424 + 32) / 32) * 32 + 4600 + 32);
+    expect([...s.seq].some((b, i) => b === 0xf0 && i > 0)).toBe(true);
   });
 });

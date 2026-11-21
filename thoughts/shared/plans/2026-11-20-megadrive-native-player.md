@@ -762,3 +762,38 @@ The first divergent frame is 17.400 s. Furnace PSG1 dips for one 2-frame step fr
 Next step: find the pattern cell at 17.4 s on PSG1. It is probably a pitch macro or arp node scaled in 1/256 semitone against a non-linear PSG period, or a fine-pitch rounding. Compare the PEG node value with the Furnace period.
 
 Listen ROMs: ~/Desktop/md-roms/Solar_Man-1o.bin, ~/Desktop/md-roms/highscorefollin-1o.bin.
+
+## Phase 1p results (2026-11-21)
+
+### Q1: FM6 DAC (highscorefollin "Drums (Kit Map)", DIV_INS_AMIGA): partial
+
+Done in `src/lib/export/md/mdsSong.ts`:
+- FM6 notes on an AMIGA (type 4) instrument now play MDSDRV PCM instead of being silenced.
+- The note is mapped through the kit noteMap (Furnace note = nv + 60). The sample is resampled with nearest-sample stepping to rate 8 (8 * 2190 = 17520 Hz), at `c4Rate * 2^((freq-108)/12)`.
+- The sample is stored as signed 8-bit in `MdsSong.pcm`. Each sample is aligned to 32 bytes, never crosses a 32 KiB bank, and has 32 bytes of zero tail.
+- Each sample gets an 8-byte PCM header item (rate 8, 24-bit offset, 32-bit length). `F0 <item>` is emitted when the header changes.
+- An FM instrument after PCM leaves PCM mode automatically through `E1`, which clears cf_pcm_control.
+- 1700 over a sounding sample is emitted as a key-off. Other 17xx values have no effect, because Furnace note-on resets dacMode.
+- The ROM builder needs the blob linked at `pcm` (shell: `cnop 0,32768` / `incbin pcm.bin`) and passed in a2 to mds_init.
+- highscorefollin blob: 9112 bytes (bassdrum_thud 5569 @ 22050, JK_SNR_01 6993 @ 26633).
+
+MAME measurement, first 40 s:
+- MAME has 98 PCM key-ons (YM 2B=0x80); Furnace VGM has 161 0x95 stream starts.
+- 0 starts match within 1 frame. MAME runs a constant ~+105 ms (~6 frames) late, and ~40% of the hits are missing.
+- Example: Furnace 3.600/3.733/4.000/4.267 s; MAME 3.704/4.105/4.375 s.
+- The right sample plays per note, but the timing is not 1:1. The lossy flag stays (`FM6 sample instrument (DAC PCM): key-on timing not 1:1 yet`).
+
+Hypotheses (not yet confirmed):
+- Missing hits: mds_pcm_key_on returns early unless nf_key_off is set. Back-to-back drum notes without a rest, and the FM-to-PCM switch path (`bset pe_pcm1; bne @no_fm_key_off`), never set it. Try a 1-tick key-off before each repeated PCM note, or read the driver path in the MDSDRV source.
+- Lag: the source is unknown. Measure the Z80 PCM request latency (68k write to Z80 RAM, then the first 2A write) and compare it with the Furnace 0x95 start against the first audible DAC byte.
+
+### Q2: PSG1 residue at 17.400 s: not started
+
+The budget went to Q1. The baseline is unchanged: 1010 PSG1 frames over 10 cents.
+
+Listen ROM: ~/Desktop/md-roms/highscorefollin-1p.bin (drums audible, late/sparse).
+
+Next:
+1. Fix the missing PCM key-ons (nf_key_off / rest before a repeated note), then re-measure the hit count.
+2. Find the source of the PCM lag, then re-measure against the 1-frame target.
+3. Q2: find the PSG1 cell at 17.4 s, its pitch macro and the scaling root cause.

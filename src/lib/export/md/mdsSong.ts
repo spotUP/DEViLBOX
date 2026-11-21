@@ -28,6 +28,8 @@ export interface MdsSong {
   lossy: string[];
   /** Furnace note-ons in play order (Furnace note value, C-4 = 48), for the MAME key-on check. */
   keyOns: MdsKeyOn[];
+  /** Signed 8-bit PCM blob for FM6 sample instruments, to `incbin` at the pcm address passed to mds_init (32 KiB aligned). */
+  pcm: Uint8Array;
 }
 
 type Kind = 'fm' | 'psg' | 'noise';
@@ -282,6 +284,28 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   // Extended pitch envelopes (mdsseq.md: entry has bit 15 set, 6-byte nodes with a word delta) for 01xx/02xx.
   const extRel = new Set<number>();
   const extItem = (b: number[]) => { const i = slideItem(b); extRel.add(i); return i; };
+  // FM6 samples: Furnace steps the sample at c4Rate * 2^((freq note - C-4) / 12) with no interpolation (genesis.cpp softPCM);
+  // each (sample, freq note) pair is resampled the same way to MDSDRV rate 8 and gets an 8-byte PCM header item (sdtop-relative).
+  // shortcut: MDSDRV rate 8 taken as 8 * 2190 Hz (mdsseq.md "~2190 Hz steps"); upgrade if a measured Z80 loop rate differs.
+  const PCM_HZ = 8 * 2190, pcm: number[] = [], pcmItems = new Map<string, number>();
+  const pcmRef = (smp: number, freqNote: number): number => {
+    const k = `${smp}:${freqNote}`;
+    if (pcmItems.has(k)) return pcmItems.get(k)!;
+    const sm = m.samples[smp];
+    const src = sm.depth === 16 ? Array.from(sm.data, (v) => v >> 8) : Array.from(sm.data);
+    if (sm.depth !== 8 && sm.depth !== 16) lossy.add(`FM6 sample depth ${sm.depth} (played as 8-bit data)`);
+    if (sm.loop) lossy.add('FM6 sample loop (played once)');
+    const step = (sm.c4Rate || 8363) * 2 ** ((freqNote - 108) / 12) / PCM_HZ;
+    const data = Array.from({ length: Math.max(1, Math.floor(src.length / step)) }, (_, j) => src[Math.floor(j * step)] & 0xff);
+    // 2-channel mode at rate 8 reads 32-byte blocks (mdssub.z80 alignment table); keep each sample inside one 32 KiB bank when it fits.
+    while (pcm.length & 31) pcm.push(0);
+    if (data.length <= 0x8000 && (pcm.length & 0x7fff) + data.length > 0x8000) while (pcm.length & 0x7fff) pcm.push(0);
+    const at = pcm.length;
+    pcm.push(...data, ...new Array(32).fill(0)); // the driver reads a few bytes past the end
+    const i = item([8, (at >> 16) & 0xff, (at >> 8) & 0xff, at & 0xff, ...be16(data.length >>> 16), ...be16(data.length & 0xffff)]);
+    pcmItems.set(k, i);
+    return i;
+  };
   const insCache = new Map<string, { ins: number; peg: number; mtab: number }>();
   const insRef = (kind: Kind, idx: number) => {
     const key = `${kind === 'fm' ? 'fm' : 'psg'}:${idx}`;
@@ -355,7 +379,10 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         const peg = (chunkStart ? sounding && (prate || poff) : prate) ? pslideCmd() : chunkStart && tick < slideEnd ? [] : [0xe8, r.peg + 1];
         return [0xe1, r.ins, ...peg, 0xeb, r.mtab + 1];
       };
-      const bytes: number[] = [...insCmd(true), ...(vDepth && sounding ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(dtn ? [0xe6, dtn & 0xff] : [])];
+      // FM6 with a sample instrument plays PCM (genesis.cpp: dacMode from the instrument type at each note-on); E1 would leave PCM mode.
+      const isDac = (n: number) => kind === 'fm' && ch === 5 && m.instruments[n]?.type === 4;
+      let curPcm = -1, pcmOn = false;
+      const bytes: number[] = [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && sounding ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(dtn ? [0xe6, dtn & 0xff] : [])];
       let curIns = ins;
       type Tok = { cmd: 'note' | 'tie' | 'rest'; n: number; t: number; pre: number[] };
       const tok: Tok[] = [];
@@ -387,7 +414,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         const nv = cell ? convertFurnaceNoteValue(cell) : -1;
         if (cell && cell.instrument >= 0) ins = cell.instrument;
         const cmds: number[] = [];
-        let pChanged = false, vChanged = false;
+        let pChanged = false, vChanged = false, dacOff = false;
         // EDxx runs the whole row xx ticks late; ECxx keys off xx ticks after the row runs (playback.cpp rowDelay / cut, delayBehavior 2).
         const fxv = (t: number) => cell?.effects?.find((e) => e.type === t && e.value > 0)?.value ?? 0;
         let delay = fxv(0xed), cutAt = fxv(0xec);
@@ -413,6 +440,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           }
           if (e.type === 0x0a) { vspeed = !e.value ? 0 : e.value & 15 ? -(e.value & 15) * 64 : (e.value >> 4) * 64; continue; }
           if (e.type === 0xec || e.type === 0xed) continue;
+          // 17xx sets dacMode; the next note-on sets it again from the instrument, so only 1700 over a playing sample is heard (it stops).
+          if (e.type === 0x17 && kind === 'fm') { if (!e.value && pcmOn && sounding) dacOff = true; continue; }
           if (e.type === 0xe3 && !e.value) continue; // E3 00: Furnace's default vibrato direction (up and down), what vibratoEnvelope plays
           if ((e.type === 0x04 || e.type === 0xe4) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
             vSync(tick + delay);
@@ -430,11 +459,21 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         }
         const vs = volStep();
         if (vs) cmds.push(...vs);
-        // A sample instrument (DIV_INS_AMIGA = 4) on FM6 plays the DAC in Furnace (genesis.cpp dacMode=1), never an FM voice.
-        // shortcut: the note is silenced and flagged lossy; upgrade to MDSDRV PCM (f0/f1 + pcm table) when the sample blob and drum mode are wired.
-        const dac = kind === 'fm' && ch === 5 && nv >= 0 && nv < 253 && m.instruments[ins]?.type === 4;
-        if (dac) lossy.add('FM6 sample instrument (DAC PCM): silenced');
-        const isNote = !dac && nv >= 0 && nv < 253, isOff = dac || nv >= 253;
+        // A sample instrument (DIV_INS_AMIGA = 4) on FM6 plays the DAC (genesis.cpp note-on): the note map (Furnace note = nv + 60)
+        // picks sample and freq note, an unmapped note plays nothing. One F0 header per (sample, freq note) replaces drum mode.
+        // shortcut: DAC volume (dacVolTable) is not applied; upgrade with a PCM volume path when a song uses FM6 volume on samples.
+        const dac = nv >= 0 && nv < 253 && isDac(ins);
+        let dacHdr = -1;
+        if (dac) {
+          const a = m.instruments[ins].amiga, fn = Math.max(0, Math.min(179, nv + 60));
+          const smp = a?.useNoteMap ? a.noteMap?.[fn]?.map ?? -1 : a?.initSample ?? -1;
+          if (smp >= 0 && smp < m.samples.length && m.samples[smp].length > 0) dacHdr = pcmRef(smp, a?.useNoteMap ? a.noteMap?.[fn]?.freq ?? fn : fn);
+        }
+        const isNote = nv >= 0 && nv < 253 && (!dac || dacHdr >= 0), isOff = (dac && dacHdr < 0) || nv >= 253 || (dacOff && !isNote);
+        // shortcut: MAME phase 1p measured PCM key-ons ~6 frames late and about 40 percent dropped; flag stays until that is fixed.
+        if (dac && isNote) lossy.add('FM6 sample instrument (DAC PCM): key-on timing not 1:1 yet');
+        if (dac && isNote) { curIns = ins; pcmOn = true; if (dacHdr !== curPcm) { curPcm = dacHdr; cmds.unshift(0xf0, dacHdr); } }
+        else if (isNote) { pcmOn = false; curPcm = -1; }
         if (isNote) { poff = 0; curNv = nv; }
         else if (pChanged && sounding && (prate || poff)) cmds.push(...pslideCmd());
         if (!isNote && vChanged && sounding) { cmds.push(...(vDepth ? vibCmd(tick + delay) : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
@@ -550,5 +589,5 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   sd.splice(0, 4, 0, 0, 0, 8);       // pcm_tab-sdtop
   sd.splice(4, 4, 0, 0, ...be16(bgm));
   sd.splice(bgm, 2, ...be16(tbase - bgm));
-  return { seq: Uint8Array.from([0x10, 0x01, 0x1f, 0x00, 0x00, 0x03, 0x00, 0x02, ...sd]), lossy: lossy.list(), keyOns };
+  return { seq: Uint8Array.from([0x10, 0x01, 0x1f, 0x00, 0x00, 0x03, 0x00, 0x02, ...sd]), lossy: lossy.list(), keyOns, pcm: Uint8Array.from(pcm) };
 }
