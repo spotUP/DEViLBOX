@@ -636,6 +636,25 @@ _uade_enter_score:
         xdef    uade_yield
 uade_yield:
         movem.l d0-d7/a0-a6,-(sp)
+;*--- PORT: one init per song-end re-post (single-module disk). score.s
+;     subsongseqloop answers the re-post with InitSound + player interrupt but
+;     leaves changesubsongbit set, so the playloop's next frame ran
+;     change_subsong as well: StopInt + EndSound + InitSound straight after
+;     the first InitSound. EMS-6, DIGI-Booster and MusicAssembler do not
+;     survive that second pass (silence, or an address error in MA). This
+;     yield is that next frame's waittrap, so clear the bit here, only once
+;     per re-post: a viewer's own subsong request never sets the latch.
+        ifnd    UADE_SONG_COUNT
+        lea     _uade_reposted(pc),a0
+        tst.w   (a0)
+        beq.b   .no_repost
+        lea     changesubsongbit,a1
+        tst.w   (a1)
+        beq.b   .no_repost              ; still waiting in subsongseqloop
+        clr.w   (a0)
+        clr.l   (a1)
+.no_repost:
+        endc
         lea     _uade_score_sp(pc),a0
         move.l  sp,(a0)
         move.l  _uade_host_sp(pc),sp
@@ -2173,6 +2192,8 @@ uade_msg_trap:
 ;     current subsong: the same latch the musicdisk path uses, so it loops.
         move.l  _uade_sub_cur(pc),$120.w
         move.l  #AMSG_SETSUBSONG,UADE_INPUT_MSG.w
+        lea     _uade_reposted(pc),a0
+        move.w  #1,(a0)                 ; see uade_yield
         endc
         bra     .done
 .not_songend:
@@ -2834,6 +2855,8 @@ uade_regs:              ds.l 16
 _uade_sub_min:          dc.l 0
 _uade_sub_cur:          dc.l 0
 _uade_sub_max:          dc.l 0
+_uade_reposted:         dc.w 0                  ; song-end re-post in flight (uade_yield)
+        even
 _uade_missing_lvo_ret:  dc.l 0
 _uade_missing_lvo_off:  dc.l 0
 ; The device reachability oracle: only score's PLAYERNAME message, dispatched
