@@ -37,6 +37,13 @@ const FURNACE = process.env.FURNACE_CLI ?? '/Applications/Furnace.app/Contents/M
 const TICKS = args.includes('--ticks') ? Number(args[args.indexOf('--ticks') + 1]) : 600;
 
 /** Mesen2 headless run; returns writes bucketed per player tick (index 0 = before the first tick: boot + hUGE_init). */
+/** Lexicographically smallest rotation of a nibble string. */
+function minRotation(h: string): string {
+  let best = h;
+  for (let k = 1; k < h.length; k++) { const r = h.slice(k) + h.slice(0, k); if (r < best) best = r; }
+  return best;
+}
+
 function runGb(rom: Uint8Array, ticks: number): BusWrite[][] {
   const dir = mkdtempSync(path.join(tmpdir(), 'gbrom-'));
   try {
@@ -141,7 +148,8 @@ function audible(ticks: BusWrite[][]): Array<Array<Record<(typeof FIELDS)[number
         duty: ch < 2 ? r1 >> 6 : 0,
         env: ch === 2 ? (reg[0x1c] >> 5) & 3 : `${vol[ch]}:${latched[ch] & 15}`, // volume now : envelope dir+period
         pan: (reg[0x25] >> ch) & 0x11,
-        wave: ch === 2 ? Buffer.from(reg.subarray(0x30, 0x40)).toString('hex') : 0,
+        // Rotation-invariant: Furnace gb.cpp antiClickWavePos rotates wave RAM writes by the play position (phase only, same timbre).
+        wave: ch === 2 ? minRotation(Buffer.from(reg.subarray(0x30, 0x40)).toString('hex')) : 0,
         mode: ch === 0 ? r0 : ch === 2 ? reg[0x1a] >> 7 : 0,
       });
     }

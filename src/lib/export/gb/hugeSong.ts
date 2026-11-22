@@ -181,12 +181,12 @@ function envelope(ins: FurnaceInstrument, lossy: Lossy): number {
   return ((gb.envVol & 15) << 4) | (gb.envDir ? 8 : 0) | (gb.envLen & 7);
 }
 
-function waveTo4bit(w: FurnaceWavetable): number[] {
+function waveTo4bit(w: FurnaceWavetable, invert: boolean): number[] {
   const out: number[] = [];
-  // Furnace DivWaveSynth::changeWave1 (height = the file's wave max) then gb.cpp invertWave (default on).
+  // Furnace DivWaveSynth::changeWave1 (height = the file's wave max) then gb.cpp invertWave (chip flag, default on).
   for (let i = 0; i < 32; i++) {
     const v = w.height < 1 ? 0 : Math.trunc(((w.data[Math.floor((i * w.width) / 32)] ?? 0) * 15) / w.height);
-    out.push(15 ^ Math.max(0, Math.min(15, v)));
+    out.push((invert ? 15 : 0) ^ Math.max(0, Math.min(15, v)));
   }
   const bytes: number[] = [];
   for (let i = 0; i < 32; i += 2) bytes.push((out[i] << 4) | out[i + 1]);
@@ -383,8 +383,10 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   for (let i = 0; i < 16; i++) out.push(retAddr & 0xff, retAddr >> 8);
   out.push(0xc9);
   w16(19, here());
+  const gbChip = m.systems.indexOf(0x04);
+  const invert = !/invertWave=(false|0)\b/.test(m.chipFlags?.[Math.max(0, gbChip)] ?? '');
   const waveList = [...waveIdx.keys()];
-  for (let i = 0; i < Math.max(1, waveList.length); i++) out.push(...(m.wavetables[waveList[i]] ? waveTo4bit(m.wavetables[waveList[i]]) : new Array(16).fill(0)));
+  for (let i = 0; i < Math.max(1, waveList.length); i++) out.push(...(m.wavetables[waveList[i]] ? waveTo4bit(m.wavetables[waveList[i]], invert) : new Array(16).fill(0)));
   for (const t of tableRefs) {
     const at = insAt[t.kind] + t.slot * 6 + (t.kind === 'noise' ? 1 : 3);
     w16(at, here()); out.push(...tables[t.table]);
