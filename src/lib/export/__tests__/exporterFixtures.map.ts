@@ -133,6 +133,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   robHubbard: 'public/data/songs/rob-hubbard/skateordie.rh',
   jankoMrsicFlogel: 'public/data/songs/formats/spacestation.jmf',
   specialFX: 'public/data/songs/formats/wildwheels_ingame.jd',
+  steveBarrett: 'public/data/songs/formats/street_fighter.sb',
   robHubbardST: 'public/data/songs/rob-hubbard-st/battleships.rho',
   benDaglish: 'public/data/songs/ben-daglish/motorhead-titleandingame.bd',
   synthDream: 'public/data/songs/formats/sdr.monsterbusiness_5',
