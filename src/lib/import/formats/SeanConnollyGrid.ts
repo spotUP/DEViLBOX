@@ -135,10 +135,10 @@ function walkVoice(b: Uint8Array, t: ScV2Tables, stream: number): Walk | null {
   return { events, patterns };
 }
 
-const gcd = (a: number, c: number): number => (c === 0 ? a : gcd(c, a % c));
-const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+export const gcd = (a: number, c: number): number => (c === 0 ? a : gcd(c, a % c));
+export const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
 
-function carrierRows(b: Uint8Array, start: number, size: number): TrackerCell[] {
+export function carrierRows(b: Uint8Array, start: number, size: number): TrackerCell[] {
   const rows: TrackerCell[] = [];
   for (let p = start; p < start + size;) {
     const n = Math.min(3, start + size - p);

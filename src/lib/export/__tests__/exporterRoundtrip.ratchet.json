@@ -424,6 +424,14 @@
       "cells": 3816,
       "bytes": 3816
     },
+    "jasonBrooke": {
+      "exporter": "JasonBrookeExporter.exportJasonBrooke",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 26130,
+      "bytes": 26130
+    },
     "jasonPage": {
       "exporter": "JasonPageExporter.exportJasonPage",
       "tier": "pattern-data",

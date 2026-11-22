@@ -20,6 +20,8 @@ import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder'
  * Extension format (common rips): songname.jcbo, songname.jcb, songname.jb
  * Checks jcbo. before jcb. to avoid false matches.
  */
+import { buildJasonBrookeGrid } from './JasonBrookeGrid';
+
 export function isJasonBrookeFormat(
   _buffer: ArrayBuffer | Uint8Array,
   filename?: string,
@@ -63,6 +65,19 @@ export function parseJasonBrookeFile(buffer: ArrayBuffer, filename: string): Tra
       originalChannelCount: 4, originalPatternCount: 1, originalInstrumentCount: 0,
     },
   };
+
+  const grid = buildJasonBrookeGrid(new Uint8Array(buffer));
+  if (grid) {
+    return {
+      name: `${moduleName} [Jason Brooke]`, format: 'MOD' as TrackerFormat,
+      patterns: [grid.pattern], instruments, songPositions: [0],
+      songLength: 1, restartPosition: 0, numChannels: 4,
+      initialSpeed: grid.rowTicks, initialBPM: 125, linearPeriods: false,
+      uadePlayerTickGrid: true, uadeVariableLayout: grid.layout,
+      uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+      uadeEditableFileName: filename,
+    };
+  }
 
   return {
     name: `${moduleName} [Jason Brooke]`, format: 'MOD' as TrackerFormat,

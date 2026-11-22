@@ -144,6 +144,7 @@ registerEditableFormat({ formatId: "s3m", label: "S3M", patternCodec: { kind: "v
 registerEditableFormat({ formatId: "sawteeth", label: "Sawteeth", newSong: { template: "templates/sawteeth.st", name: "Sawteeth" }, patternCodec: { kind: "variable" }, exporter: { module: "SawteethExporter", fn: "exportSawteeth", byLayout: true } });
 registerEditableFormat({ formatId: "scumm", label: "SCUMM", newSong: { template: "templates/scumm.scumm", name: "SCUMM" }, patternCodec: { kind: "variable" }, exporter: { module: "SCUMMExporter", fn: "exportSCUMM", byLayout: true } });
 registerEditableFormat({ formatId: "seanConnolly", label: "Sean Connolly", patternCodec: { kind: "variable" }, exporter: { module: "SeanConnollyExporter", fn: "exportSeanConnolly", byLayout: true } });
+registerEditableFormat({ formatId: "jasonBrooke", label: "Jason Brooke", patternCodec: { kind: "variable" }, exporter: { module: "JasonBrookeExporter", fn: "exportJasonBrooke", byLayout: true } });
 registerEditableFormat({ formatId: "sidmon1", label: "", newSong: { template: "templates/sidmon1.sid1", name: "SidMon 1" }, exporter: { module: "SidMon1Exporter", fn: "exportSidMon1", byLayout: true } });
 registerEditableFormat({ formatId: "sidMon1", label: "SidMon 1", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "sidMon2", label: "SidMon II", patternCodec: { kind: "variable" }, newSong: { template: "templates/sidmon2.sd2" } });
