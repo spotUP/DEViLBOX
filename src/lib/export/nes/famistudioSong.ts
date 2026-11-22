@@ -963,8 +963,10 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 if (linear) {
                   const semi = slideVal * slideUnit / 128;
                   to = Math.max(1, Math.min(96, src + dir * Math.round(semi * span(ri) * perFrame)));
-                  // Furnace note = FamiStudio note + 59; the slide stops at note 0 (down) or 179 (up).
-                  if (semi * span(ri) * perFrame >= (dir < 0 ? src + 59 : 120 - src) && m.compatFlags?.targetResetsSlides !== false) heldSlide = null;
+                  // Furnace note = FamiStudio note + 59; the slide stops at note 0 (down) or 179 (up), or with limitSlides at
+                  // getPortaFloor = 60 (NES keeps the DivDispatch default) and 156 (playback.cpp 0x01/0x02): FamiStudio 1 / 97.
+                  const lim = m.compatFlags?.limitSlides === true;
+                  if (semi * span(ri) * perFrame >= (dir < 0 ? src - (lim ? 1 : -59) : (lim ? 97 : 120) - src) && m.compatFlags?.targetResetsSlides !== false) heldSlide = null;
                   if (to !== src) mag = linStep(src, to, semi);
                 } else {
                   const pn = Math.max(1, pFrom(src) - dir * slideVal * span(ri) * perFrame);

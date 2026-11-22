@@ -366,6 +366,12 @@ describe('furnaceToFamistudio', () => {
     const slidesFromA4 = [...song.music].filter((b, i) => b === 0x50 && song.music[i + 2] === 58).length;
     expect(slidesFromA4).toBe(2);
   });
+  it('ends a held 02 slide at the limitSlides floor (getPortaFloor 60 = FamiStudio note 1), not at note 0', () => {
+    // oby1_ingame triangle: a 02xx that reaches the floor resets (targetResetsSlides), so later notes play unslid.
+    const cells = { 2: { 0: { ...A4, ...fx(0x02, 0x70) }, 4: A4 } };
+    const count = (limitSlides: boolean): number => { const s = furnaceToFamistudio({ ...nesModule(cells), compatFlags: { limitSlides, pitchSlideSpeed: 4, linearPitch: 2 } } as unknown as FurnaceModule); return [...s.music].filter((b, i) => b === 0x50 && s.music[i + 2] === 58).length; };
+    expect([count(false), count(true)]).toEqual([2, 1]);
+  });
   it('maps E1 note slide up to a 0x50 slide', () => {
     const song = music({ 0: { 0: { ...A4, ...fx(0xe1, 0x47) } } });
     expect(song.music.includes(0x50)).toBe(true);
