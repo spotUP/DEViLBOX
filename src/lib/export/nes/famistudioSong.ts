@@ -163,18 +163,19 @@ export function expandProcMacro(mac: FurnaceMacro, version = 245): FurnaceMacro 
   return { ...mac, type: mac.type & ~6, data: out, length: out.length, loop: 255, release: 255 };
 }
 
-function macroEnvelope(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch', lossy: Lossy, step?: (v: number) => number, rate = 1, version = 245): number[] {
-  const f = macroFrames(macIn, kind, lossy, step, rate, version);
+function macroEnvelope(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch', lossy: Lossy, step?: (v: number) => number, rate = 1, version = 245, ph = 0): number[] {
+  const f = macroFrames(macIn, kind, lossy, step, rate, version, ph);
   return encodeEnvelope(f.vals, f.loop, f.release, kind, f.relative);
 }
 
 /** The last engine tick (counted from song tick 0) a 60 Hz frame shows, at rate = Furnace ticks per frame. Tick j lands
  *  in frame round(j / rate), as rowFrame and the Furnace reference bin it (ties go to the earlier frame: the VGM sample
- *  is floored). Famitune1, 56 Hz: frame 1 shows tick 1 and frame 8 repeats tick 7. */
-export const tickAtFrame = (f: number, rate: number): number => Math.ceil((f + 0.5) * rate + 1e-9) - 1;
+ *  is floored). Famitune1, 56 Hz: frame 1 shows tick 1 and frame 8 repeats tick 7. `ph` = the note's start time minus
+ *  its frame (-0.5..0.5): at 50 Hz a note starting 0.4 frame late shows its tick 0 on two frames. */
+export const tickAtFrame = (f: number, rate: number, ph = 0): number => Math.ceil((f + 0.5 - ph) * rate + 1e-9) - 1;
 
 /** Per-frame envelope values of a Furnace macro (what macroEnvelope encodes). */
-function macroFrames(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch', lossy: Lossy, step?: (v: number) => number, rate = 1, version = 245): { vals: number[]; loop: number; release: number; relative: boolean } {
+function macroFrames(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch', lossy: Lossy, step?: (v: number) => number, rate = 1, version = 245, ph = 0): { vals: number[]; loop: number; release: number; relative: boolean } {
   const mac = expandProcMacro(macIn, version);
   const speed = Math.max(1, mac.speed || 1);
   const delay = Math.max(0, mac.delay || 0);
@@ -202,9 +203,9 @@ function macroFrames(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch'
     vals.length = 0;
     // A frame can hold several ticks: a one-shot macro runs on until a frame shows its last tick, so it ends on its
     // last value (samurai 128 Hz noise kick volume 0) instead of the tick before it. A looped one keeps its length.
-    const more = (f: number): boolean => tickAtFrame(f, rate) < src.length || (loop < 0 && tickAtFrame(f - 1, rate) < src.length - 1);
-    for (let f = 0; more(f); f++) vals.push(src[Math.min(src.length - 1, tickAtFrame(f, rate))]);
-    const fr = (i: number): number => (i < 0 ? -1 : Math.min(vals.length - 1, Math.floor(i / rate + 0.5 - 1e-9)));
+    const more = (f: number): boolean => tickAtFrame(f, rate, ph) < src.length || (loop < 0 && tickAtFrame(f - 1, rate, ph) < src.length - 1);
+    for (let f = 0; more(f); f++) vals.push(src[Math.min(src.length - 1, tickAtFrame(f, rate, ph))]);
+    const fr = (i: number): number => (i < 0 ? -1 : Math.min(vals.length - 1, Math.max(0, Math.floor(i / rate + ph + 0.5 - 1e-9))));
     loop = fr(loop); release = fr(release);
   }
   if (vals.length > 240) { lossy.add(`${kind} macro longer than 240 frames (cut)`); vals.length = 240; if (loop >= 240) loop = -1; if (release >= 240) release = -1; }
@@ -285,6 +286,9 @@ const clamp8 = (v: number): number => Math.max(-127, Math.min(127, Math.round(v)
  *  rounds up, so a channel volume under 15 is baked into the volume envelope and the channel volume sent as 15. */
 /** Volume cache value that forces the next 0x70 (-1 instead skips it on a note: the slide or default volume is in place). */
 const LAST_VOL_UNKNOWN = -2;
+/** + KEY_PHASE * (501 + start phase in 1/1000 frame): one instrument copy per distinct resampled macro set. */
+const KEY_PHASE = 2 ** 33;
+type PhaseStat = { over: boolean; uses: Map<number, number>; copies: Map<number, Set<number>> };
 const KEY_BAKE = 2 ** 28; // instrument key = macro index + 65536 * (1 + hardware envelope) + KEY_BAKE * (1 + baked channel volume)
 const scaleVol = (vol: number, env: number, flags: { newVolumeScaling?: unknown; ceilVolumeScaling?: unknown } | undefined): number => {
   const e = Math.min(15, env);
@@ -303,19 +307,34 @@ export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2
   // with nothing dropped: it never moves a song to another area. Then note cuts cost 2 bytes per row, a held 01/02 slide
   // 3 extra bytes per note; when the song is over the cap, drop cuts first, then held slides (the notes then play
   // unslid), then both.
+  // Macro phase copies past the 64-instrument cap: the least-used instruments fall back to one copy.
+  const noPhase = new Set<number>();
+  const conv = (cuts: boolean, held: boolean, b: number, loop: boolean): FamistudioSong => {
+    for (;;) {
+      const stat: PhaseStat = { over: false, uses: new Map(), copies: new Map() };
+      const song = convert(m, subsong, dpcmCap, cuts, held, b, loop, noPhase, stat);
+      const multi = [...stat.copies].filter(([, c]) => c.size > 1).sort((x, y) => (stat.uses.get(x[0]) ?? 0) - (stat.uses.get(y[0]) ?? 0));
+      if (!stat.over || !multi.length) {
+        if (noPhase.size) song.lossy.push(`macro start phase copies dropped for ${noPhase.size} instruments (64-instrument cap)`);
+        return song;
+      }
+      let excess = [...stat.copies.values()].reduce((n, c) => n + c.size, 0) + [...noPhase].filter((k) => stat.uses.has(k)).length - MAX_INSTRUMENTS;
+      for (const [k, c] of multi) { noPhase.add(k); excess -= c.size - 1; if (excess <= 0) break; }
+    }
+  };
   let base = 0x8000;
   let cap = MUSIC_CAP;
-  let song = convert(m, subsong, dpcmCap, true, true, base, true);
-  if (song.music.length > cap) song = convert(m, subsong, dpcmCap, true, true, base, false);
+  let song = conv(true, true, base, true);
+  if (song.music.length > cap) song = conv(true, true, base, false);
   // shortcut: VRC6 songs stay on the 16 KB mapper-24 player; give player-vrc6 a second music bank when one needs it.
   if (song.music.length > cap && !song.vrc6) {
     base = FME7_MUSIC_ADDR;
     cap = FME7_MUSIC_CAP;
-    song = convert(m, subsong, dpcmCap, true, true, base, true);
+    song = conv(true, true, base, true);
   }
   for (const [cuts, held] of [[true, true], [false, true], [true, false], [false, false]]) {
     if (song.music.length <= cap) break;
-    song = convert(m, subsong, dpcmCap, cuts, held, base, false);
+    song = conv(cuts, held, base, false);
     if (!cuts) song.lossy.push(`note cut EC dropped to fit the ${cap / 1024} KiB music area`);
     if (!held) song.lossy.push(`01/02 slide held over later notes dropped to fit the ${cap / 1024} KiB music area`);
   }
@@ -444,7 +463,7 @@ export function bestSlideStep(o: { rawFrom: number; fromPeriod: number; toPeriod
   return [sign * best, bestCost];
 }
 
-function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean, base: number, withLoop: boolean): FamistudioSong {
+function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean, base: number, withLoop: boolean, noPhase: Set<number> = new Set(), stat?: PhaseStat): FamistudioSong {
   const lossy = new Lossy();
   const pitchLossy: PitchLossySpan[] = [];
   const s = m.subsongs[subsong];
@@ -489,15 +508,15 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   }
 
   // Frame at which each row starts (speed effects in any channel apply to all; tick rate scales frames per tick).
-  const rowFrame: number[][] = [], rowSpeed: number[][] = [];
-  let songEndFrame = 0;
+  const rowFrame: number[][] = [], rowFrameT: number[][] = [], rowSpeed: number[][] = [];
+  let songEndFrame = 0, songEndT = 0;
   {
     let f = 0, cur = 0;
     let sp = [...speeds];
     const grooves = m.grooves ?? [];
     const perTick = 60 / (s.hz > 0 ? s.hz : 60) * vtScale;
     for (let o = 0; o < endOrder; o++) {
-      rowFrame.push([]); rowSpeed.push([]);
+      rowFrame.push([]); rowFrameT.push([]); rowSpeed.push([]);
       for (let r = 0; r < orderLen[o]; r++) {
         for (const e of rowFx(o, r)) {
           // playback.cpp 0x09/0x0f: with grooves, 09xx selects groove xx (a copy) and restarts it; 0Fxx sets entry 0.
@@ -506,13 +525,13 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           if (e.type === 0x0f && e.value > 0) sp[sp.length === 2 && !grooves.length ? 1 : 0] = e.value;
           if (e.type === 0xfd || e.type === 0xfe) lossy.add(`virtual tempo change ${e.type === 0xfd ? 'FD' : 'FE'}xx (ignored: rows keep the song start tempo)`);
         }
-        rowFrame[o].push(Math.round(f));
+        rowFrame[o].push(Math.round(f)); rowFrameT[o].push(f);
         rowSpeed[o].push(sp[cur]);
         f += sp[cur] * perTick;
         cur = (cur + 1) % sp.length;
       }
     }
-    songEndFrame = Math.round(f);
+    songEndFrame = Math.round(f); songEndT = f;
   }
   // The engine adds a 8.8 step of 256 x tempo / 150 per frame and starts a row when the integer part reaches the speed.
   // A rounded step drifts a row by a frame every few hundred rows (virtual tempo 155/112: step 354.29), so speeds and
@@ -558,8 +577,39 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   // Instruments by first use; envelopes deduplicated by content.
   const insMap = new Map<number, number>();
   const insNo = (i: number): number => {
-    if (!insMap.has(i)) { if (insMap.size >= MAX_INSTRUMENTS) { lossy.add('instruments past 64'); return 0; } insMap.set(i, insMap.size); }
+    if (!insMap.has(i)) { if (insMap.size >= MAX_INSTRUMENTS) { lossy.add('instruments past 64'); if (stat) stat.over = true; return 0; } insMap.set(i, insMap.size); }
     return insMap.get(i)!;
+  };
+  // Off 60 Hz a note's first tick spans one or two frames by where the note starts between frames (oby1 at 50 Hz:
+  // arp/duty steps a frame early on some notes): each distinct resampled macro set gets its own instrument copy.
+  const sigCache = new Map<string, string>(), phaseOf = new Map<string, number>();
+  // Exact start phase per copy: 56 Hz ticks fall on exact half frames, which the 1/1000 key rounding moves across the tie.
+  const phaseExact = new Map<number, number>();
+  const keyPhase = (k: number): number => phaseExact.get(k) ?? 0;
+  const MACROS = [[MACRO_VOL, 'vol'], [MACRO_ARP, 'arp'], [MACRO_DUTY, 'duty'], [MACRO_PITCH, 'pitch']] as const;
+  const phaseKey = (key: number, fi: number, ph: number): number => {
+    if (macroRate === 1) return key;
+    if (stat) stat.uses.set(key, (stat.uses.get(key) ?? 0) + 1);
+    if (noPhase.has(key)) return key;
+    const phi = Math.round(ph * 1000);
+    let sig = sigCache.get(`${fi}|${phi}`);
+    if (sig === undefined) {
+      const q = new Lossy();
+      sig = MACROS.map(([code, kind]) => {
+        const mac = m.instruments[fi]?.macros.find((x) => x.code === code && x.length > 0);
+        if (!mac) return '';
+        // A one-shot envelope holds its last value: trailing repeats of it sound the same at every phase.
+        const f = macroFrames(mac, kind, q, undefined, macroRate, m.version, ph);
+        if (f.loop < 0 && f.release < 0) while (f.vals.length > 1 && f.vals[f.vals.length - 1] === f.vals[f.vals.length - 2]) f.vals.pop();
+        return JSON.stringify(f);
+      }).join('|');
+      sigCache.set(`${fi}|${phi}`, sig);
+    }
+    if (!phaseOf.has(`${key}|${sig}`)) phaseOf.set(`${key}|${sig}`, phi);
+    const pk = key + KEY_PHASE * (501 + phaseOf.get(`${key}|${sig}`)!);
+    if (!phaseExact.has(pk)) phaseExact.set(pk, ph);
+    if (stat) stat.copies.set(key, (stat.copies.get(key) ?? new Set<number>()).add(pk));
+    return pk;
   };
   // DPCM mappings (sample, pitch, loop, delta) by first use; note byte = 1 + index.
   const dpcmMap = new Map<string, number>();
@@ -642,11 +692,11 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     let heldSlide: [number, number] | null = null;
     const efx: Array<[number, number]> = [];
     const tonal = ch < 3 || ch === 5 || ch === 6; // VRC6 pulses share the 2A03 pulse period (divider 16); the saw (14) keeps no vibrato or slides
-    const seq: Array<{ cell?: FurnacePatternCell; frame: number }> = [];
-    for (let o = 0; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: rowFrame[o][r] });
+    const seq: Array<{ cell?: FurnacePatternCell; frame: number; t: number }> = [];
+    for (let o = 0; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: rowFrame[o][r], t: rowFrameT[o][r] });
     // The loop pass (orders loopOrder..end again, after the song end): rows played with the end-of-song state.
     const n1 = seq.length, loopRi = orderLen.slice(0, loopOrder).reduce((a, b) => a + b, 0);
-    for (let o = loopOrder; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: rowFrame[o][r] + songEndFrame - rowFrame[loopOrder][0] });
+    for (let o = loopOrder; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: rowFrame[o][r] + songEndFrame - rowFrame[loopOrder][0], t: rowFrameT[o][r] + songEndT - rowFrameT[loopOrder][0] });
     /** End of the pass row i belongs to: look-aheads stop there, as the first pass always did. */
     const lim = (i: number): number => (i < n1 ? n1 : seq.length);
     /** Frames until the next note or slide effect on this channel (how long a slide runs). */
@@ -938,8 +988,11 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             const volMac = curIns?.macros.some((x) => x.code === MACRO_VOL && x.length > 0);
             // A running 0Axy changes the channel volume every tick, so it cannot be baked into the envelope: FamiStudio slides it instead.
             baked = !hwVol && ch !== DPCM_CH && ch !== 2 && !!volMac && furVol < 15 && !slideOps.length;
-            if (baked) { const f = macroFrames(curIns!.macros.find((x) => x.code === MACRO_VOL && x.length > 0)!, 'vol', lossy, undefined, macroRate, m.version); bake = { vol: furVol, vals: f.vals, held: f.loop >= 0 || f.release >= 0, loop: f.loop, release: f.release, frame: seq[ri].frame }; }
-            const key = (hwVol ? idx + 65536 * (1 + (envMode | (furVol << 2) | (lenIdx << 6))) : idx) + (baked ? KEY_BAKE * (1 + furVol) : 0);
+            const key0 = (hwVol ? idx + 65536 * (1 + (envMode | (furVol << 2) | (lenIdx << 6))) : idx) + (baked ? KEY_BAKE * (1 + furVol) : 0);
+            // shortcut: the loop pass keeps phase-0 copies: its bytes rejoin first-pass rows (whose copies hold the first pass's phase) and
+            // replay them at a shifted song tick phase (Famitune1 loop pass regressed with copies); upgrade with phase-aware rejoin.
+            const key = pass2 ? key0 : phaseKey(key0, idx, seq[ri].t + delay * perTick - seq[ri].frame - Math.round(delay * perTick));
+            if (baked) { const f = macroFrames(curIns!.macros.find((x) => x.code === MACRO_VOL && x.length > 0)!, 'vol', lossy, undefined, macroRate, m.version, keyPhase(key)); bake = { vol: furVol, vals: f.vals, held: f.loop >= 0 || f.release >= 0, loop: f.loop, release: f.release, frame: seq[ri].frame }; }
             if (key !== lastIns) { insOps.push(0x80 | (insNo(key) << 1)); lastIns = key; }
             const fsVol = hwVol || baked ? 15 : furVol;
             if (hwVol || baked ? lastVol !== 15 : lastVol !== -1 && lastVol !== furVol) { ops.push(0x70 | fsVol); lastVol = fsVol; }
@@ -1053,18 +1106,19 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
 
   // Instrument envelopes.
   const insEnvs: number[][] = [];
-  for (const [key] of [...insMap].sort((a, b) => a[1] - b[1])) {
+  for (const [pkey] of [...insMap].sort((a, b) => a[1] - b[1])) {
+    const key = pkey % KEY_PHASE, ph = keyPhase(pkey);
     const bake = Math.floor(key / KEY_BAKE) - 1, rest = key % KEY_BAKE;
     const fi = rest % 65536, hw = Math.floor(rest / 65536) - 1;
     const ins = m.instruments[fi];
     const pick = (code: number): FurnaceMacro | undefined => ins?.macros.find((x) => x.code === code && x.length > 0);
     const slot = (code: number, kind: 'vol' | 'arp' | 'duty' | 'pitch', step?: (v: number) => number): number => {
       const mac = pick(code);
-      return envId(mac ? macroEnvelope(mac, kind, lossy, step, macroRate, m.version) : DEFAULT_ENV[kind]);
+      return envId(mac ? macroEnvelope(mac, kind, lossy, step, macroRate, m.version, ph) : DEFAULT_ENV[kind]);
     };
     if (hw >= 0 && pick(MACRO_VOL)) lossy.add('volume macro under 15xx hardware envelope (APU envelope played, macro ignored)');
     const bakedVol = (): number => {
-      const f = macroFrames(pick(MACRO_VOL)!, 'vol', lossy, undefined, macroRate, m.version);
+      const f = macroFrames(pick(MACRO_VOL)!, 'vol', lossy, undefined, macroRate, m.version, ph);
       return envId(encodeEnvelope(f.vals.map((v) => scaleVol(bake, v, m.compatFlags)), f.loop, f.release, 'vol'));
     };
     insEnvs.push([hw >= 0 ? envId(hwVolumeEnvelope(hw)) : bake >= 0 ? bakedVol() : slot(MACRO_VOL, 'vol', ins?.type === VRC6_SAW_INS ? (v) => Math.round(v / 4) : undefined), slot(MACRO_ARP, 'arp'), slot(MACRO_DUTY, 'duty'), slot(MACRO_PITCH, 'pitch')]);

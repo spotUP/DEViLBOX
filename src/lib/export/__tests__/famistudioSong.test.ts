@@ -485,6 +485,19 @@ describe('furnaceToFamistudio', () => {
     if (st[i] === 0x4b) i += 3; // arp override sent again at the loop
     expect(st[i] >= 0x80 && (st[i] & 1) === 0).toBe(true); // instrument change byte (famistudio_ca65.s @instrument_change)
   });
+  it('gives each start phase of a 50 Hz macro its own instrument copy, and shares copies whose frames match', () => {
+    // 50 Hz, speed 6, 15 rows (108 frames: the loop pass keeps the phase): rows start at 0, 7.2, 14.4, 21.6, 28.8 frames. Duty [0,1,2,3] per tick shows [0,1,2,2,3],
+    // [0,1,1,2,3], [0,0,1,2,3], [0,1,2,3], [0,1,2,3,3]: tick 0 covers two frames when the note starts 0.4 frame late.
+    const ins = (rows: number[], duty: number[]): number => {
+      const m = nesModule({ 0: Object.fromEntries(rows.map((r) => [r, { ...A4, instrument: 0 }])) }, { hz: 50, patLen: 15 });
+      Object.assign(m, { instruments: [{ type: 34, macros: [{ code: 2, type: 0, mode: 0, speed: 1, delay: 0, length: duty.length, loop: 255, release: 255, data: duty }], amiga: { initSample: 0 } }] });
+      return furnaceToFamistudio(m).sizes.header;
+    };
+    expect(ins([0, 1, 2, 3, 4], [0, 1, 2, 3]) - ins([0], [0, 1, 2, 3])).toBe(3 * 8); // [0,1,2,3] and [0,1,2,3,3] hold the same last value: one copy
+    expect(ins([0, 5], [0, 1, 2, 3]) - ins([0], [0, 1, 2, 3])).toBe(0); // row 5 = 36 frames: phase 0 again
+    expect(ins([0, 1, 2, 3, 4], [2, 2]) - ins([0], [2, 2])).toBe(0); // a flat macro looks the same at every phase
+    expect(tickAtFrame(1, 50 / 60, 0.4)).toBe(0);
+  });
   it('reports a dpcmMode=false song sample note as PCM played as DPCM until an NES-type note switches Furnace to DPCM', () => {
     const pcmLossy = (insType: number): boolean => {
       const m = nesModule({ 4: { 0: { note: 1, octave: 4, instrument: 0 } } });
