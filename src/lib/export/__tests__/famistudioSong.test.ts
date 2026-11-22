@@ -248,9 +248,23 @@ describe('furnaceToFamistudio', () => {
       const u = Math.trunc(((3 * Math.trunc(127 * Math.sin(2 * Math.PI * ((6 * (tick(i) + 1)) & 63) / 64)) * 15) >> 4) / 15);
       return Math.round(X * 2 ** (-u / 1536)) - 1 - P;
     });
-    const music = furnaceToFamistudio(nesModule({ 0: { 0: A4, 4: fx(0x04, 0x63) } }, { hz: 56 })).music;
+    // Row 8 (frame 51) ends the hold 25 frames in: one cycle covers it.
+    const music = furnaceToFamistudio(nesModule({ 0: { 0: A4, 4: fx(0x04, 0x63), 8: A4 } }, { hz: 56 })).music;
     expect(has(music, encodeEnvelope(vib((i) => tickAtFrame(i, 56 / 60, ph)), 0, -1, 'pitch'))).toBe(true);
     expect(has(music, encodeEnvelope(vib((i) => Math.floor(i * 56 / 60 + 1e-9)), 0, -1, 'pitch'))).toBe(false);
+  });
+  it('unrolls a 56 Hz vibrato over a long hold to whole frames (7 x 32 ticks = 240), not one cycle rounded to 34 (Famitune1 triangle drift)', () => {
+    // 32 ticks at 60/56 = 34.29 frames: a 34-frame loop slipped the phase 0.29 frame per loop under a held note.
+    const ph = 24 * 60 / 56 - 26, tick = (i: number): number => tickAtFrame(i, 56 / 60, ph);
+    const vib = (length: number): number[] => Array.from({ length }, (_, i) => {
+      const X = 1789772.727 / (16 * 440 * 2), P = Math.round(X) - 1;
+      const u = Math.trunc(((3 * Math.trunc(127 * Math.sin(2 * Math.PI * ((6 * (tick(i) + 1)) & 63) / 64)) * 15) >> 4) / 15);
+      return Math.round(X * 2 ** (-u / 1536)) - 1 - P;
+    });
+    const music = furnaceToFamistudio(nesModule({ 0: { 0: A4, 4: fx(0x04, 0x63) } }, { hz: 56 })).music;
+    expect(tick(240) - tick(0)).toBe(224);
+    expect(has(music, encodeEnvelope(vib(240), 0, -1, 'pitch'))).toBe(true);
+    expect(has(music, encodeEnvelope(vib(34), 0, -1, 'pitch'))).toBe(false);
   });
 
   it('rounds fine pitch and vibrato together as Furnace does, minus the sent fine offset (one_sided_love pulse1, E57D + 0463)', () => {
@@ -339,6 +353,15 @@ describe('furnaceToFamistudio', () => {
     expect(mg.deltas.slice(3).reduce((a, b) => a + b, 0)).toBe(0); // the looped part does not drift
     expect(mergeVibratoPitch(vib, { vals: [100], loop: -1, relative: false }, { add: (s) => notes.push(s) }).deltas[0]).toBe(63);
     expect(notes.some((n) => n.includes('clamped'))).toBe(true);
+  });
+  it('falls back to the one-cycle vibrato when the unrolled vibrato plus the pitch macro passes 240 frames', () => {
+    // A 240-frame unroll after any pitch macro hit the cut-and-no-loop branch; the 34-frame cycle still fits and loops.
+    const notes: string[] = [];
+    const long = Array.from({ length: 240 }, (_, i) => Math.round(5 * Math.sin(2 * Math.PI * i * 7 / 240)));
+    const mg = mergeVibratoPitch(long, { vals: [0, 20, 40], loop: -1, relative: false }, { add: (s) => notes.push(s) }, long.slice(0, 34));
+    expect(mg.loop).toBe(3);
+    expect(mg.deltas.length).toBe(3 + 34);
+    expect(notes.some((n) => n.includes('cut, no loop'))).toBe(false);
   });
   it('loops the repeating tail of an LFO pitch delta list instead of storing every cycle', () => {
     const cycle = [1, 0, -1, -1, 0, 1];

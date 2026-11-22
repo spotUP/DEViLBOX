@@ -219,7 +219,7 @@ function macroFrames(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch'
  * pitch envelope, so both go into one relative envelope: per-frame deltas of (macro offset + vibrato), +-63 per step.
  * `vib` is one looping vibrato cycle (absolute offsets); `mac` is the macro as macroFrames gives it (period units).
  */
-export function mergeVibratoPitch(vib: number[], mac: { vals: number[]; loop: number; relative: boolean }, lossy: { add(s: string): void }): { deltas: number[]; loop: number } {
+export function mergeVibratoPitch(vib: number[], mac: { vals: number[]; loop: number; relative: boolean }, lossy: { add(s: string): void }, vibShort?: number[]): { deltas: number[]; loop: number } {
   let len = mac.vals.length;
   // A held tail (ADSR sustain, trailing zero increments) repeats already: end the macro part where it stops moving.
   if (mac.loop < 0) while (len > 1 && (mac.relative ? mac.vals[len - 1] === 0 : mac.vals[len - 1] === mac.vals[len - 2])) len--;
@@ -228,6 +228,8 @@ export function mergeVibratoPitch(vib: number[], mac: { vals: number[]; loop: nu
   const period = lp ? (lp * vib.length) / gcd(lp, vib.length) : vib.length;
   // Past the macro's last frame both parts repeat (macro loop or hold, vibrato cycle), so the deltas loop from there.
   let end = len + period, loop = len;
+  // An unrolled multi-cycle vibrato that no longer fits next to the macro falls back to its one-cycle loop.
+  if (end > 240 && vibShort && vibShort.length < vib.length) return mergeVibratoPitch(vibShort, mac, lossy);
   if (end > 240) { lossy.add('vibrato + pitch macro envelope longer than 240 frames (cut, no loop)'); end = 240; loop = -1; }
   const macAt = (f: number): number => (f < len ? f : lp ? mac.loop + ((f - len) % lp) : -1);
   const deltas: number[] = [];
@@ -709,6 +711,14 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
       }
       return 240;
     };
+    /** Frames until the next row that rebuilds the vibrato envelope (a note or a 04xy other than `xy`), capped at 240. */
+    const vibSpan = (i: number, xy: number): number => {
+      for (let j = i + 1; j < lim(i); j++) {
+        const c = seq[j].cell;
+        if (c && (convertFurnaceNoteValue(c) >= 0 || c.effects.some((e) => e.type === 0x04 && Math.max(0, e.value) !== xy))) return Math.min(240, seq[j].frame - seq[i].frame);
+      }
+      return 240;
+    };
     const ev: number[] = []; // stream length after each event (note byte, wait byte, slide): the reference boundaries
     const flush = (): void => { if (empty > 0) { out.push(0x81 | ((empty - 1) << 1)); empty = 0; ev.push(out.length); } };
     /** Whether state left after row i is read again in its pass: the first later row that `kills` it (overwrites it before
@@ -892,12 +902,24 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           if (tonal && (fxChanged || n > 0)) {
             // Speed is exact (a snapped speed changes the vibrato rate audibly); identical rounded envelopes share one id.
             const x = vibXY >> 4, y = vibXY & 15;
-            let pid = -1, vib: number[] | null = null;
+            let pid = -1, vib: number[] | null = null, vibLen1 = 0;
             if (x > 0 && y > 0) {
               // Furnace steps a 64-entry sine x per tick and has stepped once on the note tick: loop the whole cycle set
               // (64/gcd(x,64) ticks) so a rate like 64/6 does not drift.
               const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
-              const len = Math.max(2, Math.min(240, Math.round(64 / gcd(x, 64) * perTick)));
+              // Off 60 Hz a cycle is not whole frames (Famitune1 56 Hz: 32 ticks = 34.29 frames; looped at 34 the phase slipped
+              // 0.29 frame per loop). Each step is exact from the row's time, so unroll whole cycles up to the next rebuild (note
+              // or 04xy): the loop point is never reached. Past 240 frames take the k (k * cycle <= 240) that slips least per frame.
+              // Unrolling only as far as the note holds keeps short notes at one cycle (a blanket 240-frame unroll passed the song-data cap).
+              const cyc = 64 / gcd(x, 64) * perTick, D = vibSpan(ri, vibXY);
+              let k = Math.max(1, Math.ceil(D / cyc - 1e-6));
+              if (k * cyc > 240 + 1e-6) {
+                const slip = (j: number): number => Math.abs(j * cyc - Math.round(j * cyc)) / (j * cyc);
+                k = 1;
+                for (let j = 2; j * cyc <= 240 + 1e-6; j++) if (slip(j) < slip(k) - 1e-12) k = j;
+              }
+              const len = Math.max(2, Math.min(240, Math.round(k * cyc)));
+              const len1 = Math.max(2, Math.min(240, Math.round(cyc)));
               const amp = linear ? pulsePeriod(src || 46) * (2 ** ((vibXY & 15) / 192) - 1) : y;
               // Linear pitch: Furnace offsets the pitch by (round(127 sin) * depth) >> 4 in 1/128 semitone and rounds the
               // unrounded period (measured on Sky Sanctuary: a depth-1 vibrato dips a period only above ~2 units), so offsets
@@ -916,6 +938,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 const u = Math.trunc(((y * Math.trunc(127 * Math.sin(2 * Math.PI * (phase & 63) / 64)) * 15) >> 4) / 15);
                 return Math.round(X * 2 ** (-(u + fp) / 1536)) - 1 - P - F;
               });
+              vibLen1 = len1;
               pid = envId(encodeEnvelope(vib, 0, -1, 'pitch'));
             }
             if (linear) {
@@ -944,7 +967,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                   : macroFrames(pm, 'pitch', lossy, vib && !rel ? off : vib ? (v) => Math.round(P * (2 ** (-v / 1536) - 1)) : toPeriod, macroRate, m.version);
                 if (vib || (!mf.relative && ex !== pm)) {
                   // Vibrato on top, or an ADSR/LFO position curve (+-63 only holds per-frame steps): one relative envelope.
-                  const mg = mergeVibratoPitch(vib ?? [0], mf, lossy);
+                  const mg = mergeVibratoPitch(vib ?? [0], mf, lossy, vib?.slice(0, vibLen1));
                   const lt = !vib && ex !== pm && (mg.loop < 0 || mg.loop >= mg.deltas.length - 1) ? loopPeriodicTail(mg.deltas) : mg;
                   pid = envId(encodeEnvelope(lt.deltas, lt.loop, -1, 'pitch', true));
                 } else pid = envId(encodeEnvelope(mf.vals, mf.loop, -1, 'pitch', mf.relative));
