@@ -119,6 +119,8 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   jxs: 'public/data/songs/formats/popcorn.jxs',
   kdm: 'public/data/songs/formats/flysong.kdm',
   davidHanney: 'public/data/songs/formats/tearaway_thomas.dh',
+  psa: 'public/data/songs/formats/the punisher - title.psa',
+  thomasHermann: 'public/data/songs/formats/thm.blueangel69',
   ems: 'public/data/songs/formats/je taime.ems',
   emsv6: 'public/data/songs/formats/perception.ems',
   mcmd: 'public/data/songs/formats/ep-trmonsterbusiness.mcmd',

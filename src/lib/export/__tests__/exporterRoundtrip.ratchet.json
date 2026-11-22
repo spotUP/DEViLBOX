@@ -64,14 +64,6 @@
       "cells": 38444,
       "bytes": 38444
     },
-    "krisHatlelid": {
-      "exporter": "KrisHatlelidExporter.exportKrisHatlelid",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 37788,
-      "bytes": 37788
-    },
     "beathoven": {
       "exporter": "BeathovenExporter.exportBeathoven",
       "tier": "byte-exact",
@@ -496,6 +488,14 @@
       "cells": 41672,
       "bytes": 41672
     },
+    "krisHatlelid": {
+      "exporter": "KrisHatlelidExporter.exportKrisHatlelid",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 37788,
+      "bytes": 37788
+    },
     "lme": {
       "exporter": "LMEExporter.exportLME",
       "tier": "byte-exact",
@@ -727,6 +727,14 @@
       "matchPct": 0,
       "cells": 0,
       "bytes": 0
+    },
+    "psa": {
+      "exporter": "PSAExporter.exportPSA",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 21386,
+      "bytes": 21386
     },
     "pt41": {
       "exporter": "ProTracker4Exporter.exportProTracker4",
@@ -1055,6 +1063,14 @@
       "matchPct": 1,
       "cells": 45394,
       "bytes": 45394
+    },
+    "thomasHermann": {
+      "exporter": "ThomasHermannExporter.exportThomasHermann",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 11792,
+      "bytes": 11792
     },
     "timFollin": {
       "exporter": "TimFollinExporter.exportTimFollin",

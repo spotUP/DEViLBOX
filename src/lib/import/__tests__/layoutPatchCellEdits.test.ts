@@ -12,6 +12,10 @@ import { parseEMSFile } from '@/lib/import/formats/EMSParser';
 import { parseTomyTrackerFile } from '@/lib/import/formats/TomyTrackerParser';
 import { parseFashionTrackerFile } from '@/lib/import/formats/FashionTrackerParser';
 import { parseDavidHanneyFile } from '@/lib/import/formats/DavidHanneyParser';
+import { parsePSAFile } from '@/lib/import/formats/PSAParser';
+import { parseThomasHermannFile } from '@/lib/import/formats/ThomasHermannParser';
+import { exportPSA } from '@/lib/export/PSAExporter';
+import { exportThomasHermann } from '@/lib/export/ThomasHermannExporter';
 import { parseStoneTrackerFile } from '@/lib/import/formats/StoneTrackerParser';
 import { exportEms } from '@/lib/export/EmsExporter';
 import { exportTomyTracker } from '@/lib/export/TomyTrackerExporter';
@@ -31,8 +35,8 @@ const ab = (u: Uint8Array): ArrayBuffer => u.slice().buffer as ArrayBuffer;
 
 interface Case {
   format: string;
-  parse: () => TrackerSong;
-  parseBytes: (b: Uint8Array) => TrackerSong;
+  parse: () => TrackerSong | Promise<TrackerSong>;
+  parseBytes: (b: Uint8Array) => TrackerSong | Promise<TrackerSong>;
   exp: (s: TrackerSong) => Promise<{ data: Uint8Array }>;
 }
 
@@ -44,6 +48,8 @@ const CASES: Case[] = [
   { format: 'David Hanney (tearaway_thomas.dh)', parse: () => parseDavidHanneyFile(ab(read('formats', 'tearaway_thomas.dh')), 'tearaway_thomas.dh'), parseBytes: (b) => parseDavidHanneyFile(ab(b), 'tearaway_thomas.dh'), exp: exportDavidHanney },
   { format: 'StoneTracker (hypnosphere.spm)', parse: () => parseStoneTrackerFile(read('stonetracker', 'hypnosphere.spm'), 'hypnosphere.spm', stoneBank), parseBytes: (b) => parseStoneTrackerFile(b, 'hypnosphere.spm', stoneBank), exp: exportStoneTracker },
   { format: 'David Hanney (tearaway thomas unused.dh)', parse: () => parseDavidHanneyFile(ab(read('david-hanney', 'tearaway thomas unused.dh')), 'tearaway thomas unused.dh'), parseBytes: (b) => parseDavidHanneyFile(ab(b), 'tearaway thomas unused.dh'), exp: exportDavidHanney },
+  { format: 'PSA (the punisher - title.psa)', parse: () => parsePSAFile(ab(read('formats', 'the punisher - title.psa')), 'the punisher - title.psa'), parseBytes: (b) => parsePSAFile(ab(b), 'the punisher - title.psa'), exp: exportPSA },
+  { format: 'Thomas Hermann (thm.blueangel69)', parse: () => parseThomasHermannFile(ab(read('formats', 'thm.blueangel69')), 'thm.blueangel69'), parseBytes: (b) => parseThomasHermannFile(ab(b), 'thm.blueangel69'), exp: exportThomasHermann },
   // RonKlaren and SoundPlayer import layoutPatch; their layouts have no writeCell (the grep hits are comments), so encodeCell is the writer.
   { format: 'Ron Klaren (astra 2.rk)', parse: () => parseRonKlarenFile(read('ron-klaren', 'astra 2.rk'), 'astra 2.rk')!, parseBytes: (b) => parseRonKlarenFile(b, 'astra 2.rk')!, exp: exportRonKlaren },
   { format: 'Sound Player (sjs.awesome)', parse: () => parseSoundPlayerFile(ab(read('formats/Scott Johnston', 'sjs.awesome')), 'sjs.awesome'), parseBytes: (b) => parseSoundPlayerFile(ab(b), 'sjs.awesome'), exp: exportSoundPlayer },
@@ -70,13 +76,15 @@ const EDITS: Array<{ kind: string; want: (x: TrackerCell) => boolean; edit: (x: 
   { kind: 'effect', want: (x) => x.effTyp > 0 && x.eff > 0, edit: (x) => ({ eff: x.eff ^ 1 }), field: 'eff' },
 ];
 
+const PARSED = await Promise.all(CASES.map((c) => c.parse()));
+
 describe('layoutPatch callers: a grid edit reaches the exported file', () => {
-  for (const cs of CASES) {
+  for (const [ci, cs] of CASES.entries()) {
     for (const e of EDITS) {
-      const has = findCell(cs.parse(), e.want) !== null;
+      const has = findCell(PARSED[ci], e.want) !== null;
       // A real song with no non-empty cell of this kind cannot show the edit: recorded as skipped (unverified), never faked.
       (has ? it : it.skip)(`${cs.format}: ${e.kind} edit survives export and re-parse${has ? '' : ' (no such cell in the real song: unverified)'}`, async () => {
-        const song = cs.parse();
+        const song = await cs.parse();
         const pos = findCell(song, e.want);
         const { p, c, r } = pos!;
         setGridBaseline(baselineOf(song.patterns));
@@ -85,7 +93,7 @@ describe('layoutPatch callers: a grid edit reaches the exported file', () => {
         song.patterns[p].channels[c].rows[r] = next;
         const out = (await cs.exp(song)).data;
         setGridBaseline(null);
-        const back = cs.parseBytes(out).patterns[p].channels[c].rows[r];
+        const back = (await cs.parseBytes(out)).patterns[p].channels[c].rows[r];
         expect(back[e.field]).toBe(next[e.field]);
         expect(back[e.field]).not.toBe(cell[e.field]);
       });
