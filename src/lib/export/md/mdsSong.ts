@@ -355,14 +355,29 @@ const vibFrames = (rate: number, tpf: number): number => { let g = 64; for (let 
 export const vibNodeOff = (pos0: number, rate: number, depth: number, fine: number, tpf: number, n: number): number => vibOffAt(rate, depth, fine, Math.round((n % vibFrames(rate, tpf)) * tpf), pos0);
 export function vibratoEnvelope(pos0: number, rate: number, depth: number, fine = 15, tpf = 1, lead: number[] = []): number[] {
   const off = (t: number) => vibOffAt(rate, depth, fine, t, pos0);
-  const frames = vibFrames(rate, tpf), out: number[] = [], L = lead.length;
+  const frames = vibFrames(rate, tpf), L = lead.length;
   // lead: node values for the first frames of the note, played once, then the cycle goes on at its frame L (psgLead).
-  lead.forEach((v, n) => { const w = v & 0xffff; out.push(w >> 8, w & 0xff, 0, 0, 0, n + 1 < L ? n + 1 : L + (L % frames)); });
-  for (let n = 0; n < frames; n++) {
-    const w = (2 * off(Math.round(n * tpf))) & 0xffff;
-    out.push(w >> 8, w & 0xff, 0, 0, rate ? 0 : 255, L + ((n + 1) % frames));
+  const vals = [...lead, ...Array.from({ length: frames }, (_, n) => 2 * off(Math.round(n * tpf)))];
+  return extRuns(vals, (f) => (f === L ? L + (L % frames) : f === L + frames ? L : f), [L, L + (L % frames)]);
+}
+/**
+ * Per-frame pitch values as MDSDRV extended nodes: frame k of a node plays init + (k+1)*delta and the node lasts len+1 frames
+ * (mdsdrv.68k @extended), so each exact arithmetic run of frames shares one node. jump(f): the frame played after frame f-1
+ * (identity except at segment ends); `starts`: frames a jump lands on, which must begin a node.
+ */
+function extRuns(vals: number[], jump: (f: number) => number, starts: number[]): number[] {
+  const begin = new Set([0, ...starts]), runs: Array<[number, number]> = [];
+  for (let i = 0; i < vals.length; ) {
+    let j = i;
+    const d = i + 1 < vals.length && !begin.has(i + 1) ? vals[i + 1] - vals[i] : 0;
+    while (j + 1 < vals.length && !begin.has(j + 1) && vals[j + 1] - vals[j] === d && j - i < 254) j++;
+    runs.push([i, j]); i = j + 1;
   }
-  return out;
+  const nodeAt = new Map(runs.map(([i], n) => [i, n]));
+  return runs.flatMap(([i, j]) => {
+    const a = (vals[i] - (j > i ? vals[i + 1] - vals[i] : 0)) & 0xffff, d = (j > i ? vals[i + 1] - vals[i] : 0) & 0xffff;
+    return [a >> 8, a & 0xff, d >> 8, d & 0xff, j - i, nodeAt.get(jump(j + 1))!];
+  });
 }
 
 // Furnace engine tick of virtual tick t at fpt engine ticks per virtual tick (playback.cpp nextTick: tempoAccum from 0, a tick each D).
@@ -1102,17 +1117,26 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   streams.push([...span(0, nIntro), ...(loopChunk >= 0 ? [0xfa, ...span(nIntro, K * nBody), 0xfb, 0x00] : []), 0xff]);
   const chanIds = [...tracks.map((t) => ids[t.ch]), 0x0f];
 
-  // 5. Layout.
+  // 5. Layout. sdtop-relative items (FM voices, PSG and pitch envelopes, PCM headers) are read through movea.w / lea d.w, so they must
+  //    sit below sdtop+32 KiB (mdsdrv.68k "instrument data must fit within 32k of w_sdtop"); extended pitch envelopes go first, since
+  //    their pointer has 15 bits and the node index is added before the signed lea. `pat` subroutines, macro tables and the streams
+  //    are read as 0(tbase,pos.w): they share the signed 32 KiB window on each side of tbase, after the sdtop items.
   const sd: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // two dc.l + pcm_tab dc.w 0
   const even = () => { if (sd.length & 1) sd.push(0); };
-  const itemOff = items.map((it) => { even(); const at = sd.length; sd.push(...it); return at; });
+  const itemOff: number[] = [];
+  const put = (i: number) => { even(); itemOff[i] = sd.length; sd.push(...items[i]); };
+  const sdItems = [...items.keys()].filter((i) => !tbaseRel.has(i));
+  sdItems.filter((i) => extRel.has(i)).forEach(put);
+  if (sdItems.some((i) => extRel.has(i) && itemOff[i] + items[i].length > 0x8000)) throw new Error('MDSDRV extended pitch envelopes beyond 32 KiB of song data');
+  sdItems.filter((i) => !extRel.has(i)).forEach(put);
+  if (sdItems.some((i) => itemOff[i] >= 0x8000)) throw new Error('MDSDRV instrument and envelope data beyond 32 KiB of song data');
   even();
   const bgm = sd.length;
   sd.push(0, 0, 0, streams.length);
   const trackHdr = sd.length;
   streams.forEach(() => sd.push(0, 0, 0, 0));
-  // The driver reads streams as 0(tbase,pos.w): pos is a signed word, so stream bytes must sit within
-  // tbase-32 KiB .. tbase+32 KiB. Streams that do not fit after the tbase table go in front of it.
+  [...items.keys()].filter((i) => tbaseRel.has(i)).forEach(put);
+  // Streams that do not fit after the tbase table go in front of it.
   const place = (st: number[], i: number) => { sd.splice(trackHdr + i * 4, 4, chanIds[i], 0, ...be16(sd.length - tbase)); sd.push(...st); };
   let after = items.length * 2 + streams.reduce((n, st) => n + st.length, 0), nBefore = 0, tbase: number;
   while (after > 0x7fff && nBefore < streams.length) after -= streams[nBefore++].length;
@@ -1121,13 +1145,10 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   streams.slice(0, nBefore).forEach(place);
   even();
   if (sd.length !== tbase) throw new Error('MDSDRV layout: stream placement out of step');
-  if (itemOff.some((a, i) => extRel.has(i) && a >= 0x8000)) throw new Error('MDSDRV extended pitch envelope beyond 32 KiB of song data');
-  if (itemOff.some((a, i) => tbaseRel.has(i) && a - tbase < -0x8000) || after > 0x7fff || trackHdr - tbase < -0x8000)
-    throw new Error('MDSDRV song data does not fit the signed 32 KiB window around the track table');
+  if (after > 0x7fff || bgm - tbase < -0x8000) throw new Error('MDSDRV song data does not fit the signed 32 KiB window around the track table');
   itemOff.forEach((a, i) => sd.push(...be16(tbaseRel.has(i) ? a - tbase : extRel.has(i) ? a | 0x8000 : a)));
   streams.slice(nBefore).forEach((st, k) => place(st, nBefore + k));
   even();
-  if (sd.length > 0xffff) throw new Error('MDSDRV sequence over 64 KiB');
   sd.splice(0, 4, 0, 0, 0, 8);       // pcm_tab-sdtop
   sd.splice(4, 4, 0, 0, ...be16(bgm));
   sd.splice(bgm, 2, ...be16(tbase - bgm));

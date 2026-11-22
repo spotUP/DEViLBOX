@@ -82,6 +82,20 @@ function conductorTempos(seq: Uint8Array, passes: number): number[] {
   return tempos;
 }
 
+// MDSDRV extended pitch envelope playback: 6-byte nodes (init, delta, len, next); frame k of a node plays init + (k+1)*delta.
+function extFrames(env: number[], n: number): number[] {
+  const w = (i: number) => (((env[i] << 8) | env[i + 1]) << 16) >> 16, out: number[] = [];
+  let node = 0, delay = 0, mod = 0;
+  while (out.length < n) {
+    const i = node * 6;
+    if (delay === 0) mod = w(i);
+    mod += w(i + 2); out.push(mod);
+    if (delay === env[i + 4] && env[i + 4] !== 255) { node = env[i + 5]; delay = 0; } else delay++;
+  }
+  return out;
+}
+const cycleFrames = (env: number[]) => { let f = 0; for (let i = 0; i < env.length; i += 6) f += env[i + 4] + 1; return f; };
+
 describe('PSG period rounding', () => {
   it('psgFix makes the driver write the rounded Furnace period (highscorefollin PSG1 note 54: 76, not 75)', () => {
     expect(mdsPsgPitch(54 * 256)).toBe(75);
@@ -92,7 +106,7 @@ describe('PSG period rounding', () => {
   it('newer_song_lol PSG1 04 55: psgFix keeps the vibrato nodes on the rounded Furnace period, not one period high', () => {
     const per = (nv: number) => Math.round(3579545 / (27.5 * 2 ** ((nv + 3) / 12)) / 64);
     const env = vibratoEnvelope(0, 5, 5);
-    const nodes = Array.from({ length: env.length / 6 }, (_, i) => (((env[i * 6] << 8) | env[i * 6 + 1]) << 16) >> 16);
+    const nodes = extFrames(env, cycleFrames(env));
     // Old rule (smallest |detune| that hits the key's period) as the baseline: one PSG period high on many nodes.
     const edge = (k: number) => { for (let a = 0; a <= 128; a++) for (const d of a ? [-a, a] : [0]) if (mdsPsgPitch(k * 256 + d) === per(k)) return d; return 0; };
     const miss = (fix: (k: number) => number) => { let n = 0; for (let k = 24; k <= 72; k++) for (const w of nodes) if (mdsPsgPitch(k * 256 + fix(k) + w) !== per(k + w / 256)) n++; return n; };
@@ -138,21 +152,14 @@ describe('PSG period rounding', () => {
   });
   it('vibNodeOff: the node MDSDRV plays n frames after an E8 or note byte, looping with the envelope cycle (PSG slide-step scoring)', () => {
     // newer_song_lol PSG2 04 6x at 72 Hz on 60 Hz frames: slide steps are scored on this node, not on every vibrato offset.
-    const fpf = 72 / 60, env = vibratoEnvelope(16, 6, 6, 15, fpf), nodes = env.length / 6;
-    for (let n = 0; n < 3 * nodes; n++) {
-      const i = (n % nodes) * 6, w = ((env[i] << 8) | env[i + 1]) << 16 >> 16;
-      expect(2 * vibNodeOff(16, 6, 6, 15, fpf, n)).toBe(w);
-    }
+    const fpf = 72 / 60, env = vibratoEnvelope(16, 6, 6, 15, fpf), frames = extFrames(env, 3 * cycleFrames(env));
+    frames.forEach((w, n) => expect(2 * vibNodeOff(16, 6, 6, 15, fpf, n), `frame ${n}`).toBe(w));
   });
 
   it('vibratoEnvelope: lead nodes play once, then the cycle goes on at its frame L; no lead keeps the plain envelope', () => {
     const plain = vibratoEnvelope(0, 5, 5), env = vibratoEnvelope(0, 5, 5, 15, 1, [10, 20]);
-    expect(env.slice(0, 12)).toEqual([0, 10, 0, 0, 0, 1, 0, 20, 0, 0, 0, 4]);
-    expect(env.length).toBe(plain.length + 12);
-    for (let n = 0; n < plain.length / 6; n++) {
-      expect(env.slice(12 + 6 * n, 12 + 6 * n + 5)).toEqual(plain.slice(6 * n, 6 * n + 5));
-      expect(env[12 + 6 * n + 5]).toBe(2 + plain[6 * n + 5]);
-    }
+    const pf = extFrames(plain, 100);
+    expect(extFrames(env, 100)).toEqual([10, 20, ...pf.slice(2, 100)]);
     expect(vibratoEnvelope(0, 5, 5, 15, 1, [])).toEqual(plain);
   });
 });
@@ -390,13 +397,14 @@ describe('furnaceToMds', () => {
     rows[r]!.effects = fx.filter((e) => e.type !== 3);
     expect(withPorta).toBe(hex());
   });
-  it('vibratoEnvelope: 04 47 is 16 one-frame nodes of 2 * ((7 * vibTable[pos] * 15) >> 4) / 15, first node at pos 4, looping to node 0', () => {
-    const env = vibratoEnvelope(0, 4, 7);
-    expect(env.length).toBe(16 * 6);
-    expect(env.slice(0, 6)).toEqual([0x00, 0x2a, 0, 0, 0, 1]); // vibTable[4] = 48: (7*48*15)>>4 = 315, /15 = 21
-    expect(env.slice(15 * 6)).toEqual([0, 0, 0, 0, 0, 0]); // pos 64 = 0, next 0
-    expect(env.slice(7 * 6, 7 * 6 + 2)).toEqual([0, 0]); // node 7 = pos 32: vibTable 0
-    expect(env.slice(11 * 6, 11 * 6 + 2)).toEqual([0xff, 0x92]); // node 11 = pos 48: vibTable -127, (7*-127*15)>>4 = -834, /15 = -55
+  it('vibratoEnvelope: 04 47 plays a 16-frame cycle of 2 * ((7 * vibTable[pos] * 15) >> 4) / 15, first frame at pos 4, looping to frame 0', () => {
+    const env = vibratoEnvelope(0, 4, 7), f = extFrames(env, 32);
+    expect(cycleFrames(env)).toBe(16);
+    expect(f[0]).toBe(0x2a); // vibTable[4] = 48: (7*48*15)>>4 = 315, /15 = 21
+    expect(f[15]).toBe(0); // pos 64 = 0
+    expect(f[7]).toBe(0); // pos 32: vibTable 0
+    expect(f[11]).toBe(-110); // pos 48: vibTable -127, (7*-127*15)>>4 = -834, /15 = -55
+    expect(f.slice(16)).toEqual(f.slice(0, 16));
   });
   it('newer_song_lol: per-tick 03xx-under-04xy slides push stream data past 32 KiB, so streams split around the track table (pos is a signed word in 0(tbase,pos))', async () => {
     const s = await convert('newer_song_lol.fur'), sd = s.seq.subarray(8), w = (o: number) => (sd[o] << 8) | sd[o + 1];
