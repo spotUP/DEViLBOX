@@ -891,7 +891,7 @@ export class TrackerGLRenderer {
               }
               continue;
             }
-            const hasVol = vol >= 0x10 && vol <= 0x50;
+            const hasVol = chData.volumeHex === true ? vol !== 0 : vol >= 0x10 && vol <= 0x50;
             if (hasVol) {
               this.setTmpColor(lerpWhiteRGBA(colors.textVolume, glow), cellAlpha);
               this.addGlyphString(HEX_TABLE[vol & 0xFF], px, gy, atlas, this.tmpColor, bold);

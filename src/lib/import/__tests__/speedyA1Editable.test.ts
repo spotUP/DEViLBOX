@@ -73,7 +73,7 @@ describe('Speedy A1 System grid and export', () => {
 
   it('period slides 0x50/0x51 show as 2xx/1xx and an edited amount reaches the file', async () => {
     const song = load();
-    const cols = song.uadeVariableLayout!.columnBytes!;
+    const cols = song.uadeVariableLayout!.columnBytes!.filter((c) => c.fields.includes('effTyp'));
     expect(cols.length).toBeGreaterThan(50);
     for (const c of cols) {
       const cell = song.patterns[c.pattern].channels[c.channel].rows[c.row];
@@ -90,5 +90,23 @@ describe('Speedy A1 System grid and export', () => {
     expect(r.data[c.offset]).toBe(7);
     const re = parseSpeedyA1File(r.data.slice().buffer as ArrayBuffer, NAME);
     expect(re.patterns[c.pattern].channels[c.channel].rows[c.row].eff).toBe(7);
+  });
+
+  it('envelope byte shows as the hex volume field (attack high, release low) and an edit changes only that byte', async () => {
+    const song = load();
+    expect(song.patterns[0].channels[0].channelMeta?.volumeHex).toBe(true);
+    const env = song.uadeVariableLayout!.columnBytes!.filter((c) => c.fields[0] === 'volume');
+    expect(env.length).toBeGreaterThan(50);
+    for (const c of env) expect(song.patterns[c.pattern].channels[c.channel].rows[c.row].volume).toBe(bytes[c.offset]);
+    expect(env.some((c) => bytes[c.offset] !== 0)).toBe(true);
+    setGridBaseline(baselineOf(song.patterns));
+    const e = env.find((y) => env.filter((z) => z.offset === y.offset).length === 1)!;
+    song.patterns[e.pattern].channels[e.channel].rows[e.row].volume = 0x5a;
+    const r = await exportSpeedyA1(song);
+    expect(r.warnings).toEqual([]);
+    expect(diffAt(r.data, bytes)).toEqual(bytes[e.offset] === 0x5a ? [] : [e.offset]);
+    expect(r.data[e.offset]).toBe(0x5a);
+    const re = parseSpeedyA1File(r.data.slice().buffer as ArrayBuffer, NAME);
+    expect(re.patterns[e.pattern].channels[e.channel].rows[e.row].volume).toBe(0x5a);
   });
 });

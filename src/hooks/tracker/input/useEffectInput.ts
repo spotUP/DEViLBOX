@@ -90,6 +90,17 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
         return true;
       }
 
+      // ---------- VOLUME AS HEX BYTE (channelMeta.volumeHex): two hex nibbles typed as they are ----------
+      if (cursorRef.current.columnType === 'volume' && pattern.channels[cursorRef.current.channelIndex]?.channelMeta?.volumeHex === true && HEX_DIGITS_ALL.includes(key)) {
+        e.preventDefault();
+        const current = currentCell.volume || 0;
+        const hexDigit = parseInt(key, 16);
+        const next = cursorRef.current.digitIndex === 0 ? (hexDigit << 4) | (current & 0x0f) : (current & 0xf0) | hexDigit;
+        setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { volume: next });
+        applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
+        return true;
+      }
+
       if (cursorRef.current.columnType === 'volume') {
         const currentValue = currentCell.volume || 0;
         // Select volume key map based on scheme (IT/OpenMPT use different keys)

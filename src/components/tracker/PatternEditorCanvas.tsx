@@ -1642,6 +1642,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           effectNotation: ch.channelMeta?.effectNotation,
           noteCols: ch.channelMeta?.noteCols,
           noteColDelay: ch.channelMeta?.noteColDelay,
+          volumeHex: ch.channelMeta?.volumeHex,
           rows: ch.rows.map((cell): CellSnapshot => ({
             note: cell.note ?? 0,
             instrument: cell.instrument ?? 0,
@@ -2444,7 +2445,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 effectCols: ch.channelMeta?.effectCols ?? 2,
                 effectNotation: ch.channelMeta?.effectNotation,
                 noteCols: ch.channelMeta?.noteCols,
-          noteColDelay: ch.channelMeta?.noteColDelay,
+                noteColDelay: ch.channelMeta?.noteColDelay,
+                volumeHex: ch.channelMeta?.volumeHex,
                 rows: ch.rows.map((cell): CellSnapshot => ({
                   note: cell.note ?? 0, instrument: cell.instrument ?? 0,
                   volume: cell.volume ?? 0, effTyp: cell.effTyp ?? 0, eff: cell.eff ?? 0,

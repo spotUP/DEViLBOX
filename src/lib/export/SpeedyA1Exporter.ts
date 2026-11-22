@@ -26,7 +26,7 @@ export async function exportSpeedyA1(song: TrackerSong): Promise<SpeedyA1ExportR
   const loaded = new Uint8Array(src);
   const out = new Uint8Array(loaded);
   const at = new Map((layout.noteBytes ?? []).map((n) => [`${n.pattern}:${n.channel}:${n.row}`, n]));
-  const slides = new Map((layout.columnBytes ?? []).map((c) => [`${c.pattern}:${c.channel}:${c.row}`, c.offset]));
+  const slides = new Map((layout.columnBytes ?? []).filter((c) => c.fields.includes('effTyp')).map((c) => [`${c.pattern}:${c.channel}:${c.row}`, c.offset]));
   const written = new Map<number, string>();
   const warnings: string[] = [];
   for (const { pattern, row, channel, cell } of editedCells(song.patterns)) {
@@ -63,7 +63,8 @@ export async function exportSpeedyA1(song: TrackerSong): Promise<SpeedyA1ExportR
     }
     const sample = cell.instrument - 1;
     const sampleByte = sample >= 0 && sample <= MAX_SAMPLE ? sample : loaded[n.offset + 2];
-    const value = `${byte}:${sampleByte}`;
+    const envelope = cell.volume & 0xff; // attack nibble high, release nibble low
+    const value = `${byte}:${sampleByte}:${envelope}`;
     const prior = written.get(n.offset);
     if (prior !== undefined && prior !== value) {
       warnings.push(`${where}: shares its cell with an earlier edit (a pattern played more than once); not written`);
@@ -71,6 +72,7 @@ export async function exportSpeedyA1(song: TrackerSong): Promise<SpeedyA1ExportR
     }
     out[n.offset] = byte;
     out[n.offset + 2] = sampleByte;
+    out[n.offset + 1] = envelope;
     written.set(n.offset, value);
   }
   return { data: out, filename: name, warnings };

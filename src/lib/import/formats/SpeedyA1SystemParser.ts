@@ -101,11 +101,14 @@ export function parseSpeedyA1File(buffer: ArrayBuffer, filename: string): Tracke
           if (sample > MAX_SAMPLE) return emptyCell();
           usedInstruments.add(sample + 1);
           noteBytes.push({ pattern: pi, channel: ch, row, offset, note });
-          return { ...emptyCell(), note, instrument: sample + 1 };
+          columnBytes.push({ pattern: pi, channel: ch, row, offset: offset + 1, fields: ['volume'] });
+          // second byte: envelope, attack nibble high / release nibble low (0 = none); shown as the hex volume field
+          return { ...emptyCell(), note, instrument: sample + 1, volume: buf[offset + 1] };
         });
         return {
           id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false, solo: false, collapsed: false, volume: 100,
           pan: ch === 0 || ch === 3 ? -50 : 50, instrumentId: null, color: null, rows,
+          channelMeta: { importedFromMOD: false, volumeHex: true },
         };
       }),
     } as Pattern);

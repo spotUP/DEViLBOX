@@ -188,6 +188,8 @@ export interface ChannelData {
     noteCols?: number;   // Number of note columns per track (default 1, limited only by the song) — Renoise-style chords
     /** Note columns 2 and up show and edit their sub-row delay (ticks) in the field the volume sits in. Set by formats whose notes start inside a row (Ben Daglish). */
     noteColDelay?: boolean;
+    /** The volume field is a raw byte of two hex nibbles, drawn and typed as hex (Speedy A1 System: attack high, release low). */
+    volumeHex?: boolean;
     maxVoices?: number;  // Max simultaneous voices per channel (default unlimited; 1-16)
     systemId?: number | string; // System preset identifier (number for Furnace fileID)
     sunvoxModuleId?: number; // SunVox module ID for SunVox channels

@@ -70,6 +70,8 @@ export interface ChannelSnapshot {
   noteCols?: number;  // from channelMeta.noteCols, default 1
   /** from channelMeta.noteColDelay: note columns 2 and up draw their delay where the volume would be. */
   noteColDelay?: boolean;
+  /** from channelMeta.volumeHex: the volume field draws as a plain hex byte (any value). */
+  volumeHex?: boolean;
   rows: CellSnapshot[];
   /** Per-channel column specs — overrides global ui.columns when present */
   columnSpecs?: ColumnSpec[];
