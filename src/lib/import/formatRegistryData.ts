@@ -2557,7 +2557,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     family: 'amiga-native',
     matchMode: 'prefix',
     prefixes: ['md.'],
-    nativeParser: { module: '@lib/import/formats/SimpleAmigaStubParser', parseFn: 'parseMikeDaviesFile' },
+    nativeParser: { module: '@lib/import/formats/MikeDaviesParser', parseFn: 'parseMikeDaviesFile' },
     uadeFallback: true,
   },
   {

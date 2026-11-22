@@ -45,6 +45,5 @@ export function encodeSimpleAmigaStubCell(cell: TrackerCell): Uint8Array {
 // Register encoders for all simple stub formats
 registerPatternEncoder('soundFactoryStub', () => encodeSimpleAmigaStubCell);
 registerPatternEncoder('leggless', () => encodeSimpleAmigaStubCell);
-registerPatternEncoder('mikeDavies', () => encodeSimpleAmigaStubCell);
 registerPatternEncoder('aProSys', () => encodeSimpleAmigaStubCell);
 registerPatternEncoder('artAndMagic', () => encodeSimpleAmigaStubCell);

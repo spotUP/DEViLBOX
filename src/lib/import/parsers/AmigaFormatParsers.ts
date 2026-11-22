@@ -1674,11 +1674,14 @@ export async function tryRouteFormat(
 
   // UADE enhanced scan reconstructs patterns from Paula register captures.
   if (matchesExt(filename, ['md'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const song = await parseUADEFile(buffer, originalFileName, 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = originalFileName;
-    return song;
+    const mdCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['md']) };
+    const { isMikeDaviesFormat, parseMikeDaviesFile } = await import('@lib/import/formats/MikeDaviesParser');
+    return withNativeThenUADE('mikeDavies', mdCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isMikeDaviesFormat(buf)) return parseMikeDaviesFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'MikeDaviesParser', { injectUADE: true });
   }
 
   // ── Medley — native parser provides detection; UADE handles audio.

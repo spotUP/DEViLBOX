@@ -44,7 +44,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "graoumfTracker2_gt2", fixture: "public/data/songs/graoumf-tracker-2/living-on-video.gt2", kind: "fixed" },
   { formatId: "inStereo2", fixture: "public/data/songs/instereo!-2.0/spaceflight.is20", kind: "fixed" },
   { formatId: "medley", fixture: "public/data/songs/medley/combat.mso", kind: "variable", parser: { module: "@lib/import/formats/MedleyParser", parseFn: "parseMedleyFile" } },
-  { formatId: "mikeDavies", fixture: "public/data/songs/mike-davies/strider.md", kind: "fixed" },
+  { formatId: "mikeDavies", fixture: "public/data/songs/mike-davies/strider.md", kind: "variable" },
   { formatId: "musicAssembler", fixture: "public/data/songs/music-assembler/thanatos.ma", kind: "variable" },
   { formatId: "ronKlaren", fixture: "public/data/songs/ron-klaren/astra 2.rk", kind: "fixed" },
   { formatId: "sonixMusicDriver", fixture: "public/data/songs/sonix/snx/A-10 Tank Killer/winning.snx", kind: "variable", parser: { module: "@lib/import/formats/SonixMusicDriverParser", parseFn: "parseSonixFile" } },

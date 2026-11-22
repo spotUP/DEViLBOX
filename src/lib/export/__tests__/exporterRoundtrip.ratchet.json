@@ -760,6 +760,14 @@
       "cells": 1268,
       "bytes": 1268
     },
+    "mikeDavies": {
+      "exporter": "MikeDaviesExporter.exportMikeDavies",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 88886,
+      "bytes": 88886
+    },
     "scumm": {
       "exporter": "SCUMMExporter.exportSCUMM",
       "tier": "byte-exact",
