@@ -206,6 +206,19 @@ function macroFrames(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch'
     // last value (samurai 128 Hz noise kick volume 0) instead of the tick before it. A looped one keeps its length.
     const more = (f: number): boolean => tickAtFrame(f, rate, ph) < src.length || (loop < 0 && tickAtFrame(f - 1, rate, ph) < src.length - 1);
     for (let f = 0; more(f); f++) vals.push(src[Math.min(src.length - 1, tickAtFrame(f, rate, ph))]);
+    // A looped macro whose cycle (L ticks) is not a whole number of frames drifts a step per pass (Famitune1 duty 18 ticks = 16.8
+    // frames at 56 Hz): unroll k cycles with kL / rate whole frames, as the 00xy arpeggio does.
+    const L = src.length - loop;
+    if (loop >= 0 && release < 0 && Math.abs(L / rate - Math.round(L / rate)) > 1e-6) {
+      const fr0 = Math.floor(loop / rate + ph + 0.5 - 1e-9);
+      for (let k = 2; k <= 60; k++) {
+        const P = (k * L) / rate;
+        if (Math.abs(P - Math.round(P)) > 1e-6 || fr0 + Math.round(P) > 240) continue;
+        vals.length = 0;
+        for (let f = 0; f < fr0 + Math.round(P); f++) { const t = tickAtFrame(f, rate, ph); vals.push(src[t < src.length ? t : loop + ((t - loop) % L)]); }
+        break;
+      }
+    }
     const fr = (i: number): number => (i < 0 ? -1 : Math.min(vals.length - 1, Math.max(0, Math.floor(i / rate + ph + 0.5 - 1e-9))));
     loop = fr(loop); release = fr(release);
   }
@@ -921,7 +934,9 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             const steps = [0, arpXY >> 4, arpXY & 15];
             let len = 3 * Math.max(1, Math.round(perTick));
             for (let L = 1; L <= 240; L++) if (Math.abs(((L * macroRate) / 3) - Math.round((L * macroRate) / 3)) < 1e-6) { len = L; break; }
-            return Array.from({ length: len }, (_, f) => steps[tickAtFrame(f, macroRate) % 3]);
+            // Counted from the row's exact time like the vibrato below: a row off the frame grid (56 Hz) holds its tick on another frame.
+            const ph = seq[ri].t - seq[ri].frame;
+            return Array.from({ length: len }, (_, f) => steps[tickAtFrame(f, macroRate, ph) % 3]);
           };
           // Vibrato (04xy): looping absolute pitch envelope, a sine over 64/x ticks. Depth y is y/16 semitone in linear
           // pitch (measured with furnace -vgmout), so the amplitude in period units follows the playing note.
@@ -967,7 +982,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               // that frame, and a period offset scales with the note: take each frame's offset against its own arp note.
               const arpV = arpXY !== 0 ? [0, arpXY >> 4, arpXY & 15] : null;
               const arpAt = (i: number): number => {
-                if (arpV) return arpV[tickAtFrame(i, macroRate) % 3];
+                if (arpV) return arpV[tickAtFrame(i, macroRate, rowPh) % 3];
                 if (!insArp || !insArp.vals.length) return 0;
                 const a = insArp, L = a.vals.length;
                 return a.vals[i < L ? i : a.loop >= 0 ? a.loop + ((i - a.loop) % (L - a.loop)) : L - 1];
