@@ -140,7 +140,7 @@ registerEditableFormat({ formatId: "ronKlaren", label: "Ron Klaren", patternCode
 registerEditableFormat({ formatId: "rtm", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "s3m", label: "S3M", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "sawteeth", label: "Sawteeth", newSong: { template: "templates/sawteeth.st", name: "Sawteeth" }, patternCodec: { kind: "variable" }, exporter: { module: "SawteethExporter", fn: "exportSawteeth", byLayout: true } });
-registerEditableFormat({ formatId: "scumm", label: "SCUMM", newSong: { template: "templates/scumm.scumm", name: "SCUMM" }, patternCodec: { kind: "fixed" }, exporter: { module: "SCUMMExporter", fn: "exportSCUMM", byLayout: true } });
+registerEditableFormat({ formatId: "scumm", label: "SCUMM", newSong: { template: "templates/scumm.scumm", name: "SCUMM" }, patternCodec: { kind: "variable" }, exporter: { module: "SCUMMExporter", fn: "exportSCUMM", byLayout: true } });
 registerEditableFormat({ formatId: "seanConnolly", label: "Sean Connolly", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "sidmon1", label: "", newSong: { template: "templates/sidmon1.sid1", name: "SidMon 1" }, exporter: { module: "SidMon1Exporter", fn: "exportSidMon1", byLayout: true } });
 registerEditableFormat({ formatId: "sidMon1", label: "SidMon 1", patternCodec: { kind: "fixed" } });

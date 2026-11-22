@@ -1,43 +1,14 @@
 /**
- * SCUMMEncoder — Encodes TrackerCell back to LucasArts SCUMM music format.
- *
- * SCUMM modules are self-contained 68k binaries (player + data fused).
- * The parser generates empty placeholder patterns — no cells are parsed
- * from the binary.
- *
- * This encoder uses standard ProTracker MOD 4-byte cell encoding since SCUMM
- * is a 4-channel Amiga format. When UADE loads the module and the chip RAM
- * base is resolved, cells can potentially be patched at the correct addresses.
- *
- * Cell encoding (4 bytes, standard MOD):
- *   byte[0] = (instrHi & 0xF0) | ((period >> 8) & 0x0F)
- *   byte[1] = period & 0xFF
- *   byte[2] = ((instrLo & 0x0F) << 4) | (effTyp & 0x0F)
- *   byte[3] = eff & 0xFF
+ * SCUMM encoder: every event list is a block of carrier rows (SCUMMParser.ts), so a block encodes back through the
+ * Rob Hubbard carrier encoder.
  */
-
 import type { TrackerCell } from '@/types';
-import { registerPatternEncoder } from '../UADEPatternEncoder';
-// ProTracker naming (note 13 = C-1 = 856), one table: src/lib/amiga/periodNotes.ts.
-import { noteToPeriod as xmNoteToPeriod } from '@/lib/amiga/periodNotes';
+import { registerVariableEncoder, type VariableLengthEncoder } from '../UADEPatternEncoder';
+import { encodeRobHubbardPattern } from './RobHubbardEncoder';
 
-/**
- * Encode a TrackerCell to standard ProTracker MOD binary (4 bytes).
- * Used for SCUMM format chip RAM patching.
- */
-export function encodeSCUMMCell(cell: TrackerCell): Uint8Array {
-  const out = new Uint8Array(4);
-  const period = xmNoteToPeriod(cell.note ?? 0);
-  const instr = cell.instrument ?? 0;
-  const effTyp = cell.effTyp ?? 0;
-  const eff = cell.eff ?? 0;
+export const scummEncoder: VariableLengthEncoder = {
+  formatId: 'scumm',
+  encodePattern: (rows: TrackerCell[]) => encodeRobHubbardPattern(rows),
+};
 
-  out[0] = (instr & 0xF0) | ((period >> 8) & 0x0F);
-  out[1] = period & 0xFF;
-  out[2] = ((instr & 0x0F) << 4) | (effTyp & 0x0F);
-  out[3] = eff & 0xFF;
-
-  return out;
-}
-
-registerPatternEncoder('scumm', () => encodeSCUMMCell);
+registerVariableEncoder(scummEncoder);
