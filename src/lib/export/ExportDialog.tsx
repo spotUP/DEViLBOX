@@ -202,7 +202,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <button
                     onClick={() => ex.setExportMode('song')}
                     className={`
-                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'song'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -215,7 +215,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <button
                     onClick={() => ex.setExportMode('sfx')}
                     className={`
-                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'sfx'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -228,7 +228,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <button
                     onClick={() => ex.setExportMode('instrument')}
                     className={`
-                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'instrument'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -241,7 +241,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <button
                     onClick={() => ex.setExportMode('audio')}
                     className={`
-                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'audio'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -254,7 +254,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <button
                     onClick={() => ex.setExportMode('midi')}
                     className={`
-                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'midi'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -267,7 +267,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <button
                     onClick={() => ex.setExportMode('xm')}
                     className={`
-                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'xm'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -280,7 +280,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <button
                     onClick={() => ex.setExportMode('mod')}
                     className={`
-                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'mod'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -293,7 +293,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <button
                     onClick={() => ex.setExportMode('it')}
                     className={`
-                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'it'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -306,7 +306,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <button
                     onClick={() => ex.setExportMode('s3m')}
                     className={`
-                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 's3m'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -319,7 +319,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <button
                     onClick={() => ex.setExportMode('chip')}
                     className={`
-                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'chip'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -332,7 +332,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <button
                     onClick={() => ex.setExportMode('nano')}
                     className={`
-                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'nano'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -346,7 +346,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <button
                       onClick={() => ex.setExportMode('fur')}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'fur'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -361,7 +361,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <button
                       onClick={() => ex.setExportMode('furText')}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'furText'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -377,7 +377,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       key={k}
                       onClick={() => { ex.setAyTarget(k); ex.setExportMode('furAy'); }}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'furAy' && ex.ayTarget === k
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -392,7 +392,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <button
                       onClick={() => ex.setExportMode('zxTap')}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'zxTap'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -407,7 +407,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <button
                       onClick={() => ex.setExportMode('vectrexCart')}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'vectrexCart'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -422,7 +422,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <button
                       onClick={() => ex.setExportMode('gbRom')}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'gbRom'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -437,7 +437,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <button
                       onClick={() => ex.setExportMode('nesRom')}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'nesRom'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -452,7 +452,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <button
                       onClick={() => ex.setExportMode('nsfe')}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'nsfe'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -467,7 +467,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <button
                       onClick={() => ex.setExportMode('zxBeeperTap')}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'zxBeeperTap'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -482,7 +482,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <button
                       onClick={() => ex.setExportMode('zxQuadToneTap')}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'zxQuadToneTap'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -497,7 +497,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <button
                       onClick={() => ex.setExportMode('tad')}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'tad'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -512,7 +512,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <button
                       onClick={() => ex.setExportMode('native')}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'native'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -527,7 +527,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <button
                       onClick={() => ex.setExportMode('adf')}
                       className={`
-                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'adf'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -543,7 +543,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       onClose();
                       useMIDIStore.getState().openPatternDialog();
                     }}
-                    className="p-4 min-w-0 rounded-lg border-2 transition-all text-center bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight"
+                    className="p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight"
                   >
                     <Cable size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold break-words leading-tight">TD-3</div>
