@@ -346,6 +346,21 @@ describe('furnaceToFamistudio', () => {
     expect(has(music, encodeEnvelope(together, -1, -1, 'pitch', true))).toBe(true);
     expect(has(music, encodeEnvelope(apart, -1, -1, 'pitch', true))).toBe(false);
   });
+  it('unrolls a looped relative pitch macro as the growing period steps of Furnace\'s running sum (turtle_byte triangle kick)', () => {
+    // Furnace sums the macro per tick and rounds the period of the sum (pitch-linear): a falling kick's period steps grow.
+    // Looping the first delta played it period-linear (turtle_byte triangle 221 -> 635 as 220 -> 508 over 12 frames).
+    const X = 1789772.727 / (16 * 440 * 2), P = Math.round(X) - 1;
+    const off = (s: number): number => Math.round(P * (2 ** (-s / 1536) - 1));
+    const deltas: number[] = [];
+    for (let f = 0; f < 240 && P + off(-60 * (f + 1)) <= 2047; f++) deltas.push(off(-60 * (f + 1)) - off(-60 * f));
+    expect(new Set(deltas).size).toBeGreaterThan(1);
+    const mod = nesModule({ 0: { 0: { ...A4, instrument: 0 } } });
+    const pm = { code: 4, type: 0, mode: 1, speed: 1, delay: 0, length: 1, loop: 0, release: 255, data: [-60] };
+    Object.assign(mod, { tuning: 440, instruments: [{ type: 34, macros: [pm], amiga: { initSample: 0 } }] });
+    const music = furnaceToFamistudio(mod).music;
+    expect(has(music, encodeEnvelope(deltas, -1, -1, 'pitch', true))).toBe(true);
+    expect(has(music, encodeEnvelope([deltas[0]], 0, -1, 'pitch', true))).toBe(false);
+  });
   it('applies E5 fine pitch to every arp step as Furnace does, via a pitch envelope stepping with the arp (oby1_ingame ins 20 + E590)', () => {
     // Furnace calcFreq applies chan.pitch (E5xx - 0x80, 1/128 semitone) to the note each arp step gives; the engine adds one
     // 0x4e offset F taken at the base note. The arp step +12 needs fine(note + 12), so the envelope carries fine(n + 12) - F.

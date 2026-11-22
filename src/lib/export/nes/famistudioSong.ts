@@ -963,21 +963,40 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 const F = rnd(X * 2 ** (-fp / 1536)) - 1 - P;
                 const off = (v: number): number => (fp ? rnd(X * 2 ** (-(v + fp) / 1536)) - 1 - P - F : Math.round(P * (2 ** (-v / 1536) - 1)));
                 const rel = (pm.mode & 1) === 1;
-                // A relative macro under fine pitch: Furnace keeps the running sum in pitch2 and rounds fine + sum once, so each
-                // step is off(sum) - off(previous sum) (macroFrames maps the frames in order). Without fine pitch each increment
-                // stays scaled at the note's period.
+                // A relative macro: Furnace keeps the running sum in pitch2 and rounds fine + sum once, so each step is
+                // off(sum) - off(previous sum) (macroFrames maps the frames in order). With or without fine pitch: a constant
+                // per-step period offset is period-linear, Furnace's sum is pitch-linear (turtle_byte triangle kick 221 -> 635
+                // played 220 -> 353).
                 // shortcut: a looped relative macro repeats its first-pass deltas (the sum keeps growing in Furnace), rounding per
                 // step without fine pitch; unroll the loop if a song shows audible drift.
                 let relSum = 0;
                 const relStep = (v: number): number => { const d = off(relSum + v) - off(relSum); relSum += v; return d; };
-                const toPeriod = (v: number): number => { const d = rel ? (fp ? relStep(v) : Math.round(P * (2 ** (-v / 1536) - 1))) : off(v); if (Math.abs(d) > 63) lossy.add('pitch macro step past 63 period units (clamped)'); return d; };
+                const toPeriod = (v: number): number => { const d = rel ? relStep(v) : off(v); if (Math.abs(d) > 63) lossy.add('pitch macro step past 63 period units (clamped)'); return d; };
                 // An ADSR/LFO pitch macro in absolute mode is a position curve: FamiStudio's +-63 range only holds per-frame
                 // steps, so send the differences of the period offsets as a relative envelope.
                 const ex = expandProcMacro(pm, m.version);
                 const mf = ex !== pm && (pm.mode & 1) === 0
                   ? macroFrames({ ...ex, mode: 0 }, 'pitch', lossy, off, 1, m.version)
                   : macroFrames(pm, 'pitch', lossy, vib && !rel ? off : vib ? (v) => Math.round(P * (2 ** (-v / 1536) - 1)) : toPeriod, macroRate, m.version);
-                if (vib || (!mf.relative && ex !== pm)) {
+                // A looped relative macro whose loop moves the pitch (a falling kick): Furnace sums it per tick and rounds the
+                // period of the sum, so the steps grow (pitch-linear). Unroll it: frame f sends off(sum at the tick that frame
+                // shows) - off(sum one frame before), until the period leaves the 11-bit range (240 frames at most). Repeating
+                // the first-pass deltas played turtle_byte's triangle kick 221 -> 635 as 220 -> 508 (frames 144-156).
+                const tk = rel && !vib ? macroFrames(pm, 'pitch', lossy, undefined, 1, m.version) : null;
+                const loopSum = tk && tk.loop >= 0 ? tk.vals.slice(tk.loop).reduce((x, y) => x + y, 0) : 0;
+                if (tk && loopSum !== 0) {
+                  const at = (i: number): number => tk.vals[i < tk.vals.length ? i : tk.loop + ((i - tk.loop) % (tk.vals.length - tk.loop))];
+                  const rowPh = seq[ri].t - seq[ri].frame, deltas: number[] = [];
+                  let sum = 0, tick = -1, prev = 0;
+                  for (let f = 0; f < 240; f++) {
+                    for (const k = tickAtFrame(f, macroRate, rowPh); tick < k;) sum += at(++tick);
+                    const o = off(sum);
+                    if (P + o > 2047 || P + o < 0) break;
+                    if (Math.abs(o - prev) > 63) lossy.add('pitch macro step past 63 period units (clamped)');
+                    deltas.push(o - prev); prev = o;
+                  }
+                  pid = envId(encodeEnvelope(deltas.length ? deltas : [0], -1, -1, 'pitch', true));
+                } else if (vib || (!mf.relative && ex !== pm)) {
                   // Vibrato on top, or an ADSR/LFO position curve (+-63 only holds per-frame steps): one relative envelope.
                   const mg = mergeVibratoPitch(vib ?? [0], mf, lossy, vib?.slice(0, vibLen1));
                   const lt = !vib && ex !== pm && (mg.loop < 0 || mg.loop >= mg.deltas.length - 1) ? loopPeriodicTail(mg.deltas) : mg;
