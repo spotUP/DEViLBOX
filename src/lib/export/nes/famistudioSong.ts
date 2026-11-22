@@ -758,8 +758,14 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 const F = Math.round(X * 2 ** (-fp / 1536)) - 1 - P;
                 const off = (v: number): number => (fp ? Math.round(X * 2 ** (-(v + fp) / 1536)) - 1 - P - F : Math.round(P * (2 ** (-v / 1536) - 1)));
                 const rel = (pm.mode & 1) === 1;
-                // shortcut: relative macros scale each increment at the note's period (exact for small sums), rounding per step.
-                const toPeriod = (v: number): number => { const d = rel ? Math.round(P * (2 ** (-v / 1536) - 1)) : off(v); if (Math.abs(d) > 63) lossy.add('pitch macro step past 63 period units (clamped)'); return d; };
+                // A relative macro under fine pitch: Furnace keeps the running sum in pitch2 and rounds fine + sum once, so each
+                // step is off(sum) - off(previous sum) (macroFrames maps the frames in order). Without fine pitch each increment
+                // stays scaled at the note's period.
+                // shortcut: a looped relative macro repeats its first-pass deltas (the sum keeps growing in Furnace), rounding per
+                // step without fine pitch; unroll the loop if a song shows audible drift.
+                let relSum = 0;
+                const relStep = (v: number): number => { const d = off(relSum + v) - off(relSum); relSum += v; return d; };
+                const toPeriod = (v: number): number => { const d = rel ? (fp ? relStep(v) : Math.round(P * (2 ** (-v / 1536) - 1))) : off(v); if (Math.abs(d) > 63) lossy.add('pitch macro step past 63 period units (clamped)'); return d; };
                 // An ADSR/LFO pitch macro in absolute mode is a position curve: FamiStudio's +-63 range only holds per-frame
                 // steps, so send the differences of the period offsets as a relative envelope.
                 const ex = expandProcMacro(pm, m.version);

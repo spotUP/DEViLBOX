@@ -250,6 +250,22 @@ describe('furnaceToFamistudio', () => {
     expect(has(music, encodeEnvelope(together, -1, -1, 'pitch'))).toBe(true);
     expect(has(music, encodeEnvelope(apart, -1, -1, 'pitch'))).toBe(false);
   });
+  it('rounds fine pitch and a relative pitch macro running sum together as Furnace does (E57D + relative pitch macro)', () => {
+    // Furnace keeps the relative macro's running sum in pitch2 and rounds fine + sum once: each step is off(sum) - off(previous
+    // sum), off(s) = round(X * 2^(-(s + fp) / 1536)) - 1 - P - F, not each increment rounded at the note period.
+    const data = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5];
+    const X = 1789772.727 / (16 * 445 * 2), P = Math.round(X) - 1, fp = -3, F = Math.round(X * 2 ** (-fp / 1536)) - 1 - P;
+    const off = (s: number): number => Math.round(X * 2 ** (-(s + fp) / 1536)) - 1 - P - F;
+    const together = data.map((_, i) => off(5 * (i + 1)) - off(5 * i));
+    const apart = data.map((v) => Math.round(P * (2 ** (-v / 1536) - 1)));
+    expect(together).not.toEqual(apart); // rounding each increment apart drifts from the rounded sum
+    const mod = nesModule({ 0: { 0: { ...A4, instrument: 0, effects: [{ type: 0xe5, value: 0x7d }] } } });
+    const pm = { code: 4, type: 0, mode: 1, speed: 1, delay: 0, length: data.length, loop: 255, release: 255, data };
+    Object.assign(mod, { tuning: 445, instruments: [{ type: 34, macros: [pm], amiga: { initSample: 0 } }] });
+    const music = furnaceToFamistudio(mod).music;
+    expect(has(music, encodeEnvelope(together, -1, -1, 'pitch', true))).toBe(true);
+    expect(has(music, encodeEnvelope(apart, -1, -1, 'pitch', true))).toBe(false);
+  });
   it('keeps the vibrato phase on a 03xx porta note (Furnace clears doNote on a keyed-on channel; one_sided_love frame 3730)', () => {
     // playback.cpp: 03xx with keyOn sets doNote=false, so "commit note on" (vibratoPos=0) is skipped. 4 rows x 6 ticks of 04:63
     // leave vibratoPos at 6 * 24 & 63 = 16; the override sent on the porta row starts there, not at 0.
