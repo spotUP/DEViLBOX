@@ -427,6 +427,13 @@ describe('furnaceToFamistudio', () => {
     expect(at).toBeGreaterThan(-1);
     expect(song.music[at + 1]).toBe(2); // 3 ticks of 1 frame - 1 (hz 60, speed 6 -> 1 frame per tick)
   });
+  it('maps a 1-frame ED note delay to 0x47 0 (the driver plays n + 1 frames after the row)', () => {
+    const song = music({ 0: { 0: { ...A4, ...fx(0xed, 0x01) } } });
+    const at = [...song.music].indexOf(0x47);
+    expect(at).toBeGreaterThan(-1);
+    expect(song.music[at + 1]).toBe(0);
+    expect(song.lossy.some((l) => l.startsWith('note delay'))).toBe(false);
+  });
   it('maps EC note cut to 0x48', () => {
     const song = music({ 0: { 0: { ...A4, ...fx(0xec, 0x03) } } });
     expect(has(song.music, [0x48, 3])).toBe(true);

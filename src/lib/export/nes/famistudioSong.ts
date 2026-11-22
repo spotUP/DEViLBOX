@@ -1003,7 +1003,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           else if (slide) curNote = slide[2];
           if (delay > 0) {
             const d = Math.round(delay * perTick) - 1;
-            if (d >= 1) ops.push(0x47, Math.min(255, d)); else lossy.add('note delay under 2 frames');
+            // 0x47 n plays the note n + 1 frames after the row (engine counts n down and plays on the wrap to $FF), so n = 0 is a 1-frame delay.
+            if (d >= 0) ops.push(0x47, Math.min(255, d)); else lossy.add('note delay under 1 frame');
           }
         }
         if (slide) { tail.push(...(noAttack ? [0x43] : []), 0x50, ...slide); }
