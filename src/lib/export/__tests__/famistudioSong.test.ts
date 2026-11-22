@@ -130,6 +130,25 @@ describe('furnaceToFamistudio', () => {
     expect(song.firstNoteFrames.slice(0, 3)).toEqual([0, 12, -1]);
   });
 
+  it('09 00 selects groove 0 when the song has grooves (playback.cpp 0x09), and 0Fxx then sets its first entry', () => {
+    // Future_Re-ference: grooves [2,1] and [6], row 0 has 09 00 -> rows last 2,1,2,1 ticks, so row 4 starts at frame 6.
+    const m = nesModule({ 0: { 0: { note: 0, octave: 4, effects: [{ type: 0x09, value: 0 }] } }, 1: { 4: { note: 0, octave: 4 } }, 2: { 6: { note: 0, octave: 4, effects: [{ type: 0x0f, value: 3 }] } }, 3: { 8: { note: 0, octave: 4 } } });
+    m.grooves = [{ len: 2, val: [2, 1, ...Array(14).fill(0)] }, { len: 1, val: [6, ...Array(15).fill(0)] }];
+    // Row 6 (frame 9) sets entry 0 to 3: rows 6,7 last 3,1 ticks, row 8 starts at frame 13.
+    expect(furnaceToFamistudio(m).firstNoteFrames.slice(0, 4)).toEqual([0, 6, 9, 13]);
+  });
+
+  it('plays a [2,1] groove with one speed op at tempo x2, not one op per row (Future_Re-ference FME-7 size)', () => {
+    const cells = { 0: { 0: { note: 0, octave: 4, effects: [{ type: 0x09, value: 0 }] } }, 1: { 4: { note: 0, octave: 4 } } };
+    const m = nesModule(cells);
+    m.grooves = [{ len: 2, val: [2, 1, ...Array(14).fill(0)] }];
+    const groove = furnaceToFamistudio(m);
+    // Same rows at plain speed 3 carry a single speed op, so the groove stream must not be longer.
+    const plain = furnaceToFamistudio(nesModule({ 0: { 0: { note: 0, octave: 4, effects: [{ type: 0x0f, value: 3 }] } }, 1: { 4: { note: 0, octave: 4 } } }));
+    expect(groove.sizes.streams[0]).toBeLessThanOrEqual(plain.sizes.streams[0]);
+    expect(groove.firstNoteFrames.slice(0, 2)).toEqual([0, 6]);
+  });
+
   it('applies flow and speed effects from a dropped expansion channel (one_sided_love 0B21 in channel 7)', () => {
     // Channel 5 belongs to a dropped expansion chip; its 0F03 at row 0 and 0D00 at row 2 still act on the 2A03 channels.
     const m = nesModule({}, { ordersLen: 2, orders: [[0, 0], [0, 1], [0, 0], [0, 0], [0, 0], [0, 0]] });

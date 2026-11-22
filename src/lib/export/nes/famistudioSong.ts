@@ -448,7 +448,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   const NCH = vrc6 ? 8 : CHANNELS;
   for (const sys of m.systems.slice(vrc6 ? 2 : 1)) lossy.add(`expansion chip system ${sys} (channels dropped; 2A03 only so far)`);
   if (m.subsongs.length > 1) lossy.add('other subsongs (only one exported)');
-  // Furnace speeds: the pattern advances one entry per row (playback.cpp curSpeed); 09xx sets entry 0, 0Fxx entry 1 when there are two.
+  // Furnace speeds: the pattern advances one entry per row (playback.cpp curSpeed); 09xx sets entry 0 (or picks groove xx when the song has grooves), 0Fxx entry 1 when there are two and no grooves.
   const speeds = s.speedPattern?.length ? [...s.speedPattern] : s.speed2 !== s.speed1 ? [s.speed1, s.speed2] : [s.speed1];
   // FamiTracker tempo: frames per row = speed x 150 / tempo. Below the engine's 32 (slow tick rates such as 10 Hz),
   // multiply tempo and every speed by the same integer so frames per row stay exact.
@@ -476,14 +476,17 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   const rowFrame: number[][] = [], rowSpeed: number[][] = [];
   {
     let f = 0, cur = 0;
-    const sp = [...speeds];
+    let sp = [...speeds];
+    const grooves = m.grooves ?? [];
     const perTick = 60 / (s.hz > 0 ? s.hz : 60) * vtScale;
     for (let o = 0; o < endOrder; o++) {
       rowFrame.push([]); rowSpeed.push([]);
       for (let r = 0; r < orderLen[o]; r++) {
         for (const e of rowFx(o, r)) {
-          if (e.type === 0x09 && e.value > 0) sp[0] = e.value;
-          if (e.type === 0x0f && e.value > 0) sp[sp.length === 2 ? 1 : 0] = e.value;
+          // playback.cpp 0x09/0x0f: with grooves, 09xx selects groove xx (a copy) and restarts it; 0Fxx sets entry 0.
+          if (e.type === 0x09 && grooves.length) { if (e.value < grooves.length) { sp = grooves[e.value].val.slice(0, Math.max(1, grooves[e.value].len)); cur = 0; } }
+          else if (e.type === 0x09 && e.value > 0) sp[0] = e.value;
+          if (e.type === 0x0f && e.value > 0) sp[sp.length === 2 && !grooves.length ? 1 : 0] = e.value;
           if (e.type === 0xfd || e.type === 0xfe) lossy.add(`virtual tempo change ${e.type === 0xfd ? 'FD' : 'FE'}xx (ignored: rows keep the song start tempo)`);
         }
         rowFrame[o].push(Math.round(f));
@@ -505,6 +508,34 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     if (Math.abs(st - Math.round(st)) < 1e-6) { spdMul = q; break; }
   }
   { const st = 256 * tempoBase * spdMul / 150; if (Math.abs(st - Math.round(st)) >= 1e-6) lossy.add(`virtual tempo ${s.virtualTempo}/${s.virtualTempoD}: FamiStudio tempo step not whole (rows drift)`); }
+  // A groove ([2,1]) changes speed every row: one 0x46 op per row overflowed Future_Re-ference's FME-7 area. With tempo x2
+  // (step 2.0 per frame) the accumulator's odd phase lets one speed byte play the groove (speed 3: rows 2,1,2,1), so a
+  // speed op lands only where the byte must change. spdOut = byte per row on channel 0 (-1 = none); kept only when a
+  // replay of the driver (acc >= speed -> new row, acc -= speed; acc += 2 per frame) matches every row on both passes.
+  let spdOut: number[][] | null = null;
+  if ((m.grooves ?? []).length && tempoBase === 150 && spdMul === 1) {
+    const k = 2, out = rowSpeed.map((row) => row.map(() => -1));
+    const rowLen = (sb: number, ph: number): number => Math.max(1, Math.ceil((sb - ph) / k));
+    let sb = -1, ph = 0;
+    for (let o = 0; o < endOrder; o++) for (let r = 0; r < rowSpeed[o].length; r++) {
+      const len = rowSpeed[o][r], next = rowSpeed[o][r + 1] ?? rowSpeed[o + 1]?.[0];
+      if (sb < 0 || (o === loopOrder && r === 0) || rowLen(sb, ph) !== len) {
+        // Of the bytes that give this row's length, take one that also gives the next row's (fewer ops later).
+        sb = ph + len * k;
+        for (let c = ph + len * k; c > ph + (len - 1) * k; c--) if (next !== undefined && rowLen(c, ph + len * k - c) === next) { sb = c; break; }
+        out[o][r] = sb;
+      }
+      ph += len * k - sb;
+    }
+    let ok = true; sb = -1; ph = 0;
+    for (const o of [...Array(endOrder).keys(), ...Array(endOrder - loopOrder).keys()].map((x, i) => (i < endOrder ? x : x + loopOrder)))
+      for (let r = 0; r < rowSpeed[o].length; r++) {
+        if (out[o][r] >= 0) sb = out[o][r];
+        if (sb > 127 || rowLen(sb, ph) !== rowSpeed[o][r]) ok = false;
+        ph += rowLen(sb, ph) * k - sb;
+      }
+    if (ok) { spdOut = out; spdMul = k; }
+  }
 
   // Instruments by first use; envelopes deduplicated by content.
   const insMap = new Map<number, number>();
@@ -613,7 +644,10 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         const tail: Array<number | { env: number }> = [];
         let delay = 0, noAttack = false, slide: number[] | null = null, rowByte: number[] | null = null;
         if (ch === 7 && o === 0 && r === 0) ops.push(0x55, 1); // saw volume shift: full (x4), so 0-15 spans the saw's 0-60
-        if (ch === 0 && (rowSpeed[o][r] !== lastSpd || (o === loopOrder && r === 0))) { ops.push(0x46, Math.min(255, rowSpeed[o][r] * spdMul)); lastSpd = rowSpeed[o][r]; }
+        if (ch === 0) {
+          const sb = spdOut ? spdOut[o][r] : rowSpeed[o][r] !== lastSpd || (o === loopOrder && r === 0) ? rowSpeed[o][r] * spdMul : -1;
+          if (sb >= 0) { ops.push(0x46, Math.min(255, sb)); lastSpd = rowSpeed[o][r]; }
+        }
         // Furnace stops a running 0Axy once the volume passes its maximum or drops below 0 (playback.cpp, unless noVolSlideReset).
         if (slideOps.length && slVol >= 0) {
           slVol += slStep * (rowFrame[o][r] - slFrame) / perTick;
