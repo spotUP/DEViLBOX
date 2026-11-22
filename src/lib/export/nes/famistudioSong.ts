@@ -769,12 +769,14 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           if (cell.volume >= 0) {
             if (ch === DPCM_CH) lossy.add('volume column on DPCM');
             else { slVol = cell.volume; furVol = Math.min(15, ch === 7 ? Math.round(cell.volume / 4) : cell.volume); /* VRC6 saw volume is 0-63 */ if (!hwVol && baked && n === 0 && bake) {
-              // The envelope holds bake x macro; Furnace now plays v x macro. After a finished macro that is v x L (L = its last
-              // value): send the FamiStudio channel volume c with table[c][bake x L] = v x L (table = floor(c * e / 15)).
-              const L = bake.vals[bake.vals.length - 1] ?? 15, e = scaleVol(bake.vol, L, m.compatFlags), want = scaleVol(furVol, L, m.compatFlags);
+              // The envelope holds bake x macro; Furnace now plays v x macro. Send the FamiStudio channel volume c (table =
+              // floor(c * e / 15)) with the least error over the macro frames still to play (after a finished macro: v x L only,
+              // L = its last value). Matching L alone while the macro runs silenced a decay to 0 (Future_Re-ference pulse 2).
+              const vals = bake.vals.length ? bake.vals : [15], rest = vals.slice(Math.min(seq[ri].frame - bake.frame, vals.length - 1));
+              const err = (c: number): number => rest.reduce((a, L) => a + Math.abs(Math.floor((c * scaleVol(bake!.vol, L, m.compatFlags)) / 15) - scaleVol(furVol, L, m.compatFlags)), 0);
               let c = 0;
-              while (c < 15 && Math.floor((c * e) / 15) !== want) c++;
-              if (bake.held || seq[ri].frame - bake.frame < bake.vals.length || Math.floor((c * e) / 15) !== want) lossy.add('volume column under a running baked volume macro');
+              for (let k = 1; k <= 15; k++) if (err(k) < err(c)) c = k;
+              if (bake.held || rest.length > 1 || err(c) > 0) lossy.add('volume column under a running baked volume macro');
               if (c !== lastVol) { ops.push(0x70 | c); lastVol = c; } // lastVol stays under 15, so the next baked note sends 15 again
             } else if (!hwVol && !(baked && n === 0) && cell.volume !== lastVol) { ops.push(0x70 | furVol); lastVol = cell.volume; } }
           }

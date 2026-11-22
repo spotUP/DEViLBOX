@@ -314,6 +314,16 @@ describe('furnaceToFamistudio', () => {
     expect(b.indexOf(0x7f, at)).toBeGreaterThan(at); // the row-12 note is baked again and sends 15
     expect(song.lossy.some((l) => l.includes('baked volume macro'))).toBe(false);
   });
+  it('picks the volume-only row level over the frames a running baked macro still plays (Future_Re-ference pulse 2)', () => {
+    // Speed 1, v8 x decay [15 12 9 6 3 0]; row 2 v4 lands on macro frame 2. Matching only the last value (0) sent c = 0
+    // (silence); over [9 6 3 0] Furnace plays 2 1 0 0 and c = 8 gives floor(8 * [4 3 1 0] / 15) = 2 1 0 0.
+    const m = nesModule({ 0: { 0: { ...A4, instrument: 0, volume: 8 }, 2: { volume: 4 }, 12: { ...A4 } } }, { speed1: 1, speed2: 1 });
+    const vol = { code: 0, type: 0, mode: 0, speed: 1, delay: 0, length: 6, loop: 255, release: 255, data: [15, 12, 9, 6, 3, 0] };
+    Object.assign(m, { instruments: [{ type: 34, macros: [vol], amiga: { initSample: 0 } }] });
+    const b = [...furnaceToFamistudio(m).music];
+    expect(b.indexOf(0x78)).toBeGreaterThan(-1);
+    expect(b.indexOf(0x70)).toBe(-1);
+  });
   it('labels a 0Axy still running at the song end as lossy: the loop pass replays bytes written for no slide', () => {
     // Speed 1: 0A10 from v0 reaches only 4 by the end, so the loop target is entered with the slide on the second pass only.
     const song = furnaceToFamistudio(nesModule({ 0: { 0: { ...A4, volume: 0, ...fx(0x0a, 0x10) } } }, { speed1: 1, speed2: 1 }));
