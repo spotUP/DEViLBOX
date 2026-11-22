@@ -1,6 +1,6 @@
 // Headless check, Master System / Game Gear Banjo route: .fur -> furnaceToBanjo -> buildSmsRom -> MAME (write tap on the SN76489)
 // -> compare with the Furnace CLI -vgmout register stream of the same song (both decoded by tools/md-phase0/events.py).
-// Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/sms-rom-check.ts [--only <name>] [--failed] [--seconds N]
+// Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/sms-rom-check.ts [--only <name>] [--failed] [--seconds N] [--detail]
 // Songs: every .fur under public/data/songs/furnace whose only chip is one SN76489 (file id 0x03).
 // Results: test-data/sms-rom-check.json (skips songs whose input hash matches a recorded verdict).
 // MAME system: sg1000m3 (Mark III, plays SMS carts, needs no BIOS; `sms` needs a BIOS dump) or gamegear for songs whose system
@@ -31,6 +31,7 @@ type Ev = { t: number; ch: string; ev: string; v: string };
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : undefined;
 const failedOnly = args.includes('--failed');
+const detail = args.includes('--detail'); // print the out-of-tune note starts
 const SECONDS = args.includes('--seconds') ? Number(args[args.indexOf('--seconds') + 1]) : 10;
 
 const decode = (file: string): Ev[] =>
@@ -95,11 +96,9 @@ for (const file of walk(SONGS)) {
     const song = furnaceToBanjo(m, 0, LAYOUT);
     const gameGear = /game ?gear/i.test(m.systemName ?? '');
     const system = gameGear ? 'gamegear' : 'sg1000m3';
-    const rom = buildSmsRom(PLAYER, song.bytes, LAYOUT.song_data, gameGear);
-    // Banjo steps once per video frame; MAME's consoles are 60 Hz. A 50 Hz song is meant for a PAL console, so its MAME times are
-    // stretched to 50 Hz frames (MAME frame rate 59.922743 Hz) before the compare.
-    const pal = Math.abs(m.subsongs[0].hz - 50) < 0.5;
-    const got = starts(runMame(system, rom, dir, pal ? Math.ceil(SECONDS * 1.2) : SECONDS)).map((g) => (pal ? { ...g, t: (g.t * 59.922743) / 50 } : g)).filter((g) => g.t < SECONDS);
+    const rom = buildSmsRom(PLAYER, LAYOUT, song, gameGear);
+    // The player spreads the song's ticks over the console's frames, so a 50 Hz song plays at 50 Hz on MAME's 60 Hz consoles.
+    const got = starts(runMame(system, rom, dir, SECONDS)).filter((g) => g.t < SECONDS);
     v = { inputHash, file: rel, pass: got.length > 0, seconds: SECONDS, system, hz: m.subsongs[0].hz, romBytes: rom.length, lossy: song.lossy, mameStarts: got.length };
     if (existsSync(FURNACE)) {
       execFileSync(FURNACE, ['-console', '-nostatus', '-nocontrols', '-noreport', '-loglevel', 'error', '-loops', '0', '-vgmout', path.join(dir, 'f.vgm'), file], { stdio: 'ignore', timeout: 120000 });
@@ -107,7 +106,9 @@ for (const file of walk(SONGS)) {
       const pairs = want.map((w) => [w, got.find((g) => g.ch === w.ch && Math.abs(g.t - w.t) < 0.03)] as const).filter(([, g]) => g);
       // Pitch: tone-channel starts whose frequency is within a quarter tone (noise rates are not compared).
       const tone = pairs.filter(([w]) => w.ch !== 'NOISE' && w.hz > 0);
-      const inTune = tone.filter(([w, g]) => Math.abs(12 * Math.log2(g!.hz / w.hz)) < 0.5).length;
+      const cents = (w: Start, g: Start) => Math.round(1200 * Math.log2(g.hz / w.hz));
+      const inTune = tone.filter(([w, g]) => Math.abs(cents(w, g!)) < 50).length;
+      if (detail) for (const [w, g] of tone) if (Math.abs(cents(w, g!)) >= 50) console.log(`  ${w.t.toFixed(3)} ${w.ch} want ${w.hz.toFixed(1)} got ${g!.hz.toFixed(1)} Hz (${cents(w, g!)} cents)`);
       const pct = (a: number, b: number) => (b ? Math.round((a / b) * 10000) / 100 : 0);
       Object.assign(v, { furnaceStarts: want.length, keyOnMatch: pct(pairs.length, want.length), pitchMatch: pct(inTune, tone.length) });
     }

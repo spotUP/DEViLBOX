@@ -15,9 +15,21 @@ export interface BanjoLayout {
   banjo_mute_channel_sn: number;
   banjo_mute_all_sn: number;
   banjo_song_stop: number;
+  /** ROM file offset of song_data (bank * 0x4000 + window offset). */
+  song_rom: number;
+  /** ROM file offset of the player's song tick-rate byte. */
+  song_hz: number;
+  /** ROM file offset of the driver's SN76489 period table (sn_tone_lookup: 12 semitones x 16 fine steps, from A = 110 Hz). */
+  sn_tone_rom: number;
 }
 
-export interface BanjoSong { bytes: Uint8Array; lossy: string[] }
+/** hz: the whole-number tick rate the player steps the song at (it spreads the ticks over the console's 50 or 60 Hz frames). */
+/** hz: the whole-number tick rate the player steps the song at (it spreads the ticks over the console's 50 or 60 Hz frames).
+ *  tune: the song's tuning left after whole-semitone transposition, in semitones (0 <= tune < 1); smsRom.ts retunes the period table by it. */
+export interface BanjoSong { bytes: Uint8Array; lossy: string[]; hz: number; tune: number }
+
+/** The player's byte accumulator holds frame rate + tick rate, so the tick rate tops out here. */
+const MAX_HZ = 195;
 
 const SMS_FILE_ID = 0x03;
 export function banjoSystemsSupported(sys: readonly number[]): boolean {
@@ -74,7 +86,7 @@ function shortMacro(s: Seq, data: number[]): number[] {
 
 interface InsOut { flags: number; vol: number[] | null; arp: number[] | null; exType: number; ex: number[] | null }
 
-function convertInstrument(ins: FurnaceInstrument, version: number, lossy: Lossy): InsOut {
+function convertInstrument(ins: FurnaceInstrument, version: number, linear: boolean, lossy: Lossy): InsOut {
   const out: InsOut = { flags: 0, vol: null, arp: null, exType: 0, ex: null };
   for (const m of ins.macros) {
     if (m.length <= 0) continue;
@@ -85,7 +97,9 @@ function convertInstrument(ins: FurnaceInstrument, version: number, lossy: Lossy
     else if (out.ex === null) {
       out.exType = EX_TYPE[s.code] ?? s.code;
       let data = s.data;
-      if (s.code === MACRO_PITCH) data = data.map((v) => -Math.max(-128, Math.min(255, v)));
+      // Linear pitch: Furnace counts 1/128 semitone, Banjo adds a signed byte to the note in 1/256 semitone, both up = higher.
+      // Non-linear pitch moves the period, which has no note-domain equivalent: json2sms's negated value stays.
+      if (s.code === MACRO_PITCH) data = data.map((v) => (linear ? Math.max(-128, Math.min(127, 2 * v)) : -Math.max(-128, Math.min(255, v))));
       if (s.code === MACRO_DUTY) {
         const { body, delay } = stepped(s, data);
         for (let j = 0; j < body.length; j++) if (j === 0 || body[j] !== (body[j - 1] & 0x7f)) body[j] |= 0x80;
@@ -161,14 +175,16 @@ export function furnaceToBanjo(m: FurnaceModule, subsong: number, layout: BanjoL
   const speed1 = s.speedPattern?.length ? s.speedPattern[0] : s.speed1;
   const speed2 = s.speedPattern?.length ? (s.speedPattern[1] ?? s.speedPattern[0]) : s.speed2;
   // Banjo's SN table is fixed at A4 = 440 Hz: a song tuned elsewhere moves by whole semitones, the rest is reported.
-  const tuneSemis = 12 * Math.log2((m.tuning || 440) / 440), transpose = Math.round(tuneSemis);
-  const cents = Math.round((tuneSemis - transpose) * 100);
-  if (Math.abs(cents) >= 5) lossy.add(`tuning A4 = ${m.tuning} Hz: notes moved ${transpose} semitones, ${cents} cents off`);
-  if (Math.abs(s.hz - 60) > 0.5 && Math.abs(s.hz - 50) > 0.5) lossy.add(`tick rate ${s.hz} Hz: Banjo steps once per video frame`);
+  // Whole semitones move the notes; the rest (0..1 semitone, always raising pitch so periods stay in 10 bits) retunes the period table.
+  const tuneSemis = 12 * Math.log2((m.tuning || 440) / 440), transpose = Math.floor(tuneSemis + 1e-9);
+  const tune = Math.max(0, tuneSemis - transpose);
+  const hz = Math.max(1, Math.min(MAX_HZ, Math.round(s.hz)));
+  if (Math.abs(hz - s.hz) > 0.1) lossy.add(`tick rate ${s.hz} Hz played at ${hz} Hz`);
   const ordersLen = s.ordersLen;
   if (ordersLen > 255 || s.patLen > 255) throw new Error('Banjo export: more than 255 orders or rows per pattern');
 
-  const instruments = m.instruments.map((ins) => convertInstrument(ins, m.version, lossy));
+  const linear = Number(m.compatFlags?.linearPitch ?? 2) > 0;
+  const instruments = m.instruments.map((ins) => convertInstrument(ins, m.version, linear, lossy));
   const cellAt = (ch: number, pat: number, r: number) => m.patterns.get(`${subsong}_${ch}_${pat}`)?.rows[r];
 
   // Layout (json2sms order): header, mute-call table, macros, instruments, order pointers, order rows, patterns.
@@ -226,5 +242,5 @@ export function furnaceToBanjo(m: FurnaceModule, subsong: number, layout: BanjoL
   for (let o = 0; o < ordersLen; o++) for (let ch = 0; ch < CHANNELS; ch++) out.push(...w16(patAddr.get(`${ch}_${s.orders[ch]?.[o] ?? 0}`) ?? 0));
   for (const b of patBlobs) out.push(...b);
   if (base + out.length !== at) throw new Error('Banjo layout mismatch');
-  return { bytes: Uint8Array.from(out.map((x) => x & 0xff)), lossy: lossy.list() };
+  return { bytes: Uint8Array.from(out.map((x) => x & 0xff)), lossy: lossy.list(), hz, tune };
 }
