@@ -956,14 +956,25 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               // Linear pitch: Furnace offsets the pitch by (round(127 sin) * depth) >> 4 in 1/128 semitone and rounds the
               // unrounded period (measured on Sky Sanctuary: a depth-1 vibrato dips a period only above ~2 units), so offsets
               // are taken against the fractional base period, not the table's rounded one.
-              const P = pulsePeriod(src || 46), X = pulsePeriodRaw(src || 46);
+              const P0 = pulsePeriod(src || 46), X0 = pulsePeriodRaw(src || 46);
               // Furnace adds fine pitch (E5xx) and vibrato in 1/128 semitone and rounds once; the engine adds the sent fine
               // offset F to each step, so a step is taken at fine + vibrato minus F (rounding both apart was 1 off, one_sided_love).
-              const fp = fineRaw - 128, F = rnd(X * 2 ** (-fp / 1536)) - 1 - P;
+              const fp = fineRaw - 128, F = rnd(X0 * 2 ** (-fp / 1536)) - 1 - P0;
               // Step i shows the Furnace tick its 60 Hz frame holds, counted from the row's exact time (as the macros do):
               // floor(i / perTick) ignored a 56 Hz row firing up to half a frame off its tick and ran a frame late (Famitune1).
               const rowPh = seq[ri].t - seq[ri].frame;
+              // Under an arpeggio (00xy, or the instrument's arp macro) the pitch offset is added to the arp note the driver plays
+              // that frame, and a period offset scales with the note: take each frame's offset against its own arp note.
+              const arpV = arpXY !== 0 ? [0, arpXY >> 4, arpXY & 15] : null;
+              const arpAt = (i: number): number => {
+                if (arpV) return arpV[tickAtFrame(i, macroRate) % 3];
+                if (!insArp || !insArp.vals.length) return 0;
+                const a = insArp, L = a.vals.length;
+                return a.vals[i < L ? i : a.loop >= 0 ? a.loop + ((i - a.loop) % (L - a.loop)) : L - 1];
+              };
               vib = Array.from({ length: len }, (_, i) => {
+                const kn = n > 0 || arpV ? Math.max(1, Math.min(96, (src || 46) + arpAt(i))) : (src || 46);
+                const P = pulsePeriod(kn), X = pulsePeriodRaw(kn);
                 const phase = vibPos + x * (tickAtFrame(i, macroRate, rowPh) + 1);
                 if (!linear) return Math.round(-amp * Math.sin(2 * Math.PI * phase / 64));
                 // Furnace: vibTable = (short)(127 sin) truncates; pitch = ((depth * vibTable * vibratoFine(15)) >> 4) / 15, C division truncates.
