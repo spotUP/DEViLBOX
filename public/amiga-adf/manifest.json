@@ -470,29 +470,29 @@
     },
     "DIGI-Booster": {
       "adf": "DIGI-Booster.adf",
-      "adfSha256": "235ab68b817762ba417b7b48b048bd2b4a38f2c7152061bbc39d92ee2364c802",
+      "adfSha256": "dbf0dbb52cb5cbd48aeaf13b043ffa924dfb06b6276fdf3484faaf47a2fde904",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 48248,
+        "diskOffset": 49872,
         "maxBytes": 524288
       },
       "moduleLengthWord": {
-        "diskOffset": 48244,
+        "diskOffset": 49868,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 573024,
+        "diskOffset": 574648,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
       "chipArenaBytes": 845060,
       "memory": {
         "IMG_BASE": "0x100000",
-        "IMG_LEN": "0x8C000",
+        "IMG_LEN": "0x8C800",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0x18C000",
+        "BSS_BASE": "0x18C800",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0xCE504",
@@ -503,7 +503,7 @@
         "bytes": 521656
       },
       "sources": {
-        "tool": "6ad98888fc563b650cafa95616adbead9544588a94fc3756f182df5436a1cfb2",
+        "tool": "6a4a7814d47a44634c24c44abff6d6d58ef2873073d5b562df42a4676ca07b15",
         "player": "485b77266dba0b59f5f71de1beabde89c6396dc0e203f50ee38e068b9683f133"
       }
     },
@@ -665,29 +665,29 @@
     },
     "EMS-6": {
       "adf": "EMS-6.adf",
-      "adfSha256": "d968aefd2d8325cf835947e0b82ef2a068837226499713c4ecfef7ba2559d7a8",
+      "adfSha256": "031082bf79adf67620d66c03a0a924a57eba968c78f1fb96d2b38bcac8609e01",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 55160,
+        "diskOffset": 56784,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 55156,
+        "diskOffset": 56780,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 285020,
+        "diskOffset": 286644,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
       "chipArenaBytes": 375044,
       "memory": {
         "IMG_BASE": "0x100000",
-        "IMG_LEN": "0x45C00",
+        "IMG_LEN": "0x46200",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0x145C00",
+        "BSS_BASE": "0x146200",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x5B904",
@@ -698,7 +698,7 @@
         "bytes": 4094
       },
       "sources": {
-        "tool": "6ad98888fc563b650cafa95616adbead9544588a94fc3756f182df5436a1cfb2",
+        "tool": "6a4a7814d47a44634c24c44abff6d6d58ef2873073d5b562df42a4676ca07b15",
         "player": "40b48f7d514976d9e84585fd9a47b5075384caa0e27fe56ef537c4ee55710658"
       }
     },
