@@ -2216,6 +2216,26 @@ uade_msg_trap:
 ;     reported end (score.s end_song) and waits for a subsong request, so with
 ;     nothing here the music ended for good (FC, anthrox.fc). Re-post the
 ;     current subsong: the same latch the musicdisk path uses, so it loops.
+;*--- PORT: but an end in the first second is an EMPTY subsong (eco.gray
+;     subsong 0), same rule as the musicdisk branch above: step to the next
+;     subsong instead of looping silence. The host reference render
+;     (tools/uade-audit/uadeRenderCore.ts pickSoundingSubsong) uses the same
+;     rule, so both play the same subsong.
+        move.l  _uade_vbl_seen(pc),d1
+        sub.l   _uade_sub_vbl0(pc),d1
+        cmpi.l  #50,d1                  ; one second at 50 Hz
+        bhs.b   .sub_repost             ; a real ending: loop this subsong
+        move.l  _uade_sub_cur(pc),d1
+        cmp.l   _uade_sub_max(pc),d1
+        bge.b   .sub_repost             ; no subsong left: loop this one
+        addq.l  #1,d1
+        lea     _uade_sub_cur(pc),a0
+        move.l  d1,(a0)
+        lea     _uade_want_subsong(pc),a0
+        move.w  d1,(a0)
+.sub_repost:
+        lea     _uade_sub_vbl0(pc),a0
+        move.l  _uade_vbl_seen(pc),(a0) ; the (re)posted subsong starts its clock
         move.l  _uade_sub_cur(pc),$120.w
         move.l  #AMSG_SETSUBSONG,UADE_INPUT_MSG.w
         lea     _uade_reposted(pc),a0
@@ -2250,6 +2270,8 @@ uade_msg_trap:
         move.l  UADE_MSG+8,(a0)
         lea     _uade_sub_cur(pc),a0
         move.l  UADE_MSG+12,(a0)
+        lea     _uade_sub_vbl0(pc),a0   ; the empty-subsong clock starts here
+        move.l  _uade_vbl_seen(pc),(a0)
 ;*--- PORT: START AT THE MINIMUM SUBSONG, which is not always 0. score's
 ;     cursubsong is cleared to 0 on every switch (uade_do_switch step 1a) and
 ;     a module whose range starts higher then plays a subsong that does not
@@ -2813,6 +2835,7 @@ _uade_req_idx:          dc.w    0
 _uade_switch_frames:    dc.w    0       ; VBLs this switch has been running
         xdef    _uade_adv_ticks
 _uade_adv_ticks:        dc.l    0       ; VBLs since the last auto-advance
+_uade_sub_vbl0:         dc.l    0       ; _uade_vbl_seen when the current subsong was posted
         xdef    _uade_pump_seen
 _uade_pump_seen:        dc.l    0       ; main-loop liveness (see the pump)
         xdef    _uade_pending_song

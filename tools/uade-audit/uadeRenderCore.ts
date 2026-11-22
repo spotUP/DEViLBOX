@@ -33,6 +33,8 @@ export interface UADEModule {
   _uade_wasm_cleanup(): void;
   _uade_wasm_set_looping(loop: number): void;
   _uade_wasm_set_one_subsong(on: number): void;
+  /** Full IPC reset + replay of this subsong (entry.c uade_wasm_set_subsong). */
+  _uade_wasm_set_subsong(subsong: number): void;
   _uade_wasm_get_total_frames(): number;
   /** Put one file into the WASM filesystem so a player's DTP_ExtLoad can open it. */
   _uade_wasm_add_extra_file(namePtr: number, dataPtr: number, len: number): number;
@@ -242,6 +244,28 @@ export function channelsWithDma(mod: UADEModule, snapshotPtr: number): number {
 }
 
 /**
+ * The subsong a module with an EMPTY default subsong really plays: the first in
+ * min..max whose render lasts at least `minFrames` (one second). UADE's own
+ * default (load with subsong -1) came first and ended inside that second
+ * (eco.gray, FredGray: subsong 0 ends at once). The ADF's single-module
+ * song-end handler (third-party/amiga-adf/amiga/uade_glue.s, "EMPTY subsong")
+ * steps on by the same one-second rule, so the reference and the disk play the
+ * same subsong. undefined: no subsong lasts that long.
+ */
+export function pickSoundingSubsong<T extends { frames: number }>(
+  min: number,
+  max: number,
+  minFrames: number,
+  render: (subsong: number) => T,
+): T | undefined {
+  for (let s = min; s <= max; s++) {
+    const r = render(s);
+    if (r.frames >= minFrames) return r;
+  }
+  return undefined;
+}
+
+/**
  * Render `data` (a module file) to interleaved float32 samples. Loads into a
  * caller-supplied module instance (use a fresh one per file). One-subsong mode with
  * looping off, matching uade123 -1.
@@ -261,25 +285,28 @@ export async function renderToSamples(
   const { sampleRate, seconds } = opts;
   const chunkSize = opts.chunkSize ?? DEFAULT_CHUNK_SIZE;
 
-  const ptr = mod._malloc(data.byteLength);
-  if (!ptr) throw new Error('malloc failed for file data');
-  refreshHeap(mod);
-  mod.HEAPU8.set(data, ptr);
+  const hint = uadePlayerHint(filename);
+  const load = (): void => {
+    const ptr = mod._malloc(data.byteLength);
+    if (!ptr) throw new Error('malloc failed for file data');
+    refreshHeap(mod);
+    mod.HEAPU8.set(data, ptr);
 
-  filename = uadePlayerHint(filename);
-  const hintLen = filename.length * 4 + 1;
-  const hintPtr = mod._malloc(hintLen);
-  if (!hintPtr) { mod._free(ptr); throw new Error('malloc failed for filename hint'); }
-  mod.stringToUTF8(filename, hintPtr, hintLen);
+    const hintLen = hint.length * 4 + 1;
+    const hintPtr = mod._malloc(hintLen);
+    if (!hintPtr) { mod._free(ptr); throw new Error('malloc failed for filename hint'); }
+    mod.stringToUTF8(hint, hintPtr, hintLen);
 
-  mod._uade_wasm_stop();
-  mod._uade_wasm_set_looping(0);
-  mod._uade_wasm_set_one_subsong(1);
+    mod._uade_wasm_stop();
+    mod._uade_wasm_set_looping(0);
+    mod._uade_wasm_set_one_subsong(1);
 
-  const loadRet = mod._uade_wasm_load(ptr, data.byteLength, hintPtr);
-  mod._free(ptr);
-  mod._free(hintPtr);
-  if (loadRet !== 0) throw new Error(`_uade_wasm_load failed (ret=${loadRet})`);
+    const loadRet = mod._uade_wasm_load(ptr, data.byteLength, hintPtr);
+    mod._free(ptr);
+    mod._free(hintPtr);
+    if (loadRet !== 0) throw new Error(`_uade_wasm_load failed (ret=${loadRet})`);
+  };
+  load();
 
   const ptrL = mod._malloc(chunkSize * 4);
   const ptrR = mod._malloc(chunkSize * 4);
@@ -290,30 +317,45 @@ export async function renderToSamples(
   }
 
   const maxFrames = sampleRate * seconds;
-  const allSamples: number[] = [];
-  let totalFrames = 0;
 
   // _uade_wasm_render(): 1=ok, 0=song-ended, <0=error. L and R identical (mono mix).
-  while (totalFrames < maxFrames) {
-    const chunk = Math.min(chunkSize, maxFrames - totalFrames);
-    const ret = mod._uade_wasm_render(ptrL, ptrR, chunk);
-    if (ret <= 0) break;
-    refreshHeap(mod);
-    const heapF32 = new Float32Array(mod.HEAPU8.buffer);
-    const indexL = ptrL >> 2;
-    const indexR = ptrR >> 2;
-    for (let i = 0; i < chunk; i++) {
-      allSamples.push(heapF32[indexL + i]);
-      allSamples.push(heapF32[indexR + i]);
+  const renderLoop = (): RenderResult => {
+    const allSamples: number[] = [];
+    let totalFrames = 0;
+    while (totalFrames < maxFrames) {
+      const chunk = Math.min(chunkSize, maxFrames - totalFrames);
+      const ret = mod._uade_wasm_render(ptrL, ptrR, chunk);
+      if (ret <= 0) break;
+      refreshHeap(mod);
+      const heapF32 = new Float32Array(mod.HEAPU8.buffer);
+      const indexL = ptrL >> 2;
+      const indexR = ptrR >> 2;
+      for (let i = 0; i < chunk; i++) {
+        allSamples.push(heapF32[indexL + i]);
+        allSamples.push(heapF32[indexR + i]);
+      }
+      totalFrames += chunk;
+      opts.onChunk?.(mod, totalFrames);
     }
-    totalFrames += chunk;
-    opts.onChunk?.(mod, totalFrames);
+    return { samples: new Float32Array(allSamples), sampleRate, frames: totalFrames };
+  };
+
+  let result = renderLoop();
+  const minFrames = Math.min(sampleRate, maxFrames);
+  if (result.frames < minFrames) {
+    const meta = readMeta(mod);
+    result = pickSoundingSubsong(meta.subsongMin, meta.subsongMax, minFrames, (s) => {
+      // set_subsong is a no-op once the song ended (entry.c: !s_playing), so reload first.
+      load();
+      mod._uade_wasm_set_subsong(s);
+      return renderLoop();
+    }) ?? result;
   }
 
   mod._free(ptrL);
   mod._free(ptrR);
 
-  return { samples: new Float32Array(allSamples), sampleRate, frames: totalFrames };
+  return result;
 }
 
 /**

@@ -12,7 +12,6 @@ import { addCompanions, refreshHeap, type UADEModule } from './uadeRenderCore';
 export interface LogModule extends UADEModule {
   _uade_wasm_enable_paula_log(on: number): void;
   _uade_wasm_get_paula_log(outPtr: number, max: number): number;
-  _uade_wasm_set_subsong?(n: number): void;
 }
 
 /**
