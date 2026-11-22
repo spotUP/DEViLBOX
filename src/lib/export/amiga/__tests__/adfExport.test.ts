@@ -170,3 +170,26 @@ describe('adf slot patcher', () => {
     await expect(buildAdf(new Uint8Array(2000).fill(7), 'x.bin', manifest, async () => new Uint8Array())).rejects.toThrow(/No Amiga disk player/);
   });
 });
+
+describe('single-companion ExtLoad disks route by file name', () => {
+  const bytes = new Uint8Array(2048);
+  it.each([
+    ['turtle-ready.adsc', 'AudioSculpture'],
+    ['advantage tennis-intro.dum', 'Infogrames'],
+    ['jpn.virocop-14', 'JasonPage'],
+    ['dawnpatrol-sad.dat', 'PaulRobotham'],
+    ['fiendish freddys - songs.kh', 'KrisHatlelid'],
+  ])('%s -> %s', (file, name) => {
+    expect(adfTemplateFor(bytes, file)).toBe(name);
+    expect(manifest.templates[name].companionSlot).toBeDefined();
+  });
+  it('an AudioSculpture module with M.K. magic still takes the AudioSculpture disk', () => {
+    const mk = new Uint8Array(2048); mk.set([0x4d, 0x2e, 0x4b, 0x2e], 1080);
+    expect(adfTemplateFor(mk, 'turtle-ready.adsc')).toBe('AudioSculpture');
+  });
+  it('the companion lands in its slot', () => {
+    const e = manifest.templates.KrisHatlelid, t = tpl(e.adf);
+    const out = patchAdfSlot(t, e, new Uint8Array([1, 2, 3, 4]), new Uint8Array([9, 8, 7]));
+    expect([...out.slice(e.companionSlot!.diskOffset, e.companionSlot!.diskOffset + 3)]).toEqual([9, 8, 7]);
+  });
+});

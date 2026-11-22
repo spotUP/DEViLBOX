@@ -53,6 +53,11 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   // Tronic (dp / trc / tro / tronic) and AM-Composer (amc) have no magic either: isTronicFormat accepts any buffer, so only the eagleplayer.conf prefixes can tell them.
   if (/^(dp|trc|tro|tronic)\./.test(base) || /\.(dp|trc|tro|tronic)$/.test(base)) return 'Tronic';
   if (base.startsWith('amc.') || base.endsWith('.amc')) return 'AM-Composer';
+  // DTP_ExtLoad players with one companion file (name only; their modules have no magic). AudioSculpture is first: an .adsc can start with M.K.
+  if (/\.adsc$|^mod_adsc4\./.test(base)) return 'AudioSculpture';
+  if (/\.dum$/.test(base)) return 'Infogrames';
+  if (/^jpn\.|^jpnd\.|\.jpn$|\.jpnd$/.test(base)) return 'JasonPage';
+  if (/\.kh$/.test(base)) return 'KrisHatlelid';
   // Maximum Effect (MAX.<game> <tune>) has no magic either; the SMP.set file rides in the companion slot.
   if (base.startsWith('max.')) return 'Maximum_Effect';
   // Sound-FX: 'SONG' tag at $3c (the .sfx / sfx.* name alone is not enough, DefleMask sfx.dmf shares the prefix).
@@ -99,6 +104,8 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   if (isSonicArrangerFormat(m.buffer.slice(m.byteOffset, m.byteOffset + m.byteLength) as ArrayBuffer)) return 'SonicArranger';
   // TFMX: the mdat header magic (TFMX-SONG / TFMX_SONG / tfmxsong / TFMX 1.5); the smpl file rides in the companion slot.
   if (isTFMXFile(m.buffer.slice(m.byteOffset, m.byteOffset + m.byteLength) as ArrayBuffer)) return 'TFMX-Pro';
+  // PaulRobotham: .dat is too common a suffix for the top of the chain.
+  if (/\.dat$/.test(base)) return 'PaulRobotham';
   // Last: the hunk scan for the RIFFRAFF magic is the loosest of the detect functions.
   if (isRiffRaffFormat(m)) return 'RiffRaff';
   return null;
@@ -170,14 +177,18 @@ export async function exportLiveSongAdf(): Promise<AdfResult | null> {
   const { exportNativeFile } = await import('../moduleExportService');
   const native = await exportNativeFile();
   if (!native) return null;
-  // TFMX: the native export is the mdat only; the smpl file the importer kept goes in the companion slot.
-  let companion: Uint8Array | undefined;
-  const fromNative = native.companions?.find((c) => /^(smpl|smp)\.|^wantedteam\.bin$/i.test(c.name));
-  if (fromNative) companion = fromNative.data;
-  else {
+  // The native export is the module only; the companion the importer kept rides in the companion slot. TFMX smpl / Maximum Effect SMP.set /
+  // wantedteam.bin are told by name; a single-companion ExtLoad disk (AudioSculpture, Infogrames, JasonPage, PaulRobotham, KrisHatlelid) takes
+  // the song's one non-module companion.
+  const modBase = native.filename.split('/').pop() ?? '';
+  const all: { name: string; data: Uint8Array }[] = [...(native.companions ?? [])];
+  if (!all.length) {
     const { useFormatStore } = await import('@/stores/useFormatStore');
-    for (const [n, buf] of useFormatStore.getState().uadeCompanionFiles ?? []) if (/^(smpl|smp)\.|^wantedteam\.bin$/i.test(n.split('/').pop() ?? '')) companion = new Uint8Array(buf);
+    for (const [n, buf] of useFormatStore.getState().uadeCompanionFiles ?? []) all.push({ name: n, data: new Uint8Array(buf) });
   }
+  const isSmp = (n: string) => /^(smpl|smp)\.|^wantedteam\.bin$/i.test(n.split('/').pop() ?? '');
+  const others = all.filter((c) => (c.name.split('/').pop() ?? '') !== modBase);
+  const companion = (all.find((c) => isSmp(c.name)) ?? (others.length === 1 ? others[0] : undefined))?.data;
   const base = `${import.meta.env.BASE_URL}amiga-adf/`;
   const manifest = await (await fetch(`${base}manifest.json`)).json() as AdfManifest;
   return buildAdf(native.data, native.filename, manifest, async (f) => new Uint8Array(await (await fetch(`${base}${f}`)).arrayBuffer()), companion);
