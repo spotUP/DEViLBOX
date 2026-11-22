@@ -11,6 +11,7 @@ import { furnaceAyScrambleExportAvailable, ayScrambleTempoWarning, type AyScramb
 import { gbRomExportAvailable } from '@/lib/export/gb/gbExport';
 import { mdRomExportAvailable } from '@/lib/export/md/mdExport';
 import { smsRomExportAvailable } from '@/lib/export/sms/smsExport';
+import { pceRomExportAvailable } from '@/lib/export/pce/pceExport';
 import { nesRomExportAvailable, nesTempoWarning, type NesRegionChoice } from '@/lib/export/nes/nesExport';
 import { QUADTONE_PLATFORM } from '@lib/export/zx/zxQuadToneData';
 import { FURNACE_SNES_CHIP_ID } from '@/lib/export/tad/tadSongWriter';
@@ -43,7 +44,7 @@ import { saveFurFileWasm, saveFurTextWasm, loadFurFileWasm } from '@lib/import/w
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'gbRom' | 'mdRom' | 'smsRom' | 'ggRom' | 'snesRom' | 'nsfe' | 'tad' | 'adf';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'gbRom' | 'mdRom' | 'smsRom' | 'ggRom' | 'pceRom' | 'snesRom' | 'nsfe' | 'tad' | 'adf';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -94,6 +95,7 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   gbRom: '.gb',
   mdRom: '.bin',
   smsRom: '.sms',
+  pceRom: '.pce',
   ggRom: '.gg',
   snesRom: '.sfc',
   adf: '.adf',
@@ -449,6 +451,23 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
       setSmsRomBusy(false);
     }
   }, [metadata]);
+  // PC Engine HuCard (HuSIC driver).
+  const pceRomAvailable = pceRomExportAvailable(furnaceNative?.chipIds);
+  const [pceRomBusy, setPceRomBusy] = useState(false);
+  const handleExportPceRom = useCallback(async (downloadFn: (blob: Blob, filename: string) => void, onClose: () => void) => {
+    setPceRomBusy(true);
+    try {
+      const r = await (await import('@lib/export/pce/pceExport')).exportPceRom();
+      downloadFn(new Blob([r.rom as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.pce`);
+      notify.success(`PC Engine ROM exported (${r.rom.byteLength} bytes).`);
+      r.warnings.forEach((w) => notify.warning(w));
+      onClose();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'PC Engine export failed.');
+    } finally {
+      setPceRomBusy(false);
+    }
+  }, [metadata]);
   const [snesRomBusy, setSnesRomBusy] = useState(false);
   const handleExportSnesRom = useCallback(async (downloadFn: (blob: Blob, filename: string) => void, onClose: () => void) => {
     setSnesRomBusy(true);
@@ -736,6 +755,9 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportSmsRom,
     smsRomAvailable,
     smsRomBusy,
+    handleExportPceRom,
+    pceRomAvailable,
+    pceRomBusy,
     handleExportNsfe,
     nesRomAvailable,
     nesRegion,
