@@ -79,7 +79,7 @@ const empty = (): Cell => ({ note: 0, octave: 0, instrument: -1, volume: -1, eff
 /** One-order NES module, 16 rows; `cells[ch][row]` overrides empty cells. */
 function nesModule(cells: Record<number, Record<number, Partial<Cell>>>, subsong: Record<string, number | number[][]> = {}): FurnaceModule {
   const patterns = new Map<string, { rows: Cell[] }>();
-  for (let ch = 0; ch < 5; ch++) patterns.set(`0_${ch}_0`, { rows: Array.from({ length: 16 }, (_, r) => ({ ...empty(), ...cells[ch]?.[r] })) });
+  for (let ch = 0; ch < 5; ch++) patterns.set(`0_${ch}_0`, { rows: Array.from({ length: Number(subsong.patLen ?? 16) }, (_, r) => ({ ...empty(), ...cells[ch]?.[r] })) });
   return {
     systems: [6],
     subsongs: [{ speed1: 6, speed2: 6, hz: 60, patLen: 16, ordersLen: 1, orders: [[0], [0], [0], [0], [0]], ...subsong }],
@@ -647,6 +647,32 @@ describe('furnaceToFamistudio', () => {
     };
     const out = furnaceToFamistudio(m).music;
     expect(has(out, env(0.2))).toBe(true);
+  });
+  it('keeps the note-phase arp override on triangle instruments past the 64-instrument cap (noPhase copies)', () => {
+    // 50 Hz, speed 6: row r starts at frame 7.2 r, so rows 5k sit on phase 0 and rows 5k+1 on phase 0.2. 70 instruments x 2 phase copies pass the cap.
+    const rate = 50 / 60, N = 70, nv = convertFurnaceNoteValue({ ...empty(), ...A4 });
+    const arps = Array.from({ length: N }, (_, i) => [(i % 10) - 5, Math.floor(i / 10) - 4, 0, -2, -4]);
+    const cells: Record<number, Partial<Cell>> = {};
+    for (let i = 0; i < N; i++) { cells[5 * i] = { ...A4, instrument: i }; cells[5 * i + 1] = { ...A4, instrument: i }; }
+    const m = nesModule({ 2: cells }, { hz: 50, patLen: 5 * N });
+    Object.assign(m, { instruments: arps.map((arp) => ({ type: 34, macros: [{ code: 1, type: 0, mode: 0, speed: 1, delay: 0, length: arp.length, loop: 255, release: 255, data: arp }], amiga: { initSample: 0 } })) });
+    const env = (arp: number[], ph: number): number[] => {
+      const vals: number[] = [];
+      for (let f = 0; tickAtFrame(f, rate, ph) < arp.length || tickAtFrame(f - 1, rate, ph) < arp.length - 1; f++) vals.push(arp[Math.min(arp.length - 1, tickAtFrame(f, rate, ph))]);
+      return encodeEnvelope(vals, -1, -1, 'arp');
+    };
+    const song = furnaceToFamistudio(m);
+    expect(nv).toBeGreaterThan(0);
+    expect(song.lossy.some((l) => l.startsWith('macro start phase copies dropped'))).toBe(true);
+    // Every instrument has its phase-0.2 arp in the music: kept copies carry it, dropped ones get the per-note override.
+    for (const arp of arps) expect(has(song.music, env(arp, 0.2))).toBe(true);
+  });
+  it('falls back to the plain conversion when the phase-arp override would push oby1_ingame past the 16 KiB music area', async () => {
+    const buf = readFileSync(path.join(ROOT, 'public/data/songs/furnace/nes/oby1_ingame.fur'));
+    const song = furnaceToFamistudio(await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer));
+    expect(song.fme7).toBeFalsy();
+    expect(song.music.length).toBeLessThanOrEqual(META.musicCap); // plain 15836 B; with the override 17676 B
+    expect(song.lossy.some((l) => l.includes('to fit the'))).toBe(false);
   });
   it('reports a dpcmMode=false song sample note as PCM played as DPCM until an NES-type note switches Furnace to DPCM', () => {
     const pcmLossy = (insType: number): boolean => {
