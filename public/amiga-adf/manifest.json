@@ -1121,59 +1121,59 @@
     },
     "JochenHippel-7V": {
       "adf": "JochenHippel-7V.adf",
-      "adfSha256": "ffe001f67f3b7a11d9c7884edcc9a6ce6ca3162d53576582794c81fe2748c078",
-      "target": "a500",
-      "cpu": "68000",
+      "adfSha256": "0ab40ae7550d63cd9fbf2773c0d2f555a6c8b6a2b89dc0331a3896da0cffc3a6",
+      "target": "a1200",
+      "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 46660,
+        "diskOffset": 46668,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 46656,
+        "diskOffset": 46664,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 276530,
+        "diskOffset": 276538,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
       "chipArenaBytes": 383236,
       "memory": {
-        "IMG_BASE": "0xC18000",
+        "IMG_BASE": "0x100000",
         "IMG_LEN": "0x43A00",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC5BA00",
+        "BSS_BASE": "0x143A00",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x5D904",
-        "ENTRY": "0xC18000"
+        "ENTRY": "0x100000"
       },
       "provenWith": {
         "name": "ghostbattle_gameover.hip7",
         "bytes": 45394
       },
       "sources": {
-        "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
+        "tool": "2066d3eb6fc72b3b8d47a44bcb598d90d3145d2f9cb221975cb6864e886366e2",
         "player": "91f90a57be47174a401fe51ff20fdbe55d5f10dc8bd2f12b4bbfb182f8789b41"
       }
     },
     "JochenHippel-CoSo": {
       "adf": "JochenHippel-CoSo.adf",
-      "adfSha256": "948fc91d44645591402b945223bb1b3e81016af4336cf7d45cb54206cbb0203e",
+      "adfSha256": "dc9a6c4aec64069eab3742083e2e9e88a99b90da8bcdf514cead2daa25886ae2",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 42664,
+        "diskOffset": 42668,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 42660,
+        "diskOffset": 42664,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 272530,
+        "diskOffset": 272534,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -1193,7 +1193,7 @@
         "bytes": 24340
       },
       "sources": {
-        "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
+        "tool": "2066d3eb6fc72b3b8d47a44bcb598d90d3145d2f9cb221975cb6864e886366e2",
         "player": "d008b7a6bd2bbb7f1e281a64ff29a8e37db1d564ea130294317f4b5e86dc418f"
       }
     },
@@ -1647,20 +1647,20 @@
     },
     "Oktalyzer": {
       "adf": "Oktalyzer.adf",
-      "adfSha256": "062a546f2c3165a5983badb2ce0b8618573b88f108bcffb50fc448415db3ba21",
+      "adfSha256": "dcd6663f7e9464490f0b75fb8b4c29ccd3f71d1fd07ae2d1a6cc763af4ec8fb4",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 45768,
+        "diskOffset": 45772,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 45764,
+        "diskOffset": 45768,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 275638,
+        "diskOffset": 275642,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -1680,7 +1680,7 @@
         "bytes": 218296
       },
       "sources": {
-        "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
+        "tool": "2066d3eb6fc72b3b8d47a44bcb598d90d3145d2f9cb221975cb6864e886366e2",
         "player": "c0abc75d756f56eec22b3e191c56f272ff74a28001a53f56153e3cfea4fdd636"
       }
     },
