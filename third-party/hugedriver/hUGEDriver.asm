@@ -759,10 +759,31 @@ fx_call_routine:
 fx_set_pan:
     ret nz
 
-    ;; Pretty simple. The editor can create the correct value here without a bunch
-    ;; of bit shifting manually.
+    ;; DEViLBOX: per-channel pan (Furnace gb.cpp lastPan). C bit 4 = left, bit 0 = right for
+    ;; this channel only; both are shifted by the channel ID and merged into NR51, so one
+    ;; channel's pan no longer overwrites the others.
+    push bc
+    push de
     ld a, c
+    and $11
+    ld c, a
+    ld a, $11
+    inc b
+.shift:
+    dec b
+    jr z, .merge
+    sla a
+    sla c
+    jr .shift
+.merge:
+    cpl
+    ld d, a
+    ldh a, [rAUDTERM]
+    and d
+    or c
     ldh [rAUDTERM], a
+    pop de
+    pop bc
     ret
 
 

@@ -1,19 +1,21 @@
 ;; hUGETracker note table.
 ;; Written by SuperDisk 2019
 
-;; Gameboy sound frequences are represented as 11 byte periods.
-;; this note table was generated from http://www.devrs.com/gb/files/sndtab.html
+;; DEViLBOX: regenerated as 2048 - round(131072 / (440 * 2^((n - 33) / 12))), the per-note rounding
+;; the Furnace.app reference register streams show (cheap, snowdin, finger: notes 1, 2, 5, 7, 8, 36
+;; differ from the devrs sndtab table by one). Furnace dev258 DivPitchTable rounds per octave shift
+;; instead and gives 156, 262, 546, 710, 785, 1797 for those notes.
 
 dw 44
-dw 156
-dw 262
+dw 157
+dw 263
 dw 363
 dw 457
 dw 547
 dw 631
-dw 710
+dw 711
 dw 786
-dw 854
+dw 856
 dw 923
 dw 986
 dw 1046
@@ -28,7 +30,7 @@ dw 1417
 dw 1452
 dw 1486
 dw 1517
-dw 1546
+dw 1547
 dw 1575
 dw 1602
 dw 1627
@@ -65,7 +67,7 @@ dw 1974
 dw 1978
 dw 1982
 dw 1985
-dw 1988
+dw 1989
 dw 1992
 dw 1995
 dw 1998

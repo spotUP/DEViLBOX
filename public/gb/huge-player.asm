@@ -22,6 +22,14 @@ start:
     ldh [rAUDTERM], a       ; NR51: all channels to both sides (hUGE pans with effect 8)
     ld a, $77
     ldh [rAUDVOL], a        ; NR50: full master volume
+    xor a
+    ldh [rAUD3ENA], a       ; NR30: DAC off so wave RAM is writable
+    ld hl, _AUD3WAVERAM
+    ld c, 16
+.clear_wave:                ; wave RAM = zeros, as the Furnace reference assumes (DMG power-on is 00ff)
+    ld [hli], a
+    dec c
+    jr nz, .clear_wave
     ld hl, song
     call hUGE_init
     ld a, IEF_VBLANK

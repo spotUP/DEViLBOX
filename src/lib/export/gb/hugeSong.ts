@@ -33,8 +33,8 @@ const BASE = HUGE_SONG_BASE;
 /** hUGE note 0 is C_3 in hUGE naming = 65.4 Hz = Furnace C-2 (flat value 24). */
 const NOTE_OFFSET = 24;
 const VBLANK_HZ = 59.7275;
-const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3;
-const MACRO_NAMES: Record<number, string> = { 4: 'pitch', 5: 'ex1', 6: 'ex2', 7: 'ex3', 12: 'pan left', 13: 'pan right', 14: 'phase reset' };
+const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PAN = 12;
+const MACRO_NAMES: Record<number, string> = { 4: 'pitch', 5: 'ex1', 6: 'ex2', 7: 'ex3', 13: 'pan right', 14: 'phase reset' };
 const FX_NAMES: Record<number, string> = { 0x08: 'panning', 0x10: 'wave select', 0x11: 'noise length', 0x13: 'sweep time', 0x14: 'sweep direction', 0xe1: 'note slide up', 0xe2: 'note slide down', 0xe5: 'finetune', 0xff: 'stop song' };
 
 type Kind = 'duty' | 'wave' | 'noise';
@@ -56,19 +56,24 @@ function macro(ins: FurnaceInstrument, code: number): FurnaceMacro | undefined {
 }
 
 /** Per-tick table (arp in the note column, volume or duty in the effect column), max 32 rows. */
-function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy): number[] | undefined {
+function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy, waveNo: (w: number) => number): number[] | undefined {
   const arp = macro(ins, MACRO_ARP);
   const vol = kind === 'wave' ? undefined : macro(ins, MACRO_VOL);
   const duty = kind === 'duty' ? macro(ins, MACRO_DUTY) : undefined;
+  // Wave channel: wave macro -> table 9 (driver wave select + retrigger, as gb.cpp keys on after a
+  // wave change); volume macro -> table C on gbVolMap steps. Pan macro -> table 8 (per-channel NR51).
+  const waveM = kind === 'wave' && (macro(ins, MACRO_WAVE)?.length ?? 0) > 1 ? macro(ins, MACRO_WAVE) : undefined;
+  const wvol = kind === 'wave' ? macro(ins, MACRO_VOL) : undefined;
+  const pan = macro(ins, MACRO_PAN);
   // Duty beside a volume macro rides in effect C's param: bit 6 = duty changed, bits 5-4 = duty
   // (driver fx_table_volume). Noise duty (NR43 mode) has no such path.
   let dutyCol = vol && duty && kind === 'duty' ? duty : undefined;
-  const fx = vol ?? duty;
-  if (kind === 'wave' && macro(ins, MACRO_VOL)) lossy.add('wave channel volume macro');
-  if (kind === 'wave' && (macro(ins, MACRO_WAVE)?.length ?? 0) > 1) lossy.add('wave macro (wave changes per tick)');
+  const fx = vol ?? duty ?? waveM ?? wvol ?? pan;
+  if (wvol && fx !== wvol) lossy.add('wave channel volume macro beside a wave macro');
+  if (pan && fx !== pan) lossy.add('pan macro beside another macro (one table effect column)');
   for (const m of ins.macros) if (MACRO_NAMES[m.code] && m.length > 0) lossy.add(`${MACRO_NAMES[m.code]} macro`);
   const used = [arp, fx, dutyCol].filter((m): m is FurnaceMacro => !!m);
-  if (used.length === 0 || (used.every((m) => m.length === 1) && !arp)) return undefined;
+  if (used.length === 0 || (used.every((m) => m.length === 1) && !arp && fx !== pan && fx !== wvol)) return undefined;
   for (const m of used) if (m.delay > 0) lossy.add('macro delay');
   // Per-tick values from Furnace's DivMacroStruct::doMacro (sequence type): speed, release hold,
   // loop. Both macros step together until their joint state repeats; that repeat is the table loop.
@@ -115,7 +120,7 @@ function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy): number[] 
   let { loop, len } = sim;
   if (loop < 0 || len > 31) { lossy.add('macro longer than 31 table rows'); len = Math.min(len, 31); loop = len - 1; }
   const out: number[] = [];
-  let prevFx = -1, prevDuty = -1;
+  let prevFx = waveM && fx === waveM ? waveM.data[0] : -1, prevDuty = -1; // the instrument already loads wave data[0]
   // Extra row `len` is itself one tick. With a loop it replays the loop row and jumps on to the row
   // after it, so the loop period stays len - loop ticks and row 0 (the driver's key-on row, where
   // the volume latches with a retrigger) never runs again. Without a loop it holds the last values.
@@ -133,7 +138,13 @@ function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy): number[] 
     if (fx && (!extra || looped)) {
       const v = fxRows[Math.min(i, fxRows.length - 1)];
       const d = dutyCol ? dutyRows[Math.min(i, dutyRows.length - 1)] & 3 : -1;
-      if (v !== prevFx || d !== prevDuty) effect = fx === vol ? 0xc00 | (d !== prevDuty ? 0x40 | (d << 4) : 0) | (v & 15) : 0x900 | ((v & 3) << 6);
+      if (v !== prevFx || d !== prevDuty) {
+        effect = fx === vol ? 0xc00 | (d !== prevDuty ? 0x40 | (d << 4) : 0) | (v & 15)
+          : fx === duty ? 0x900 | ((v & 3) << 6)
+          : fx === waveM ? 0x900 | waveNo(v)
+          : fx === wvol ? 0xc00 | waveVol(v)
+          : 0x800 | (v & 2 ? 0x10 : 0) | (v & 1);
+      }
       prevFx = v;
       prevDuty = d;
     }
@@ -173,8 +184,13 @@ function waveTo4bit(w: FurnaceWavetable): number[] {
   return bytes;
 }
 
+/** CH3 volume 0-15 -> the hUGE C value whose driver quantisation (>=10, >=5, >0) lands on Furnace's gbVolMap step. */
+function waveVol(v: number): number {
+  return v >= 12 ? 15 : v >= 8 ? 9 : v >= 4 ? 4 : 0;
+}
+
 /** Furnace effect -> hUGE effect word, or undefined when it has no hUGE equivalent. */
-function mapEffect(type: number, value: number, kind: Kind, jumpTarget: (order: number) => number): number | undefined {
+function mapEffect(type: number, value: number, kind: Kind, jumpTarget: (order: number) => number, waveNo: (w: number) => number): number | undefined {
   const v = value & 0xff;
   switch (type) {
     case 0x00: return v === 0 ? undefined : v;
@@ -189,6 +205,9 @@ function mapEffect(type: number, value: number, kind: Kind, jumpTarget: (order: 
     case 0xec: return 0xe00 | v;
     case 0xed: return 0x700 | v;
     case 0x12: return kind === 'duty' ? 0x900 | ((v & 3) << 6) : undefined;
+    // gb.cpp: pan = (x ? left : 0) | (y ? right : 0), none -> both; driver fx_set_pan merges it per channel.
+    case 0x08: return 0x800 | (((v >> 4 ? 0x10 : 0) | (v & 15 ? 1 : 0)) || 0x11);
+    case 0x10: return kind === 'wave' ? 0x900 | waveNo(v) : undefined;
     default: return undefined;
   }
 }
@@ -223,6 +242,12 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
     return map.get(i)!;
   };
 
+  const waveIdx = new Map<number, number>();
+  const waveNo = (w: number): number => {
+    if (!waveIdx.has(w)) { if (waveIdx.size >= 16) { lossy.add('wavetables past 16'); return 0; } waveIdx.set(w, waveIdx.size); }
+    return waveIdx.get(w)!;
+  };
+
   // Pass 2: cells, 64-row chunks, deduplicated per pattern bytes.
   const patterns: number[][] = [];
   const patKey = new Map<string, number>();
@@ -251,13 +276,12 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
             if (cell.instrument >= 0 && note !== NO_NOTE) instr = insNo(kind, cell.instrument);
             const fxs = cell.effects.filter((e) => e.type >= 0);
             for (const e of fxs) {
-              const h = mapEffect(e.type, e.value, kind, (ord) => orderStart[ord] ?? 0);
+              const h = mapEffect(e.type, e.value, kind, (ord) => orderStart[ord] ?? 0, waveNo);
               if (h === undefined) { if (!(e.type === 0 && (e.value & 0xff) === 0)) lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}${FX_NAMES[e.type] ? ` (${FX_NAMES[e.type]})` : ''}`); continue; }
               if (effect < 0) effect = h; else lossy.add('second effect in one cell (hUGE has one effect column)');
             }
             if (cell.volume >= 0) {
-              if (kind === 'wave') lossy.add('wave channel volume column');
-              else if (effect < 0) effect = 0xc00 | (cell.volume & 15);
+              if (effect < 0) effect = 0xc00 | (kind === 'wave' ? waveVol(cell.volume & 15) : cell.volume & 15);
               else lossy.add('volume column beside an effect');
             }
           }
@@ -284,11 +308,6 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   // Instruments and tables.
   const tables: number[][] = [];
   const instrBytes: Record<Kind, number[][]> = { duty: [], wave: [], noise: [] };
-  const waveIdx = new Map<number, number>();
-  const waveNo = (w: number): number => {
-    if (!waveIdx.has(w)) { if (waveIdx.size >= 16) { lossy.add('wavetables past 16'); return 0; } waveIdx.set(w, waveIdx.size); }
-    return waveIdx.get(w)!;
-  };
   const tableRefs: Array<{ kind: Kind; slot: number; table: number }> = [];
   for (const kind of ['duty', 'wave', 'noise'] as Kind[]) {
     for (const [fi, hi] of insMap[kind]) {
@@ -296,7 +315,7 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
       if (!ins) continue;
       const { len, enable } = lengthBits(ins);
       const high = 0x80 | (enable ? 0x40 : 0);
-      const table = buildTable(ins, kind, lossy);
+      const table = buildTable(ins, kind, lossy, waveNo);
       if (table) tableRefs.push({ kind, slot: hi - 1, table: tables.push(table) - 1 });
       const duty0 = macro(ins, MACRO_DUTY)?.data[0] ?? 2;
       if (kind === 'duty') instrBytes.duty[hi - 1] = [0x00, ((duty0 & 3) << 6) | len, envelope(ins, lossy), 0, 0, high];
