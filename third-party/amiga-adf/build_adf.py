@@ -244,6 +244,7 @@ def main():
     # Hippel-7V bars: software mixer, screen.s reads the player's voice records.
     asm += ['-DHIP7V_VOICES=1'] if player == 'JochenHippel-7V' else []
     asm += ['-DOKT_VOICES=1'] if player == 'Oktalyzer' else []
+    asm += ['-DCOSO_VOICES=1'] if player == 'JochenHippel-CoSo' else []
     needs_020 = {l.split('\t')[0] for l in open(MIN_CPU_TSV) if l.strip() and not l.startswith('#')}
     target = a.target or ('a1200' if player in needs_020 else 'a500')
     t = TARGETS[target]

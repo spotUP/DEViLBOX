@@ -750,8 +750,10 @@ draw_bars:
         tst.w   drop
         bne.b   .v0
         ifnd    OKT_VOICES              ; Oktalyzer reads software words, needs no hook table
+        ifnd    COSO_VOICES
         move.l  a4,d1
         beq.b   .v0
+        endc
         endc
         ifnd    HIP7V_VOICES            ; 7V plays its mix on AUD3 only
         btst    d7,d6
@@ -770,6 +772,18 @@ draw_bars:
         beq.b   .v0
         move.w  (a0),d0
         else
+        ifd     COSO_VOICES
+; Hippel-CoSo: volume/period go out as long writes from the stack, no hookable store. Channel structs
+; (hipc_chanstruct_A18 etc.) are 4 x $54 bytes in hunk1; byte +$4F = instrument volume 0..64 (before master scale).
+; hunk0 data = base+8 ($424 bytes), hunk1 data = base+$430; struct0 at hunk1+$9fe -> volume byte base+$e7d.
+; shortcut: one CoSo player binary; channel 3 struct is swapped for lbL000B68 when the song uses the alt channel set.
+        move.w  d7,d1
+        mulu    #$54,d1
+        move.l  _uade_reloc_base,a0
+        add.w   d1,a0
+        moveq   #0,d0
+        move.b  $e7d(a0),d0
+        else
         ifd     OKT_VOICES
 ; Oktalyzer: per-channel volume word 0..64 at file $1a6+$12*k, hunk0 data at file $28 -> mem = file-$20,
 ; i.e. _uade_reloc_base+$186+$12*k (stale when the channel is skipped).
@@ -783,6 +797,7 @@ draw_bars:
         move.w  d7,d1
         mulu    chanstride,d1
         move.b  (a4,d1.w),d0
+        endc
         endc
         endc
         cmp.b   #64,d0
