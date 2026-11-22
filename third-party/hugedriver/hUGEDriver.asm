@@ -149,6 +149,8 @@ table_row4: db
 chvol_inv: ds 4
 last_kill: ds 4
 table_cur_row: db
+;; DEViLBOX: NRx1 length bits of the CH1/CH2 instrument; gb.cpp writes them with every duty change.
+nrx1_len: ds 2
 ds 4
 
 end_zero:
@@ -771,6 +773,10 @@ fx_set_pan:
 ;;; Destroy: AF
 fx_set_duty:
     ret nz
+    ;; DEViLBOX: CH1/CH2 keep the instrument's length bits (gb.cpp writes NRx1 = duty | 63 - soundLen).
+    ld a, b
+    cp 2
+    call c, duty_with_len
 
     ;; $900 = 12.5%
     ;; $940 = 25%
@@ -960,6 +966,28 @@ fx_table_volume:
     dec e
     jr nz, .mute
     ret c
+    ;; Param bit 6: bits 5-4 hold a duty macro value for NRx1 (CH1/CH2), changed this row.
+    bit 6, c
+    jr z, .no_duty
+    push bc
+    ld a, c
+    add a
+    add a
+    ld c, a
+    call duty_with_len
+    ld a, b
+    add a
+    add a
+    add b
+    add LOW(rAUD1LEN)
+    ld l, a
+    ld h, HIGH(rAUD1LEN)
+    ld [hl], c
+    pop bc
+.no_duty:
+    ld a, c
+    and $0F
+    ld c, a
     ;; A = channel volume
     ld a, LOW(chvol_inv)
     add b
@@ -1045,6 +1073,21 @@ fx_table_volume:
     jr nz, .kill
     ret
 
+;;; DEViLBOX: C = duty bits 7-6 of C | the instrument's NRx1 length bits. B = channel (< 2).
+;;; Destroy: AF HL
+duty_with_len:
+    ld a, LOW(nrx1_len)
+    add b
+    ld l, a
+    adc HIGH(nrx1_len)
+    sub l
+    ld h, a
+    ld a, c
+    and $C0
+    or [hl]
+    ld c, a
+    ret
+
 ;;; Processes effect C, "set volume".
 ;;; Param: B = Current channel ID (0 = CH1, 1 = CH2, etc.)
 ;;; Param: C = Volume to set the channel to
@@ -1054,7 +1097,7 @@ fx_set_volume:
     ret nz ; Return if we're not on tick zero.
     ;; DEViLBOX: D bit 0 is still set when a table row called us (do_effect.no_set_offset).
     bit 0, d
-    jr nz, fx_table_volume
+    jp nz, fx_table_volume
     ;; Pattern volume: remember it as the channel volume the table volume scales.
     ld a, LOW(chvol_inv)
     add b
@@ -1557,6 +1600,8 @@ ENDC
     ldh [rAUD1SWEEP], a
     ld a, [hl+]
     ldh [rAUD1LEN], a
+    and $3F
+    ld [nrx1_len], a
     ld a, [hl+]
     ldh [rAUD1ENV], a
     ld a, [hl+]
@@ -1621,6 +1666,8 @@ process_ch2:
 
     ld a, [hl+]
     ldh [rAUD2LEN], a
+    and $3F
+    ld [nrx1_len+1], a
     ld a, [hl+]
     ldh [rAUD2ENV], a
     ld a, [hl+]

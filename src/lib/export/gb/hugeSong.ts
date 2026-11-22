@@ -60,25 +60,62 @@ function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy): number[] 
   const arp = macro(ins, MACRO_ARP);
   const vol = kind === 'wave' ? undefined : macro(ins, MACRO_VOL);
   const duty = kind === 'duty' ? macro(ins, MACRO_DUTY) : undefined;
+  // Duty beside a volume macro rides in effect C's param: bit 6 = duty changed, bits 5-4 = duty
+  // (driver fx_table_volume). Noise duty (NR43 mode) has no such path.
+  let dutyCol = vol && duty && kind === 'duty' ? duty : undefined;
   const fx = vol ?? duty;
-  if (vol && duty && duty.length > 1) lossy.add('duty macro beside a volume macro (one table effect column)');
   if (kind === 'wave' && macro(ins, MACRO_VOL)) lossy.add('wave channel volume macro');
   if (kind === 'wave' && (macro(ins, MACRO_WAVE)?.length ?? 0) > 1) lossy.add('wave macro (wave changes per tick)');
   for (const m of ins.macros) if (MACRO_NAMES[m.code] && m.length > 0) lossy.add(`${MACRO_NAMES[m.code]} macro`);
-  const used = [arp, fx].filter((m): m is FurnaceMacro => !!m);
+  const used = [arp, fx, dutyCol].filter((m): m is FurnaceMacro => !!m);
   if (used.length === 0 || (used.every((m) => m.length === 1) && !arp)) return undefined;
   for (const m of used) if (m.delay > 0) lossy.add('macro delay');
-  // Expand macro speed (ticks per step) into rows.
-  const expand = (m: FurnaceMacro | undefined) => (m ? m.data.slice(0, m.length).flatMap((v) => Array(Math.max(1, m.speed)).fill(v) as number[]) : []);
-  const loopOf = (m: FurnaceMacro | undefined) => (m && m.loop < m.length && m.loop !== 255 ? m.loop * Math.max(1, m.speed) : -1);
-  const arpRows = expand(arp), fxRows = expand(fx);
-  let len = Math.max(arpRows.length, fxRows.length);
-  // Loop point: the longer macro's loop wins (the shorter one holds its last value).
-  const longer = arpRows.length >= fxRows.length ? arp : fx;
-  let loop = loopOf(longer);
-  if (len > 31) { lossy.add('macro longer than 31 table rows'); len = 31; if (loop >= len) loop = -1; }
+  // Per-tick values from Furnace's DivMacroStruct::doMacro (sequence type): speed, release hold,
+  // loop. Both macros step together until their joint state repeats; that repeat is the table loop.
+  type St = { pos: number; delay: number; has: boolean; val: number };
+  const step = (m: FurnaceMacro, s: St): St => {
+    if (s.delay > 0) return { ...s, delay: s.delay - 1 };
+    const len = m.length, loopP = m.loop < 0 ? 255 : m.loop, rel = m.release < 0 ? 255 : m.release;
+    const n: St = { ...s, delay: Math.max(1, m.speed) - 1 };
+    if (!n.has) return n;
+    n.val = m.data[n.pos++];
+    if (n.pos > rel) n.pos = loopP < len && loopP < rel ? loopP : n.pos - 1;
+    if (n.pos >= len) {
+      if (loopP < len && (loopP >= rel || rel >= len)) n.pos = loopP;
+      else n.has = false;
+    }
+    return n;
+  };
+  const key = (s: St | undefined) => (s ? `${s.pos},${s.delay},${s.has ? 1 : 0},${s.has ? '' : s.val}` : '');
+  const simulate = (dc: FurnaceMacro | undefined) => {
+    let sa: St | undefined = arp && { pos: 0, delay: 0, has: true, val: 0 };
+    let sf: St | undefined = fx && { pos: 0, delay: 0, has: true, val: 0 };
+    let sd: St | undefined = dc && { pos: 0, delay: 0, has: true, val: 0 };
+    const arpRows: number[] = [], fxRows: number[] = [], dutyRows: number[] = [];
+    const seen = new Map<string, number>();
+    let loop = -1;
+    for (let t = 0; t < 64; t++) {
+      const k = `${key(sa)}|${key(sf)}|${key(sd)}`;
+      const hit = seen.get(k);
+      if (hit !== undefined) { loop = hit; break; }
+      seen.set(k, t);
+      if (sa && arp) { sa = step(arp, sa); arpRows.push(sa.val); }
+      if (sf && fx) { sf = step(fx, sf); fxRows.push(sf.val); }
+      if (sd && dc) { sd = step(dc, sd); dutyRows.push(sd.val); }
+    }
+    return { arpRows, fxRows, dutyRows, loop, len: Math.max(arpRows.length, fxRows.length) };
+  };
+  let sim = simulate(dutyCol);
+  // The duty column multiplies the joint period; when that overflows the table, keep arp + volume exact.
+  if (dutyCol && (sim.loop < 0 || sim.len > 31)) {
+    const plain = simulate(undefined);
+    if (plain.loop >= 0 && plain.len <= 31) { lossy.add('duty macro beside a volume macro (joint period over 31 rows)'); dutyCol = undefined; sim = plain; }
+  }
+  const { arpRows, fxRows, dutyRows } = sim;
+  let { loop, len } = sim;
+  if (loop < 0 || len > 31) { lossy.add('macro longer than 31 table rows'); len = Math.min(len, 31); loop = len - 1; }
   const out: number[] = [];
-  let prevFx = -1;
+  let prevFx = -1, prevDuty = -1;
   // Extra row `len` is itself one tick. With a loop it replays the loop row and jumps on to the row
   // after it, so the loop period stays len - loop ticks and row 0 (the driver's key-on row, where
   // the volume latches with a retrigger) never runs again. Without a loop it holds the last values.
@@ -89,13 +126,16 @@ function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy): number[] 
     let note = NO_NOTE;
     if (arp) {
       const a = arpRows[Math.min(i, arpRows.length - 1)];
-      if (a & 0x40000000) { lossy.add('fixed-note arpeggio macro'); } else note = Math.max(0, Math.min(71, 36 + (a | 0)));
+      // Furnace calcArp: fixed when bit 30 differs from the sign bit
+      if ((a < 0) !== !!(a & 0x40000000)) { lossy.add('fixed-note arpeggio macro'); } else note = Math.max(0, Math.min(71, 36 + (a | 0)));
     }
     let effect = 0;
     if (fx && (!extra || looped)) {
       const v = fxRows[Math.min(i, fxRows.length - 1)];
-      if (v !== prevFx) effect = fx === vol ? 0xc00 | (v & 15) : 0x900 | ((v & 3) << 6);
+      const d = dutyCol ? dutyRows[Math.min(i, dutyRows.length - 1)] & 3 : -1;
+      if (v !== prevFx || d !== prevDuty) effect = fx === vol ? 0xc00 | (d !== prevDuty ? 0x40 | (d << 4) : 0) | (v & 15) : 0x900 | ((v & 3) << 6);
       prevFx = v;
+      prevDuty = d;
     }
     // hUGE jump field = target row + 1; row len + 1 does not exist, so loop = len - 1 jumps to itself.
     const jump = extra ? (looped ? Math.min(loop + 1, len) + 1 : len + 1) : 0;
@@ -123,10 +163,10 @@ function envelope(ins: FurnaceInstrument, lossy: Lossy): number {
 
 function waveTo4bit(w: FurnaceWavetable): number[] {
   const out: number[] = [];
-  const max = Math.max(1, w.height - 1);
+  // Furnace DivWaveSynth::changeWave1 (height = the file's wave max) then gb.cpp invertWave (default on).
   for (let i = 0; i < 32; i++) {
-    const v = w.data[Math.floor((i * w.width) / 32)] ?? 0;
-    out.push(Math.max(0, Math.min(15, Math.round((v * 15) / max))));
+    const v = w.height < 1 ? 0 : Math.trunc(((w.data[Math.floor((i * w.width) / 32)] ?? 0) * 15) / w.height);
+    out.push(15 ^ Math.max(0, Math.min(15, v)));
   }
   const bytes: number[] = [];
   for (let i = 0; i < 32; i += 2) bytes.push((out[i] << 4) | out[i + 1]);
@@ -202,7 +242,9 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
             if (nv === 253 || nv === 254) effect = 0xe00; // note off / release -> note cut now
             else if (nv === 255) lossy.add('macro release');
             else if (nv >= 0) {
-              const hn = nv - NOTE_OFFSET;
+              // Noise: gb.cpp NR43 = noiseTable[note - 60] and hUGE get_note_poly(n) equals noiseTable[n + 5],
+              // so the noise note sits 19 semitones above the tone mapping.
+              const hn = nv - NOTE_OFFSET + (kind === 'noise' ? 19 : 0);
               if (hn < 0 || hn > 71) lossy.add('note outside hUGE range C-2..B-7 (clamped)');
               note = Math.max(0, Math.min(71, hn));
             }
