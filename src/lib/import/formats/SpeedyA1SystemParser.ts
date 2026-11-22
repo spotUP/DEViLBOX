@@ -5,7 +5,8 @@
  * A note cell is [byte, delays, sample]; byte < 0x50 indexes the replayer's period table (0 entries are no note), 0x50..0xFE
  * is an effect and 0xFF ends the song. The grid is the order list as it plays: one display pattern per position. Every
  * played file pattern is a block of 16 carrier rows (the three file bytes), so unedited blocks encode back byte-exact;
- * `noteBytes` pair each note cell with its file byte for the exporter. Effects and delays are not shown or edited.
+ * `noteBytes` pair each note cell with its file byte for the exporter. Period slides 0x50/0x51 show as MOD 2xx/1xx
+ * (amount low byte; `columnBytes` name that byte); other effects and the delays are not shown or edited.
  * Pitch: the replayer writes the table period to Paula unchanged, so the grid note is periodToNote(period).
  */
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -23,6 +24,8 @@ const CELL_BYTES = 3;
 const ORDER_END = 0xffff;
 const END_CELL = 0xff;
 const EFFECT_FIRST = 0x50;
+/** Effect byte -> grid effect: 0x50 adds to the period every tick (pitch down, MOD 2xx), 0x51 subtracts (pitch up, MOD 1xx). */
+export const SA1_SLIDE_EFFTYP: Readonly<Record<number, number>> = { 0x50: 2, 0x51: 1 };
 const TAG = 0x200;
 const FORM_TAG = 0x464f524d;
 const TABLES_TO_FORM = 0x280;
@@ -70,6 +73,7 @@ export function parseSpeedyA1File(buffer: ArrayBuffer, filename: string): Tracke
   const patterns: Pattern[] = [];
   const blocks = new Set<number>(); // played file pattern numbers
   const noteBytes: NonNullable<UADEVariablePatternLayout['noteBytes']> = [];
+  const columnBytes: NonNullable<UADEVariablePatternLayout['columnBytes']> = [];
   const usedInstruments = new Set<number>();
   for (let position = start, walked = 0; walked < MAX_POSITIONS; walked++) {
     const nums = [0, 1, 2, 3].map((v) => u16(buf, ORDER_OFFSET + position * 8 + v * 2));
@@ -85,6 +89,12 @@ export function parseSpeedyA1File(buffer: ArrayBuffer, filename: string): Tracke
         blocks.add(n);
         const rows = Array.from({ length: Math.max(1, length) }, (_, row): TrackerCell => {
           const offset = PATTERNS_OFFSET + n * PATTERN_BYTES + row * CELL_BYTES;
+          const slide = SA1_SLIDE_EFFTYP[buf[offset]];
+          if (slide) {
+            // amount = (second << 8) | third, added to / subtracted from the period every tick; the grid shows the low byte
+            columnBytes.push({ pattern: pi, channel: ch, row, offset: offset + 2, fields: ['effTyp', 'eff'] });
+            return { ...emptyCell(), effTyp: slide, eff: buf[offset + 2] };
+          }
           const note = length > 0 ? speedyA1GridNote(buf[offset]) : 0;
           if (note === 0) return emptyCell();
           const sample = buf[offset + 2];
@@ -119,6 +129,7 @@ export function parseSpeedyA1File(buffer: ArrayBuffer, filename: string): Tracke
       return { ...emptyCell(), cutoff: CELL_BYTES, period: buf[p], pan: buf[p + 1], resonance: buf[p + 2] } as TrackerCell;
     })),
     noteBytes,
+    columnBytes,
     propagateSharedCells: true,
   } : undefined;
 

@@ -70,4 +70,25 @@ describe('Speedy A1 System grid and export', () => {
     const re = parseSpeedyA1File(data.slice().buffer as ArrayBuffer, NAME);
     expect(re.patterns[x.pattern].channels[x.channel].rows[x.row].note).toBe(x.note + 1);
   });
+
+  it('period slides 0x50/0x51 show as 2xx/1xx and an edited amount reaches the file', async () => {
+    const song = load();
+    const cols = song.uadeVariableLayout!.columnBytes!;
+    expect(cols.length).toBeGreaterThan(50);
+    for (const c of cols) {
+      const cell = song.patterns[c.pattern].channels[c.channel].rows[c.row];
+      expect(cell.effTyp).toBe(bytes[c.offset - 2] === 0x50 ? 2 : 1);
+      expect(cell.eff).toBe(bytes[c.offset]);
+    }
+    setGridBaseline(baselineOf(song.patterns));
+    const c = cols.find((y) => bytes[y.offset - 2] === 0x50)!;
+    // a file cell played several times: every grid cell of it carries the edit
+    for (const z of cols.filter((q) => q.offset === c.offset)) song.patterns[z.pattern].channels[z.channel].rows[z.row].eff = 7;
+    const r = await exportSpeedyA1(song);
+    expect(r.warnings).toEqual([]);
+    expect(diffAt(r.data, bytes)).toEqual([c.offset]);
+    expect(r.data[c.offset]).toBe(7);
+    const re = parseSpeedyA1File(r.data.slice().buffer as ArrayBuffer, NAME);
+    expect(re.patterns[c.pattern].channels[c.channel].rows[c.row].eff).toBe(7);
+  });
 });
