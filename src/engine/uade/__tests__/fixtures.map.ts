@@ -113,7 +113,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "rtm", fixture: "public/data/songs/formats/odyssey.rtm", kind: "variable" },
   { formatId: "s3m", fixture: "public/data/songs/formats/andante.s3m", kind: "variable" },
   { formatId: "scumm", fixture: "public/data/songs/formats/zaktitle.scumm", kind: "variable" },
-  { formatId: "seanConnolly", fixture: "public/data/songs/formats/surf_ninjas.scn", kind: "fixed" },
+  { formatId: "seanConnolly", fixture: "public/data/songs/formats/surf_ninjas.scn", kind: "variable" },
   { formatId: "sidmon1", fixture: "public/data/songs/formats/anarchy.sid1", kind: "fixed" },
   { formatId: "sidMon2", fixture: "public/data/songs/formats/bruno_time.sid2", kind: "variable" },
   { formatId: "sonicArranger", fixture: "public/data/songs/formats/almighty.sa", kind: "fixed" },

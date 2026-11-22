@@ -8,6 +8,14 @@
       "matchPct": 1,
       "cells": 35
     },
+    "anders0land": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 147
+    },
     "artOfNoise": {
       "kind": "fixed",
       "method": "decode-encode",
@@ -32,29 +40,21 @@
       "matchPct": 1,
       "cells": 47
     },
-    "anders0land": {
-      "kind": "fixed",
-      "method": "decode-encode",
-      "status": "byte-exact",
-      "byteExact": true,
-      "matchPct": 1,
-      "cells": 147
-    },
     "coreDesign": {
       "kind": "fixed",
       "method": "decode-encode",
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 921
+      "cells": 317
     },
     "customMade": {
       "kind": "fixed",
-      "method": "decode-encode",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.0664,
-      "cells": 256
+      "method": "encode-parsed",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 1033
     },
     "daveLowe": {
       "kind": "variable",
@@ -126,7 +126,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 1792
+      "cells": 2048
     },
     "faceTheMusic": {
       "kind": "variable",
@@ -142,7 +142,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 262144
+      "cells": 29696
     },
     "fashionTracker": {
       "kind": "fixed",
@@ -150,7 +150,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 16640
+      "cells": 2560
     },
     "format669": {
       "kind": "fixed",
@@ -165,8 +165,8 @@
       "method": "decode-encode",
       "status": "lossy",
       "byteExact": false,
-      "matchPct": 0.2148,
-      "cells": 256
+      "matchPct": 0.2431,
+      "cells": 255
     },
     "futureComposer": {
       "kind": "fixed",
@@ -230,7 +230,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 2048
+      "cells": 1920
     },
     "hivelyHVL": {
       "kind": "variable",
@@ -254,7 +254,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 999
+      "cells": 42
     },
     "inStereo2": {
       "kind": "fixed",
@@ -293,8 +293,8 @@
       "method": "decode-encode",
       "status": "lossy",
       "byteExact": false,
-      "matchPct": 0.3984,
-      "cells": 256
+      "matchPct": 0.5255,
+      "cells": 255
     },
     "jasonPage": {
       "kind": "variable",
@@ -334,7 +334,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 34
+      "cells": 16
     },
     "markII": {
       "kind": "variable",
@@ -382,7 +382,15 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 40704
+      "cells": 35712
+    },
+    "multiMediaSound": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 3584
     },
     "musicAssembler": {
       "kind": "variable",
@@ -422,7 +430,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 16
+      "cells": 9
     },
     "paulSummers": {
       "kind": "variable",
@@ -438,7 +446,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 12288
+      "cells": 8767
     },
     "psa": {
       "kind": "fixed",
@@ -521,12 +529,12 @@
       "cells": 4
     },
     "seanConnolly": {
-      "kind": "fixed",
-      "method": "decode-encode",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.293,
-      "cells": 256
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 12
     },
     "sidmon1": {
       "kind": "fixed",
@@ -534,7 +542,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 1536
+      "cells": 2064
     },
     "sidMon2": {
       "kind": "variable",
@@ -590,7 +598,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 398
+      "cells": 387
     },
     "soundfx": {
       "kind": "fixed",
@@ -686,7 +694,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 144
+      "cells": 3908
     },
     "tcbTracker": {
       "kind": "fixed",
@@ -702,7 +710,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 143
+      "cells": 142
     },
     "tfmx7v": {
       "kind": "fixed",
@@ -710,15 +718,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 24640
-    },
-    "multiMediaSound": {
-      "kind": "fixed",
-      "method": "decode-encode",
-      "status": "byte-exact",
-      "byteExact": true,
-      "matchPct": 1,
-      "cells": 3584
+      "cells": 224
     },
     "tme": {
       "kind": "fixed",
@@ -758,7 +758,7 @@
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 504
+      "cells": 1375
     },
     "xm": {
       "kind": "variable",

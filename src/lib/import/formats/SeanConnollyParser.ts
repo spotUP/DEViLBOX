@@ -10,9 +10,7 @@
 
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig, TrackerCell } from '@/types';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeSeanConnollyCell } from '@/engine/uade/encoders/SeanConnollyEncoder';
-import { decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { buildSeanConnollyGrid } from './SeanConnollyGrid';
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
@@ -99,17 +97,26 @@ export function parseSeanConnollyFile(buffer: ArrayBuffer, filename: string): Tr
     pan: 0,
   } as InstrumentConfig));
 
-  const uadePatternLayout: UADEPatternLayout = {
-    formatId: 'seanConnolly',
-    patternDataFileOffset: 0,
-    bytesPerCell: 4,
-    rowsPerPattern: ROWS,
-    numChannels: NUM_CHANNELS,
-    numPatterns: 1,
-    moduleSize: buffer.byteLength,
-    encodeCell: encodeSeanConnollyCell,
-    decodeCell: decodeMODCell,
-  };
+  const grid = buildSeanConnollyGrid(buf);
+  if (grid) {
+    return {
+      name: `${name} [Sean Connolly EMS]`,
+      format: 'MOD' as any,
+      patterns: [grid.pattern],
+      instruments,
+      songPositions: [0],
+      songLength: 1,
+      restartPosition: 0,
+      numChannels: NUM_CHANNELS,
+      initialSpeed: grid.rowTicks,
+      initialBPM: 125,
+      linearPeriods: false,
+      uadePlayerTickGrid: true,
+      uadeVariableLayout: grid.layout,
+      uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+      uadeEditableFileName: filename,
+    };
+  }
 
   return {
     name: `${name} [Sean Connolly EMS]`,
@@ -125,6 +132,5 @@ export function parseSeanConnollyFile(buffer: ArrayBuffer, filename: string): Tr
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
-    uadePatternLayout,
   };
 }
