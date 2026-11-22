@@ -9,6 +9,7 @@
 import { furnaceModuleExportAvailable } from '@/lib/export/FurnaceModuleExporter';
 import { furnaceAyScrambleExportAvailable, ayScrambleTempoWarning, type AyScrambleTarget } from '@/lib/export/FurnaceExporter';
 import { gbRomExportAvailable } from '@/lib/export/gb/gbExport';
+import { mdRomExportAvailable } from '@/lib/export/md/mdExport';
 import { nesRomExportAvailable, nesTempoWarning, type NesRegionChoice } from '@/lib/export/nes/nesExport';
 import { QUADTONE_PLATFORM } from '@lib/export/zx/zxQuadToneData';
 import { FURNACE_SNES_CHIP_ID } from '@/lib/export/tad/tadSongWriter';
@@ -41,7 +42,7 @@ import { saveFurFileWasm, saveFurTextWasm, loadFurFileWasm } from '@lib/import/w
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'gbRom' | 'nsfe' | 'tad' | 'adf';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'gbRom' | 'mdRom' | 'nsfe' | 'tad' | 'adf';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -90,6 +91,7 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   vectrexCart: '.bin',
   nesRom: '.nes',
   gbRom: '.gb',
+  mdRom: '.bin',
   adf: '.adf',
   nsfe: '.nsfe',
   tad: '.zip',
@@ -408,6 +410,23 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
       setGbRomBusy(false);
     }
   }, [metadata]);
+  // Mega Drive ROM (MDSDRV player).
+  const mdRomAvailable = mdRomExportAvailable(furnaceNative?.chipIds);
+  const [mdRomBusy, setMdRomBusy] = useState(false);
+  const handleExportMdRom = useCallback(async (downloadFn: (blob: Blob, filename: string) => void, onClose: () => void) => {
+    setMdRomBusy(true);
+    try {
+      const r = await (await import('@lib/export/md/mdExport')).exportMdRom();
+      downloadFn(new Blob([r.rom as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.bin`);
+      notify.success(`Mega Drive ROM exported (${r.rom.byteLength} bytes).`);
+      r.warnings.forEach((w) => notify.warning(w));
+      onClose();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Mega Drive export failed.');
+    } finally {
+      setMdRomBusy(false);
+    }
+  }, [metadata]);
   const handleExportNsfe = useCallback((d: (blob: Blob, filename: string) => void, c: () => void) => exportNes('nsfe', d, c), [exportNes]);
 
   const [zxBeeperReport, setZxBeeperReport] = useState<{ warnings: string[]; seconds: number } | null>(null);
@@ -673,6 +692,9 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportGbRom,
     gbRomAvailable,
     gbRomBusy,
+    handleExportMdRom,
+    mdRomAvailable,
+    mdRomBusy,
     handleExportNsfe,
     nesRomAvailable,
     nesRegion,
