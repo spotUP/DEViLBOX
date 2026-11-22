@@ -42,7 +42,7 @@ import { saveFurFileWasm, saveFurTextWasm, loadFurFileWasm } from '@lib/import/w
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'gbRom' | 'mdRom' | 'nsfe' | 'tad' | 'adf';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'gbRom' | 'mdRom' | 'snesRom' | 'nsfe' | 'tad' | 'adf';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -92,6 +92,7 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   nesRom: '.nes',
   gbRom: '.gb',
   mdRom: '.bin',
+  snesRom: '.sfc',
   adf: '.adf',
   nsfe: '.nsfe',
   tad: '.zip',
@@ -427,6 +428,22 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
       setMdRomBusy(false);
     }
   }, [metadata]);
+  const [snesRomBusy, setSnesRomBusy] = useState(false);
+  const handleExportSnesRom = useCallback(async (downloadFn: (blob: Blob, filename: string) => void, onClose: () => void) => {
+    setSnesRomBusy(true);
+    try {
+      const r = await (await import('@lib/export/moduleExportService')).exportTadProjectFile();
+      if (!r.ok || !r.playerRom) throw new Error(r.warnings.find((w) => w.includes('not built')) ?? 'The TAD compiler rejected the project; no SNES ROM was built.');
+      downloadFn(new Blob([r.playerRom as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.sfc`);
+      notify.success(`SNES ROM exported (${r.playerRom.byteLength} bytes). It plays the first song on boot.`);
+      r.warnings.forEach((w) => notify.warning(w));
+      onClose();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'SNES ROM export failed.');
+    } finally {
+      setSnesRomBusy(false);
+    }
+  }, [metadata]);
   const handleExportNsfe = useCallback((d: (blob: Blob, filename: string) => void, c: () => void) => exportNes('nsfe', d, c), [exportNes]);
 
   const [zxBeeperReport, setZxBeeperReport] = useState<{ warnings: string[]; seconds: number } | null>(null);
@@ -711,6 +728,8 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     zxQuadToneReport,
     zxBeeperReport,
     handleExportTad,
+    handleExportSnesRom,
+    snesRomBusy,
     tadAvailable,
     tadReport,
     furnaceAyAvailable,

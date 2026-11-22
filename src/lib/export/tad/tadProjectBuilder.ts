@@ -55,6 +55,8 @@ export interface TadBuildResult {
   ok: boolean;
   songs: string[];
   soundEffects: string[];
+  /** The DEViLBOX LoROM player ROM (build/player.sfc) with the songs injected; absent when the build or injection failed. */
+  playerRom?: Uint8Array;
 }
 
 // TAD names must not start with a digit.
@@ -236,7 +238,9 @@ async function buildTadProjectOnce(files: TadBuildFile[], create: CreateTadCompi
           for (const [rom, name] of [['player-devilbox-lorom', 'player'], ['player-lorom', 'soundtest']] as const) {
             try {
               const [base, meta] = await Promise.all([loadAsset(`${rom}.sfc`), loadAsset(`${rom}.json`)]);
-              zip.file(`build/${name}.sfc`, injectTadPlayerRom(base, JSON.parse(new TextDecoder().decode(meta)) as TadPlayerRomMeta, exp, player));
+              const sfc = injectTadPlayerRom(base, JSON.parse(new TextDecoder().decode(meta)) as TadPlayerRomMeta, exp, player);
+              zip.file(`build/${name}.sfc`, sfc);
+              if (name === 'player') result.playerRom = sfc;
             } catch (e) { warnings.push(`${name}.sfc not built: ${(e as Error).message}`); }
           }
         }

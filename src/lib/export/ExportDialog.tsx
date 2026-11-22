@@ -111,6 +111,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         case 'furAy':
           return await ex.handleExportFurAy((b, n) => saveAs(b, n), onClose);
 
+        case 'snesRom':
+          return await ex.handleExportSnesRom((b, n) => saveAs(b, n), onClose);
         case 'tad':
           return await ex.handleExportTad((b, n) => saveAs(b, n), onClose);
 
@@ -508,6 +510,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     >
                       <FileMusic size={24} className="mx-auto mb-2" />
                       <div className="font-mono text-sm font-semibold break-words leading-tight">ZX Spectrum QuadTone (.tap)</div>
+                    </button>
+                  )}
+                  {ex.tadAvailable && (
+                    <button
+                      onClick={() => ex.setExportMode('snesRom')}
+                      className={`
+                        p-4 min-w-0 whitespace-normal rounded-lg border-2 transition-all text-center
+                        ${ex.exportMode === 'snesRom'
+                          ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                          : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                        }
+                      `}
+                    >
+                      <FileMusic size={24} className="mx-auto mb-2" />
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">SNES Cartridge (.sfc)</div>
                     </button>
                   )}
                   {ex.tadAvailable && (
@@ -1047,6 +1064,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : ex.exportMode === 'gbRom' ? '.gb'
                   : ex.exportMode === 'mdRom' ? '.bin'
                   : ex.exportMode === 'nsfe' ? '.nsfe'
+                  : ex.exportMode === 'snesRom' ? '.sfc'
                   : ex.exportMode === 'tad' ? '.zip'
                   : ex.exportMode === 'adf' ? '.adf'
                   : `.${ex.exportMode}.json`
