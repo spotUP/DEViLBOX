@@ -131,6 +131,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   piyoPiyo: 'public/data/songs/studio-pixel---piyopiyo/obj0176-1.pmd',
   davidWhittaker: 'public/data/songs/formats/apb.dw',
   robHubbard: 'public/data/songs/rob-hubbard/skateordie.rh',
+  jankoMrsicFlogel: 'public/data/songs/formats/spacestation.jmf',
   robHubbardST: 'public/data/songs/rob-hubbard-st/battleships.rho',
   benDaglish: 'public/data/songs/ben-daglish/motorhead-titleandingame.bd',
   synthDream: 'public/data/songs/formats/sdr.monsterbusiness_5',

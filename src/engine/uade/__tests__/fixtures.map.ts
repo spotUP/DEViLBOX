@@ -84,7 +84,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "infogrames", fixture: "public/data/songs/formats/bob4e.dum", kind: "fixed" },
   { formatId: "it", fixture: "public/data/songs/formats/absm chain mod.it", kind: "variable" },
   { formatId: "jamCracker", fixture: "public/data/songs/formats/analogue_vibes.jam", kind: "fixed" },
-  { formatId: "jankoMrsicFlogel", fixture: "public/data/songs/formats/spacestation.jmf", kind: "fixed" },
+  { formatId: "jankoMrsicFlogel", fixture: "public/data/songs/formats/spacestation.jmf", kind: "variable" },
   { formatId: "jasonBrooke", fixture: "public/data/songs/formats/Scott Johnston/sjs.jb", kind: "fixed" },
   { formatId: "jasonPage", fixture: "public/data/songs/formats/jpn.virocop-14", kind: "variable", parser: { module: "@lib/import/formats/JasonPageParser", parseFn: "parseJasonPageFile" } },
   { formatId: "klystrack", fixture: "public/data/songs/klystrack/Ocean Loader III.kt", kind: "variable" },
