@@ -137,7 +137,7 @@ export function parseSpeedyA1File(buffer: ArrayBuffer, filename: string): Tracke
     songLength: Math.max(1, songPositions.length),
     restartPosition: 0,
     numChannels: NUM_CHANNELS,
-    initialSpeed: 6,
+    initialSpeed: u32(buf, 0) + 1, // header speed long + 1 = ticks per row (sa_module.c)
     initialBPM: 125,
     linearPeriods: false,
     ...(layout ? { uadeVariableLayout: layout } : {}),

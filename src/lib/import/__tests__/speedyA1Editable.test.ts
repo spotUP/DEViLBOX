@@ -19,6 +19,10 @@ const diffAt = (a: Uint8Array, b: Uint8Array) => a.reduce<number[]>((l, v, k) =>
 const bytesOf = (note: number) => SA1_PERIODS.map((_, b) => b).filter((b) => speedyA1GridNote(b) === note);
 
 describe('Speedy A1 System grid and export', () => {
+  it('takes the speed from the header: ticks per row = header long + 1', () => {
+    expect(load().initialSpeed).toBe(3);
+  });
+
   it('recognises the module', () => {
     expect(isSpeedyA1Format(bytes)).toBe(true);
   });
