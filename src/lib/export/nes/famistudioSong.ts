@@ -1082,9 +1082,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             // A running 0Axy changes the channel volume every tick, so it cannot be baked into the envelope: FamiStudio slides it instead.
             baked = !hwVol && ch !== DPCM_CH && ch !== 2 && !!volMac && furVol < 15 && !slideOps.length;
             const key0 = (hwVol ? idx + 65536 * (1 + (envMode | (furVol << 2) | (lenIdx << 6))) : idx) + (baked ? KEY_BAKE * (1 + furVol) : 0);
-            // shortcut: the loop pass keeps phase-0 copies: its bytes rejoin first-pass rows (whose copies hold the first pass's phase) and
-            // replay them at a shifted song tick phase (Famitune1 loop pass regressed with copies); upgrade with phase-aware rejoin.
-            const key = pass2 ? key0 : phaseKey(key0, idx, seq[ri].t + delay * perTick - seq[ri].frame - Math.round(delay * perTick));
+            // The loop pass gets phase copies like the first pass; it rejoins first-pass bytes only when the loop shifts the song tick phase by a whole frame (else the replay plays first-pass phases).
+            const key = pass2 ? phaseKey(key0, idx, (seq[ri].t + delay * perTick) - Math.round(seq[ri].t + delay * perTick)) : phaseKey(key0, idx, seq[ri].t + delay * perTick - seq[ri].frame - Math.round(delay * perTick));
             if (baked) { const f = macroFrames(curIns!.macros.find((x) => x.code === MACRO_VOL && x.length > 0)!, 'vol', lossy, undefined, macroRate, m.version, keyPhase(key)); bake = { vol: furVol, vals: f.vals, held: f.loop >= 0 || f.release >= 0, loop: f.loop, release: f.release, frame: seq[ri].frame }; }
             if (key !== lastIns) { insOps.push(0x80 | (insNo(key) << 1)); lastIns = key; }
             if (ch < DPCM_CH && ch !== 2) {
@@ -1245,7 +1244,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         const sig = `${out.slice(startAt).join()}|${efx.slice(startEfx).map(([at, id]) => `${at - startAt}:${id}`).join()}`, post = snap();
         if (!pass2) { pass1.push({ at: startEmpty === 0 ? startAt : -1, sig, post }); continue; }
         if (!q || q.sig !== sig) run = null;
-        else if (run && q.post === post) { converge(run); break passes; }
+        else if (run && q.post === post && Math.abs((songEndT - rowFrameT[loopOrder][0]) - Math.round(songEndT - rowFrameT[loopOrder][0])) < 1e-3) { converge(run); break passes; }
       }
     }
     // Bytes equal to the song end: the copy from the run start is the first pass's. Else loop the loop-pass copy itself.
