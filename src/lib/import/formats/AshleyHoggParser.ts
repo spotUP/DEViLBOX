@@ -33,6 +33,7 @@ import type { InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { buildAshleyHoggOldGrid } from './AshleyHoggOldGrid';
 
 const MIN_FILE_SIZE = 20;
 
@@ -318,6 +319,21 @@ export function parseAshleyHoggFile(buffer: ArrayBuffer, filename: string): Trac
       originalInstrumentCount: instruments.length,
     },
   };
+
+  // Old family with readable tables: the tick grid replaces the placeholder pattern (AshleyHoggOldGrid.ts).
+  const grid = isOldFormat(buf) ? buildAshleyHoggOldGrid(buf) : null;
+  if (grid) {
+    return {
+      name: `${moduleName} [Ashley Hogg]`, format: 'MOD' as TrackerFormat,
+      patterns: [grid.pattern], instruments, songPositions: [0],
+      songLength: 1, restartPosition: 0, numChannels: 4,
+      initialSpeed: grid.rowTicks, initialBPM: 125, linearPeriods: false,
+      uadePlayerTickGrid: true,
+      uadeVariableLayout: grid.layout,
+      uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+      uadeEditableFileName: filename,
+    } as TrackerSong;
+  }
 
   return {
     name: `${moduleName} [Ashley Hogg]`, format: 'MOD' as TrackerFormat,

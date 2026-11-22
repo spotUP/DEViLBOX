@@ -108,6 +108,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   ims: 'public/data/songs/images-music-system/chip5.ims',
   stp: 'public/data/songs/formats/noname.stp',
   unic: 'public/data/songs/formats/african dreams.unic',
+  ashleyHogg: 'public/data/songs/ashley-hogg/ash.nobby the aardvark',
   mikeDavies: 'public/data/songs/mike-davies/strider.md',
   scumm: 'public/data/songs/formats/zaktitle.scumm',
   sunTronic: 'public/data/songs/formats/SUNTronicTunes/mule.src',

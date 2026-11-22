@@ -38,7 +38,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   // cell edits are written into the event bytes by the module model, not by a UADE cell layout.
   { formatId: "artOfNoise", fixture: "public/data/songs/art-of-noise/inside.blipp.aon", kind: "fixed" },
   { formatId: "ams", fixture: "public/data/songs/velvet-studio/kernel.ams", kind: "variable" },
-  { formatId: "ashleyHogg", fixture: "public/data/songs/ashley-hogg/ash.nobby the aardvark", kind: "fixed" },
+  { formatId: "ashleyHogg", fixture: "public/data/songs/ashley-hogg/ash.nobby the aardvark", kind: "variable" },
   { formatId: "deltaMusic2", fixture: "public/data/songs/delta-music-2/asperity megademo 3.dm2", kind: "fixed" },
   { formatId: "digiBoosterPro", fixture: "public/data/songs/digibooster-pro/invisibility.dbm", kind: "variable" },
   { formatId: "graoumfTracker2_gt2", fixture: "public/data/songs/graoumf-tracker-2/living-on-video.gt2", kind: "fixed" },

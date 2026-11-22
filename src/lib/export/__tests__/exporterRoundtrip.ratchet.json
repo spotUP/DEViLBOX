@@ -760,6 +760,14 @@
       "cells": 1268,
       "bytes": 1268
     },
+    "ashleyHogg": {
+      "exporter": "AshleyHoggExporter.exportAshleyHogg",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 38444,
+      "bytes": 38444
+    },
     "mikeDavies": {
       "exporter": "MikeDaviesExporter.exportMikeDavies",
       "tier": "byte-exact",

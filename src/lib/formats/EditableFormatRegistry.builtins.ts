@@ -109,6 +109,7 @@ registerEditableFormat({ formatId: "mdl", label: "", patternCodec: { kind: "vari
 registerEditableFormat({ formatId: "med_mmd0", label: "OctaMED", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "med_mmd1", label: "OctaMED", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "mfp", label: "Magnetic Fields Packer", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "ashleyHogg", label: "Ashley Hogg", patternCodec: { kind: "variable" }, exporter: { module: "AshleyHoggExporter", fn: "exportAshleyHogg", byLayout: true } });
 registerEditableFormat({ formatId: "mikeDavies", label: "Mike Davies", patternCodec: { kind: "variable" }, exporter: { module: "MikeDaviesExporter", fn: "exportMikeDavies", byLayout: true } });
 registerEditableFormat({ formatId: "mod", label: "MOD", patternCodec: { kind: "fixed" }, newSong: { template: "templates/protracker.mod", name: "ProTracker MOD" } });
 registerEditableFormat({ formatId: "mt2", label: "", patternCodec: { kind: "fixed" } });
