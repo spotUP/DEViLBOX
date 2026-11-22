@@ -79,21 +79,26 @@ function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy): number[] 
   if (len > 31) { lossy.add('macro longer than 31 table rows'); len = 31; if (loop >= len) loop = -1; }
   const out: number[] = [];
   let prevFx = -1;
+  // Extra row `len` is itself one tick. With a loop it replays the loop row and jumps on to the row
+  // after it, so the loop period stays len - loop ticks and row 0 (the driver's key-on row, where
+  // the volume latches with a retrigger) never runs again. Without a loop it holds the last values.
   for (let r = 0; r <= len; r++) {
-    const hold = r === len; // extra row holding the last values, jumps to itself or to the loop
-    const i = Math.min(r, len - 1);
+    const extra = r === len;
+    const looped = extra && loop >= 0;
+    const i = looped ? loop : Math.min(r, len - 1);
     let note = NO_NOTE;
     if (arp) {
       const a = arpRows[Math.min(i, arpRows.length - 1)];
       if (a & 0x40000000) { lossy.add('fixed-note arpeggio macro'); } else note = Math.max(0, Math.min(71, 36 + (a | 0)));
     }
     let effect = 0;
-    if (fx && !hold) {
+    if (fx && (!extra || looped)) {
       const v = fxRows[Math.min(i, fxRows.length - 1)];
-      if (v !== prevFx || r === loop) effect = fx === vol ? 0xc00 | (v & 15) : 0x900 | ((v & 3) << 6);
+      if (v !== prevFx) effect = fx === vol ? 0xc00 | (v & 15) : 0x900 | ((v & 3) << 6);
       prevFx = v;
     }
-    const jump = hold ? (loop >= 0 ? loop + 1 : len + 1) : 0;
+    // hUGE jump field = target row + 1; row len + 1 does not exist, so loop = len - 1 jumps to itself.
+    const jump = extra ? (looped ? Math.min(loop + 1, len) + 1 : len + 1) : 0;
     out.push(...dn(note, jump, effect));
   }
   return out;
@@ -111,7 +116,7 @@ function envelope(ins: FurnaceInstrument, lossy: Lossy): number {
   if (gb.hwSeqLen > 0) lossy.add('hardware sequence');
   if (gb.softEnv) {
     const v = macro(ins, MACRO_VOL)?.data[0] ?? 15;
-    return (v & 15) << 4;
+    return ((v & 15) << 4) | 8; // gb.cpp soft envelope: envDir 1, envLen 0
   }
   return ((gb.envVol & 15) << 4) | (gb.envDir ? 8 : 0) | (gb.envLen & 7);
 }

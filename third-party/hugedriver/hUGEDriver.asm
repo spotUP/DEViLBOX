@@ -144,6 +144,11 @@ vibrato_tremolo_phase4: db
 envelope4: db
 table4: dw
 table_row4: db
+;; DEViLBOX: Furnace soft-envelope volume. Channel volume stored as 15 - vol (zero-init = 15),
+;; then the last volume latched per channel (Furnace gb.cpp lastKill), then the table row being run.
+chvol_inv: ds 4
+last_kill: ds 4
+table_cur_row: db
 ds 4
 
 end_zero:
@@ -570,6 +575,7 @@ play_ch4_note:
 do_table:
     ;; Increment the current row
     ld a, [hl]
+    ld [table_cur_row], a
     inc [hl]
     push hl
 
@@ -937,6 +943,108 @@ note_cut:
     ret
 
 
+;;; DEViLBOX: effect C from an instrument table = Furnace soft-envelope volume macro (gb.cpp).
+;;; Output volume = channel volume * macro / 15. On the table's first row it latches with a
+;;; retrigger (Furnace key-on); later rows change the volume in zombie mode without a retrigger,
+;;; with Furnace's exact NRx2 write sequence. CH3 keeps the stock behaviour.
+;;; Param: B = channel, C = macro value. Destroy: AF BC DE HL
+fx_table_volume:
+    ld a, b
+    cp 2
+    jp z, fx_set_volume.orig
+    ld a, [mute_channels]
+    ld e, b
+    inc e
+.mute:
+    rrca
+    dec e
+    jr nz, .mute
+    ret c
+    ;; A = channel volume
+    ld a, LOW(chvol_inv)
+    add b
+    ld l, a
+    adc HIGH(chvol_inv)
+    sub l
+    ld h, a
+    ld a, [hl]
+    cpl
+    and $0F
+    ld e, a
+    ;; D = min(15, macro)
+    ld a, c
+    cp 16
+    jr c, .clamped
+    ld a, 15
+.clamped:
+    ld d, a
+    inc d
+    xor a
+    jr .mul_next
+.mul:
+    add e
+.mul_next:
+    dec d
+    jr nz, .mul
+    ld d, -1
+.div:
+    inc d
+    sub 15
+    jr nc, .div
+    ld c, d ; C = output volume
+    ;; HL = last_kill[channel]
+    inc hl
+    inc hl
+    inc hl
+    inc hl
+    ld a, [hl]
+    ld [hl], c
+    ld e, a ; E = previous latched volume
+    ;; HL = NRx2 of the channel ($FF12 + 5 * channel)
+    ld a, b
+    add a
+    add a
+    add b
+    add LOW(rAUD1ENV)
+    ld l, a
+    ld h, HIGH(rAUD1ENV)
+    ld a, [table_cur_row]
+    or a
+    jr nz, .zombie
+    ld a, c
+    swap a
+    or 8
+    ld [hl], a
+    ld a, b
+    or a
+    jp z, play_ch1_note
+    dec a
+    jp z, play_ch2_note
+    jp play_ch4_note
+.zombie:
+    ;; killDelta = (last - out + 1) mod 16, 0 meaning 16; 1 = no change.
+    ld a, e
+    sub c
+    inc a
+    and $0F
+    jr nz, .delta
+    ld a, 16
+.delta:
+    cp 1
+    ret z
+    ld e, a
+    ld a, c
+    swap a
+    or 8
+    ld [hl], a
+.kill:
+    ld [hl], $09
+    ld [hl], $11
+    ld [hl], $08
+    dec e
+    jr nz, .kill
+    ret
+
 ;;; Processes effect C, "set volume".
 ;;; Param: B = Current channel ID (0 = CH1, 1 = CH2, etc.)
 ;;; Param: C = Volume to set the channel to
@@ -944,7 +1052,21 @@ note_cut:
 ;;; Destroy: AF BC
 fx_set_volume:
     ret nz ; Return if we're not on tick zero.
-
+    ;; DEViLBOX: D bit 0 is still set when a table row called us (do_effect.no_set_offset).
+    bit 0, d
+    jr nz, fx_table_volume
+    ;; Pattern volume: remember it as the channel volume the table volume scales.
+    ld a, LOW(chvol_inv)
+    add b
+    ld l, a
+    adc HIGH(chvol_inv)
+    sub l
+    ld h, a
+    ld a, c
+    cpl
+    and $0F
+    ld [hl], a
+.orig:
     swap c
     ld a, [mute_channels]
     dec b
