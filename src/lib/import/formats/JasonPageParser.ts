@@ -305,6 +305,83 @@ export function isJasonPageFormat(buffer: ArrayBuffer, filename?: string): boole
   return detectVariant(buf) !== null;
 }
 
+
+// ── Script walk: every sample a Jason Page instrument script starts ──────────
+
+const s16 = (v: number): number => (v << 16) >> 16;
+
+/**
+ * Run an instrument script of the new (Graftgold) format as jp_voice.c execute()/jp_voice_output() do, for a bounded
+ * number of commands, and return each distinct (start, words) that reaches the Paula registers (address = sample start +
+ * 2 * words - loop bytes, length = words), as offsets into the sample file. The first entry is the note's attack.
+ * shortcut: sample-rewriting commands (copy, morph) are not modelled, only the registers they leave; fine for the
+ * address/length the keys need, upgrade if a song's keys need the rewritten bytes.
+ */
+function scriptSampleWrites(buf: Uint8Array, script: number, sampleOffsets: number[], mem: Uint8Array): Array<{ off: number; words: number; pcm: Uint8Array; volume: number }> {
+  const out: Array<{ off: number; words: number; pcm: Uint8Array; volume: number }> = [];
+  const emit = (start: number, words: number, loopBytes: number): void => {
+    if (loopBytes === 0 || words === 0) return;
+    const off = (start + 2 * words - loopBytes) & ~1;
+    if (!out.some(o => o.off === off && o.words === words)) out.push({ off, words, pcm: mem.slice(off, off + 2 * words), volume: Math.min(64, volume >> 10) });
+  };
+  let start = 0, base = 0, words = 0, loopBytes = 0;
+  let volume = 0; // the voice's 16-bit volume (jp_voice.c): the Paula register is volume >> 10
+  const stack: Array<{ count: number; back: number }> = [];
+  let pc = script;
+  for (let n = 0; n < 400 && out.length < 16 && pc + 1 < buf.length; n++) {
+    const cmd = buf[pc + 1];
+    const arg = u16BE(buf, pc + 2);
+    const arg32 = u32BE(buf, pc + 2);
+    pc += 2;
+    switch (cmd) {
+      case 2: { const o = sampleOffsets[arg]; if (o !== undefined) start = base = o; pc += 2; break; }
+      case 3: loopBytes = arg; words = arg >> 1; pc += 2; break;
+      case 4: loopBytes = arg32; if (arg32 !== 0) words = (arg32 & 0xffff) >> 1; pc += 4; break;
+      case 5: emit(start, words, loopBytes); pc += 2; break;
+      case 6: stack.push({ count: arg, back: pc + 2 }); pc += 2; break;
+      case 7: {
+        const top = stack[stack.length - 1];
+        if (!top) return out;
+        if (top.count !== 0 && --top.count === 0) stack.pop(); else pc = top.back;
+        break;
+      }
+      case 8: start = (start + arg32) >>> 0; pc += 4; break;
+      case 9: words = (words + (s16(arg) >> 1)) & 0xffff; pc += 2; break;
+      case 10: loopBytes = (loopBytes + arg32) >>> 0; pc += 4; break;
+      case 12: volume = (volume + arg) & 0xffff; pc += 2; break;
+      case 15: volume = arg; pc += 2; break;
+      case 19: { // envelope: the level the attack and decay ramps leave, where the hold and release phases start from
+        const ramp = (word: number, level: number, sign: number): number => {
+          for (let t = word & 0xff, rate = (word >> 8) << 8; t !== 0xff; t = (t - 1) & 0xff) {
+            const next = level + sign * rate;
+            if (sign > 0 ? next > 0xffff : rate > level) { level = sign > 0 ? 0xff00 : Math.max(0, next); break; }
+            level = next;
+            if (t === 0) break;
+          }
+          return level;
+        };
+        volume = ramp(u16BE(buf, pc + 2), ramp(arg, 0, 1), -1);
+        pc += 8; break;
+      }
+      case 11: case 13: case 14: case 20: case 21: pc += 2; break;
+      case 23: { // the voice's sample steps one unit per byte towards another sample's (jp_voice.c morph_sample)
+        const goal = sampleOffsets[arg];
+        if (goal !== undefined) for (let i = 0; i < 128; i++) { const g = mem[goal + i], n = mem[base + i]; mem[base + i] = n > g ? n - 1 : n < g ? n + 1 : n; }
+        pc += 2; break;
+      }
+      case 16: emit(start, words, loopBytes); break;
+      case 22: { // 128 bytes of one sample over the start of another (jp_voice.c copy_sample)
+        const from = sampleOffsets[buf[pc]], to = sampleOffsets[((buf[pc] * 4) & ~0xff) | buf[pc + 1]]; // source byte, target byte
+        if (from !== undefined && to !== undefined) mem.copyWithin(to, from, from + 128);
+        pc += 2; break;
+      }
+      case 18: emit(start, words, loopBytes); break;
+      default: emit(start, words, loopBytes); return out; // 0, 1 and 17 end the voice's script
+    }
+  }
+  return out;
+}
+
 // ── Main parser ─────────────────────────────────────────────────────────────
 
 /**
@@ -371,8 +448,30 @@ export async function parseJasonPageFile(
   // ── Sample extraction (Formats 1/2: sample length table in header) ───────
 
   const instruments: InstrumentConfig[] = [];
+  const grid = buildJasonPageGrid(buf, filename);
 
-  if ((variant === 1 || variant === 2) && buf.length >= 0x32) {
+  // Grid instrument n is the script instrument_table[n - 1] runs: each sample that script starts (address, length) is an
+  // instrument, the first one under the grid id (instrument & 0x7F + 1), the rest after it.
+  if (grid && (variant === 1 || variant === 2) && smpBuf) {
+    const smpTable = u16BE(buf, 2), instTable = u16BE(buf, 4), scriptBase = u16BE(buf, 6);
+    const offsets: number[] = [];
+    for (let at = smpTable, sum = 0; at + 4 <= u16BE(buf, 0x30); at += 4) { offsets.push(sum); sum += u32BE(buf, at); }
+    let extra = 128;
+    const mem = smpBuf.slice(); // the player rewrites sample bytes as it runs (copy and morph commands)
+    const make = (id: number, w: { off: number; words: number; pcm: Uint8Array; volume: number }): void => {
+      const pcm = w.pcm;
+      if (pcm.length < 2 * w.words || pcm.length <= 2) return;
+      instruments.push(createSamplerInstrument(id, '', pcm, w.volume, 8287, 0, pcm.length)); // the player loops the whole slice
+    };
+    for (const id of new Set(grid.placements.map(p => p.instrument)).values()) {
+      if (id <= 0) continue;
+      const scriptAt = scriptBase + ((u16BE(buf, instTable + (id - 1) * 2) << 16) >> 16);
+      const writes = scriptSampleWrites(buf, scriptAt, offsets, mem);
+      writes.forEach((w, k) => make(k === 0 ? id : ++extra, w));
+    }
+  }
+
+  if (instruments.length === 0 && (variant === 1 || variant === 2) && buf.length >= 0x32) {
     // Sample table: starts at base + word[2], extends to base + word[0x30]
     const smpTableOff = u16BE(buf, 2);
     const songSize = u16BE(buf, 0x30);
@@ -452,7 +551,6 @@ export async function parseJasonPageFile(
   // One row per sequencer step (every speed + 1 frames), read from subsong 0's own track lists and pattern bytes
   // (jasonPageGrid.ts, new format only). The patterns ride along byte-exact as carrier blocks; note edits are written
   // in place by JasonPageExporter. UADE plays the module.
-  const grid = buildJasonPageGrid(buf, filename);
   if (grid) {
     const R = JASON_PAGE_ROWS_PER_PATTERN;
     return {

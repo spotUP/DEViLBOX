@@ -49,10 +49,37 @@ describe('parseJasonPageFile — jpn.fire and ice-1', () => {
 
   it('extracts the real samples that follow unused slots (companion smp.fire and ice-1)', async () => {
     const smp = new Uint8Array(readFileSync(resolve(REF, 'jason-page/smp.fire and ice-1')));
-    const song = await parseJasonPageFile(loadBuf(FILE1), 'jpn.fire and ice-1', new Map([['smp.fire and ice-1', smp.buffer as ArrayBuffer]]));
     // Non-zero lengths in the table: 7004, 3386, 1556, 3306, 1288, 4x256, 3x128 = 17948 = size of the companion file
+    const d = new DataView(loadBuf(FILE1));
+    const lens: number[] = [];
+    for (let at = d.getUint16(2); at + 4 <= d.getUint16(0x30); at += 4) lens.push(d.getUint32(at));
+    expect(lens.filter(l => l > 0)).toHaveLength(12);
+    expect(lens.reduce((a, b) => a + b, 0)).toBe(smp.length);
+  });
+
+  it('adds script-walk instruments for each sample an instrument script starts (grid ids 1..128, extras from 129)', async () => {
+    const smp = new Uint8Array(readFileSync(resolve(REF, 'jason-page/smp.fire and ice-1')));
+    const song = await parseJasonPageFile(loadBuf(FILE1), 'jpn.fire and ice-1', new Map([['smp.fire and ice-1', smp.buffer as ArrayBuffer]]));
     const withPcm = song.instruments.filter(i => i.type === 'sample');
-    expect(withPcm).toHaveLength(12);
+    // measured: 7 script attack samples + 30 extras: 15 morph-rewritten 128-byte variants
+    // (bytes the player rewrites in RAM, so not in the file) and 15 eight-byte loop offsets inside the file
+    expect(withPcm).toHaveLength(37);
+    const extras = withPcm.filter(i => i.id >= 129);
+    expect(extras).toHaveLength(30);
+    expect(withPcm.filter(i => i.id <= 128)).toHaveLength(7);
+    const pcmOf = (i: (typeof withPcm)[number]): Uint8Array => {
+      const dv = new DataView(i.sample!.audioBuffer!);
+      return Uint8Array.from({ length: i.sample!.loopEnd }, (_, k) => (dv.getInt16(44 + 2 * k, true) >> 8) & 255);
+    };
+    const d = new DataView(loadBuf(FILE1));
+    let end = 0;
+    for (let at = d.getUint16(2); at + 4 <= d.getUint16(0x30); at += 4) end += d.getUint32(at);
+    const file = Buffer.from(smp);
+    const inFile = extras.filter(i => file.indexOf(pcmOf(i)) >= 0);
+    expect(end).toBe(smp.length); // every file offset lies inside one of the 12 real slots
+    expect(inFile).toHaveLength(15);
+    for (const i of extras) expect([8, 128]).toContain(i.sample!.loopEnd);
+    expect(extras.filter(i => !inFile.includes(i)).every(i => i.sample!.loopEnd === 128)).toBe(true);
   });
 
   it('leaves instruments unnamed (the format stores no names) and keeps every slot', async () => {

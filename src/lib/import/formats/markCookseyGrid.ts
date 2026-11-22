@@ -64,6 +64,10 @@ function findLea(buf: Uint8Array, from: number, to: number, lea: number, tail: n
 
 export interface MarkCookseyTables {
   song: number; sub: number; instrument: number; period: number;
+  /** Address the instrument record's sample and loop longs are relative to (`lea (pc),a1; move.l (a0)+,d0; beq; add.l a1,d0`). */
+  sampleBase: number;
+  /** Per voice, the volume scale in the replayer's variables at module start (record + 0x48); notes play at it until a 0x63 volume op. */
+  voiceScale: number[];
 }
 
 /** The replayer's tables, located from its own code; null when the module is not the D040 D040 4EFB format. */
@@ -77,12 +81,18 @@ export function findMarkCookseyTables(buf: Uint8Array): MarkCookseyTables | null
   const play = entry(0), init = entry(1);
   if (play < 0 || init < 0) return null;
   const song = findLea(buf, init, init + 64, 0x43fa, []);
-  const span = Math.min(buf.length, play + 0x800);
+  const span = Math.min(buf.length, play + 0x800); // covers the tick's 0x600 code span
   const sub = findLea(buf, play, span, 0x41fa, [0xd040, 0xd0c0, 0xd0d0]);
   const instrument = findLea(buf, play, span, 0x41fa, [0xd241, 0xd0c1, 0xd0d0]);
   const period = findLea(buf, play, span, 0x41fa, [0x302d, 0x005c, 0xd040]);
-  if ([song, sub, instrument, period].some(a => a <= 0 || a >= buf.length)) return null;
-  return { song, sub, instrument, period };
+  const sampleBase = findLea(buf, play, span, 0x43fa, [0x2018, 0x6702, 0xd089]);
+  if ([song, sub, instrument, period, sampleBase].some(a => a <= 0 || a >= buf.length)) return null;
+  // the variables record of voice i: `lea (pc),a3` (+4 header) stepped by the tick's `lea -N(a5),a5`
+  const state = findLea(buf, play, span, 0x47fa, []);
+  let stride = 0;
+  for (let o = play; o + 4 <= span; o += 2) if (u16(buf, o) === 0x4bed) { stride = -s16(u16(buf, o + 2)); break; }
+  const voiceScale = [0, 1, 2, 3].map(v => state > 0 && stride > 0 && state + 4 + v * stride + 0x4a <= buf.length ? u16(buf, state + 4 + v * stride + 0x48) : 0);
+  return { song, sub, instrument, period, sampleBase, voiceScale };
 }
 
 export function encodeMarkCookseyStream(rows: TrackerCell[]): Uint8Array {
@@ -94,6 +104,8 @@ export interface MarkCookseyPlacement {
   /** File offset of the stored note byte. */
   offset: number;
   note: number;
+  /** The voice's volume scale in force (the 0x63 op's byte, else the start snapshot). */
+  scale: number;
   /** Grid note minus the stored byte, for the transpose and instrument in force. */
   delta: number;
   instrument: number;
@@ -113,7 +125,7 @@ export interface MarkCookseyGrid {
 const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
 
 interface Frame { start: number; ret: number; count: number }
-interface VoiceWalk { pc: number; stack: Frame[]; transpose: number; tick: number; active: boolean; ended: boolean }
+interface VoiceWalk { pc: number; stack: Frame[]; transpose: number; scale: number; tick: number; active: boolean; ended: boolean }
 
 /** Build the grid of subsong 0 of a Mark Cooksey module; null when it is not one the walk can read. */
 export function buildMarkCookseyGrid(buf: Uint8Array, sourceFile: string): MarkCookseyGrid | null {
@@ -169,7 +181,7 @@ export function buildMarkCookseyGrid(buf: Uint8Array, sourceFile: string): MarkC
           const note = gridNote(byte + w.transpose, instr);
           if (note > 0) {
             timelines[voice][w.tick] = { ...emptyCell(), note, instrument: instr + 1 };
-            placements.push({ voice, tick: w.tick, offset: at, note, delta: note - byte, instrument: instr + 1 });
+            placements.push({ voice, tick: w.tick, offset: at, note, scale: w.scale, delta: note - byte, instrument: instr + 1 });
           }
         }
         return Math.max(buf[at + 2], 1);
@@ -206,7 +218,8 @@ export function buildMarkCookseyGrid(buf: Uint8Array, sourceFile: string): MarkC
           blockOf(target);
           continue;
         }
-        default: continue; // 0x63 volume, 0x69 / 0x6B portamento
+        case 0x63: w.scale = buf[at + 1]; continue;
+        default: continue; // 0x69 / 0x6B portamento
       }
       break;
     }
@@ -221,7 +234,7 @@ export function buildMarkCookseyGrid(buf: Uint8Array, sourceFile: string): MarkC
     const pc = (at + rel) >>> 0;
     if (pc >= buf.length) return null;
     blockOf(pc);
-    return { pc, stack: [], transpose: 0, tick: 0, active: true, ended: false };
+    return { pc, stack: [], transpose: 0, scale: t.voiceScale[ch], tick: 0, active: true, ended: false };
   });
   const runUntil = (voice: number, w: VoiceWalk, limit: number, firstPass: boolean): void => {
     while (w.active && w.tick < limit && !(firstPass && w.ended)) {

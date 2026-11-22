@@ -37,7 +37,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { UADEPatternLayout, UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { markCookseyEncoder } from '@/engine/uade/encoders/MarkCookseyEncoder';
-import { buildMarkCookseyGrid, MARK_COOKSEY_ROWS_PER_PATTERN } from './markCookseyGrid';
+import { buildMarkCookseyGrid, findMarkCookseyTables, MARK_COOKSEY_ROWS_PER_PATTERN } from './markCookseyGrid';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
@@ -416,6 +416,37 @@ export async function parseMarkCookseyFile(
   const grid = buildMarkCookseyGrid(buf, filename);
   if (grid) {
     const R = MARK_COOKSEY_ROWS_PER_PATTERN;
+    // The grid names an instrument by its record index + 1 (the replayer's own table), so the samples come from those
+    // records: sample long, loop long, then attack and loop lengths in words at +16 / +18 (checked against the Paula writes).
+    const tables = findMarkCookseyTables(buf);
+    if (tables) {
+      const w16 = (o: number) => (buf[o] << 8) | buf[o + 1];
+      const w32 = (o: number) => ((w16(o) << 16) | w16(o + 2)) >>> 0;
+      const top = grid.placements.reduce((m, pl) => Math.max(m, pl.instrument), 0);
+      for (let id = 1; id <= top; id++) {
+        const rec = tables.instrument + 2 * (id - 1) + ((w16(tables.instrument + 2 * (id - 1)) << 16) >> 16);
+        if (rec < 0 || rec + 24 > buf.length) continue;
+        // a zero loop long still reloads sampleBase + 0 (the Paula writes: the loop pair is sampleBase, 32 words of silence)
+        const at = w32(rec) === 0 ? 0 : tables.sampleBase + w32(rec), loopAt = tables.sampleBase + w32(rec + 4), attack = w16(rec + 16) * 2, loopLen = (w32(rec + 4) === 0 ? 32 : w16(rec + 18)) * 2; // no loop long: 32 words of sampleBase, measured on all four such records
+        if (at === 0 || attack === 0 || at + attack > buf.length) continue;
+        let pcm = buf.slice(at, at + attack), loopStart = 0, loopEnd = attack;
+        if (loopAt >= at && loopLen > 0 && loopAt + loopLen <= at + attack) { loopStart = loopAt - at; loopEnd = loopStart + loopLen; }
+        else if (loopAt > 0 && loopLen > 0 && loopAt + loopLen <= buf.length) {
+          // an attack with its loop elsewhere is one buffer: the attack, then the loop bytes
+          pcm = new Uint8Array([...pcm, ...buf.subarray(loopAt, loopAt + loopLen)]);
+          loopStart = attack; loopEnd = attack + loopLen;
+        }
+        // The Paula volume the replayer writes: gain * voice scale >> 8, or the sustain level of the volume envelope (the level it holds longest before it decays;
+        // (level + 1) * scale, then * gain >> 16), halved, at most 64. The scale is the one in force at the first note.
+        const scale = grid.placements.find(pl => pl.instrument === id)?.scale ?? 0;
+        let level = -1;
+        if (w32(rec + 8) !== 0) { const env = rec + 8 + w32(rec + 8); const held = new Map<number, number>(); for (let e = env; e < Math.min(env + 256, buf.length) && buf[e] !== 0; e++) held.set(buf[e], (held.get(buf[e]) ?? 0) + 1); for (const [l, n] of held) if (level < 0 || n > held.get(level)!) level = l; }
+        const gain = w16(rec + 26);
+        const paula = Math.min(64, (level < 0 ? (gain * scale) >> 8 : ((((level + 1) * scale) & 0xffff) * gain) >> 16) >> 1);
+        instruments[id - 1] = createSamplerInstrument(id, '', pcm, scale > 0 ? paula : 64, 8287, loopStart, loopEnd);
+      }
+      for (let id = 1; id <= top; id++) instruments[id - 1] ??= { id, name: '', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig;
+    }
     return {
       name: `${moduleName} [Mark Cooksey ${variantLabel}]${subsongCount > 1 ? ` (${subsongCount} subsongs)` : ''}`,
       format: 'MOD' as TrackerFormat,

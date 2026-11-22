@@ -35,10 +35,10 @@ servePublicToFetch();
 const FORMATS: Array<{ name: string; file: string; companions?: Record<string, string>; minVoices: number; minSteady: number; minGridCover: number; nativeGrid?: boolean }> = [
   { name: 'Delitracker Custom bards tale.cus (K6)', file: 'delitracker-custom/bards tale.cus', minVoices: 1, minSteady: 1, minGridCover: 0.8 },
   { name: 'Fred Editor (Gray) eco.gray', file: 'fred-gray/eco.gray', minVoices: 1, minSteady: 0 /* modulated synth voices */, minGridCover: 0.8 },
-  { name: 'Mark Cooksey mighty bombjack.mc', file: 'mark-cooksey/mighty bombjack.mc', minVoices: 2, minSteady: 1, minGridCover: 0.8 },
+  { name: 'Mark Cooksey mighty bombjack.mc', file: 'mark-cooksey/mighty bombjack.mc', minVoices: 2, minSteady: 1, minGridCover: 0.8, nativeGrid: true },
   { name: 'Rob Hubbard ST battleships.rho', file: 'rob-hubbard-st/battleships.rho', minVoices: 1, minSteady: 0 /* modulated synth voices */, minGridCover: 0.8 },
   { name: 'Jeroen Tel stormlord title.jt', file: 'jeroen-tel/stormlord title.jt', minVoices: 1, minSteady: 1, minGridCover: 0.8, nativeGrid: true },
-  { name: 'Jason Page jpn.fire and ice-1', file: 'jason-page/jpn.fire and ice-1', companions: { 'smp.fire and ice-1': 'jason-page/smp.fire and ice-1' }, minVoices: 1, minSteady: 1, minGridCover: 0.55 /* the rest play constant (silent) waves */ },
+  { name: 'Jason Page jpn.fire and ice-1', file: 'jason-page/jpn.fire and ice-1', companions: { 'smp.fire and ice-1': 'jason-page/smp.fire and ice-1' }, minVoices: 1, minSteady: 1, minGridCover: 0.55 /* the rest play constant (silent) waves */, nativeGrid: true },
 ];
 
 

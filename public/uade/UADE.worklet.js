@@ -2318,9 +2318,16 @@ class UADEProcessor extends AudioWorkletProcessor {
           const ch = w0 >>> 24, reg = (w0 >>> 16) & 0xff, val = w0 & 0xffff;
           if (ch > 3) continue;
           const v = voices[ch];
-          if (reg === 0) v.lch = val;
-          else if (reg === 1) v.lcl = val;
-          else if (reg === 2) v.len = val;
+          if (reg <= 2) {
+            if (reg === 0) v.lch = val; else if (reg === 1) v.lcl = val; else v.len = val;
+            // A player may write the loop pair right after the period, with no period write after it (Mark Cooksey):
+            // a pair that differs from the attack, written inside the loop window of a note's start, is its loop.
+            const c = v.cur;
+            if (c && !c.settled && k - c.chunk <= LOOP_WINDOW) {
+              const p = (((v.lch << 16) | v.lcl) & ~1) >>> 0;
+              if (p !== c.attackPtr || v.len !== c.attackLen) { c.loopPtr = p; c.loopLen = v.len; }
+            }
+          }
           else if (reg === 4) {
             v.vol = val;
             // the channel volume the note settles at: the last write within the loop window of its start

@@ -33,6 +33,7 @@ const MAX_STEPS = 100000;
 const READ_LIMIT = 4096;
 const MAX_NOTE_BYTE = 0x3f;
 const PORTA_INSTRUMENT = 0x77;
+const LEGATO_INSTRUMENT = 0x78; // Graftgold: notes of this instrument change the pitch only
 
 /** lbW001334, the eagleplayer's period table. */
 const PERIODS = [
@@ -57,17 +58,17 @@ export function jasonPageGridNote(byte: number, transpose: number): number {
   return period ? periodToGridNote(period) : 0;
 }
 
-export interface JasonPageTables { tracks: number[]; patTable: number; patBase: number; speed: number }
+export interface JasonPageTables { tracks: number[]; patTable: number; patBase: number; speed: number; graftgold: boolean }
 
-/** The module's tables for subsong 0; null when it is not the new-format layout Play_2 reads. */
+/** The module's tables for subsong 0. graftgold: patterns start with a flagged byte (jp_module.c PATTERN_FLAG_MASK), jp_seq.c graftgold_pattern syntax; else the Virocop syntax of Play_2. */
 export function findJasonPageTables(buf: Uint8Array): JasonPageTables | null {
   if (buf.length < 0x40 || u16(buf, 0) !== 2) return null;
   const patBase = u16(buf, 46);
-  if (patBase <= 0 || patBase >= buf.length || (u16(buf, patBase) & 0x0f00) === 0x0f00) return null;
+  if (patBase <= 0 || patBase >= buf.length) return null;
   const patTable = u16(buf, 44);
   const tracks = [0, 1, 2, 3].map(v => u16(buf, 28 + 2 * v) + u16(buf, u16(buf, 12 + 2 * v)));
   if (patTable <= 0 || patTable >= buf.length || tracks.some(t => t <= 0 || t + 1 >= buf.length)) return null;
-  return { tracks, patTable, patBase, speed: u16(buf, u16(buf, 8)) & 0xff };
+  return { tracks, patTable, patBase, speed: u16(buf, u16(buf, 8)) & 0xff, graftgold: (u16(buf, patBase) & 0x0f00) === 0x0f00 };
 }
 
 export function encodeJasonPageStream(rows: TrackerCell[]): Uint8Array {
@@ -142,16 +143,16 @@ export function buildJasonPageGrid(buf: Uint8Array, sourceFile: string): JasonPa
       let size = 1;
       let endsStep = true;
       if (b < 0x40) {
-        if (w.instr === PORTA_INSTRUMENT) size = 2;
+        if (!t.graftgold && w.instr === PORTA_INSTRUMENT) size = 2;
         const note = jasonPageGridNote(b, w.transpose);
         if (note > 0) {
-          const instrument = w.instr < PORTA_INSTRUMENT ? w.instr + 1 : 0;
+          const instrument = w.instr < (t.graftgold ? LEGATO_INSTRUMENT : PORTA_INSTRUMENT) ? w.instr + 1 : 0;
           timelines[v][tick] = { ...emptyCell(), note, instrument };
           placements.push({ voice: v, tick, offset: at, note, transpose: w.transpose, delta: note - b, instrument });
         }
       } else if (b < 0x80) { w.dur = b & 0x3f; w.counter = w.dur; endsStep = false; }
-      else if (b <= 0xf8) { w.instr = b & 0x7f; endsStep = false; }
-      else if (b === 0xfc) size = 2;
+      else if (b <= 0xf8 || (t.graftgold && b < 0xfe)) { w.instr = b & 0x7f; endsStep = false; }
+      else if (b === 0xfc && !t.graftgold) size = 2;
       else if (b === 0xfe) size = 3;
       blockEnd.set(w.pat, Math.max(blockEnd.get(w.pat) ?? 0, Math.min(at + size, buf.length)));
       if (b === 0xff) { w.pat = -1; w.pos = 0; w.idx += 2; continue; }
