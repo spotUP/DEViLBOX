@@ -717,15 +717,21 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             if (linear) {
               const pm = curIns?.macros.find((mc) => mc.code === MACRO_PITCH && mc.length > 0);
               if (pm) {
-                const P = pulsePeriod(src || 46);
+                const P = pulsePeriod(src || 46), X = pulsePeriodRaw(src || 46), fp = fineRaw - 128;
+                // Furnace adds fine pitch (E5xx) and the macro in 1/128 semitone and rounds once; the engine adds the sent fine
+                // offset F, so an absolute value is taken at fine + v minus F (rounding both apart was 1 off). Without fine pitch
+                // the note-period scaling stays as it was.
+                const F = Math.round(X * 2 ** (-fp / 1536)) - 1 - P;
+                const off = (v: number): number => (fp ? Math.round(X * 2 ** (-(v + fp) / 1536)) - 1 - P - F : Math.round(P * (2 ** (-v / 1536) - 1)));
+                const rel = (pm.mode & 1) === 1;
                 // shortcut: relative macros scale each increment at the note's period (exact for small sums), rounding per step.
-                const toPeriod = (v: number): number => { const d = Math.round(P * (2 ** (-v / 1536) - 1)); if (Math.abs(d) > 63) lossy.add('pitch macro step past 63 period units (clamped)'); return d; };
+                const toPeriod = (v: number): number => { const d = rel ? Math.round(P * (2 ** (-v / 1536) - 1)) : off(v); if (Math.abs(d) > 63) lossy.add('pitch macro step past 63 period units (clamped)'); return d; };
                 // An ADSR/LFO pitch macro in absolute mode is a position curve: FamiStudio's +-63 range only holds per-frame
                 // steps, so send the differences of the period offsets as a relative envelope.
                 const ex = expandProcMacro(pm, m.version);
                 const mf = ex !== pm && (pm.mode & 1) === 0
-                  ? macroFrames({ ...ex, mode: 0 }, 'pitch', lossy, (v) => Math.round(P * (2 ** (-v / 1536) - 1)), 1, m.version)
-                  : macroFrames(pm, 'pitch', lossy, vib ? (v) => Math.round(P * (2 ** (-v / 1536) - 1)) : toPeriod, macroRate, m.version);
+                  ? macroFrames({ ...ex, mode: 0 }, 'pitch', lossy, off, 1, m.version)
+                  : macroFrames(pm, 'pitch', lossy, vib && !rel ? off : vib ? (v) => Math.round(P * (2 ** (-v / 1536) - 1)) : toPeriod, macroRate, m.version);
                 if (vib || (!mf.relative && ex !== pm)) {
                   // Vibrato on top, or an ADSR/LFO position curve (+-63 only holds per-frame steps): one relative envelope.
                   const mg = mergeVibratoPitch(vib ?? [0], mf, lossy);

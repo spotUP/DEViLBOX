@@ -216,6 +216,21 @@ describe('furnaceToFamistudio', () => {
     expect(has(music, encodeEnvelope(vib(-3), 0, -1, 'pitch'))).toBe(true);
     expect(has(music, encodeEnvelope(vib(0), 0, -1, 'pitch'))).toBe(false);
   });
+  it('rounds fine pitch and an absolute pitch macro together as Furnace does, minus the sent fine offset (E57D + pitch macro)', () => {
+    // Furnace sums chan.pitch (E5xx - 0x80) and pitch2 (the macro) in 1/128 semitone and rounds once; the engine adds the 0x4e
+    // fine offset F to the envelope, so each value is round(X * 2^(-(v + fp) / 1536)) - 1 - P - F, not round(P * (2^(-v/1536) - 1)).
+    const data = [0, 8, 16, 24, 32, 40, 48, 56, 64, 72];
+    const X = 1789772.727 / (16 * 445 * 2), P = Math.round(X) - 1, fp = -3, F = Math.round(X * 2 ** (-fp / 1536)) - 1 - P;
+    const together = data.map((v) => Math.round(X * 2 ** (-(v + fp) / 1536)) - 1 - P - F);
+    const apart = data.map((v) => Math.round(P * (2 ** (-v / 1536) - 1)));
+    expect(together).not.toEqual(apart); // rounding fine and macro apart is 1 off at this note
+    const mod = nesModule({ 0: { 0: { ...A4, instrument: 0, effects: [{ type: 0xe5, value: 0x7d }] } } });
+    const pm = { code: 4, type: 0, mode: 0, speed: 1, delay: 0, length: data.length, loop: 255, release: 255, data };
+    Object.assign(mod, { tuning: 445, instruments: [{ type: 34, macros: [pm], amiga: { initSample: 0 } }] });
+    const music = furnaceToFamistudio(mod).music;
+    expect(has(music, encodeEnvelope(together, -1, -1, 'pitch'))).toBe(true);
+    expect(has(music, encodeEnvelope(apart, -1, -1, 'pitch'))).toBe(false);
+  });
   it('keeps the vibrato phase on a 03xx porta note (Furnace clears doNote on a keyed-on channel; one_sided_love frame 3730)', () => {
     // playback.cpp: 03xx with keyOn sets doNote=false, so "commit note on" (vibratoPos=0) is skipped. 4 rows x 6 ticks of 04:63
     // leave vibratoPos at 6 * 24 & 63 = 16; the override sent on the porta row starts there, not at 0.
