@@ -14,8 +14,16 @@ import type { FurnaceModule, FurnaceWavetable } from '../../import/formats/Furna
 import type { FurnaceInstrument, FurnaceMacro } from '../../import/formats/furnace/FurnaceInstrumentParser';
 import type { FurnacePatternCell } from '../../import/formats/furnace/FurnacePatternParser';
 import { convertFurnaceNoteValue } from '../../import/formats/furnace/FurnacePatternParser';
+import { nesScreenText, nesScrollText } from '../nes/nesCartridge';
 
-export interface HugePlayerMeta { songAddress: number; songOffset: number; songCapacity: number; tickAddress: number; sourceHash: string }
+export interface HugePlayerMeta {
+  songAddress: number; songOffset: number; songCapacity: number; tickAddress: number; sourceHash: string;
+  /** ScreenText block in huge-player.asm: timer TMA byte, title (11), author (17), scroller text (256). */
+  rateOffset: number; titleOffset: number; authorOffset: number; scrollOffset: number;
+}
+
+/** Player screen text and tick rate the exporter patches into the ROM. */
+export interface HugeScreen { title: string; author: string; /** Timer TMA at 4096 Hz for the song tick rate; 0 = one tick per VBlank. */ timerTma: number }
 
 export interface HugeSong {
   blob: Uint8Array;
@@ -23,6 +31,7 @@ export interface HugeSong {
   lossy: string[];
   /** hUGE orders after splitting Furnace orders into 64-row chunks. */
   orders: number;
+  screen: HugeScreen;
 }
 
 const ROWS = 64;
@@ -199,7 +208,7 @@ function mapEffect(type: number, value: number, kind: Kind, jumpTarget: (order: 
     case 0x03: return 0x300 | v;
     case 0x04: return 0x400 | v;
     case 0x0a: return 0xa00 | v;
-    case 0x0b: return 0xb00 | (jumpTarget(v) + 1); // hUGE stores order + 1
+    case 0x0b: { const t = jumpTarget(v); return t < 255 ? 0xb00 | (t + 1) : undefined; } // hUGE stores order + 1 in one byte
     case 0x0d: return 0xd00 | (Math.min(v, ROWS - 1) + 1); // hUGE stores row + 1
     case 0x09: case 0x0f: return 0xf00 | v;
     case 0xec: return 0xe00 | v;
@@ -207,6 +216,8 @@ function mapEffect(type: number, value: number, kind: Kind, jumpTarget: (order: 
     case 0x12: return kind === 'duty' ? 0x900 | ((v & 3) << 6) : undefined;
     // gb.cpp: pan = (x ? left : 0) | (y ? right : 0), none -> both; driver fx_set_pan merges it per channel.
     case 0x08: return 0x800 | (((v >> 4 ? 0x10 : 0) | (v & 15 ? 1 : 0)) || 0x11);
+    // 80xx linear pan: convertPanLinearToSplit(x, 8, 255) gives left > 0 unless x = FF, right > 0 unless x = 00
+    case 0x80: return 0x800 | (v < 0xff ? 0x10 : 0) | (v > 0 ? 1 : 0);
     case 0x10: return kind === 'wave' ? 0x900 | waveNo(v) : undefined;
     default: return undefined;
   }
@@ -216,7 +227,9 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   const lossy = new Lossy();
   const s = m.subsongs[subsong];
   if (!s) throw new Error(`subsong ${subsong} missing`);
-  if (Math.abs(s.hz - VBLANK_HZ) > 0.5) lossy.add(`tick rate ${s.hz} Hz played at ${VBLANK_HZ} Hz VBlank`);
+  // Tick rate: VBlank when it is the Furnace GB default, else the timer at 4096 / (256 - TMA) Hz (16-4096 Hz).
+  const timerTma = Math.abs(s.hz - VBLANK_HZ) <= 0.5 ? 0 : 256 - Math.min(255, Math.max(1, Math.round(4096 / s.hz)));
+  if (timerTma && Math.abs(4096 / (256 - timerTma) - s.hz) > 0.5) lossy.add(`tick rate ${s.hz} Hz played at ${(4096 / (256 - timerTma)).toFixed(2)} Hz`);
   if (s.speed2 !== s.speed1) lossy.add(`speed 2 (${s.speed2}) and groove: played at speed 1 (${s.speed1})`);
   if (m.subsongs.length > 1) lossy.add('other subsongs (only one exported)');
   const cellAt = (ch: number, o: number, r: number): FurnacePatternCell | undefined => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o]}`)?.rows[r];
@@ -303,7 +316,7 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
       }
     }
   }
-  if (hOrders * 2 > 255) throw new Error(`song has ${hOrders} hUGE orders; hUGEDriver holds at most 127`);
+  // The vendored hUGEDriver keeps order_cnt and current_order as 16-bit offsets; only Bxx targets stay below 255.
 
   // Instruments and tables.
   const tables: number[][] = [];
@@ -331,7 +344,7 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   out.fill(0);
   out[0] = Math.max(1, s.speed1);
   const here = () => BASE + out.length;
-  w16(1, here()); out.push(hOrders * 2);
+  w16(1, here()); out.push((hOrders * 2) & 0xff, (hOrders * 2) >> 8);
   const orderAt: number[] = [];
   for (let ch = 0; ch < 4; ch++) { w16(3 + ch * 2, here()); orderAt.push(out.length); out.push(...new Array(hOrders * 2).fill(0)); }
   const insAt: Record<Kind, number> = { duty: 0, wave: 0, noise: 0 };
@@ -354,15 +367,19 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   const patAt = patterns.map((p) => { const a = here(); out.push(...p); return a; });
   for (let ch = 0; ch < 4; ch++) orderLists[ch].forEach((p, i) => w16(orderAt[ch] + i * 2, patAt[p]));
   if (out.length > 0x6000) throw new Error(`song data ${out.length} bytes exceeds the 24 KiB song area`); // shortcut: no MBC banking, add it when a real song needs more
-  return { blob: Uint8Array.from(out), lossy: lossy.list(), orders: hOrders };
+  return { blob: Uint8Array.from(out), lossy: lossy.list(), orders: hOrders, screen: { title: m.name, author: m.author, timerTma } };
 }
 
 /** Patch the song into the player ROM and recompute the global checksum (header checksum is unchanged). */
-export function buildHugeRom(player: Uint8Array, meta: HugePlayerMeta, blob: Uint8Array): Uint8Array {
+export function buildHugeRom(player: Uint8Array, meta: HugePlayerMeta, blob: Uint8Array, screen: HugeScreen): Uint8Array {
   if (blob.length > meta.songCapacity) throw new Error(`song ${blob.length} bytes exceeds ${meta.songCapacity}`);
   const rom = player.slice();
   rom.fill(0xff, meta.songOffset, meta.songOffset + meta.songCapacity);
   rom.set(blob, meta.songOffset);
+  rom[meta.rateOffset] = screen.timerTma;
+  rom.set(nesScreenText(screen.title, 11), meta.titleOffset);
+  rom.set(nesScreenText(screen.author, 17), meta.authorOffset);
+  rom.set(nesScrollText(screen.title, { author: screen.author }, 256), meta.scrollOffset);
   let sum = 0;
   for (let i = 0; i < rom.length; i++) if (i !== 0x14e && i !== 0x14f) sum += rom[i];
   rom[0x14e] = (sum >> 8) & 0xff;

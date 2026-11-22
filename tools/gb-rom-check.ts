@@ -188,7 +188,7 @@ for (const name of names) {
   try {
     const m = await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
     const song = furnaceToHuge(m);
-    const rom = buildHugeRom(PLAYER, META, song.blob);
+    const rom = buildHugeRom(PLAYER, META, song.blob, song.screen);
     if (saveRom) writeFileSync(path.join(saveRom, `${name}.gb`), rom);
     const got = runGb(rom, TICKS);
     const channels = [0, 1, 2, 3].map((ch) => got.slice(1).flat().filter(([a]) => a === [0xff14, 0xff19, 0xff1e, 0xff23][ch]).length);

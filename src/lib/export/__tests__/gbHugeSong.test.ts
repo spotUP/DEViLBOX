@@ -30,7 +30,7 @@ describe('hUGEDriver Game Boy export', () => {
       expect(p).toBeLessThan(end);
     }
     const player = readFileSync(join(ROOT, 'public/gb/huge-player.gb'));
-    const rom = buildHugeRom(player, META, song.blob);
+    const rom = buildHugeRom(player, META, song.blob, song.screen);
     let sum = 0;
     for (let i = 0; i < rom.length; i++) if (i !== 0x14e && i !== 0x14f) sum = (sum + rom[i]) & 0xffff;
     expect((rom[0x14e] << 8) | rom[0x14f]).toBe(sum);

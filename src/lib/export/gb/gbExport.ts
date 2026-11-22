@@ -18,5 +18,5 @@ export async function exportGbRom(): Promise<{ rom: Uint8Array; warnings: string
     liveFurnaceModule(),
   ]);
   const song = furnaceToHuge(live.module, live.subsong);
-  return { rom: buildHugeRom(new Uint8Array(player), meta, song.blob), warnings: [...live.warnings, ...song.lossy.map((l) => `Not carried to hUGEDriver: ${l}`)] };
+  return { rom: buildHugeRom(new Uint8Array(player), meta, song.blob, song.screen), warnings: [...live.warnings, ...song.lossy.map((l) => `Not carried to hUGEDriver: ${l}`)] };
 }

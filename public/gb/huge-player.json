@@ -2,14 +2,19 @@
  "songAddress": 8192,
  "songOffset": 8192,
  "songCapacity": 24576,
- "tickAddress": 380,
+ "tickAddress": 424,
+ "rateOffset": 7424,
+ "titleOffset": 7425,
+ "authorOffset": 7436,
+ "scrollOffset": 7453,
  "sources": [
   "public/gb/huge-player.asm",
   "tools/build-gb-player.sh",
   "third-party/hugedriver/hUGEDriver.asm",
   "third-party/hugedriver/include/hardware.inc",
   "third-party/hugedriver/include/hUGE.inc",
-  "third-party/hugedriver/include/hUGE_note_table.inc"
+  "third-party/hugedriver/include/hUGE_note_table.inc",
+  "public/gb/screen_font.inc"
  ],
- "sourceHash": "42af2876614b4a193ce56b25aa01a9f19d30bd26"
+ "sourceHash": "4981f2a82b2881216af0b30f1e9c5600eee1e23f"
 }

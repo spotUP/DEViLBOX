@@ -35,7 +35,7 @@ DEF PATTERN_LENGTH EQU 64
 
 SECTION "Playback variables", WRAM0
 ;; Active song descriptor
-order_cnt: db
+order_cnt: ds 2 ; DEViLBOX: orders * 2, 16 bits (more than 127 orders)
 _start_song_descriptor_pointers:
 ;; Pointers to the song's current four orders (one per channel)
 order1: dw
@@ -80,7 +80,7 @@ tick: db
 row_break: db
 next_order: db
 row: db
-current_order: db
+current_order: ds 2 ; DEViLBOX: 16-bit order offset
 
 IF DEF(PREVIEW_MODE)
 loop_order: db
@@ -177,6 +177,9 @@ hUGE_init::
     ld d, a
     ld a, [de]
     ld [order_cnt], a
+    inc de
+    ld a, [de]
+    ld [order_cnt+1], a
 
     ld c, _end_song_descriptor_pointers - (_start_song_descriptor_pointers)
     ld de, order1
@@ -218,7 +221,7 @@ ENDC
     ;; fallthrough (load the pattern pointers)
 
 ;;; Sets all 4 pattern pointers from a certain index in the respective 4 orders.
-;;; Param: C = The index (in increments of 2)
+;;; Param: [current_order] = The index (in increments of 2, 16 bits; DEViLBOX)
 ;;; Destroy: AF DE HL
 load_patterns:
 IF DEF(PREVIEW_MODE)
@@ -240,11 +243,13 @@ ENDC
 
 .load_pattern:
     ld a, [hl+]
-    add c
     ld h, [hl]
     ld l, a
+    ld a, [current_order]
+    add l
+    ld l, a
+    ld a, [current_order+1]
     adc h
-    sub l
     ld h, a
 
     ld a, [hl+]
@@ -2011,7 +2016,9 @@ ENDC
     ld [hl], 0
 
     dec a
-    add a ; multiply order by 2 (they are words)
+    ld l, a
+    ld h, 0
+    add hl, hl ; multiply order by 2 (they are words)
 
     jr .update_current_order
 
@@ -2033,19 +2040,27 @@ IF DEF(PREVIEW_MODE)
 .no_loop_order:
 ENDC
     ;; Increment order and change loaded patterns
-    ld a, [order_cnt]
-    ld c, a
     ld a, [current_order]
-    add 2
-    cp c
+    ld l, a
+    ld a, [current_order+1]
+    ld h, a
+    inc hl
+    inc hl
+    ld a, [order_cnt]
+    cp l
     jr nz, .update_current_order
-    xor a
+    ld a, [order_cnt+1]
+    cp h
+    jr nz, .update_current_order
+    ld hl, 0
 .update_current_order:
     ;; Call with:
-    ;; A: The order to load
+    ;; HL: The order offset to load (16 bits, DEViLBOX)
     ;; B: The row for the order to start on
+    ld a, l
     ld [current_order], a
-    ld c, a
+    ld a, h
+    ld [current_order+1], a
     call load_patterns
 
     ld a, b

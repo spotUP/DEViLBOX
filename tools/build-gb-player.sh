@@ -8,7 +8,7 @@ D=$(mktemp -d)
 trap 'rm -rf "$D"' EXIT
 H="$ROOT/third-party/hugedriver"
 rgbasm -I "$H" -o "$D/driver.o" "$H/hUGEDriver.asm"
-rgbasm -I "$H" -o "$D/player.o" "$ROOT/public/gb/huge-player.asm"
+rgbasm -I "$H" -I "$ROOT/public/gb" -o "$D/player.o" "$ROOT/public/gb/huge-player.asm"
 rgblink -t -o "$D/p.gb" -n "$D/p.sym" "$D/player.o" "$D/driver.o"
 rgbfix -v -c -p 0xFF -t DEVILBOX "$D/p.gb"
 cp "$D/p.gb" "$ROOT/public/gb/huge-player.gb"
@@ -20,11 +20,11 @@ for line in open(sys.argv[1]):
     if len(p) == 2 and ':' in p[0]:
         b, a = p[0].split(':'); sym[p[1]] = (int(b, 16), int(a, 16))
 root = sys.argv[2]
-srcs = ['public/gb/huge-player.asm', 'tools/build-gb-player.sh', 'third-party/hugedriver/hUGEDriver.asm', 'third-party/hugedriver/include/hardware.inc', 'third-party/hugedriver/include/hUGE.inc', 'third-party/hugedriver/include/hUGE_note_table.inc']
+srcs = ['public/gb/huge-player.asm', 'tools/build-gb-player.sh', 'third-party/hugedriver/hUGEDriver.asm', 'third-party/hugedriver/include/hardware.inc', 'third-party/hugedriver/include/hUGE.inc', 'third-party/hugedriver/include/hUGE_note_table.inc', 'public/gb/screen_font.inc']
 h = hashlib.sha1()
 for s in srcs: h.update(open(f'{root}/{s}', 'rb').read())
 assert sym['song'] == (0, 0x2000), sym['song']
-meta = {'songAddress': 0x2000, 'songOffset': 0x2000, 'songCapacity': 0x6000, 'tickAddress': sym['player_tick'][1], 'sources': srcs, 'sourceHash': h.hexdigest()}
+meta = {'songAddress': 0x2000, 'songOffset': 0x2000, 'songCapacity': 0x6000, 'tickAddress': sym['player_tick'][1], 'rateOffset': sym['scr_rate'][1], 'titleOffset': sym['scr_title'][1], 'authorOffset': sym['scr_author'][1], 'scrollOffset': sym['scr_scroll'][1], 'sources': srcs, 'sourceHash': h.hexdigest()}
 json.dump(meta, open(f'{root}/public/gb/huge-player.json', 'w'), indent=1)
 open(f'{root}/public/gb/huge-player.json', 'a').write('\n')
 print(meta)
