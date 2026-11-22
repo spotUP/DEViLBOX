@@ -168,6 +168,11 @@ function macroEnvelope(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitc
   return encodeEnvelope(f.vals, f.loop, f.release, kind, f.relative);
 }
 
+/** The last engine tick (counted from song tick 0) a 60 Hz frame shows, at rate = Furnace ticks per frame. Tick j lands
+ *  in frame round(j / rate), as rowFrame and the Furnace reference bin it (ties go to the earlier frame: the VGM sample
+ *  is floored). Famitune1, 56 Hz: frame 1 shows tick 1 and frame 8 repeats tick 7. */
+export const tickAtFrame = (f: number, rate: number): number => Math.ceil((f + 0.5) * rate + 1e-9) - 1;
+
 /** Per-frame envelope values of a Furnace macro (what macroEnvelope encodes). */
 function macroFrames(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch', lossy: Lossy, step?: (v: number) => number, rate = 1, version = 245): { vals: number[]; loop: number; release: number; relative: boolean } {
   const mac = expandProcMacro(macIn, version);
@@ -193,9 +198,13 @@ function macroFrames(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch'
   // Furnace steps macros once per engine tick; FamiStudio once per 60 Hz frame. Resample (rate = ticks per frame);
   // relative pitch macros are increments per tick and stay unresampled.
   if (rate !== 1 && (kind !== 'pitch' || (mac.mode & 1) === 0) && vals.length > 1) {
-    const src = vals.slice(), fr = (i: number): number => (i < 0 ? -1 : Math.min(Math.ceil(src.length / rate) - 1, Math.round(i / rate)));
+    const src = vals.slice();
     vals.length = 0;
-    for (let f = 0; f * rate < src.length; f++) vals.push(src[Math.floor(f * rate)]);
+    // A frame can hold several ticks: a one-shot macro runs on until a frame shows its last tick, so it ends on its
+    // last value (samurai 128 Hz noise kick volume 0) instead of the tick before it. A looped one keeps its length.
+    const more = (f: number): boolean => tickAtFrame(f, rate) < src.length || (loop < 0 && tickAtFrame(f - 1, rate) < src.length - 1);
+    for (let f = 0; more(f); f++) vals.push(src[Math.min(src.length - 1, tickAtFrame(f, rate))]);
+    const fr = (i: number): number => (i < 0 ? -1 : Math.min(vals.length - 1, Math.floor(i / rate + 0.5 - 1e-9)));
     loop = fr(loop); release = fr(release);
   }
   if (vals.length > 240) { lossy.add(`${kind} macro longer than 240 frames (cut)`); vals.length = 240; if (loop >= 240) loop = -1; if (release >= 240) release = -1; }
@@ -888,7 +897,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               const x = arpXY >> 4, y = arpXY & 15, steps = [0, x, y];
               let len = 3 * Math.max(1, Math.round(perTick));
               for (let L = 1; L <= 240; L++) if (Math.abs(((L * macroRate) / 3) - Math.round((L * macroRate) / 3)) < 1e-6) { len = L; break; }
-              env = encodeEnvelope(Array.from({ length: len }, (_, f) => steps[Math.floor(f * macroRate + 1e-9) % 3]), 0, -1, 'arp');
+              env = encodeEnvelope(Array.from({ length: len }, (_, f) => steps[tickAtFrame(f, macroRate) % 3]), 0, -1, 'arp');
             } else env = noteArp;
             if (env) { const id = envId(env); if (arpOn !== id) ops.push(0x4b, { env: id }); arpOn = id; }
             else if (arpOn !== -1) { ops.push(0x4c); arpOn = -1; lastIns = -1; }

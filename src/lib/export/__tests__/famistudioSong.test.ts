@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { FurnaceModule } from '../../import/formats/FurnaceSongParser';
 import { MESEN } from './nesMesenHarness';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { buildFamistudioRom, compressRefs, expandRefs, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, loopPeriodicTail, mergeVibratoPitch, noiseNote, type FamistudioMeta, bestSlideStep } from '../nes/famistudioSong';
+import { buildFamistudioRom, compressRefs, expandRefs, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, loopPeriodicTail, mergeVibratoPitch, noiseNote, type FamistudioMeta, bestSlideStep, tickAtFrame } from '../nes/famistudioSong';
 
 const ROOT = path.resolve(__dirname, '../../../..');
 const DIR = path.join(ROOT, 'public/nes/famistudio');
@@ -190,6 +190,25 @@ describe('furnaceToFamistudio', () => {
     for (let n = 0; n < 3000; n++) expect(Math.max(0, Math.ceil((256 * S * n - h) / step))).toBe(Math.floor(6 * n * 60 / 56 + 0.5));
   });
 
+  it('steps macros on the Furnace tick each 60 Hz frame shows (Famitune1 56 Hz arp one frame late)', () => {
+    // The check bins a tick at VGM sample floor(j x 44100 / hz) into frame round(sample / 735).
+    for (const hz of [10, 50, 56, 128]) {
+      const frameOf = (j: number): number => Math.floor(Math.floor((j * 44100) / hz) / 735 + 0.5);
+      let j = 0;
+      for (let f = 0; f < 3000; f++) {
+        while (frameOf(j + 1) <= f) j++;
+        expect([hz, f, tickAtFrame(f, hz / 60)]).toEqual([hz, f, j]);
+      }
+    }
+  });
+
+  it('ends a one-shot macro on its last tick when a frame holds several ticks (samurai 128 Hz noise kick stuck at volume 2)', () => {
+    // Rate 128/60: frame 0 shows tick 1 (8), frame 1 would show tick 3, past the end; Furnace holds the last value 0 there.
+    const m = nesModule({ 0: { 0: { note: 9, octave: 4, instrument: 0 } } }, { hz: 128 });
+    const vol = { code: 0, type: 0, mode: 0, speed: 1, delay: 0, length: 3, loop: 255, release: 255, data: [15, 8, 0] };
+    Object.assign(m, { instruments: [{ type: 34, macros: [vol], amiga: { initSample: 0 } }] });
+    expect(has(furnaceToFamistudio(m).music, encodeEnvelope([8, 0], -1, -1, 'vol'))).toBe(true);
+  });
   const A4 = { note: 9, octave: 4 };
   const fx =(type: number, value: number) => ({ effects: [{ type, value }] });
   const music = (cells: Record<number, Record<number, Partial<Cell>>>) => furnaceToFamistudio(nesModule(cells));
