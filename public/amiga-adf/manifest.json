@@ -1845,20 +1845,20 @@
     },
     "QuadraComposer": {
       "adf": "QuadraComposer.adf",
-      "adfSha256": "166940785501e430605484fa09496c9347d266a7c0354db159d4dba9d984c8c8",
+      "adfSha256": "e01e92af4d48ae7670d4809766fa9be6de2797e4d3a819bff26a4dff6812987f",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 48556,
+        "diskOffset": 48668,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 48552,
+        "diskOffset": 48664,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 278416,
+        "diskOffset": 278528,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -1878,7 +1878,7 @@
         "bytes": 39490
       },
       "sources": {
-        "tool": "31ef8ad896dc5de4abf5c0823451fc4adac44fdcb38c952b00c36f60cb4619df",
+        "tool": "03086d228f6bc96831a603237c26c5d98db455974c35557143b37bd652a756b3",
         "player": "5753455cd768b3cd6880442673a659bc7ae95328da00be9cb5e200cc3315c92e"
       }
     },

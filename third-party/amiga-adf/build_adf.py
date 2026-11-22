@@ -142,6 +142,10 @@ def main():
     player = entry['player']
     # UADE ignores the end report of these players (SONG_END_NOT_POSSIBLE -> $12C = 0); match it.
     asm = ASM + (['-DUADE_NO_SONG_END=1'] if {'broken_song_end', 'no_ep_end_detect'} & set(entry.get('flags', [])) else [])
+    # QuadraComposer's DTP_InitSound relocates the in-memory module (player +$6aa: addl base,30(a0) per
+    # sample), so the single-module song-end re-post's second InitSound corrupts every sample pointer
+    # (silent, DMACONR 0380). UADE never re-inits a loaded module; the player loops on its own (uade123 -n).
+    asm += ['-DUADE_NO_SONG_END=1'] if player == 'QuadraComposer' and '-DUADE_NO_SONG_END=1' not in asm else []
     # TFMX Pro's own check rejects some mdat files that the browser's UADE.wasm plays (forced).
     asm += ['-DUADE_FORCE=1'] if player == 'TFMX-Pro' else []
     # EMS / EMS-6 modules have no magic and no text fields: screen.s must not print the MOD layout.
