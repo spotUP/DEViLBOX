@@ -1,0 +1,5 @@
+TODO LIST:
+    rewrite documentation - separate docs for c and asm ?
+    msx scc(+) ?
+    opl/opl2/opl3?
+    convert remaining js scripts to python ?

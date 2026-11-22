@@ -10,6 +10,7 @@ import { furnaceModuleExportAvailable } from '@/lib/export/FurnaceModuleExporter
 import { furnaceAyScrambleExportAvailable, ayScrambleTempoWarning, type AyScrambleTarget } from '@/lib/export/FurnaceExporter';
 import { gbRomExportAvailable } from '@/lib/export/gb/gbExport';
 import { mdRomExportAvailable } from '@/lib/export/md/mdExport';
+import { smsRomExportAvailable } from '@/lib/export/sms/smsExport';
 import { nesRomExportAvailable, nesTempoWarning, type NesRegionChoice } from '@/lib/export/nes/nesExport';
 import { QUADTONE_PLATFORM } from '@lib/export/zx/zxQuadToneData';
 import { FURNACE_SNES_CHIP_ID } from '@/lib/export/tad/tadSongWriter';
@@ -42,7 +43,7 @@ import { saveFurFileWasm, saveFurTextWasm, loadFurFileWasm } from '@lib/import/w
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'gbRom' | 'mdRom' | 'snesRom' | 'nsfe' | 'tad' | 'adf';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'gbRom' | 'mdRom' | 'smsRom' | 'ggRom' | 'snesRom' | 'nsfe' | 'tad' | 'adf';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -92,6 +93,8 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   nesRom: '.nes',
   gbRom: '.gb',
   mdRom: '.bin',
+  smsRom: '.sms',
+  ggRom: '.gg',
   snesRom: '.sfc',
   adf: '.adf',
   nsfe: '.nsfe',
@@ -428,6 +431,24 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
       setMdRomBusy(false);
     }
   }, [metadata]);
+  // Master System / Game Gear ROM (Banjo player).
+  const smsRomAvailable = smsRomExportAvailable(furnaceNative?.chipIds);
+  const [smsRomBusy, setSmsRomBusy] = useState(false);
+  const handleExportSmsRom = useCallback(async (gameGear: boolean, downloadFn: (blob: Blob, filename: string) => void, onClose: () => void) => {
+    const label = gameGear ? 'Game Gear' : 'Master System';
+    setSmsRomBusy(true);
+    try {
+      const r = await (await import('@lib/export/sms/smsExport')).exportSmsRom(gameGear);
+      downloadFn(new Blob([r.rom as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}${gameGear ? '.gg' : '.sms'}`);
+      notify.success(`${label} ROM exported (${r.rom.byteLength} bytes).`);
+      r.warnings.forEach((w) => notify.warning(w));
+      onClose();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : `${label} export failed.`);
+    } finally {
+      setSmsRomBusy(false);
+    }
+  }, [metadata]);
   const [snesRomBusy, setSnesRomBusy] = useState(false);
   const handleExportSnesRom = useCallback(async (downloadFn: (blob: Blob, filename: string) => void, onClose: () => void) => {
     setSnesRomBusy(true);
@@ -712,6 +733,9 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportMdRom,
     mdRomAvailable,
     mdRomBusy,
+    handleExportSmsRom,
+    smsRomAvailable,
+    smsRomBusy,
     handleExportNsfe,
     nesRomAvailable,
     nesRegion,

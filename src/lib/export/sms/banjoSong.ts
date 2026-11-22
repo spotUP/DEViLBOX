@@ -1,0 +1,230 @@
+// Furnace song -> Banjo (Joe Kennedy, MIT, third-party/banjo) song data for one SN76489.
+// Byte-for-byte port of the SN76489 path of third-party/banjo/json2sms.py, with labels
+// resolved to absolute Z80 addresses so the result drops into the prebuilt player.
+import type { FurnaceModule } from '../../import/formats/FurnaceSongParser';
+import type { FurnaceInstrument, FurnaceMacro } from '../../import/formats/furnace/FurnaceInstrumentParser';
+import { convertFurnaceNoteValue } from '../../import/formats/furnace/FurnacePatternParser';
+import { Lossy } from '../md/mdsSong';
+import { expandProcMacro } from '../nes/famistudioSong';
+
+/** Driver routine addresses the song header points at (from public/sms/player.json). */
+export interface BanjoLayout {
+  song_data: number;
+  banjo_init_sn: number;
+  banjo_update_channels_sn: number;
+  banjo_mute_channel_sn: number;
+  banjo_mute_all_sn: number;
+  banjo_song_stop: number;
+}
+
+export interface BanjoSong { bytes: Uint8Array; lossy: string[] }
+
+const SMS_FILE_ID = 0x03;
+export function banjoSystemsSupported(sys: readonly number[]): boolean {
+  return sys.length === 1 && sys[0] === SMS_FILE_ID;
+}
+
+const MAGIC = 0xba, BANJO_HAS_SN = 0x01, CHANNELS = 4, FLAGS_LOOP = 2;
+const NOTE_OFF = 0x01, INSTRUMENT_CHANGE = 0x02, SN_NOISE_MODE = 0x05, SLIDE_UP = 0x06, SLIDE_DOWN = 0x07, SLIDE_PORTA = 0x08,
+  SLIDE_OFF = 0x09, ARPEGGIO = 0x0a, ARPEGGIO_OFF = 0x0b, VIBRATO = 0x0c, VIBRATO_OFF = 0x0d, LEGATO_ON = 0x0e, LEGATO_OFF = 0x0f,
+  GAME_GEAR_PAN = 0x10, ORDER_JUMP = 0x19, SET_SPEED_1 = 0x1a, SET_SPEED_2 = 0x1b, ORDER_NEXT = 0x1c, NOTE_DELAY = 0x1d,
+  NOTE_RELEASE = 0x1e, VOLUME_CHANGE = 0x20, END_LINE = 0x40, NOTE_ON = 0x80;
+const FLAG_VOLUME_MACRO = 0x08, FLAG_ARP_MACRO = 0x04, FLAG_EX_MACRO = 0x80;
+const MACRO_VOLUME = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_PITCH = 4;
+const EX_TYPE: Record<number, number> = { 0: 0x02, 1: 0x40, 2: 0x20, 3: 0x10, 4: 0x01, 5: 0 };
+const HANDLED_EFFECTS = new Set([0x20, 0x00, 0x01, 0x02, 0x03, 0x04, 0xea, 0x80, 0x08, 0x0b, 0x0d, 0x09, 0x0f, 0xed, 0xec]);
+const NONE = 0xff;
+
+interface Seq { code: number; data: number[]; length: number; loop: number; release: number; speed: number; delay: number }
+
+/** Furnace macro as a plain step sequence; ADSR / LFO macros (type bits 1-2) run through the shared Furnace state machine. */
+function toSeq(raw: FurnaceMacro, version: number): Seq {
+  const m = expandProcMacro(raw, version);
+  const loop = m.loop >= 0 && m.loop < m.length ? m.loop : NONE;
+  const release = m.release >= 0 && m.release < 255 ? m.release : NONE;
+  return { code: m.code, data: m.data.slice(0, m.length), length: m.length, loop, release, speed: Math.max(1, m.speed), delay: m.delay };
+}
+
+function stepped(s: Seq, data: number[]): { body: number[]; delay: number[] } {
+  const body: number[] = [];
+  for (const v of data) for (let k = 0; k < s.speed; k++) body.push(v);
+  return { body, delay: new Array<number>(s.delay).fill(body[0] ?? 0) };
+}
+
+function volumeMacro(s: Seq): number[] {
+  const { body, delay } = stepped(s, s.data.map((v) => 15 - (v & 15)));
+  let susLoop = s.loop !== NONE ? s.loop * s.speed + s.delay + 4 : 0;
+  let susLen = s.length * s.speed + s.delay + 4;
+  let relLoop = susLoop, relLen = susLen;
+  if (s.release !== NONE) {
+    relLen = susLen;
+    susLen = s.release * s.speed + s.delay + 5;
+    if (s.loop === NONE) { relLoop = 0; susLoop = susLen - 1; }
+    else if (s.loop < s.release) relLoop = 0;
+    else { relLoop = susLoop; susLoop = susLen - 1; }
+  }
+  return [susLen, susLoop, relLen, relLoop, ...delay, ...body];
+}
+
+function shortMacro(s: Seq, data: number[]): number[] {
+  const { body, delay } = stepped(s, data);
+  const loop = s.loop !== NONE ? s.loop * s.speed + s.delay + 1 : 0;
+  return [s.length * s.speed + s.delay + 2, loop, ...delay, ...body];
+}
+
+interface InsOut { flags: number; vol: number[] | null; arp: number[] | null; exType: number; ex: number[] | null }
+
+function convertInstrument(ins: FurnaceInstrument, version: number, lossy: Lossy): InsOut {
+  const out: InsOut = { flags: 0, vol: null, arp: null, exType: 0, ex: null };
+  for (const m of ins.macros) {
+    if (m.length <= 0) continue;
+    const s = toSeq(m, version);
+    if (s.length === 0) continue;
+    if (s.code === MACRO_VOLUME) out.vol = volumeMacro(s);
+    else if (s.code === MACRO_ARP) out.arp = shortMacro(s, s.data.map((v) => (v & 0x7f) | ((Math.abs(v) >> 23) & 0x80)));
+    else if (out.ex === null) {
+      out.exType = EX_TYPE[s.code] ?? s.code;
+      let data = s.data;
+      if (s.code === MACRO_PITCH) data = data.map((v) => -Math.max(-128, Math.min(255, v)));
+      if (s.code === MACRO_DUTY) {
+        const { body, delay } = stepped(s, data);
+        for (let j = 0; j < body.length; j++) if (j === 0 || body[j] !== (body[j - 1] & 0x7f)) body[j] |= 0x80;
+        if (delay.length) delay[0] |= 0x80;
+        const loop = s.loop !== NONE ? s.loop * s.speed + s.delay + 1 : 0;
+        out.ex = [s.length * s.speed + s.delay + 2, loop, ...delay, ...body];
+      } else out.ex = shortMacro(s, data);
+    } else lossy.add(`second extra macro (code ${s.code}) on one instrument`);
+  }
+  if (out.vol) out.flags |= FLAG_VOLUME_MACRO;
+  if (out.arp) out.flags |= FLAG_ARP_MACRO;
+  if (out.ex) out.flags |= FLAG_EX_MACRO;
+  return out;
+}
+
+/** One channel pattern as Banjo commands (json2sms pattern loop, SN76489 channel). */
+function convertPattern(
+  cellAt: (r: number) => { note: number; octave: number; instrument: number; volume: number; effects: { type: number; value: number }[] } | undefined,
+  rows: number, sub: number, tb1: number, nIns: number, transpose: number, lossy: Lossy,
+): number[] {
+  const out: number[] = [];
+  let curIns = -1, curVol = -1, lastWasEnd = false;
+  const push = (...b: number[]) => { out.push(...b.map((x) => x & 0xff)); lastWasEnd = false; };
+  for (let r = 0; r < rows; r++) {
+    const cell = cellAt(r);
+    const fx = (cell?.effects ?? []).filter((e) => e.type >= 0).map((e) => ({ type: e.type, value: e.value < 0 ? 0 : e.value }));
+    if (cell && cell.instrument !== -1 && cell.instrument !== curIns) {
+      curIns = cell.instrument;
+      if (curIns < nIns) push(INSTRUMENT_CHANGE, curIns);
+    }
+    for (const { type: t, value: v } of fx) {
+      if (t === 0x20) push(SN_NOISE_MODE, (v & 1) | ((v & 0x10) >> 3));
+      else if (t === 0x00) { if (v) push(ARPEGGIO, v); else push(ARPEGGIO_OFF); }
+      else if (t === 0x01 || t === 0x02 || t === 0x03) { if (v) push(t === 0x01 ? SLIDE_UP : t === 0x02 ? SLIDE_DOWN : SLIDE_PORTA, v); else push(SLIDE_OFF); }
+      else if (t === 0x04) {
+        const speed = v >> 4, amount = v & 0x0f;
+        if (speed && amount) push(VIBRATO, speed | (amount << 4)); else push(VIBRATO_OFF);
+      } else if (t === 0xea) push(v > 0 ? LEGATO_ON : LEGATO_OFF);
+      else if (t === 0x80 || t === 0x08) {
+        const left = t === 0x80 ? (v > 0x80 ? 0 : 1) << (sub + 4) : (v & 0xf0 ? 1 : 0) << (sub + 4);
+        // json2sms compares the whole 08xy byte with 0x0f for the right side; kept as written so the driver hears what Banjo's own tool emits.
+        const right = t === 0x80 ? (v < 0x80 ? 0 : 1) << sub : (v < 0x0f ? 1 : 0) << sub;
+        const mask = ~(1 << sub) & 0x0f;
+        push(GAME_GEAR_PAN, left | right, mask | (mask << 4));
+      } else if (t === 0x0b) push(ORDER_JUMP, v);
+      else if (t === 0x0d) push(ORDER_NEXT);
+      else if (t === 0x09) { if (v) push(SET_SPEED_1, v * tb1); }
+      else if (t === 0x0f) { if (v) push(SET_SPEED_2, v * tb1); }
+      else if (t === 0xed) push(NOTE_DELAY, v * tb1);
+      else if (!HANDLED_EFFECTS.has(t)) lossy.add(`effect ${t.toString(16).toUpperCase().padStart(2, '0')}xx (not in Banjo)`);
+    }
+    if (cell && cell.volume !== -1 && cell.volume !== curVol) { push(VOLUME_CHANGE | Math.min(15, cell.volume)); curVol = cell.volume; }
+    const nv = cell ? convertFurnaceNoteValue(cell) : -1;
+    if (nv >= 0 && nv < 253) push(NOTE_ON | (Math.max(0, nv + transpose) & 0x7f));
+    else if (nv === 253) push(NOTE_OFF);
+    else if (nv === 254 || nv === 255) push(NOTE_RELEASE);
+    for (const { type: t, value: v } of fx) if (t === 0xec) push(NOTE_DELAY, v, NOTE_OFF);
+    // End of line: merge with a directly preceding end-line while its wait fits in 6 bits.
+    if (lastWasEnd && (out[out.length - 1] & 0x3f) < 0x3f) out[out.length - 1]++;
+    else { out.push(END_LINE); lastWasEnd = true; }
+  }
+  return out;
+}
+
+export function furnaceToBanjo(m: FurnaceModule, subsong: number, layout: BanjoLayout): BanjoSong {
+  if (!banjoSystemsSupported(m.systems)) {
+    throw new Error(`Banjo export needs a Master System song (one SN76489); systems are ${m.systems.map((x) => x.toString(16)).join(',')}`);
+  }
+  const lossy = new Lossy();
+  const s = m.subsongs[subsong];
+  const tb1 = (s.timeBase ?? 0) + 1;
+  if (s.speedPattern && s.speedPattern.length > 2) lossy.add(`speed pattern of ${s.speedPattern.length} steps (first two kept)`);
+  const speed1 = s.speedPattern?.length ? s.speedPattern[0] : s.speed1;
+  const speed2 = s.speedPattern?.length ? (s.speedPattern[1] ?? s.speedPattern[0]) : s.speed2;
+  // Banjo's SN table is fixed at A4 = 440 Hz: a song tuned elsewhere moves by whole semitones, the rest is reported.
+  const tuneSemis = 12 * Math.log2((m.tuning || 440) / 440), transpose = Math.round(tuneSemis);
+  const cents = Math.round((tuneSemis - transpose) * 100);
+  if (Math.abs(cents) >= 5) lossy.add(`tuning A4 = ${m.tuning} Hz: notes moved ${transpose} semitones, ${cents} cents off`);
+  if (Math.abs(s.hz - 60) > 0.5 && Math.abs(s.hz - 50) > 0.5) lossy.add(`tick rate ${s.hz} Hz: Banjo steps once per video frame`);
+  const ordersLen = s.ordersLen;
+  if (ordersLen > 255 || s.patLen > 255) throw new Error('Banjo export: more than 255 orders or rows per pattern');
+
+  const instruments = m.instruments.map((ins) => convertInstrument(ins, m.version, lossy));
+  const cellAt = (ch: number, pat: number, r: number) => m.patterns.get(`${subsong}_${ch}_${pat}`)?.rows[r];
+
+  // Layout (json2sms order): header, mute-call table, macros, instruments, order pointers, order rows, patterns.
+  const HEADER = 34; // sizeof music_state (banjo_defines_wladx.inc)
+  const base = layout.song_data;
+  const muteTable = base + HEADER;
+  let at = muteTable + CHANNELS * 2;
+  const blobs: number[][] = [];
+  const place = (b: number[]) => { const a = at; blobs.push(b); at += b.length; return a; };
+  const insPtrs = instruments.map((i) => ({
+    vol: i.vol ? place(i.vol) : 0xffff,
+    arp: i.arp ? place(i.arp) : 0xffff,
+    ex: i.ex ? place(i.ex) : 0xffff,
+  }));
+  const instrumentData = at;
+  const insBytes: number[] = [];
+  instruments.forEach((i, n) => {
+    const p = insPtrs[n];
+    insBytes.push(i.flags, p.vol & 0xff, p.vol >> 8, p.arp & 0xff, p.arp >> 8, i.exType, p.ex & 0xff, p.ex >> 8, 0xff, 0xff, 0xff, 0xff);
+  });
+  place(insBytes);
+  const orderPtrs = at;
+  at += ordersLen * 2;
+  const orderRowsAt = at;
+  at += ordersLen * CHANNELS * 2;
+
+  const patAddr = new Map<string, number>();
+  const patBlobs: number[][] = [];
+  for (let ch = 0; ch < CHANNELS; ch++) {
+    for (let o = 0; o < ordersLen; o++) {
+      const pat = s.orders[ch]?.[o] ?? 0;
+      const key = `${ch}_${pat}`;
+      if (patAddr.has(key)) continue;
+      const b = convertPattern((r) => cellAt(ch, pat, r), s.patLen, ch, tb1, instruments.length, ch < 3 ? transpose : 0, lossy);
+      patAddr.set(key, at);
+      patBlobs.push(b);
+      at += b.length;
+    }
+  }
+
+  const w16 = (v: number) => [v & 0xff, (v >> 8) & 0xff];
+  const header = [
+    MAGIC, 1, CHANNELS, FLAGS_LOOP, 0, 0, BANJO_HAS_SN, 0xff, 0xff,
+    tb1, speed1 * tb1, speed2 * tb1, s.patLen, ordersLen,
+    ...w16(instrumentData), ...w16(orderPtrs),
+    speed1 * tb1, s.patLen, 0, 0xff, 0, 0xff,
+    ...w16(layout.banjo_init_sn), ...w16(layout.banjo_update_channels_sn), ...w16(muteTable),
+    ...w16(layout.banjo_mute_all_sn), ...w16(layout.banjo_song_stop),
+  ];
+  if (header.length !== HEADER) throw new Error(`Banjo header is ${header.length} bytes, expected ${HEADER}`);
+  const out: number[] = [...header];
+  for (let c = 0; c < CHANNELS; c++) out.push(...w16(layout.banjo_mute_channel_sn));
+  for (const b of blobs) out.push(...b);
+  for (let o = 0; o < ordersLen; o++) out.push(...w16(orderRowsAt + o * CHANNELS * 2));
+  for (let o = 0; o < ordersLen; o++) for (let ch = 0; ch < CHANNELS; ch++) out.push(...w16(patAddr.get(`${ch}_${s.orders[ch]?.[o] ?? 0}`) ?? 0));
+  for (const b of patBlobs) out.push(...b);
+  if (base + out.length !== at) throw new Error('Banjo layout mismatch');
+  return { bytes: Uint8Array.from(out.map((x) => x & 0xff)), lossy: lossy.list() };
+}
