@@ -235,6 +235,14 @@ describe('furnaceToFamistudio', () => {
     expect(has(music, encodeEnvelope(vib(-3), 0, -1, 'pitch'))).toBe(true);
     expect(has(music, encodeEnvelope(vib(0), 0, -1, 'pitch'))).toBe(false);
   });
+  it('plays the loop target with the E5 fine pitch left at the song end (Furnace keeps chan.pitch across the loop; Sky Sanctuary triangle)', () => {
+    const mod = nesModule({ 0: { 0: A4, 8: { ...A4, effects: [{ type: 0xe5, value: 0x90 }] } } });
+    const song = furnaceToFamistudio(mod);
+    const st = song.sizes.header + song.sizes.samples + song.sizes.envelopes;
+    const p1 = song.music.slice(st, st + song.sizes.streams[0]);
+    // Row 8 sends fine 0x4e ff; the loop pass sends it again on row 0, where a single pass replays row 0 without it.
+    expect([...p1].filter((b, i) => b === 0x4e && p1[i + 1] === 0xff).length).toBe(2);
+  });
   it('rounds fine pitch and an absolute pitch macro together as Furnace does, minus the sent fine offset (E57D + pitch macro)', () => {
     // Furnace sums chan.pitch (E5xx - 0x80) and pitch2 (the macro) in 1/128 semitone and rounds once; the engine adds the 0x4e
     // fine offset F to the envelope, so each value is round(X * 2^(-(v + fp) / 1536)) - 1 - P - F, not round(P * (2^(-v/1536) - 1)).

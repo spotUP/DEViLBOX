@@ -31,6 +31,8 @@ class Lossy {
   private counts = new Map<string, number>();
   add(item: string, n = 1): void { this.counts.set(item, (this.counts.get(item) ?? 0) + n); }
   list(): string[] { return [...this.counts].map(([k, n]) => `${k}: ${n}`); }
+  save(): Map<string, number> { return new Map(this.counts); }
+  restore(saved: Map<string, number>): void { this.counts = saved; }
 }
 
 const VRC6_SYSTEM = 0x88; // Furnace file system id: VRC6 (channels 5-7 after the five 2A03 ones: pulse, pulse, saw)
@@ -272,6 +274,8 @@ const SLIDE_FX = new Set([0x01, 0x02, 0x03, 0xe1, 0xe2]);
 const clamp8 = (v: number): number => Math.max(-127, Math.min(127, Math.round(v)));
 /** Furnace VOL_SCALE_LINEAR_BROKEN (dispatch.h): channel volume x macro volume. Default floors; FamiStudio's volume table
  *  rounds up, so a channel volume under 15 is baked into the volume envelope and the channel volume sent as 15. */
+/** Volume cache value that forces the next 0x70 (-1 instead skips it on a note: the slide or default volume is in place). */
+const LAST_VOL_UNKNOWN = -2;
 const KEY_BAKE = 2 ** 28; // instrument key = macro index + 65536 * (1 + hardware envelope) + KEY_BAKE * (1 + baked channel volume)
 const scaleVol = (vol: number, env: number, flags: { newVolumeScaling?: unknown; ceilVolumeScaling?: unknown } | undefined): number => {
   const e = Math.min(15, env);
@@ -286,20 +290,23 @@ const FME7_MUSIC_ADDR = 0x6000;
 const FME7_MUSIC_CAP = 0x6000;
 
 export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2000): FamistudioSong {
-  // Note cuts cost 2 bytes per row, a held 01/02 slide 3 extra bytes per note; when the song is over the cap, drop cuts
-  // first, then held slides (the notes then play unslid), then both.
+  // The loop pass (end-of-song state at the loop target) is tried first in each music area and kept only when it fits
+  // with nothing dropped: it never moves a song to another area. Then note cuts cost 2 bytes per row, a held 01/02 slide
+  // 3 extra bytes per note; when the song is over the cap, drop cuts first, then held slides (the notes then play
+  // unslid), then both.
   let base = 0x8000;
   let cap = MUSIC_CAP;
-  let song = convert(m, subsong, dpcmCap, true, true, base);
+  let song = convert(m, subsong, dpcmCap, true, true, base, true);
+  if (song.music.length > cap) song = convert(m, subsong, dpcmCap, true, true, base, false);
   // shortcut: VRC6 songs stay on the 16 KB mapper-24 player; give player-vrc6 a second music bank when one needs it.
   if (song.music.length > cap && !song.vrc6) {
     base = FME7_MUSIC_ADDR;
     cap = FME7_MUSIC_CAP;
-    song = convert(m, subsong, dpcmCap, true, true, base);
+    song = convert(m, subsong, dpcmCap, true, true, base, true);
   }
-  for (const [cuts, held] of [[false, true], [true, false], [false, false]]) {
+  for (const [cuts, held] of [[true, true], [false, true], [true, false], [false, false]]) {
     if (song.music.length <= cap) break;
-    song = convert(m, subsong, dpcmCap, cuts, held, base);
+    song = convert(m, subsong, dpcmCap, cuts, held, base, false);
     if (!cuts) song.lossy.push(`note cut EC dropped to fit the ${cap / 1024} KiB music area`);
     if (!held) song.lossy.push(`01/02 slide held over later notes dropped to fit the ${cap / 1024} KiB music area`);
   }
@@ -428,7 +435,7 @@ export function bestSlideStep(o: { rawFrom: number; fromPeriod: number; toPeriod
   return [sign * best, bestCost];
 }
 
-function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean, base: number): FamistudioSong {
+function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean, base: number, withLoop: boolean): FamistudioSong {
   const lossy = new Lossy();
   const pitchLossy: PitchLossySpan[] = [];
   const s = m.subsongs[subsong];
@@ -474,6 +481,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
 
   // Frame at which each row starts (speed effects in any channel apply to all; tick rate scales frames per tick).
   const rowFrame: number[][] = [], rowSpeed: number[][] = [];
+  let songEndFrame = 0;
   {
     let f = 0, cur = 0;
     let sp = [...speeds];
@@ -495,6 +503,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         cur = (cur + 1) % sp.length;
       }
     }
+    songEndFrame = Math.round(f);
   }
   // The engine adds a 8.8 step of 256 x tempo / 150 per frame and starts a row when the integer part reaches the speed.
   // A rounded step drifts a row by a frame every few hundred rows (virtual tempo 155/112: step 354.29), so speeds and
@@ -603,7 +612,10 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   const firstNotes: number[] = [];
   const firstNoteFrames: number[] = [];
   const speedFx = new Set([0x09, 0x0f]);
+  // forceVol: the channel is converted again with the volume cache unknown at the loop target (see the loop-row check).
+  let forceVol = false;
   for (let ch = 0; ch < NCH; ch++) {
+    const chMark = { envs: envs.length, ins: insMap.size, pl: pitchLossy.length, lossy: lossy.save() };
     const out: number[] = [];
     const fx: Array<[number, number]> = [];
     // 2A03 hardware volume state (nes.cpp): 15xx envMode, 16xx length index, volume column = envelope period in envelope modes.
@@ -612,7 +624,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     let slideOps: number[] = [];
     let slVol = ch === 7 ? 63 : 15, slStep = 0, slFrame = 0; // Furnace channel volume under a running 0Axy (volume units), its step per tick
     let loopSlide = ''; // running 0Axy as the first pass enters the loop target
-    let lastIns = -1, lastVol = -1, empty = 0, hasNotes = false, loopAt = 0, first = -1, firstFrame = -1;
+    let lastIns = -1, lastVol = -1, empty = 0, hasNotes = false, first = -1, firstFrame = -1;
     let curIns: FurnaceInstrument | undefined;
     let vibPos = 0, vibFrame = 0; // Furnace's vibratoPos (64-step sine) at the row start
     let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, arpXY = 0, arpOn = -1, keyOff = false, noteArp: number[] | null = null, fineRaw = 128, fineSent = 0;
@@ -623,9 +635,14 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     const tonal = ch < 3 || ch === 5 || ch === 6; // VRC6 pulses share the 2A03 pulse period (divider 16); the saw (14) keeps no vibrato or slides
     const seq: Array<{ cell?: FurnacePatternCell; frame: number }> = [];
     for (let o = 0; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: rowFrame[o][r] });
+    // The loop pass (orders loopOrder..end again, after the song end): rows played with the end-of-song state.
+    const n1 = seq.length, loopRi = orderLen.slice(0, loopOrder).reduce((a, b) => a + b, 0);
+    for (let o = loopOrder; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: rowFrame[o][r] + songEndFrame - rowFrame[loopOrder][0] });
+    /** End of the pass row i belongs to: look-aheads stop there, as the first pass always did. */
+    const lim = (i: number): number => (i < n1 ? n1 : seq.length);
     /** Frames until the next note or slide effect on this channel (how long a slide runs). */
     const span = (i: number): number => {
-      for (let j = i + 1; j < seq.length; j++) {
+      for (let j = i + 1; j < lim(i); j++) {
         const c = seq[j].cell;
         if (c && (convertFurnaceNoteValue(c) >= 0 || c.effects.some((e) => SLIDE_FX.has(e.type)))) return Math.min(240, seq[j].frame - seq[i].frame);
       }
@@ -633,11 +650,74 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     };
     const ev: number[] = []; // stream length after each event (note byte, wait byte, slide): the reference boundaries
     const flush = (): void => { if (empty > 0) { out.push(0x81 | ((empty - 1) << 1)); empty = 0; ev.push(out.length); } };
-    let ri = 0;
-    for (let o = 0; o < endOrder; o++) {
+    /** Whether state left after row i is read again in its pass: the first later row that `kills` it (overwrites it before
+     *  any read) or `uses` it decides; the pass end counts as a read (the loop replays it). */
+    const liveAfter = (i: number, use: (c: FurnacePatternCell) => boolean, kill: (c: FurnacePatternCell) => boolean): boolean => {
+      for (let j = i + 1; j < lim(i); j++) { const c = seq[j].cell; if (c && kill(c)) return false; if (c && use(c)) return true; }
+      return true;
+    };
+    const hasFx = (c: FurnacePatternCell, ...t: number[]): boolean => c.effects.some((e) => t.includes(e.type));
+    const isNote = (c: FurnacePatternCell): boolean => { const v = convertFurnaceNoteValue(c); return v >= 0 && v < 253; };
+    // The state after a row that can change later bytes or the driver's state (frames relative to the current row): two
+    // rows with equal bytes and equal snapshots convert the rest of the pass alike. A field enters only while a later row
+    // can read it; slFrame is the row frame after every row (relative 0), and first/hasNotes do not reach the stream.
+    const snap = (): string => {
+      const notePorta = (c: FurnacePatternCell): boolean => isNote(c) && hasFx(c, 0x03);
+      // curNote: the slide/fine/vibrato source on rows without a note, and the 03xx porta start; a plain note replaces it.
+      const noteLive = tonal && liveAfter(ri, (c) => notePorta(c) || (!isNote(c) && hasFx(c, 0x00, 0x04, 0xe5, ...SLIDE_FX)), (c) => isNote(c) && !notePorta(c));
+      // curIns: read by notes and by 00xy/04xy rebuilds (pitch macro); an instrument column replaces it first.
+      const insLive = liveAfter(ri, (c) => isNote(c) || hasFx(c, 0x00, 0x04), (c) => c.instrument >= 0);
+      // vibratoPos: read by every vibrato rebuild; a note zeroes it (not under continuousVibrato or a keyed-on 03xx).
+      const vibLive = tonal && liveAfter(ri, (c) => notePorta(c) || hasFx(c, 0x00, 0x04) || (isNote(c) && !!m.compatFlags?.continuousVibrato), (c) => isNote(c) && !notePorta(c) && !m.compatFlags?.continuousVibrato);
+      // keyOff: a later note clears a running 00xy after a note off; a note off sets it again, a note with no arp running clears it.
+      const offLive = noteLive || liveAfter(ri, (c) => (hasFx(c, 0x00) && !isNote(c)) || (isNote(c) && arpXY !== 0), (c) => { const v = convertFurnaceNoteValue(c); return v === 253 || v === 254 || (isNote(c) && arpXY === 0); });
+      // slVol: the 0Axy slide's start volume; a volume column replaces it first.
+      const slLive = slideOps.length > 0 || liveAfter(ri, (c) => hasFx(c, 0x0a), (c) => c.volume >= 0);
+      // furVol: read by notes (instrument key, bake, volume byte); a volume column replaces it first.
+      const furLive = liveAfter(ri, isNote, (c) => c.volume >= 0);
+      // bake/baked: read by a volume column on a row with no note; a note re-bakes first.
+      const bakeLive = liveAfter(ri, (c) => c.volume >= 0, (c) => isNote(c));
+      return JSON.stringify([envMode, lenIdx, furLive ? furVol : null, hwVol, ch === 0 && !spdOut ? lastSpd : null,
+        !bakeLive ? null : !hwVol && baked && bake ? [bake.vol, bake.vals, bake.held, Math.min(seq[ri].frame - bake.frame, bake.vals.length - 1)] : !hwVol && baked,
+        slideOps, slLive ? slVol : null, slideOps.length ? slStep : null, lastIns, lastVol, empty,
+        vibLive ? [vibPos, (vibXY & 15) > 0 ? seq[ri].frame - vibFrame : 0] : null, insLive ? curInsIdx : null, noteLive ? curNote : null,
+        vibXY, vibOn, arpXY, arpOn, offLive ? keyOff : null, noteArp, fineRaw, fineSent, heldSlide]);
+    };
+    // Song loop: Furnace keeps the end-of-song state (fine pitch, arp, vibrato, slides, volume) at the loop target, while
+    // the stream's 0x42 jump replays first-pass bytes. Each channel converts the loop pass with the end-of-song state;
+    // from the first row X of a run of rows whose bytes equal the first pass's, up to a row whose state after it equals
+    // the first pass's too (or the song end), the copy is dropped and the loop jumps to the first pass's row X.
+    const pass1: Array<{ at: number; sig: string; post: string }> = [];
+    type Mark = { at: number; ev: number; efx: number; pl: number; envs: number; ins: number; lossy: Map<string, number> };
+    let ri = 0, loopTarget = -1, loopPassAt = 0, p1Vol = -1, retry = false, run: (Mark & { to: number }) | null = null;
+    const converge = (mk: Mark & { to: number }): void => {
+      out.length = mk.at; ev.length = mk.ev; efx.length = mk.efx; pitchLossy.length = mk.pl; empty = 0;
+      for (const [k, id] of envKey) if (id >= mk.envs) envKey.delete(k);
+      envs.length = mk.envs;
+      for (const [k, id] of insMap) if (id >= mk.ins) insMap.delete(k);
+      lossy.restore(mk.lossy);
+      loopTarget = mk.to;
+    };
+    passes: for (let p = 0; p < (withLoop ? 2 * endOrder - loopOrder : endOrder); p++) {
+      const pass2 = p >= endOrder, o = pass2 ? p - endOrder + loopOrder : p;
       // The loop target is entered with the end-of-song instrument, not the first pass's: send the instrument again.
-      if (o === loopOrder) { flush(); loopAt = out.length; lastIns = -1; loopSlide = slideOps.join(); }
+      if (o === loopOrder) {
+        // shortcut: a 0Axy running at the loop target on one pass only stays lossy (the loop pass does not compare it).
+        if (pass2 && slideOps.join() !== loopSlide) lossy.add('volume slide 0Axy running on one pass of the loop target only');
+        flush(); if (pass2 || !withLoop) loopPassAt = out.length; if (!pass2) loopSlide = slideOps.join(); lastIns = -1;
+        // The driver enters the loop target from the song start and from the song end. When the volume caches differ
+        // there, both passes restart from LAST_VOL_UNKNOWN (the next note or volume column sends 0x70), so they converge.
+        if (!pass2) p1Vol = lastVol;
+        else if (!forceVol && lastVol !== p1Vol) { retry = true; break passes; }
+        if (forceVol) lastVol = LAST_VOL_UNKNOWN;
+      }
       for (let r = 0; r < orderLen[o]; r++, ri++) {
+        const q = pass2 ? pass1[ri - n1 + loopRi] : null;
+        if (q && q.at >= 0) {
+          flush(); // a first-pass row on an event boundary can be jumped to: start the loop-pass copy on one too
+          run ??= { at: out.length, ev: ev.length, efx: efx.length, pl: pitchLossy.length, envs: envs.length, ins: insMap.size, lossy: lossy.save(), to: q.at };
+        }
+        const startEmpty = empty, startAt = out.length, startEfx = efx.length;
         const cell = cellAt(ch, o, r);
         const ops: Array<number | { env: number }> = [];
         const insOps: number[] = [];
@@ -650,15 +730,15 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         }
         // Furnace stops a running 0Axy once the volume passes its maximum or drops below 0 (playback.cpp, unless noVolSlideReset).
         if (slideOps.length && slVol >= 0) {
-          slVol += slStep * (rowFrame[o][r] - slFrame) / perTick;
+          slVol += slStep * (seq[ri].frame - slFrame) / perTick;
           if ((slVol >= (ch === 7 ? 64 : 16) || slVol < 0) && !m.compatFlags?.noVolSlideReset) slideOps = [];
         }
-        slFrame = rowFrame[o][r];
+        slFrame = seq[ri].frame;
         if (cell) {
           if (cell.instrument >= 0) { curIns = m.instruments[cell.instrument]; curInsIdx = cell.instrument; }
           // Furnace steps vibratoPos by the rate each tick (a new note zeroes it unless continuousVibrato) while the depth is above 0; the elapsed ticks run with the previous 04xy.
-          if ((vibXY & 15) > 0) vibPos = (vibPos + (vibXY >> 4) * Math.round((rowFrame[o][r] - vibFrame) / perTick)) & 63;
-          vibFrame = rowFrame[o][r];
+          if ((vibXY & 15) > 0) vibPos = (vibPos + (vibXY >> 4) * Math.round((seq[ri].frame - vibFrame) / perTick)) & 63;
+          vibFrame = seq[ri].frame;
           // The loop target is entered again with the end-of-song state: its effects are sent there even when they match the first pass.
           const atLoop = o === loopOrder && r === 0;
           if (atLoop) { fineSent = NaN; vibOn = -2; arpOn = -2; } // -2: override state unknown, sent either way
@@ -694,7 +774,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           else if (nv === 254 || nv === 255) rowByte = ch === DPCM_CH ? [0x00] : [0x45];
           else if (nv >= 0) {
             hasNotes = true;
-            if (first < 0) { first = nv; firstFrame = rowFrame[o][r]; }
+            if (first < 0) { first = nv; firstFrame = seq[ri].frame; }
             if (ch === DPCM_CH) {
               const b = dpcmNote(curIns, nv);
               rowByte = b > 0 ? [b] : null;
@@ -814,7 +894,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             else if (arpOn !== -1) { ops.push(0x4c); arpOn = -1; lastIns = -1; }
           }
           // A cut at or after the end of its row never fires; skip it (saves 2 bytes per row against the 16 KiB cap).
-          if (withCuts && cutTicks > 0 && seq[ri + 1] && cutTicks * perTick < seq[ri + 1].frame - seq[ri].frame) ops.push(0x48, Math.min(255, Math.round(cutTicks * perTick)));
+          if (withCuts && cutTicks > 0 && ri + 1 < lim(ri) && cutTicks * perTick < seq[ri + 1].frame - seq[ri].frame) ops.push(0x48, Math.min(255, Math.round(cutTicks * perTick)));
           if (cell.volume >= 0) {
             if (ch === DPCM_CH) lossy.add('volume column on DPCM');
             else { slVol = cell.volume; furVol = Math.min(15, ch === 7 ? Math.round(cell.volume / 4) : cell.volume); /* VRC6 saw volume is 0-63 */ if (!hwVol && baked && n === 0 && bake) {
@@ -849,7 +929,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             const key = (hwVol ? idx + 65536 * (1 + (envMode | (furVol << 2) | (lenIdx << 6))) : idx) + (baked ? KEY_BAKE * (1 + furVol) : 0);
             if (key !== lastIns) { insOps.push(0x80 | (insNo(key) << 1)); lastIns = key; }
             const fsVol = hwVol || baked ? 15 : furVol;
-            if (hwVol || baked ? lastVol !== 15 : lastVol >= 0 && lastVol !== furVol) { ops.push(0x70 | fsVol); lastVol = fsVol; }
+            if (hwVol || baked ? lastVol !== 15 : lastVol !== -1 && lastVol !== furVol) { ops.push(0x70 | fsVol); lastVol = fsVol; }
           }
           if (volSlide < 0 && slideOps.length && (cell.volume >= 0 || n > 0)) { ops.push(...slideOps); lastVol = -1; }
           // Slides: 0x50 step,from,to replaces the note byte (it attacks the note); 0x43 first keeps a held note from retriggering.
@@ -891,8 +971,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             // A lossy slide is off until the next note on this channel.
             const markPitchLossy = (): void => {
               let j = ri + 1;
-              while (j < seq.length && !(seq[j].cell && convertFurnaceNoteValue(seq[j].cell!) >= 0)) j++;
-              pitchLossy.push({ ch, from: seq[ri].frame, to: j < seq.length ? seq[j].frame : seq[ri].frame + 600 });
+              while (j < lim(ri) && !(seq[j].cell && convertFurnaceNoteValue(seq[j].cell!) >= 0)) j++;
+              pitchLossy.push({ ch, from: seq[ri].frame, to: j < lim(ri) ? seq[j].frame : seq[ri].frame + 600 });
             };
             if (to !== from && mag > 0) {
               if ((linear && Math.abs(to - from) > 2) || mag > 127.5) markPitchLossy();
@@ -926,12 +1006,27 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           if (rowByte) { out.push(...rowByte); ev.push(out.length); } else if (!slide) empty = 1; else ev.push(out.length);
         } else { empty++; }
         if (empty === MAX_EMPTY) flush();
+        const sig = `${out.slice(startAt).join()}|${efx.slice(startEfx).map(([at, id]) => `${at - startAt}:${id}`).join()}`, post = snap();
+        if (!pass2) { pass1.push({ at: startEmpty === 0 ? startAt : -1, sig, post }); continue; }
+        if (!q || q.sig !== sig) run = null;
+        else if (run && q.post === post) { converge(run); break passes; }
       }
     }
-    // The loop pass replays the first pass's bytes: a 0Axy running there on one pass only plays wrong on the other (sweatsmile noise order 4).
-    if (slideOps.join() !== loopSlide) lossy.add('volume slide 0Axy running on one pass of the loop target only');
+    // Bytes equal to the song end: the copy from the run start is the first pass's. Else loop the loop-pass copy itself.
+    if (retry) {
+      envs.length = chMark.envs;
+      for (const [k, id] of envKey) if (id >= chMark.envs) envKey.delete(k);
+      for (const [k, id] of insMap) if (id >= chMark.ins) insMap.delete(k);
+      pitchLossy.length = chMark.pl; lossy.restore(chMark.lossy);
+      forceVol = true; ch--; continue;
+    }
+    forceVol = false;
+    // Single pass: the 0x42 jump replays first-pass bytes, so a 0Axy running at the loop target on one pass only plays wrong on the other (sweatsmile noise order 4).
+    if (!withLoop && slideOps.join() !== loopSlide) lossy.add('volume slide 0Axy running on one pass of the loop target only');
+    if (loopTarget < 0 && run) converge(run);
+    if (loopTarget < 0) loopTarget = loopPassAt;
     flush();
-    const packed = compressRefs(out, ev, efx, loopAt);
+    const packed = compressRefs(out, ev, efx, loopTarget);
     out.length = 0; out.push(...packed.out);
     efx.length = 0; efx.push(...packed.efx);
     fx.push(...packed.refs.map((r): [number, number] => [r.at + 2, r.target]));
