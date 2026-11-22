@@ -21,6 +21,7 @@ registerEditableFormat({ formatId: "davidHanney", label: "David Hanney", pattern
 registerEditableFormat({ formatId: "ems", label: "EMS", patternCodec: { kind: "fixed" }, exporter: { module: "EmsExporter", fn: "exportEms", byLayout: true } });
 registerEditableFormat({ formatId: "fashionTracker", label: "Fashion Tracker", patternCodec: { kind: "fixed" }, exporter: { module: "FashionTrackerExporter", fn: "exportFashionTracker", byLayout: true } });
 registerEditableFormat({ formatId: "emsv6", label: "EMS v6", patternCodec: { kind: "variable" }, exporter: { module: "EmsV6Exporter", fn: "exportEmsV6", byLayout: true } });
+registerEditableFormat({ formatId: "robHubbardST", label: "Rob Hubbard ST", patternCodec: { kind: "variable" }, exporter: { module: "RobHubbardSTExporter", fn: "exportRobHubbardST", byLayout: true } });
 registerEditableFormat({ formatId: "richardJoseph", label: "Richard Joseph", patternCodec: { kind: "fixed" }, exporter: { module: "RichardJosephExporter", fn: "exportRichardJoseph", byLayout: true } });
 registerEditableFormat({ formatId: "tfmx7v", label: "Jochen Hippel 7V", patternCodec: { kind: "fixed" }, exporter: { module: "Tfmx7vExporter", fn: "exportTfmx7v", byLayout: true } });
 registerEditableFormat({ formatId: "jesperOlsen", label: "Jesper Olsen", patternCodec: { kind: "fixed" }, exporter: { module: "JesperOlsenExporter", fn: "exportJesperOlsen", byLayout: true } });

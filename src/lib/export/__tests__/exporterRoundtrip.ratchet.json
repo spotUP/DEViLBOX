@@ -1047,6 +1047,14 @@
       "matchPct": 1,
       "cells": 1408,
       "bytes": 6689
+    },
+    "robHubbardST": {
+      "exporter": "RobHubbardSTExporter.exportRobHubbardST",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 2762,
+      "bytes": 2762
     }
   },
   "missingFixture": [
