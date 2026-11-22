@@ -16,7 +16,8 @@
 ; hook_trap performs the same store and, when the address is AUDxVOL or its
 ; low byte, records the value (hookvol). Immediate source, (An) indirect, abs.l
 ; and software mixers are not seen, except EMS-6 (EMS6_VOICES: track note-on
-; stores in RAM, see .voice in hook_trap).
+; stores in RAM, see .voice in hook_trap) and Hippel-7V (HIP7V_VOICES: draw_bars
+; reads the player's voice records, no hook).
 ; shortcut: channel volume, not a sample envelope; a held or one-shot sample
 ; keeps its bar up. Upgrade: read Paula AUDxDAT or the sample position.
 
@@ -748,13 +749,42 @@ draw_bars:
         bne.b   .v0
         tst.w   drop
         bne.b   .v0
+        ifnd    OKT_VOICES              ; Oktalyzer reads software words, needs no hook table
         move.l  a4,d1
         beq.b   .v0
+        endc
+        ifnd    HIP7V_VOICES            ; 7V plays its mix on AUD3 only
         btst    d7,d6
         beq.b   .v0
+        endc
+        ifd     HIP7V_VOICES
+; Hippel-7V mixes 4 voices in software (no per-voice AUDxVOL store): read the
+; voice records, 16 bytes each at file offset $1bb2 = _uade_reloc_base+$1b96 (base is file offset $1c): word +6 period (0 = off), word +8 volume 0..63.
+; shortcut: offsets measured on the one 7V player binary (same for every .hip7 module).
+        move.w  d7,d1
+        lsl.w   #4,d1
+        move.l  _uade_reloc_base,a0
+        add.w   d1,a0
+        lea     $1b9c(a0),a0
+        tst.w   (a0)+
+        beq.b   .v0
+        move.w  (a0),d0
+        else
+        ifd     OKT_VOICES
+; Oktalyzer: per-channel volume word 0..64 at file $1a6+$12*k, hunk0 data at file $28 -> mem = file-$20,
+; i.e. _uade_reloc_base+$186+$12*k (stale when the channel is skipped).
+; shortcut: offsets measured on the one Oktalyzer player binary.
+        move.w  d7,d1
+        mulu    #$12,d1
+        move.l  _uade_reloc_base,a0
+        add.w   d1,a0
+        move.w  $186(a0),d0
+        else
         move.w  d7,d1
         mulu    chanstride,d1
         move.b  (a4,d1.w),d0
+        endc
+        endc
         cmp.b   #64,d0
         bls.b   .vok
         moveq   #64,d0
