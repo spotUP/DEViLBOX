@@ -702,12 +702,15 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               // unrounded period (measured on Sky Sanctuary: a depth-1 vibrato dips a period only above ~2 units), so offsets
               // are taken against the fractional base period, not the table's rounded one.
               const P = pulsePeriod(src || 46), X = pulsePeriodRaw(src || 46);
+              // Furnace adds fine pitch (E5xx) and vibrato in 1/128 semitone and rounds once; the engine adds the sent fine
+              // offset F to each step, so a step is taken at fine + vibrato minus F (rounding both apart was 1 off, one_sided_love).
+              const fp = fineRaw - 128, F = Math.round(X * 2 ** (-fp / 1536)) - 1 - P;
               vib = Array.from({ length: len }, (_, i) => {
                 const phase = vibPos + x * (Math.floor(i / perTick + 1e-9) + 1);
                 if (!linear) return Math.round(-amp * Math.sin(2 * Math.PI * phase / 64));
                 // Furnace: vibTable = (short)(127 sin) truncates; pitch = ((depth * vibTable * vibratoFine(15)) >> 4) / 15, C division truncates.
                 const u = Math.trunc(((y * Math.trunc(127 * Math.sin(2 * Math.PI * (phase & 63) / 64)) * 15) >> 4) / 15);
-                return Math.round(X * 2 ** (-u / 1536)) - 1 - P;
+                return Math.round(X * 2 ** (-(u + fp) / 1536)) - 1 - P - F;
               });
               pid = envId(encodeEnvelope(vib, 0, -1, 'pitch'));
             }
