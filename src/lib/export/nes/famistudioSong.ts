@@ -722,7 +722,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     for (let o = 0; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: rowFrame[o][r], t: rowFrameT[o][r] });
     // The loop pass (orders loopOrder..end again, after the song end): rows played with the end-of-song state.
     const n1 = seq.length, loopRi = orderLen.slice(0, loopOrder).reduce((a, b) => a + b, 0);
-    for (let o = loopOrder; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: rowFrame[o][r] + songEndFrame - rowFrame[loopOrder][0], t: rowFrameT[o][r] + songEndT - rowFrameT[loopOrder][0] });
+    for (let o = loopOrder; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: Math.round(rowFrameT[o][r] + songEndT - rowFrameT[loopOrder][0]), t: rowFrameT[o][r] + songEndT - rowFrameT[loopOrder][0] });
     /** End of the pass row i belongs to: look-aheads stop there, as the first pass always did. */
     const lim = (i: number): number => (i < n1 ? n1 : seq.length);
     /** Frames until the next note or slide effect on this channel (how long a slide runs). */
