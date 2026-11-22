@@ -1572,20 +1572,20 @@
     },
     "MusicAssembler": {
       "adf": "MusicAssembler.adf",
-      "adfSha256": "78975d609d80e4180da3fe89bc72c48f6829cb8abb52ce1bc631f9b85ee63d44",
+      "adfSha256": "d8139e73828ecba71f6f7b03fb7799115900c43e599f26b0e0840a5e645f3fc9",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 38948,
+        "diskOffset": 39032,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 38944,
+        "diskOffset": 39028,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 268806,
+        "diskOffset": 268890,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -1605,7 +1605,7 @@
         "bytes": 113600
       },
       "sources": {
-        "tool": "ac79e2ed0964b364258e0645d83b308e877b7e453e01730d5fb90504db62846d",
+        "tool": "6bc3a9bbfb86de733754fdfac973b18ea999460b7907df1ceafd2712fc82f166",
         "player": "2f9c5e3c849f342a342f7300a05301750571ece7d3c1cc4642194bbb4e5ff56a"
       }
     },
