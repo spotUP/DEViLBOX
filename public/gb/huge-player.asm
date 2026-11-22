@@ -212,6 +212,14 @@ draw_bar:
     ld l, [hl]
     ld h, $FF
     ld a, [hl]
+    cp $08                  ; zombie-mode soft envelope (Furnace gb.cpp): NRx2 = $08, volume lives in the driver
+    jr nz, .hw_env
+    ld hl, last_kill
+    add hl, de
+    ld a, [hl]
+    and $0F
+    jr .have_vol
+.hw_env:
     swap a
     and $0F
     jr .have_vol

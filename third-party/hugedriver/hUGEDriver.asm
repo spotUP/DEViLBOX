@@ -147,7 +147,7 @@ table_row4: db
 ;; DEViLBOX: Furnace soft-envelope volume. Channel volume stored as 15 - vol (zero-init = 15),
 ;; then the last volume latched per channel (Furnace gb.cpp lastKill), then the table row being run.
 chvol_inv: ds 4
-last_kill: ds 4
+last_kill:: ds 4 ; DEViLBOX: exported, the player's VU bars read soft-envelope volume here
 table_cur_row: db
 ;; DEViLBOX: NRx1 length bits of the CH1/CH2 instrument; gb.cpp writes them with every duty change.
 nrx1_len: ds 2
