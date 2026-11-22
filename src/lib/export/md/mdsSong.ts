@@ -473,17 +473,25 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const fmOnly = sys.length === 1 && (sys[0] === 0x83 || sys[0] === 0xa0);
   const ext = isExt(sys);
   const kinds = ext ? EXT_KIND : KIND, ids = ext ? EXT_CHAN : MDS_CHAN;
+  // MDSDRV can mix a second PCM channel (f2 02, 17.5 kHz), but the converter only models the fm6 DAC.
+  if (sys.some((x) => x === 0xbd || x === 0xbe)) {
+    throw new Error('MDSDRV export: YM2612 DualPCM (second PCM channel) is not converted yet; MDSDRV PCM mixing mode (f2 02) could play it');
+  }
   if (!mdsSystemsSupported(sys)) {
     throw new Error(`MDSDRV export needs a Genesis song (YM2612 + SN76489); systems are ${sys.map((x) => x.toString(16)).join(',')}`);
   }
   const s = m.subsongs[subsong];
   const nCh = fmOnly ? (ext ? 9 : 6) : kinds.length;
   // Driver: each NTSC VINT adds tempo+1 to a counter and steps one tick per 128 (Phase 0), so ticks/s = (dd+1)*NTSC/128.
-  const rate = s.hz * (s.virtualTempo || 1) / (s.virtualTempoD || 1);
+  // F0xx on the first row sets the tick rate before the first tick (playback.cpp: divider = xx*2/5, at least 1).
+  const f0 = Array.from({ length: kinds.length }, (_, ch) => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[0]}`)?.rows[0]?.effects ?? [])
+    .flat().filter((e) => e.type === 0xf0).pop();
+  const hz = f0 ? Math.max(1, Math.max(0, f0.value) * 2 / 5) : s.hz;
+  const rate = hz * (s.virtualTempo || 1) / (s.virtualTempoD || 1);
   const tempo = Math.max(0, Math.min(255, Math.round(rate * 128 / NTSC_HZ) - 1));
-  // Furnace runs per-tick effects and macros at s.hz; virtual tempo only moves the row counter (playback.cpp tempoAccum), so a sequence
+  // Furnace runs per-tick effects and macros at hz; virtual tempo only moves the row counter (playback.cpp tempoAccum), so a sequence
   // tick holds fpt Furnace ticks (1 without virtual tempo; 5/6 at 180/150).
-  const fpt = s.hz / rate;
+  const fpt = hz / rate;
   if (Math.abs(rate - NTSC_HZ) > 0.5) lossy.add(`tick rate ${rate.toFixed(2)} Hz: ticks land on NTSC frames (up to 1 frame early or late)`);
   if (rate * 128 / NTSC_HZ < 1 || rate * 128 / NTSC_HZ > 256) lossy.add(`tick rate ${rate.toFixed(2)} Hz outside the driver's ${(NTSC_HZ / 128).toFixed(2)}-${(2 * NTSC_HZ).toFixed(2)} Hz range (clamped)`);
   if (Math.abs((m.tuning || 440) - 440) > 0.5) lossy.add(`tuning ${m.tuning} Hz: played at 440 Hz`);
@@ -580,7 +588,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const useFt = fpt < 1 - 1e-9 && rate >= NTSC_HZ;
   let K = 1;
   for (let k = 1, best = Infinity; useFt && nBody && k <= 8; k++) {
-    const fF = k * nBody * fpt, x = (fF * NTSC_HZ) / s.hz, e = Math.abs(x - Math.round(x)) / k;
+    const fF = k * nBody * fpt, x = (fF * NTSC_HZ) / hz, e = Math.abs(x - Math.round(x)) / k;
     if (Math.abs(fF - Math.round(fF)) < 1e-6 && e < best - 1e-9) [best, K] = [e, k];
   }
   // One extra body after the loop so the block's last frame tempo leads into the next pass, not into silence.
@@ -617,7 +625,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       });
     }
   }
-  const ft = useFt ? frameTempos(nFt, fpt, s.hz, Array.from(busy, bits)) : null;
+  const ft = useFt ? frameTempos(nFt, fpt, hz, Array.from(busy, bits)) : null;
   const span = (a: number, n: number) => (ft ? encodeTempos(ft.slice(a, a + n)) : conduct(n));
   // Driver frame of each first-pass sequence tick (mdsdrv.68k request loop, as frameTempos models it): frame 0 plays tick 0, then each
   // frame adds the last run tick's F9 + 1 to the counter and runs one tick per 128. PSG envelopes are cut per hit against it.
@@ -642,15 +650,15 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     if (!v) {
       const ins = m.instruments[idx];
       const pm = macro(ins, MACRO_PITCH, m.version), am = macro(ins, MACRO_ARP, m.version);
-      // Furnace runs macros once per engine tick at s.hz; virtual tempo only moves the row counter (playback.cpp tempoAccum), so envelopes use s.hz, not `rate`.
-      const peg = pm && pitchEnvelope(pm, lossy, s.hz), mt = am && arpTable(am, lossy, undefined, 1 / fpt);
+      // Furnace runs macros once per engine tick at hz; virtual tempo only moves the row counter (playback.cpp tempoAccum), so envelopes use hz, not `rate`.
+      const peg = pm && pitchEnvelope(pm, lossy, hz), mt = am && arpTable(am, lossy, undefined, 1 / fpt);
       if (kind === 'fm' && macro(ins, MACRO_VOL, m.version)) lossy.add('FM volume macro (ignored)');
-      v = { ins: item(kind === 'fm' ? fmVoice(ins, lossy) : psgEnvelope(ins, m.version, lossy, s.hz)), peg: peg ? item(peg) : -1, mtab: mt ? tbItem(mt) : -1 };
+      v = { ins: item(kind === 'fm' ? fmVoice(ins, lossy) : psgEnvelope(ins, m.version, lossy, hz)), peg: peg ? item(peg) : -1, mtab: mt ? tbItem(mt) : -1 };
       insCache.set(key, v);
     }
     if (kind === 'fm' || !phase || items.length >= 224) return v; // shortcut: per-hit tables only without virtual tempo and while the 256-item table has room; upgrade by sharing tables across close phases
     // Each hit gets the envelope cut for its own tick phase; hits with the same table share one item (keyed on content).
-    const env = psgEnvelope(m.instruments[idx], m.version, new Lossy(), s.hz, phase), ek = env.join();
+    const env = psgEnvelope(m.instruments[idx], m.version, new Lossy(), hz, phase), ek = env.join();
     let e = envItems.get(ek);
     if (e === undefined) envItems.set(ek, (e = ek === items[v.ins].join() ? v.ins : item(env)));
     return { ...v, ins: e };
@@ -921,7 +929,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         const cmds: number[] = [];
         let pChanged = false, vChanged = false, dacOff = false;
         // EDxx runs the whole row xx ticks late; ECxx keys off xx ticks after the row runs (playback.cpp rowDelay / cut, delayBehavior 2).
-        // Both count Furnace engine ticks (s.hz), so under virtual tempo they land on the nearest sequence tick.
+        // Both count Furnace engine ticks (hz), so under virtual tempo they land on the nearest sequence tick.
         const fxv = (t: number) => cell?.effects?.find((e) => e.type === t && e.value > 0)?.value ?? 0;
         const seqAt = (f: number) => Math.round(f / fpt) - tick, edF = fTick(tick) + fxv(0xed);
         let delay = fxv(0xed) ? Math.max(0, seqAt(edF)) : 0, cutAt = fxv(0xec);
@@ -971,6 +979,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (!Number.isInteger(2 * e.value * pss * fpf)) lossy.add('01xx/02xx at a fractional sequence-tick-per-frame rate (rounded per frame)');
             continue;
           }
+          if (e.type === 0xf0 && Math.max(1, e.value * 2 / 5) === hz) continue; // the start tick rate (or a repeat of it)
           lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}`);
         }
         const vs = volStep();
@@ -1113,44 +1122,109 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     b.push(...(loopChunk >= 0 ? [...t.wrap, 0xfb, 0x00] : []), 0xff);
     return b;
   });
-  if (items.length > 256) throw new Error(`MDSDRV song table holds 256 items; this song needs ${items.length}`);
   streams.push([...span(0, nIntro), ...(loopChunk >= 0 ? [0xfa, ...span(nIntro, K * nBody), 0xfb, 0x00] : []), 0xff]);
   const chanIds = [...tracks.map((t) => ids[t.ch]), 0x0f];
 
-  // 5. Layout. sdtop-relative items (FM voices, PSG and pitch envelopes, PCM headers) are read through movea.w / lea d.w, so they must
-  //    sit below sdtop+32 KiB (mdsdrv.68k "instrument data must fit within 32k of w_sdtop"); extended pitch envelopes go first, since
-  //    their pointer has 15 bits and the node index is added before the signed lea. `pat` subroutines, macro tables and the streams
-  //    are read as 0(tbase,pos.w): they share the signed 32 KiB window on each side of tbase, after the sdtop items.
-  const sd: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // two dc.l + pcm_tab dc.w 0
-  const even = () => { if (sd.length & 1) sd.push(0); };
-  const itemOff: number[] = [];
-  const put = (i: number) => { even(); itemOff[i] = sd.length; sd.push(...items[i]); };
-  const sdItems = [...items.keys()].filter((i) => !tbaseRel.has(i));
-  sdItems.filter((i) => extRel.has(i)).forEach(put);
-  if (sdItems.some((i) => extRel.has(i) && itemOff[i] + items[i].length > 0x8000)) throw new Error('MDSDRV extended pitch envelopes beyond 32 KiB of song data');
-  sdItems.filter((i) => !extRel.has(i)).forEach(put);
-  if (sdItems.some((i) => itemOff[i] >= 0x8000)) throw new Error('MDSDRV instrument and envelope data beyond 32 KiB of song data');
-  even();
-  const bgm = sd.length;
-  sd.push(0, 0, 0, streams.length);
-  const trackHdr = sd.length;
-  streams.forEach(() => sd.push(0, 0, 0, 0));
-  [...items.keys()].filter((i) => tbaseRel.has(i)).forEach(put);
-  // Streams that do not fit after the tbase table go in front of it.
-  const place = (st: number[], i: number) => { sd.splice(trackHdr + i * 4, 4, chanIds[i], 0, ...be16(sd.length - tbase)); sd.push(...st); };
-  let after = items.length * 2 + streams.reduce((n, st) => n + st.length, 0), nBefore = 0, tbase: number;
-  while (after > 0x7fff && nBefore < streams.length) after -= streams[nBefore++].length;
-  const preLen = sd.length + streams.slice(0, nBefore).reduce((n, st) => n + st.length, 0);
-  tbase = preLen + (preLen & 1); // the table is read with move.w
-  streams.slice(0, nBefore).forEach(place);
-  even();
-  if (sd.length !== tbase) throw new Error('MDSDRV layout: stream placement out of step');
-  if (after > 0x7fff || bgm - tbase < -0x8000) throw new Error('MDSDRV song data does not fit the signed 32 KiB window around the track table');
-  itemOff.forEach((a, i) => sd.push(...be16(tbaseRel.has(i) ? a - tbase : extRel.has(i) ? a | 0x8000 : a)));
-  streams.slice(nBefore).forEach((st, k) => place(st, nBefore + k));
-  even();
-  sd.splice(0, 4, 0, 0, 0, 8);       // pcm_tab-sdtop
-  sd.splice(4, 4, 0, 0, ...be16(bgm));
-  sd.splice(bgm, 2, ...be16(tbase - bgm));
+  const sharedLayout = (): number[] | null => {
+  if (items.length > 256) return null;
+    // 5. Shared layout (null when it does not fit). sdtop-relative items (FM voices, PSG and pitch envelopes, PCM headers) are read through movea.w / lea d.w, so they must
+    //    sit below sdtop+32 KiB (mdsdrv.68k "instrument data must fit within 32k of w_sdtop"); extended pitch envelopes go first, since
+    //    their pointer has 15 bits and the node index is added before the signed lea. `pat` subroutines, macro tables and the streams
+    //    are read as 0(tbase,pos.w): they share the signed 32 KiB window on each side of tbase, after the sdtop items.
+    const sd: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // two dc.l + pcm_tab dc.w 0
+    const even = () => { if (sd.length & 1) sd.push(0); };
+    const itemOff: number[] = [];
+    const put = (i: number) => { even(); itemOff[i] = sd.length; sd.push(...items[i]); };
+    const sdItems = [...items.keys()].filter((i) => !tbaseRel.has(i));
+    sdItems.filter((i) => extRel.has(i)).forEach(put);
+    if (sdItems.some((i) => extRel.has(i) && itemOff[i] + items[i].length > 0x8000)) throw new Error('MDSDRV extended pitch envelopes beyond 32 KiB of song data');
+    sdItems.filter((i) => !extRel.has(i)).forEach(put);
+    if (sdItems.some((i) => itemOff[i] >= 0x8000)) throw new Error('MDSDRV instrument and envelope data beyond 32 KiB of song data');
+    even();
+    const bgm = sd.length;
+    sd.push(0, 0, 0, streams.length);
+    const trackHdr = sd.length;
+    streams.forEach(() => sd.push(0, 0, 0, 0));
+    [...items.keys()].filter((i) => tbaseRel.has(i)).forEach(put);
+    // Streams that do not fit after the tbase table go in front of it.
+    const place = (st: number[], i: number) => { sd.splice(trackHdr + i * 4, 4, chanIds[i], 0, ...be16(sd.length - tbase)); sd.push(...st); };
+    let after = items.length * 2 + streams.reduce((n, st) => n + st.length, 0), nBefore = 0, tbase: number;
+    while (after > 0x7fff && nBefore < streams.length) after -= streams[nBefore++].length;
+    const preLen = sd.length + streams.slice(0, nBefore).reduce((n, st) => n + st.length, 0);
+    tbase = preLen + (preLen & 1); // the table is read with move.w
+    streams.slice(0, nBefore).forEach(place);
+    even();
+    if (sd.length !== tbase) throw new Error('MDSDRV layout: stream placement out of step');
+    if (after > 0x7fff || bgm - tbase < -0x8000) return null;
+    itemOff.forEach((a, i) => sd.push(...be16(tbaseRel.has(i) ? a - tbase : extRel.has(i) ? a | 0x8000 : a)));
+    streams.slice(nBefore).forEach((st, k) => place(st, nBefore + k));
+    even();
+    sd.splice(0, 4, 0, 0, 0, 8);       // pcm_tab-sdtop
+    sd.splice(4, 4, 0, 0, ...be16(bgm));
+    sd.splice(bgm, 2, ...be16(tbase - bgm));
+    return sd;
+  };
+
+  // 6. Far layout, when the shared one does not fit: every track starts with DEViLBOX `far` (F3 dd.l pp.w, mdsdrv.68k @cmd_far),
+  //    which moves the track base to its own song table copy with local item numbers. A song is then bound to 256 items and one
+  //    signed 32 KiB window per track (subroutines and macro tables before the table, the stream after it), not in total.
+  const farLayout = (): number[] => {
+    const sd: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const even = () => { if (sd.length & 1) sd.push(0); };
+    const sdOff: number[] = [];
+    const put = (i: number) => { even(); sdOff[i] = sd.length; sd.push(...items[i]); };
+    const sdItems = [...items.keys()].filter((i) => !tbaseRel.has(i));
+    sdItems.filter((i) => extRel.has(i)).forEach(put);
+    if (sdItems.some((i) => extRel.has(i) && sdOff[i] + items[i].length > 0x8000)) throw new Error('MDSDRV extended pitch envelopes beyond 32 KiB of song data');
+    sdItems.filter((i) => !extRel.has(i)).forEach(put);
+    if (sdItems.some((i) => sdOff[i] >= 0x8000)) throw new Error('MDSDRV instrument and envelope data beyond 32 KiB of song data');
+    even();
+    const bgm = sd.length;
+    sd.push(0, 0, 0, streams.length);
+    const trackHdr = sd.length;
+    streams.forEach(() => sd.push(0, 0, 0, 0));
+    even();
+    const tbase = sd.length;
+    sd.push(...be16(tbaseRel.has(0) ? 0 : sdOff[0] ?? 0)); // entry 0: the FM voice the driver loads at track init
+    const stubs = streams.map((_, i) => { const at = sd.length; sd.splice(trackHdr + i * 4, 4, chanIds[i], 0, ...be16(at - tbase)); sd.push(0xf3, 0, 0, 0, 0, 0, 0); return at; });
+    // Bytes per command e0..ff (mdsdrv.68k @cmd_length_table; fe pat reads 2, ff 1, f3 far 7).
+    const LEN = [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 2, 2, 2, 7, 1, 3, 3, 1, 2, 2, 1, 2, 2, 3, 2, 1];
+    const subItems = new Set(subs.values());
+    streams.forEach((stream, i) => {
+      const local: number[] = [], loc = new Map<number, number>();
+      const id = (g: number) => { if (!loc.has(g)) { loc.set(g, local.length); local.push(g); } return loc.get(g)!; };
+      if (!tbaseRel.has(0)) id(0);
+      // E1 ins, F0 pcm and FE pat carry the item number; E8 peg and EB mtab carry it plus one (0 = off).
+      const remap = (b: number[]) => {
+        const o = b.slice();
+        for (let q = 0; q < o.length; q += o[q] < 0xe0 ? 1 : LEN[o[q] - 0xe0]) {
+          if (o[q] === 0xe1 || o[q] === 0xf0 || o[q] === 0xfe) o[q + 1] = id(o[q + 1]);
+          else if ((o[q] === 0xe8 || o[q] === 0xeb) && o[q + 1]) o[q + 1] = id(o[q + 1] - 1) + 1;
+        }
+        return o;
+      };
+      const st = remap(stream), bodies = new Map<number, number[]>();
+      for (let k = 0; k < local.length; k++) if (tbaseRel.has(local[k])) bodies.set(local[k], subItems.has(local[k]) ? remap(items[local[k]]) : items[local[k]]);
+      if (local.length > 256) throw new Error(`MDSDRV song table holds 256 items per track; track ${i} needs ${local.length}`);
+      const at = new Map<number, number>();
+      even();
+      const first = sd.length;
+      for (const [g, b] of bodies) { even(); at.set(g, sd.length); sd.push(...b); }
+      even();
+      const base = sd.length;
+      local.forEach((g) => sd.push(...be16(tbaseRel.has(g) ? at.get(g)! - base : extRel.has(g) ? sdOff[g] | 0x8000 : sdOff[g])));
+      const pos = sd.length - base;
+      sd.push(...st);
+      if (base - first > 0x8000 || sd.length - base > 0x7fff) throw new Error(`MDSDRV track ${i} does not fit its signed 32 KiB window`);
+      const d = base - tbase;
+      sd.splice(stubs[i] + 1, 6, (d >>> 24) & 0xff, (d >>> 16) & 0xff, (d >>> 8) & 0xff, d & 0xff, ...be16(pos));
+    });
+    even();
+    sd.splice(0, 4, 0, 0, 0, 8);       // pcm_tab-sdtop
+    sd.splice(4, 4, 0, 0, ...be16(bgm));
+    sd.splice(bgm, 2, ...be16(tbase - bgm));
+    return sd;
+  };
+  const sd = sharedLayout() ?? farLayout();
   return { seq: Uint8Array.from([0x10, 0x01, 0x1f, 0x00, 0x00, 0x03, 0x00, 0x02, ...sd]), lossy: lossy.list(), keyOns, pcm: Uint8Array.from(pcm) };
 }

@@ -1123,7 +1123,7 @@ mds_update_seq
 ;----------------------------------------------------------------------
 @cmd_length_table
 	dc.b	1,2,2,2, 2,2,2,2, 2,2,2,2, 2,3,3,3		;e0
-	dc.b	2,2,2,0, 0,3,3,0, 2,2,1,2, 2,3,1,0		;f0
+	dc.b	2,2,2,1, 0,3,3,0, 2,2,1,2, 2,3,1,0		;f0 (f3: DEViLBOX far)
 @cmd_table
 	bra.w	@cmd_slr						;e0 slur
 	bra.w	@cmd_ins						;e1 instrument
@@ -1144,7 +1144,7 @@ mds_update_seq
 	bra.w	@cmd_pcm						;f0 pcm instrument
 	bra.w	@cmd_pcmrate					;f1 pcm rate
 	bra.w	@cmd_pcmmode					;f2 pcm mode
-	bra.w	@cmd_finish						;f3
+	bra.w	@cmd_far						;f3 DEViLBOX far jump with track base move
 	bra.w	@cmd_finish						;f4
 	bra.w	@cmd_jump						;f5 jump
 	bra.w	@cmd_fmreg						;f6 fm register write
@@ -1539,6 +1539,28 @@ mds_update_seq
 	move.w	(sp)+,@tempreg
 	move.b	1(@tbase,@trackpos),@tempreg
 	add.w	@tempreg,@cmdlen
+	bra.w	@next_command
+
+;----------------------------------------------------------------------
+; far - DEViLBOX: move this track's base (song table + stream index
+;       origin) by a signed long and continue at a word position.
+;       f3 dd dd dd dd pp pp. Lets each track carry its own song table
+;       copy, so a song is no longer bound to one signed 32 KiB window
+;       around tbase nor to 256 items in total.
+;----------------------------------------------------------------------
+@cmd_far
+	moveq	#3,@tempreg
+@cmd_far_byte
+	lsl.l	#8,@cmd
+	move.b	0(@tbase,@trackpos),@cmd
+	addq.w	#1,@trackpos
+	dbra	@tempreg,@cmd_far_byte
+	move.b	0(@tbase,@trackpos),@tempreg
+	lsl.w	#8,@tempreg
+	move.b	1(@tbase,@trackpos),@tempreg
+	adda.l	@cmd,@tbase
+	move.l	@tbase,t_base_addr(twork)		; keeps the t_op_mask MSB
+	move.w	@tempreg,@trackpos
 	bra.w	@next_command
 
 ;----------------------------------------------------------------------
