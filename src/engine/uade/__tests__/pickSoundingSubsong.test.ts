@@ -19,4 +19,8 @@ describe('pickSoundingSubsong', () => {
   it('returns undefined when no subsong lasts a second', () => {
     expect(pickSoundingSubsong(0, 1, 44100, render)).toBeUndefined();
   });
+  it('skips a full-length but silent subsong', () => {
+    const r = (s: number) => ({ s, frames: 441000, samples: new Float32Array([0, s < 2 ? 0 : 0.5]) });
+    expect(pickSoundingSubsong(0, 3, 44100, r)?.s).toBe(2);
+  });
 });

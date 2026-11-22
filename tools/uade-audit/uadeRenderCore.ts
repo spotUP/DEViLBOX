@@ -250,9 +250,10 @@ export function channelsWithDma(mod: UADEModule, snapshotPtr: number): number {
  * (eco.gray, FredGray: subsong 0 ends at once). The ADF's single-module
  * song-end handler (third-party/amiga-adf/amiga/uade_glue.s, "EMPTY subsong")
  * steps on by the same one-second rule, so the reference and the disk play the
- * same subsong. undefined: no subsong lasts that long.
+ * same subsong. A full-length render whose peak is exactly 0 counts as failed
+ * too. undefined: no subsong lasts that long and sounds.
  */
-export function pickSoundingSubsong<T extends { frames: number }>(
+export function pickSoundingSubsong<T extends { frames: number; samples?: Float32Array }>(
   min: number,
   max: number,
   minFrames: number,
@@ -260,10 +261,13 @@ export function pickSoundingSubsong<T extends { frames: number }>(
 ): T | undefined {
   for (let s = min; s <= max; s++) {
     const r = render(s);
-    if (r.frames >= minFrames) return r;
+    if (r.frames >= minFrames && !isSilent(r)) return r;
   }
   return undefined;
 }
+
+/** Peak exactly 0 over the whole render (Desire batmanreturns: subsongs 0 and 1 are digital silence). */
+const isSilent = (r: { samples?: Float32Array }): boolean => !!r.samples && !r.samples.some((v) => v !== 0);
 
 /**
  * Render `data` (a module file) to interleaved float32 samples. Loads into a
@@ -342,7 +346,7 @@ export async function renderToSamples(
 
   let result = renderLoop();
   const minFrames = Math.min(sampleRate, maxFrames);
-  if (result.frames < minFrames) {
+  if (result.frames < minFrames || isSilent(result)) {
     const meta = readMeta(mod);
     result = pickSoundingSubsong(meta.subsongMin, meta.subsongMax, minFrames, (s) => {
       // set_subsong is a no-op once the song ended (entry.c: !s_playing), so reload first.
