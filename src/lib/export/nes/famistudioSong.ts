@@ -685,6 +685,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     let loopSlide = ''; // running 0Axy as the first pass enters the loop target
     let lastIns = -1, lastVol = -1, empty = 0, hasNotes = false, first = -1, firstFrame = -1;
     let curIns: FurnaceInstrument | undefined;
+    // Furnace duty is channel state a duty macro writes (nes.cpp chan.duty); FamiStudio's 0x4f value (famistudio_duty_cycle) is what a note of a duty-macro-less instrument plays.
+    let furDuty = 0, fsDuty = 0, dutyMac: { vals: number[]; loop: number; t: number } | null = null;
     let vibPos = 0, vibFrame = 0; // Furnace's vibratoPos (64-step sine) at the row start
     let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, arpXY = 0, arpOn = -1, keyOff = false, noteArp: number[] | null = null, fineRaw = 128, fineSent = 0;
     // Furnace 01xx/02xx is channel state (playback.cpp portaSpeed): it keeps sliding every new note until x00, another
@@ -800,14 +802,14 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           vibFrame = seq[ri].frame;
           // The loop target is entered again with the end-of-song state: its effects are sent there even when they match the first pass.
           const atLoop = o === loopOrder && r === 0;
-          if (atLoop) { fineSent = NaN; vibOn = -2; arpOn = -2; } // -2: override state unknown, sent either way
+          if (atLoop) { fineSent = NaN; vibOn = -2; arpOn = -2; fsDuty = -1; } // -2 / -1: override state unknown, sent either way (the loop pass enters with the duty the song end left)
           let fxChanged = false, fineHere = false, slideFx = 0, slideVal = 0, volSlide = -1, cutTicks = 0;
           for (const e of cell.effects) {
             if (e.type < 0) continue;
             const t = e.type, v = Math.max(0, e.value); // an effect with no value byte plays as xx = 00 (Furnace playback.cpp)
             if (speedFx.has(t)) continue; // speed rows are written per row on channel 0 from rowSpeed
             else if ((t === 0x15 || t === 0x16) && ch < DPCM_CH && ch !== 2) { if (t === 0x15) envMode = v & 3; else lenIdx = v & 0x1f; }
-            else if (t === 0x12 && ch < DPCM_CH && ch !== 2) ops.push(0x4f, v & 3);
+            else if (t === 0x12 && ch < DPCM_CH && ch !== 2) { ops.push(0x4f, v & 3); furDuty = fsDuty = v & 3; dutyMac = null; }
             else if (t === 0x0b || t === 0x0d || t === 0xfd || t === 0xfe) continue; // global, handled (or reported) in the row scans
             else if (t === 0x00 && ch !== DPCM_CH) { if (v !== arpXY || atLoop) fxChanged = true; arpXY = v; }
             else if (t === 0x04 && tonal) { if (v !== vibXY || atLoop) fxChanged = true; vibXY = v; }
@@ -994,6 +996,17 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             const key = pass2 ? key0 : phaseKey(key0, idx, seq[ri].t + delay * perTick - seq[ri].frame - Math.round(delay * perTick));
             if (baked) { const f = macroFrames(curIns!.macros.find((x) => x.code === MACRO_VOL && x.length > 0)!, 'vol', lossy, undefined, macroRate, m.version, keyPhase(key)); bake = { vol: furVol, vals: f.vals, held: f.loop >= 0 || f.release >= 0, loop: f.loop, release: f.release, frame: seq[ri].frame }; }
             if (key !== lastIns) { insOps.push(0x80 | (insNo(key) << 1)); lastIns = key; }
+            if (ch < DPCM_CH && ch !== 2) {
+              const dm = curIns?.macros.find((x) => x.code === MACRO_DUTY && x.length > 0);
+              if (dutyMac) { // the duty the previous note's macro left in Furnace's channel state
+                // vals are per Furnace tick (rate 1, no phase). The new note's row runs before that tick's macro step (playback.cpp
+                // nextTick, then the dispatch tick), so the old macro last played tick n - 1 of the n ticks between the two notes.
+                const { vals, loop } = dutyMac, at = Math.max(0, Math.round((seq[ri].t - dutyMac.t) * macroRate) - 1);
+                furDuty = vals[at < vals.length ? at : loop >= 0 ? loop + ((at - loop) % (vals.length - loop)) : vals.length - 1] & 3;
+              }
+              if (dm) { const f = macroFrames(dm, 'duty', lossy); dutyMac = { vals: f.vals, loop: f.loop, t: seq[ri].t }; }
+              else { dutyMac = null; if (furDuty !== fsDuty) { ops.push(0x4f, furDuty); fsDuty = furDuty; } }
+            }
             const fsVol = hwVol || baked ? 15 : furVol;
             if (hwVol || baked ? lastVol !== 15 : lastVol !== -1 && lastVol !== furVol) { ops.push(0x70 | fsVol); lastVol = fsVol; }
           }

@@ -433,6 +433,14 @@ describe('furnaceToFamistudio', () => {
     expect(b.indexOf(0x70)).toBe(-1);
     expect(b.indexOf(0x78)).toBe(-1);
   });
+  it('sends the duty a duty macro left for a note of an instrument with no duty macro (Future_Re-ference pulse 2 row 9)', () => {
+    // 1200 sets duty 0; ins 0 duty macro [0 1] leaves Furnace's channel duty at 1. Ins 1 has no duty macro, so Furnace plays 1,
+    // while FamiStudio's default duty envelope plays famistudio_duty_cycle (still 0 from the 1200) unless 0x4f 1 is sent.
+    const m = nesModule({ 0: { 0: { ...A4, instrument: 0, ...fx(0x12, 0x00) }, 6: { ...A4, instrument: 1 } } }, { speed1: 1, speed2: 1 });
+    const duty = { code: 2, type: 0, mode: 0, speed: 1, delay: 0, length: 2, loop: 255, release: 255, data: [0, 1] };
+    Object.assign(m, { instruments: [{ type: 34, macros: [duty], amiga: { initSample: 0 } }, { type: 34, macros: [], amiga: { initSample: 0 } }] });
+    expect(has(furnaceToFamistudio(m).music, [0x4f, 1])).toBe(true);
+  });
   it('labels a 0Axy still running at the song end as lossy: the loop pass replays bytes written for no slide', () => {
     // Speed 1: 0A10 from v0 reaches only 4 by the end, so the loop target is entered with the slide on the second pass only.
     const song = furnaceToFamistudio(nesModule({ 0: { 0: { ...A4, volume: 0, ...fx(0x0a, 0x10) } } }, { speed1: 1, speed2: 1 }));
@@ -483,6 +491,7 @@ describe('furnaceToFamistudio', () => {
     let i = st[st.length - 2] + 256 * st[st.length - 1] - 0x8000 - start; // trailing 0x42 jump to the loop target
     if (st[i] === 0x41) i = st[i + 2] + 256 * st[i + 3] - 0x8000 - start; // the loop row is a reference to an earlier chunk
     if (st[i] === 0x4b) i += 3; // arp override sent again at the loop
+    if (st[i] === 0x4f) i += 2; // duty sent again at the loop: famistudio_ca65.s @opcode_duty_cycle_effect sets famistudio_duty_cycle, which the instrument load copies (lda famistudio_duty_cycle,x), so it may precede the instrument byte
     expect(st[i] >= 0x80 && (st[i] & 1) === 0).toBe(true); // instrument change byte (famistudio_ca65.s @instrument_change)
   });
   it('gives each start phase of a 50 Hz macro its own instrument copy, and shares copies whose frames match', () => {
