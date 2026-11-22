@@ -19,5 +19,9 @@ mkdir -p "$ROOT/public/pce"
 cp "$T/makepce.pce" "$ROOT/public/pce/player.pce"
 SIZE=$(wc -c < "$T/makepce.pce" | tr -d ' ')
 HASH=$(cat "$H"/hescode/* "$H"/stub/* | shasum | cut -c1-12)
-printf '{\n  "soundDat": 16384,\n  "songEnd": 24576,\n  "ll0": 16384,\n  "constBank": 3,\n  "firstFreeBank": %d,\n  "sourceHash": "%s"\n}\n' $((SIZE / 8192)) "$HASH" > "$ROOT/public/pce/player.json"
+# Data bank (startup.asm DATA_BANK = 4, mapped at MPR3 $6000 for the whole run): song tables may use its $FF-filled tail.
+awk '$3=="04" {print $2}' "$T/makepce.sym" | grep -v -E '^[67]' && { echo "bank 4 labels outside \$6000-\$7FFF"; exit 1; } || true
+USED=$(dd if="$T/makepce.pce" bs=8192 skip=4 count=1 2>/dev/null | od -An -v -tu1 | tr -s ' ' '\n' | awk 'NF {i++; if ($1 != 255) l = i} END {print l}')
+DATA_START=$(( 0x6000 + (USED + 15) / 16 * 16 ))
+printf '{\n  "soundDat": %d,\n  "songEnd": 24576,\n  "ll0": 16384,\n  "constBank": 3,\n  "firstFreeBank": %d,\n  "dataBank": 4,\n  "dataStart": %d,\n  "dataEnd": 32768,\n  "sourceHash": "%s"\n}\n' $((16#$(sym _sound_dat))) $((SIZE / 8192)) "$DATA_START" "$HASH" > "$ROOT/public/pce/player.json"
 echo "player.pce $SIZE bytes"; cat "$ROOT/public/pce/player.json"

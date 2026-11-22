@@ -90,12 +90,19 @@ _vsync_drv:
 	__stw <__vs_ptr
 	__ldw <_bx
 	__stw <__vs_bx
+	; DEViLBOX: song tables that overflow the const bank live in DATA_BANK; map it at $6000 while the driver runs
+	tma	#3
+	pha
+	lda	#DATA_BANK
+	tam	#3
 	tma	#page(_drv_intr)
 	pha
 	map	_drv_intr
 	jsr	_drv_intr
 	pla
 	tam	#page(_drv_intr)
+	pla
+	tam	#3
 	__ldw <__vs_temp
 	__stw <__temp
 	__ldw <__vs_ptr

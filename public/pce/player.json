@@ -1,8 +1,11 @@
 {
-  "soundDat": 16384,
+  "soundDat": 17408,
   "songEnd": 24576,
   "ll0": 16384,
   "constBank": 3,
   "firstFreeBank": 11,
-  "sourceHash": "1d7299a87a15"
+  "dataBank": 4,
+  "dataStart": 24784,
+  "dataEnd": 32768,
+  "sourceHash": "ba461c00e874"
 }

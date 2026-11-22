@@ -12,7 +12,8 @@ import { convertFurnaceNoteValue } from '../../import/formats/furnace/FurnacePat
 import { Lossy } from '../md/mdsSong';
 import { expandProcMacro } from '../nes/famistudioSong';
 
-export interface HusicLayout { soundDat: number; songEnd: number; ll0: number; constBank: number; firstFreeBank: number }
+/** dataBank/dataStart/dataEnd: free tail of the HuC data bank (MPR3, $6000-$7FFF), measured by tools/build-pce-player.sh. */
+export interface HusicLayout { soundDat: number; songEnd: number; ll0: number; constBank: number; firstFreeBank: number; dataBank: number; dataStart: number; dataEnd: number }
 export interface HusicSong { rom: Uint8Array; lossy: string[]; frames: number; loopFrame: number }
 
 export const PCE_SYSTEM_ID = 0x05;
@@ -118,11 +119,13 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   if (Math.abs(hz - FRAME_HZ) > 0.01) lossy.add(`tick rate ${hz} Hz quantized to 60 Hz frames`);
 
   // 2. Pitch: the driver's note byte (octave << 4 | semitone) whose period is closest to Furnace's.
+  // HuSIC _set_note: period = _freq[(note + 3) & 15] >> (note >> 4), so byte $00 = 3420 = 32.7 Hz.
+  // Furnace calcBaseFreq: tuning/16 * 2^((nv + 3) / 12), i.e. flat value 45 = A-4 = tuning (nv 0 = byte $00).
   const cb = layout.constBank * BANK + (layout.ll0 - WINDOW);
   const freq = Array.from({ length: 16 }, (_, i) => player[cb + FREQ_TABLE + 2 * i] | (player[cb + FREQ_TABLE + 2 * i + 1] << 8));
   const tuning = m.tuning || 440;
   const noteByte = (nv: number): number => {
-    const want = PSG_CLOCK / 32 / (tuning * Math.pow(2, (nv - 57) / 12));
+    const want = PSG_CLOCK / 32 / (tuning * Math.pow(2, (nv - 45) / 12));
     let best = 0, err = Infinity;
     for (let oct = 0; oct < 8; oct++) for (let semi = 0; semi < 12; semi++) {
       const p = freq[(semi + 3) & 15] >> oct;
@@ -264,37 +267,46 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     unit([JUMP, loopAt.bank, loopAt.addr & 0xff, loopAt.addr >> 8]);
   }
 
-  // 6. Const-bank tables at `_sound_dat`.
-  const blob: number[] = new Array<number>(0x24).fill(0);
-  const base = layout.soundDat;
-  const addr = () => base + blob.length;
+  // 6. Tables: `_sound_dat` header + song tables in the const bank (MPR2, $4400-$5FFF); what does not fit there
+  // goes to the free tail of the data bank, which the driver keeps mapped at MPR3 ($6000-$7FFF) while it reads envelopes.
+  const regions = [
+    { start: layout.soundDat, end: layout.songEnd, rom: layout.constBank * BANK + (layout.soundDat - WINDOW), bytes: [] as number[] },
+    { start: layout.dataStart, end: layout.dataEnd, rom: layout.dataBank * BANK + (layout.dataStart - 0x6000), bytes: [] as number[] },
+  ];
+  const alloc = (bytes: number[]) => {
+    const r = regions.find((g) => g.start + g.bytes.length + bytes.length <= g.end);
+    if (!r) throw new Error(`HuSIC export: song tables need ${regions.reduce((s, g) => s + g.bytes.length, 0) + bytes.length} bytes, ${regions.reduce((s, g) => s + g.end - g.start, 0)} fit in the driver banks`);
+    const at = r.start + r.bytes.length; r.bytes.push(...bytes); return at;
+  };
+  const put16 = (at: number, v: number) => {
+    const r = regions.find((g) => at >= g.start && at < g.start + g.bytes.length)!;
+    r.bytes[at - r.start] = v & 0xff; r.bytes[at - r.start + 1] = (v >> 8) & 0xff;
+  };
   const w16 = (v: number) => [v & 0xff, (v >> 8) & 0xff];
-  const put16 = (off: number, v: number) => { blob[off] = v & 0xff; blob[off + 1] = (v >> 8) & 0xff; };
+  const header = alloc(new Array<number>(0x24).fill(0));
   const ptrs = new Array<number>(16).fill(0);
-  const songAddr = addr(); blob.push(0, 0);
-  ptrs[0] = addr(); put16(songAddr - base, ptrs[0]); starts.forEach((p) => blob.push(...w16(p.addr)));
-  ptrs[7] = addr(); starts.forEach((p) => blob.push(p.bank));
-  ptrs[1] = addr(); loops.forEach((p) => blob.push(...w16(p.addr)));
-  ptrs[8] = addr(); loops.forEach((p) => blob.push(p.bank));
+  const songAddr = alloc([0, 0]);
+  ptrs[0] = alloc(starts.flatMap((p) => w16(p.addr))); put16(songAddr, ptrs[0]);
+  ptrs[7] = alloc(starts.map((p) => p.bank));
+  ptrs[1] = alloc(loops.flatMap((p) => w16(p.addr)));
+  ptrs[8] = alloc(loops.map((p) => p.bank));
   ptrs[15] = songAddr;
   const table = (t: EnvTable, at: number) => {
-    ptrs[at] = addr(); const listAt = blob.length; blob.push(...new Array<number>(t.items.length * 2).fill(0));
-    ptrs[at + 1] = addr(); const lpAt = blob.length; blob.push(...new Array<number>(t.items.length * 2).fill(0));
-    t.items.forEach((it, i) => { put16(listAt + 2 * i, addr()); put16(lpAt + 2 * i, addr() + it.lp); blob.push(...it.bytes); });
+    ptrs[at] = alloc(new Array<number>(t.items.length * 2).fill(0));
+    ptrs[at + 1] = alloc(new Array<number>(t.items.length * 2).fill(0));
+    t.items.forEach((it, i) => { const body = alloc(it.bytes); put16(ptrs[at] + 2 * i, body); put16(ptrs[at + 1] + 2 * i, body + it.lp); });
   };
   table(volEnv, 2); table(noteEnv, 9); table(waveEnv, 11);
-  ptrs[4] = ptrs[5] = ptrs[6] = ptrs[13] = ptrs[14] = addr(); blob.push(0, 0); // pitch / LFO / multi envelopes: unused
+  ptrs[4] = ptrs[5] = ptrs[6] = ptrs[13] = ptrs[14] = alloc([0, 0]); // pitch / LFO / multi envelopes: unused
   const waves = m.wavetables.length ? m.wavetables : [{ width: 32, height: 32, data: Array.from({ length: 32 }, (_, i) => (i < 16 ? i * 2 : 62 - i * 2)) }];
   if (!m.wavetables.length) lossy.add('song has no wavetables (triangle used)');
-  const waveTable = addr(); blob.push(...new Array<number>(waves.length * 2).fill(0));
+  const waveTable = alloc(new Array<number>(waves.length * 2).fill(0));
   waves.forEach((w, i) => {
-    put16(waveTable - base + 2 * i, addr());
     const n = Math.max(1, w.width || w.data.length), top = Math.max(1, (w.height || 32) - 1);
-    for (let k = 0; k < 32; k++) blob.push(Math.max(0, Math.min(31, Math.round(((w.data[Math.floor((k * n) / 32)] ?? 0) * 31) / top))));
+    put16(waveTable + 2 * i, alloc(Array.from({ length: 32 }, (_, k) => Math.max(0, Math.min(31, Math.round(((w.data[Math.floor((k * n) / 32)] ?? 0) * 31) / top))))));
   });
-  ptrs.forEach((p, i) => put16(2 * i, p));
-  put16(0x20, waveTable); put16(0x22, ptrs[4]);
-  if (base + blob.length > layout.songEnd) throw new Error(`HuSIC export: song tables need ${blob.length} bytes, ${layout.songEnd - base} fit in the driver bank`);
+  ptrs.forEach((p, i) => put16(header + 2 * i, p));
+  put16(header + 0x20, waveTable); put16(header + 0x22, ptrs[4]);
 
   // 7. HuCard: driver, tables, tracks; power-of-two size of at least 128 KB.
   const used = layout.firstFreeBank + banks.length;
@@ -303,7 +315,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   if (size > 0x100000) throw new Error('HuSIC export: song data does not fit in a 1 MB HuCard');
   const rom = new Uint8Array(size);
   rom.set(player.subarray(0, Math.min(player.length, layout.firstFreeBank * BANK)));
-  rom.set(blob, layout.constBank * BANK + (base - WINDOW));
+  regions.forEach((g) => rom.set(g.bytes, g.rom));
   banks.forEach((b, i) => rom.set(b, (layout.firstFreeBank + i) * BANK));
   const text = (str: string, at: number, max: number) => {
     const t = [...(str || '')].map((c) => (c >= ' ' && c <= '~' ? c.charCodeAt(0) : 0x3f)).slice(0, max);
