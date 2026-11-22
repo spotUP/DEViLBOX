@@ -432,7 +432,8 @@ describe('furnaceToFamistudio', () => {
     expect(dropped.music.includes(0x4c)).toBe(true);
   });
   it('maps 03 portamento to a slide that replaces the note byte (0x43 then 0x50 step from to)', () => {
-    const song = music({ 0: { 0: A4, 4: { note: 9, octave: 5, ...fx(0x03, 0x20) } } });
+    // One semitone in one tick: a constant 0x50 step follows Furnace exactly (longer curves go out as pitch envelopes).
+    const song = music({ 0: { 0: A4, 4: { note: 10, octave: 4, ...fx(0x03, 0x20) } } });
     expect(song.music.includes(0x50)).toBe(true);
     expect(song.music.includes(0x43)).toBe(true);
   });
@@ -443,6 +444,30 @@ describe('furnaceToFamistudio', () => {
     expect([step, err]).toEqual([-6, 0]);
     const curve = [1, 2, 3].map((f) => 132 + Math.floor(Math.max(0, 16 + f * step) / 2));
     expect(curve).toEqual([137, 134, 132]);
+  });
+  it('sends a slow 03 portamento over an octave as a per-frame pitch envelope, not a period-linear 0x50 slide (NES 110)', () => {
+    // turtle_byte pulse2 frame 403: Furnace's pitch-linear porta went 457 -> 469 where the 0x50 slide jumped 429 -> 496.
+    const song = music({ 0: { 0: A4, 4: { note: 9, octave: 5, ...fx(0x03, 0x04) } } });
+    expect(song.music.includes(0x50)).toBe(false);
+    const at = song.music.indexOf(0x49);
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(song.music.includes(0x43)).toBe(true);
+  });
+  it('cancels only the slide envelope steps an ED note delay lets play before the next row (NES 118)', () => {
+    // turtle_byte pulse2 frame 403: ED01 attacks a frame late, so the engine offset was 216, not the envelope end 242.
+    const song = (ed: boolean) => music({ 0: {
+      0: { ...A4, effects: [{ type: 0x02, value: 0x10 }, ...(ed ? [{ type: 0xed, value: 1 }] : [])] },
+      4: fx(0x01, 0x10),
+    } });
+    const chunks = (e: number): number[] => { const c: number[] = []; for (let l = -e; l !== 0; l -= c[c.length - 1]) c.push(Math.max(-64, Math.min(63, l))); return c; };
+    const cancelOf = (m: Uint8Array): number => {
+      for (let e = 2047; e > 0; e--) if (has(m, encodeEnvelope(chunks(e), -1, -1, 'pitch', true))) return e;
+      return 0;
+    };
+    const plain = cancelOf(song(false).music), late = cancelOf(song(true).music);
+    expect(plain).toBeGreaterThan(0);
+    expect(late).toBeGreaterThan(0);
+    expect(late).toBeLessThan(plain);
   });
   it('maps 01 slide up to a 0x50 slide toward the note it reaches', () => {
     const song = music({ 0: { 0: { ...A4, ...fx(0x01, 0x20) }, 8: { note: 9, octave: 5 } } });
@@ -461,7 +486,7 @@ describe('furnaceToFamistudio', () => {
     expect([count(false), count(true)]).toEqual([2, 1]);
   });
   it('maps E1 note slide up to a 0x50 slide', () => {
-    const song = music({ 0: { 0: { ...A4, ...fx(0xe1, 0x47) } } });
+    const song = music({ 0: { 0: { ...A4, ...fx(0xe1, 0xf1) } } });
     expect(song.music.includes(0x50)).toBe(true);
   });
   it('maps 0A volume slide to 0x51 step target', () => {

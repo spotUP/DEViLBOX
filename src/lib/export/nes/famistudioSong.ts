@@ -702,7 +702,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     // Furnace duty is channel state a duty macro writes (nes.cpp chan.duty); FamiStudio's 0x4f value (famistudio_duty_cycle) is what a note of a duty-macro-less instrument plays.
     let furDuty = 0, fsDuty = 0, dutyMac: { vals: number[]; loop: number; t: number } | null = null;
     let vibPos = 0, vibFrame = 0; // Furnace's vibratoPos (64-step sine) at the row start
-    let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, arpXY = 0, arpOn = -1, keyOff = false, noteArp: number[] | null = null, insArp: { vals: number[]; loop: number } | null = null, fineRaw = 128, fineSent = 0;
+    let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, slideEnv = -1, envCarry = 0, arpXY = 0, arpOn = -1, keyOff = false, noteArp: number[] | null = null, insArp: { vals: number[]; loop: number } | null = null, fineRaw = 128, fineSent = 0;
     // Furnace 01xx/02xx is channel state (playback.cpp portaSpeed): it keeps sliding every new note until x00, another
     // slide effect, or the slide reaching its target (note 0 / 179, targetResetsSlides).
     let heldSlide: [number, number] | null = null;
@@ -764,6 +764,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         !bakeLive ? null : !hwVol && baked && bake ? [bake.vol, bake.vals, bake.held, Math.min(seq[ri].frame - bake.frame, bake.vals.length - 1)] : !hwVol && baked,
         slideOps, slLive ? slVol : null, slideOps.length ? slStep : null, lastIns, lastVol, empty,
         vibLive ? [vibPos, (vibXY & 15) > 0 ? seq[ri].frame - vibFrame : 0] : null, insLive ? curInsIdx : null, noteLive ? curNote : null,
+        // slideEnv / envCarry stay out of this state: with them in, turtle_byte pulse2 instrument-9 arpeggios played a frame off (637, 9231).
         vibXY, vibOn, arpXY, arpOn, offLive ? keyOff : null, noteArp, fineRaw, fineSent, heldSlide]);
     };
     // Song loop: Furnace keeps the end-of-song state (fine pitch, arp, vibrato, slides, volume) at the loop target, while
@@ -805,7 +806,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         const ops: Array<number | { env: number }> = [];
         const insOps: number[] = [];
         const tail: Array<number | { env: number }> = [];
-        let delay = 0, noAttack = false, slide: number[] | null = null, rowByte: number[] | null = null;
+        let delay = 0, noAttack = false, envTo = 0, slide: number[] | null = null, rowByte: number[] | null = null;
         if (ch === 7 && o === 0 && r === 0) ops.push(0x55, 1); // saw volume shift: full (x4), so 0-15 spans the saw's 0-60
         if (ch === 0) {
           const sb = spdOut ? spdOut[o][r] : rowSpeed[o][r] !== lastSpd || (o === loopOrder && r === 0) ? rowSpeed[o][r] * spdMul : -1;
@@ -1126,24 +1127,87 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               while (j < lim(ri) && !(seq[j].cell && convertFurnaceNoteValue(seq[j].cell!) >= 0)) j++;
               pitchLossy.push({ ch, from: seq[ri].frame, to: j < lim(ri) ? seq[j].frame : seq[ri].frame + 600 });
             };
-            if (to !== from && mag > 0) {
+            // Linear pitch: units per tick and whether Furnace stops at the target (03, E1/E2) or slides on (01/02).
+            const units = slideFx === 0x03 || slideFx === 0x01 || slideFx === 0x02 ? slideVal * slideUnit : (slideVal >> 4) * 4 * slideUnit;
+            const totalUnits = slideFx === 0x01 || slideFx === 0x02 ? Infinity : Math.abs(to - from) * 128;
+            const [step, curveErr] = to !== from && mag > 0 && linear && mag <= 127.5
+              ? bestSlideStep({ rawFrom: pulsePeriodRaw(from), fromPeriod: pFrom(from), toPeriod: pFrom(to), unitsPerTick: units, totalUnits, dirUp: to > from, furPitch: fineRaw - 128, fsOffset: fineSent || 0, frames: Math.max(1, span(ri)), perTick, guess: mag, clock })
+              : [-Math.sign(pFrom(from) - pFrom(to)) * Math.max(1, Math.min(127, Math.round(mag))), 0];
+            // Furnace slides pitch-linear; a FamiStudio 0x50 slide is period-linear with steps of at least half a period per
+            // frame, so a long or slow slide overshoots or lags (turtle_byte pulse2 frame 403: 457 -> 469 played 429 -> 496).
+            // When no other pitch override runs, play the start note and send Furnace's per-frame periods (row phase as the
+            // unrolled pitch macro) as a relative 0x49 envelope; it holds the last offset once the slide reaches its target.
+            // shortcut: a 04xy / 00xy change mid-slide without a note sends 0x4a and drops the offset; merge it into the
+            // vibrato envelope if a song needs that.
+            const curveMiss = linear && to !== from && mag > 0 && (Math.abs(to - from) > 2 || mag > 127.5 || curveErr > 0);
+            // The engine zeroes a relative pitch envelope's running offset only on a note attack (famistudio_do_note_attack
+            // @reset_pitch_env); 0x49, 0x4a and a 0x43 note keep it. envCarry models that running offset: a slide envelope on
+            // a no-attack 03 starts with a step that cancels it (turtle_byte pulse1 frame 403: 462 played 739), and a no-attack
+            // 0x50 slide after one gets a one-step cancel envelope (Famitune1 triangle frame 1440: 80 played 93).
+            if (n > 0 && !noAttack) envCarry = 0;
+            // The envelope path plays the start note; a 00xy / 04xy / E5xx before the next note replaces the envelope with an
+            // override that rides on that start note (Famitune1 triangle frame 1260: vibrato around 39, Furnace around 35).
+            const playsOut = (): boolean => {
+              for (let j = ri + 1; j < lim(ri); j++) {
+                const c = seq[j].cell;
+                if (!c) continue;
+                if (convertFurnaceNoteValue(c) > 0) return true;
+                if (c.effects.some((e) => e.type === 0x00 || e.type === 0x04 || e.type === 0xe5)) return false;
+              }
+              return true;
+            };
+            if (curveMiss && n > 0 && (vibOn === -1 || (vibOn >= 0 && vibOn === slideEnv)) && playsOut()) {
+              const rowPh = seq[ri].t - seq[ri].frame, raw = pulsePeriodRaw(from), base = pFrom(from) + (fineSent || 0), d: number[] = [];
+              const start = envCarry;
+              // span 240 = no next note or slide in sight: the envelope must reach the target (it then holds), else it
+              // would freeze mid-slide; stop it there, the held last offset covers the rest.
+              const open = span(ri) >= 240;
+              let prev = envCarry, u = 0;
+              for (let f = 0; f < Math.max(1, span(ri)); f++) {
+                u = Math.min(totalUnits, units * (tickAtFrame(f, macroRate, rowPh) + 1));
+                const o = roundOnClock(raw * 2 ** (-((to > from ? u : -u) + fineRaw - 128) / 1536), clock) - 1 - base;
+                if (Math.abs(o - prev) > 63 || base + o < 1 || base + o > 2047) { d.length = 0; break; }
+                d.push(o - prev); prev = o;
+                if (open && u >= totalUnits) break;
+              }
+              if (open && u < totalUnits) d.length = 0;
+              if (d.length) {
+                slideEnv = envId(encodeEnvelope(d, -1, -1, 'pitch', true));
+                // An EDxx note delay attacks (and restarts the envelope) that many frames late, so only the first span - delay
+                // steps play before the next row (turtle_byte pulse2 frame 403: ED01 left the engine at 216, not the end 242).
+                const played = open ? d.length : Math.max(0, d.length - Math.round(delay * perTick)); // open: trimmed to the target, all steps play
+                envCarry = start + d.slice(0, played).reduce((a, b) => a + b, 0); // shortcut: assumes the envelope plays out before the next 0x49 / attack
+                ops.push(0x49, { env: slideEnv }); vibOn = slideEnv;
+                if (noAttack) tail.push(0x43);
+                rowByte = from >= 13 && from <= 75 ? [from - 12] : [0x40, from];
+                envTo = to;
+                if (n > 0) hasNotes = true;
+              }
+            }
+            if (!envTo && vibOn >= 0 && vibOn === slideEnv) { ops.push(0x4a); vibOn = -1; lastIns = -1; }
+            if (envTo) { /* sent as a pitch envelope above */ } else if (to !== from && mag > 0) {
               if ((linear && Math.abs(to - from) > 2) || mag > 127.5) markPitchLossy();
               if (linear && Math.abs(to - from) > 2) lossy.add('pitch slide over 2 semitones: FamiStudio slides period-linear, Furnace linear pitch (curve differs mid-slide)');
               if (mag > 127.5) lossy.add('pitch slide faster than FamiStudio step 127 (slowed)');
-              // Linear pitch: units per tick and whether Furnace stops at the target (03, E1/E2) or slides on (01/02).
-              const units = slideFx === 0x03 || slideFx === 0x01 || slideFx === 0x02 ? slideVal * slideUnit : (slideVal >> 4) * 4 * slideUnit;
-              const [step, curveErr] = linear && mag <= 127.5
-                ? bestSlideStep({ rawFrom: pulsePeriodRaw(from), fromPeriod: pFrom(from), toPeriod: pFrom(to), unitsPerTick: units, totalUnits: slideFx === 0x01 || slideFx === 0x02 ? Infinity : Math.abs(to - from) * 128, dirUp: to > from, furPitch: fineRaw - 128, fsOffset: fineSent || 0, frames: Math.max(1, span(ri)), perTick, guess: mag, clock })
-                : [-Math.sign(pFrom(from) - pFrom(to)) * Math.max(1, Math.min(127, Math.round(mag))), 0];
               // one_sided_love triangle frame 295 (148 -> 132): Furnace steps 3,3,4,3,3 periods, no constant FamiStudio step does.
               if (curveErr > 0 && !(Math.abs(to - from) > 2) && mag <= 127.5) { lossy.add('pitch slide curve not reachable with a constant FamiStudio step'); markPitchLossy(); }
               slide = [step & 0xff, from, to];
+              // A no-attack slide keeps the previous slide envelope's end offset: zero it with a one-step envelope (the
+              // next note row's 0x4a hands back the instrument envelope with the offset kept at 0).
+              // A relative step holds -64..63 (encodeEnvelope clamps): one [-242] step left the engine at 178 (turtle_byte
+              // pulse1 frame 403, measured famistudio_pitch_env_value), so cancel in steps of at most 64.
+              if (noAttack && envCarry && vibOn === -1) {
+                const cancel: number[] = [];
+                for (let left = -envCarry; left !== 0; left -= cancel[cancel.length - 1]) cancel.push(Math.max(-64, Math.min(63, left)));
+                vibOn = envId(encodeEnvelope(cancel, -1, -1, 'pitch', true)); ops.push(0x49, { env: vibOn }); envCarry = 0;
+              }
               rowByte = null;
               if (n > 0) hasNotes = true;
             } else if (slideVal > 0) { lossy.add('slide shorter than a semitone'); markPitchLossy(); }
           }
-          if (n > 0) curNote = slide ? slide[2] : n;
-          else if (slide) curNote = slide[2];
+          if (slide || envTo) curNote = slide ? slide[2] : envTo;
+          else if (n > 0) curNote = n;
+          if (n > 0 && !noAttack && !envTo) envCarry = 0; // any attacked note zeroes the engine's pitch envelope offset
           if (delay > 0) {
             const d = Math.round(delay * perTick) - 1;
             // 0x47 n plays the note n + 1 frames after the row (engine counts n down and plays on the wrap to $FF), so n = 0 is a 1-frame delay.
