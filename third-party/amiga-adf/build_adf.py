@@ -75,14 +75,11 @@ def patch_player_for_68000(path):
     open(path, 'wb').write(b)
 
 
-# EMS-6 reads mode / mixing rate / boost from ENV:EaglePlayer/ems_v6.cfg (ems_new.s:88-178).
-# UADE ships that cfg (the reference renderer embeds it), but disks carry no ENV files, so
-# the player would run its dc.l defaults instead: hunk 0 +$E4/+$E8/+$EC = 2, 14000 Hz, 0.
-# The rate sets the tempo rounding (bytesperframe, ems_new.s:811) and the mixed sound, so
-# bake the cfg's values into those defaults. The cfg read then fails on the disk and keeps them.
-EMS6_CFG = os.path.join(UADE_ROOT, 'players', 'ENV', 'EaglePlayer', 'ems_v6.cfg')
-EMS6_DEFAULTS_OFF = 0xE4
-EMS6_DEFAULTS = (2, 14000, 0)
+# Players that read a setting from ENV:EaglePlayer/<cfg>. UADE ships those cfgs (the reference
+# renderer embeds them), but disks carry no ENV files, so on the disk the player falls back to its
+# built-in default. Bake the cfg's value into that default at staging instead.
+ENV_EP = os.path.join(UADE_ROOT, 'players', 'ENV', 'EaglePlayer')
+EMS6_CFG = os.path.join(ENV_EP, 'ems_v6.cfg')
 
 
 def hunk0_offset(b):
@@ -103,17 +100,65 @@ def ems6_cfg_values(cfg=EMS6_CFG):
     return tuple(vals)
 
 
-def patch_ems6_defaults(path, cfg=EMS6_CFG):
+def wt_cfg_word(cfg, lo, hi):
+    """Wanted Team cfg: 'WT' + one big-endian word, the value the player's config load takes."""
+    b = open(cfg, 'rb').read()
+    v = struct.unpack('>H', b[2:4])[0] if len(b) == 4 and b[:2] == b'WT' else None
+    if v is None or not lo <= v <= hi:
+        sys.exit(f'{cfg}: expected "WT" + a word in {lo}..{hi}, got {b.hex()}')
+    return v
+
+
+def hippel7v_new(cfg):
+    khz = wt_cfg_word(cfg, 1, 28)
+    return [struct.pack('>H', khz), struct.pack('>H', 0x7200 | khz)]
+
+
+def tfmxpro_new(cfg):
+    mode = wt_cfg_word(cfg, 0, 1)
+    old = TFMXPRO_DEFAULT_TAIL
+    return [old if mode == 0 else bytes.fromhex('7201 243c20444d41 303c0000')]
+
+
+# Default path of TFMX-Pro's config load (no file): moveq #0,d1 / move.l #' VBI',d2 / move.w #'WT',d0,
+# then d0 -> hunk 0 +$250 (the flag 18 replay sites tst.w: nonzero = VBI wait), d2 -> the "Player is
+# now using VBI wait mode!" text, d1 -> the GUI's wait-mode word. Cfg word 1 = DMA wait (the load's
+# value-1 path: d1 = 1, d2 = ' DMA', d0 = 0); 0 = VBI, already the default.
+TFMXPRO_DEFAULT_TAIL = bytes.fromhex('7200 243c20564249 303c5754')
+
+# player: (cfg, [(hunk 0 offset, built-in bytes)], cfg -> new bytes per offset)
+PLAYER_ENV_DEFAULTS = {
+    # ems_new.s:88-178: dc.l mode / mixing rate / boost at +$E4 = 2, 14000 Hz, 0. The rate sets the
+    # tempo rounding (bytesperframe, ems_new.s:811) and the mixed sound.
+    'EMS-6': (EMS6_CFG, [(0xE4, struct.pack('>3L', 2, 14000, 0))],
+              lambda cfg: [struct.pack('>3L', *ems6_cfg_values(cfg))]),
+    # Jochen Hippel 7V_v2.asm: MixRate dc.w DEFAULT_MIXING_RATE (16 kHz) at +$1EC, and the config
+    # load's "Default: moveq #16,d1" at +$642 that overwrites MixRate when no cfg opens.
+    'JochenHippel-7V': (os.path.join(ENV_EP, 'EP-Hippel_7V.cfg'),
+                        [(0x1EC, struct.pack('>H', 16)), (0x642, bytes.fromhex('7210'))], hippel7v_new),
+    'TFMX-Pro': (os.path.join(ENV_EP, 'EP-TFMX_Pro.cfg'), [(0x698, TFMXPRO_DEFAULT_TAIL)], tfmxpro_new),
+}
+
+
+def patch_player_env_defaults(path, player):
+    """Byte-check the player's built-in defaults, write the cfg's values over them, read back."""
+    if player not in PLAYER_ENV_DEFAULTS:
+        return None
+    cfg, sites, new_of = PLAYER_ENV_DEFAULTS[player]
     b = bytearray(open(path, 'rb').read())
-    off = hunk0_offset(b) + EMS6_DEFAULTS_OFF
-    got = struct.unpack_from('>3L', b, off)
-    if got != EMS6_DEFAULTS:
-        sys.exit(f'{path}: EMS-6 defaults at hunk 0 +$E4 are {got}, expected {EMS6_DEFAULTS}; the player changed, re-check ems_new.s')
-    want = ems6_cfg_values(cfg)
-    struct.pack_into('>3L', b, off, *want)
+    base = hunk0_offset(b)
+    new = new_of(cfg)
+    assert len(new) == len(sites)
+    for (off, old), want in zip(sites, new):
+        got = bytes(b[base + off:base + off + len(old)])
+        if got != old or len(want) != len(old):
+            sys.exit(f'{path}: {player} default at hunk 0 +${off:X} is {got.hex()}, expected {old.hex()}; '
+                     'the player changed, re-check its source')
+        b[base + off:base + off + len(old)] = want
     open(path, 'wb').write(b)
-    assert struct.unpack_from('>3L', open(path, 'rb').read(), off) == want
-    return want
+    rb = open(path, 'rb').read()
+    assert all(rb[base + off:base + off + len(w)] == w for (off, _), w in zip(sites, new))
+    return [(f'+${off:X}', w.hex()) for (off, _), w in zip(sites, new)]
 
 
 def source_hashes(player):
@@ -215,9 +260,9 @@ def main():
 
     if player == 'PTK-Prowiz':
         patch_player_for_68000(os.path.join(stage, 'current.uadeplayer'))
-    if player == 'EMS-6':
-        print('EMS-6 defaults from ems_v6.cfg (mode, rate, boost):',
-              patch_ems6_defaults(os.path.join(stage, 'current.uadeplayer')))
+    baked = patch_player_env_defaults(os.path.join(stage, 'current.uadeplayer'), player)
+    if baked:
+        print(f'{player} defaults baked from {os.path.basename(PLAYER_ENV_DEFAULTS[player][0])}:', baked)
 
     # The slot: UADE_MODULE_BYTES sizes the arena for the largest module the slot
     # takes; _uade_module_len carries the real length and is what the browser patches.
