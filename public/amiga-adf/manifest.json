@@ -236,32 +236,41 @@
     },
     "AudioSculpture": {
       "adf": "AudioSculpture.adf",
-      "adfSha256": "2c8397b7daa3df742eb4ef8f6bf2588e883faa6973257d7fb8598066fc3377ca",
+      "adfSha256": "7bde1371cd85c91076fc38c0ad964b28a5980b2aef4a7405929c1f00b11ac6d3",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
         "diskOffset": 44272,
-        "maxBytes": 229376
+        "maxBytes": 65536
       },
       "moduleLengthWord": {
         "diskOffset": 44268,
         "bytes": 4,
         "endian": "big"
       },
+      "companionSlot": {
+        "diskOffset": 109808,
+        "maxBytes": 16384
+      },
+      "companionLengthWord": {
+        "diskOffset": 126200,
+        "bytes": 4,
+        "endian": "big"
+      },
       "titleSlot": {
-        "diskOffset": 274134,
+        "diskOffset": 126716,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
-      "chipArenaBytes": 361732,
+      "chipArenaBytes": 214276,
       "memory": {
         "IMG_BASE": "0xC18000",
-        "IMG_LEN": "0x43200",
+        "IMG_LEN": "0x1F200",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC5B200",
+        "BSS_BASE": "0xC37200",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
-        "CHIP_LEN": "0x58504",
+        "CHIP_LEN": "0x34504",
         "ENTRY": "0xC18000"
       },
       "provenWith": {
@@ -938,37 +947,46 @@
     },
     "Infogrames": {
       "adf": "Infogrames.adf",
-      "adfSha256": "2d65f6d3e6cdc4dac22e7d08c79aa3f834e12ae6610b588344a4526ed96f8a0b",
-      "target": "a1200",
-      "cpu": "68020",
+      "adfSha256": "a2d590cef9ce6740771006146fc4a63446c324c9761eb68bac8d58b5e52a4314",
+      "target": "a500",
+      "cpu": "68000",
       "moduleSlot": {
         "diskOffset": 42672,
-        "maxBytes": 229376
+        "maxBytes": 65536
       },
       "moduleLengthWord": {
         "diskOffset": 42668,
         "bytes": 4,
         "endian": "big"
       },
+      "companionSlot": {
+        "diskOffset": 108208,
+        "maxBytes": 98304
+      },
+      "companionLengthWord": {
+        "diskOffset": 206520,
+        "bytes": 4,
+        "endian": "big"
+      },
       "titleSlot": {
-        "diskOffset": 272526,
+        "diskOffset": 207052,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
-      "chipArenaBytes": 360708,
+      "chipArenaBytes": 295172,
       "memory": {
-        "IMG_BASE": "0x100000",
-        "IMG_LEN": "0x42C00",
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x32C00",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0x142C00",
+        "BSS_BASE": "0xC4AC00",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
-        "CHIP_LEN": "0x58104",
-        "ENTRY": "0x100000"
+        "CHIP_LEN": "0x48104",
+        "ENTRY": "0xC18000"
       },
       "provenWith": {
-        "name": "bob4e.dum",
-        "bytes": 999
+        "name": "advantage tennis-intro.dum",
+        "bytes": 2627
       },
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
@@ -1016,32 +1034,41 @@
     },
     "JasonPage": {
       "adf": "JasonPage.adf",
-      "adfSha256": "e302c4eb5377158586e5232400580b396c6f06662ca7ad0fe0f4717c8b2f8a3d",
+      "adfSha256": "6209a23d33d6740e3dec1fab013ca6aa31ea24af1f73065155abc16d1d3e9ee8",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
         "diskOffset": 51588,
-        "maxBytes": 229376
+        "maxBytes": 65536
       },
       "moduleLengthWord": {
         "diskOffset": 51584,
         "bytes": 4,
         "endian": "big"
       },
+      "companionSlot": {
+        "diskOffset": 117124,
+        "maxBytes": 32768
+      },
+      "companionLengthWord": {
+        "diskOffset": 149900,
+        "bytes": 4,
+        "endian": "big"
+      },
       "titleSlot": {
-        "diskOffset": 281448,
+        "diskOffset": 150408,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
-      "chipArenaBytes": 368900,
+      "chipArenaBytes": 237828,
       "memory": {
         "IMG_BASE": "0xC18000",
-        "IMG_LEN": "0x44E00",
+        "IMG_LEN": "0x24E00",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC5CE00",
+        "BSS_BASE": "0xC3CE00",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
-        "CHIP_LEN": "0x5A104",
+        "CHIP_LEN": "0x3A104",
         "ENTRY": "0xC18000"
       },
       "provenWith": {
@@ -1689,33 +1716,42 @@
     },
     "PaulRobotham": {
       "adf": "PaulRobotham.adf",
-      "adfSha256": "c691608d2307ee7e0b5e129ac098028cafecb46eeef8b304746969e894e7cae7",
-      "target": "a1200",
-      "cpu": "68020",
+      "adfSha256": "a7f1fc8922cd31b02cbab7f4c3ee3e232c46c2242239723f86250834a3e40f8f",
+      "target": "a500",
+      "cpu": "68000",
       "moduleSlot": {
         "diskOffset": 44376,
-        "maxBytes": 229376
+        "maxBytes": 65536
       },
       "moduleLengthWord": {
         "diskOffset": 44372,
         "bytes": 4,
         "endian": "big"
       },
+      "companionSlot": {
+        "diskOffset": 109912,
+        "maxBytes": 163840
+      },
+      "companionLengthWord": {
+        "diskOffset": 273760,
+        "bytes": 4,
+        "endian": "big"
+      },
       "titleSlot": {
-        "diskOffset": 274240,
+        "diskOffset": 274268,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
       "chipArenaBytes": 361732,
       "memory": {
-        "IMG_BASE": "0x100000",
+        "IMG_BASE": "0xC18000",
         "IMG_LEN": "0x43200",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0x143200",
+        "BSS_BASE": "0xC5B200",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
         "CHIP_LEN": "0x58504",
-        "ENTRY": "0x100000"
+        "ENTRY": "0xC18000"
       },
       "provenWith": {
         "name": "dawnpatrol-sad.dat",
