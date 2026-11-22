@@ -22,7 +22,6 @@ const NUM_CHANNELS = 4;
 const MAX_ROWS = 4096;
 const MAX_STEPS = 20000;
 const SEARCH = 0x600;
-const SONG_SIZE = 0x12;
 
 type Cmd = 'rest' | 'clear' | 'slide' | 'down' | 'up' | 'next' | 'vibrato' | 'stop' | 'transpose' | 'adkcon' | 'tie' | 'tieNoEnv'
   | 'noEnv' | 'pwm' | 'volume' | 'skip' | 'globalTranspose' | 'tempo' | 'arp' | 'loopStart' | 'loopTwice' | 'loopEnd' | 'invalid';
@@ -36,7 +35,6 @@ const u16 = (b: Uint8Array, o: number): number => (u8(b, o) << 8) | u8(b, o + 1)
 const s16 = (b: Uint8Array, o: number): number => (u16(b, o) << 16) >> 16;
 const pc16 = (b: Uint8Array, e: number): number => e + s16(b, e);
 const pc8 = (b: Uint8Array, e: number): number => e + ((u8(b, e + 1) << 24) >> 24);
-const an8 = (b: Uint8Array, base: number, e: number): number => base + ((u8(b, e + 1) << 24) >> 24);
 
 /** jbm_find: first match at an even offset in [from, to); a pattern is words of four hex digits, "x" matches any. */
 function find(b: Uint8Array, from: number, to: number, pattern: string): number {
