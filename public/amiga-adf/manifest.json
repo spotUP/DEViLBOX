@@ -665,20 +665,20 @@
     },
     "EMS-6": {
       "adf": "EMS-6.adf",
-      "adfSha256": "50916e3aa14cd09554219244c1e493d9e8d59870f1ae33e79a856ef9fd83c729",
+      "adfSha256": "5da0e427a1e2992d97f19c831eb7d88dea2a4f60e1fced5ee06dc4c473c5967b",
       "target": "a1200",
       "cpu": "68020",
       "moduleSlot": {
-        "diskOffset": 56840,
+        "diskOffset": 56900,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 56836,
+        "diskOffset": 56896,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 286700,
+        "diskOffset": 286760,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -698,7 +698,7 @@
         "bytes": 4094
       },
       "sources": {
-        "tool": "6bc3a9bbfb86de733754fdfac973b18ea999460b7907df1ceafd2712fc82f166",
+        "tool": "3ca2a140f5cd6f2571a1720dc0f78394f922087a431bb7a1f57c4743f816d3a4",
         "player": "40b48f7d514976d9e84585fd9a47b5075384caa0e27fe56ef537c4ee55710658"
       }
     },
@@ -1094,20 +1094,20 @@
     },
     "JochenHippel-7V": {
       "adf": "JochenHippel-7V.adf",
-      "adfSha256": "b2dc8cf1fed839d5611cab3d27b59f7386c0e0bd1a0ee6a9798efcf327391eb2",
+      "adfSha256": "3c61daa4dcbe16ec4dcbaaddd47a8cdc012797504c63908168b4a54a40b54958",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 46600,
+        "diskOffset": 46660,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 46596,
+        "diskOffset": 46656,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 276470,
+        "diskOffset": 276530,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -1127,7 +1127,7 @@
         "bytes": 45394
       },
       "sources": {
-        "tool": "6bc3a9bbfb86de733754fdfac973b18ea999460b7907df1ceafd2712fc82f166",
+        "tool": "3ca2a140f5cd6f2571a1720dc0f78394f922087a431bb7a1f57c4743f816d3a4",
         "player": "91f90a57be47174a401fe51ff20fdbe55d5f10dc8bd2f12b4bbfb182f8789b41"
       }
     },
