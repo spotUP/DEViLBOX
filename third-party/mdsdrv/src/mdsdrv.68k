@@ -1231,6 +1231,13 @@ mds_update_seq
 ; psg
 ;--------------------------------------
 @cmd_ins_psg
+	tst.b	t_op_mask(twork)				; DEViLBOX: FM3 operator track on a dummy
+	bpl.s	@cmd_ins_psg_env				; or PSG id takes only the voice transpose
+	adda.l	a_sdtop,tmpa0					; (the FM3 voice comes from the channel 2
+	move.b	29(tmpa0),t_ins_trs(twork)		; track); upstream left it 0 there
+	st		t_last_pitch(twork)
+	bra.w	@next_command
+@cmd_ins_psg_env
 	bset	#nf+nf_key_off,flag				; set key off
 	bclr	#nf+nf_slur,flag
 	move.w	tmpa0,t_psg_eg_addr(twork)

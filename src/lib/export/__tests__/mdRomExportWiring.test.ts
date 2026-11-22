@@ -11,6 +11,9 @@ describe('MD ROM export wiring', () => {
     expect(mdRomExportAvailable([FurnaceDispatchPlatform.GENESIS])).toBe(true);
     expect(mdRomExportAvailable([FurnaceDispatchPlatform.SMS])).toBe(false);
     expect(mdRomExportAvailable(undefined)).toBe(false);
+    expect(mdRomExportAvailable([FurnaceDispatchPlatform.GENESIS_EXT])).toBe(true);
+    expect(mdRomExportAvailable([FurnaceDispatchPlatform.YM2612_EXT, FurnaceDispatchPlatform.SMS])).toBe(true);
+    expect(mdRomExportAvailable([FurnaceDispatchPlatform.YM2612, FurnaceDispatchPlatform.SMS])).toBe(true);
   });
   it('dialog mode, handler and tile are connected to the builder', () => {
     const hook = readFileSync(join(root, 'src/hooks/dialogs/useExportDialog.ts'), 'utf8');

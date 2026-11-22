@@ -9,6 +9,7 @@
 #     `if def(X)` -> `ifd X`; mdsseq.inc `if def(MML)&(~def(MMLDEF))` -> `ifd MML`.
 #  4. mdssub.inc: named macro params (\ch, \vol) -> positional (\1, \2); vasm mot rejects `\ch` as index register.
 #  5. vasm flags: -spaces (asm68k allows blanks after commas), -no-opt (no size optimisation beyond the source).
+# Behaviour fixes live in the vendored source itself, each marked `DEViLBOX:` (grep it).
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 OUT=$1

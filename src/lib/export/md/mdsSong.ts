@@ -36,6 +36,15 @@ type Kind = 'fm' | 'psg' | 'noise';
 const MDS_CHAN: number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 const KIND: Kind[] = ['fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'psg', 'psg', 'psg', 'noise'];
 /**
+ * Furnace "YM2612 Extended Channel 3" (file id 0xa0, or 0x42 Genesis Extended): FM1, FM2, OP1-OP4 of FM3, FM4-FM6, then PSG (genesisext.cpp).
+ * OP1 rides MDSDRV channel 2 (its E1 loads the FM3 voice), OP2-OP4 ride dummy ids 0a-0c; each track sets FM3 special mode with
+ * EC 8x, x = operators it leaves alone (bit i = slot i+1; Furnace OPn writes slot n: A9/AA/A8/A2 in genesisext.cpp).
+ */
+const EXT_CHAN: number[] = [0, 1, 2, 0x0a, 0x0b, 0x0c, 3, 4, 5, 6, 7, 8, 9];
+const EXT_KIND: Kind[] = ['fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'psg', 'psg', 'psg', 'noise'];
+const EXT_OP: number[] = [0, 0, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0];
+const isExt = (sys: readonly number[]) => sys[0] === 0xa0 || sys[0] === 0x42;
+/**
  * With voice transpose $30 the FM note equals the Furnace note value. PSG key k writes period PSG_TAB[k%12] >> (k/12)
  * (key 0 = 1710), the period Furnace 0.6.8.3 writes for note value k truncated instead of rounded: Furnace writes
  * round(clock / f / 32) (engine.cpp calcFreq, sms.cpp toneDivider 64), so the PSG key is the note value with no offset
@@ -236,7 +245,6 @@ const MDS_FIRST_CARRIER = [3, 3, 3, 3, 2, 1, 1, 0];
 function fmVoice(ins: FurnaceInstrument | undefined, lossy: Lossy): number[] {
   const fm = ins?.fm;
   if (!fm || fm.operators.length < 4) { lossy.add('FM channel instrument without FM data (default voice)'); return [...Array<number>(24).fill(0), 0x7f, 0x7f, 0x7f, 0, 7, FM_TRANSPOSE]; }
-  if ((fm.fms ?? 0) || (fm.ams ?? 0)) lossy.add('FM LFO sensitivity (FMS/AMS)');
   const DT = [7, 6, 5, 0, 1, 2, 3, 4];
   const ops = fm.operators.slice(0, 4);
   const row = (f: (o: (typeof ops)[number]) => number) => ops.map(f);
@@ -436,15 +444,25 @@ export function encodeTempos(v: number[]): number[] {
   return out;
 }
 
+/**
+ * File-format system ids the converter accepts: Genesis (0x02) or Genesis Extended (0x42), YM2612 (0x83) or YM2612 Extended
+ * Channel 3 (0xa0) alone or followed by SN76489 (0x03).
+ */
+export function mdsSystemsSupported(sys: readonly number[]): boolean {
+  return (sys.length === 1 && [0x02, 0x42, 0x83, 0xa0].includes(sys[0])) || (sys.length === 2 && (sys[0] === 0x83 || sys[0] === 0xa0) && sys[1] === 0x03);
+}
+
 export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const lossy = new Lossy();
   const sys = m.systems;
-  const fmOnly = sys.length === 1 && sys[0] === 0x83;
-  if (!fmOnly && !(sys.length === 1 && sys[0] === 0x02) && !(sys.length === 2 && sys[0] === 0x83 && sys[1] === 0x03)) {
+  const fmOnly = sys.length === 1 && (sys[0] === 0x83 || sys[0] === 0xa0);
+  const ext = isExt(sys);
+  const kinds = ext ? EXT_KIND : KIND, ids = ext ? EXT_CHAN : MDS_CHAN;
+  if (!mdsSystemsSupported(sys)) {
     throw new Error(`MDSDRV export needs a Genesis song (YM2612 + SN76489); systems are ${sys.map((x) => x.toString(16)).join(',')}`);
   }
   const s = m.subsongs[subsong];
-  const nCh = fmOnly ? 6 : KIND.length;
+  const nCh = fmOnly ? (ext ? 9 : 6) : kinds.length;
   // Driver: each NTSC VINT adds tempo+1 to a counter and steps one tick per 128 (Phase 0), so ticks/s = (dd+1)*NTSC/128.
   const rate = s.hz * (s.virtualTempo || 1) / (s.virtualTempoD || 1);
   const tempo = Math.max(0, Math.min(255, Math.round(rate * 128 / NTSC_HZ) - 1));
@@ -625,9 +643,14 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
 
   // 3. Per channel, per chunk: standalone command bytes.
   const keyOns: MdsKeyOn[] = [];
-  const tracks: Array<{ ch: number; chunks: Array<{ bytes: number[]; tieStart: boolean; head: number }>; wrap: number[] }> = [];
+  const op1Ins = new Set<number>();
+  // FMS/AMS live in B4 beside the pan (EA on an FM track keeps the pan bits). Furnace enables the LFO at reset (genesis.cpp lfoValue=8,
+  // reg 22) and MDSDRV never writes 22, so a song that uses the LFO starts with F6 22 08. Off for other songs, keeping their bytes.
+  const lfoOf = (n: number) => { const f = m.instruments[n]?.fm; return ((f?.ams ?? 0) & 3) << 4 | ((f?.fms ?? 0) & 7); };
+  const songLfo = m.instruments.some((_, n) => lfoOf(n) !== 0);
+  const tracks: Array<{ ch: number; op: number; chunks: Array<{ bytes: number[]; tieStart: boolean; head: number }>; wrap: number[] }> = [];
   for (let ch = 0; ch < nCh; ch++) {
-    const kind = KIND[ch];
+    const kind = kinds[ch], op = ext ? EXT_OP[ch] : 0, fm6 = ids[ch] === 5;
     let envPh: HitPhase | undefined, trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0, slideEnd = 0, prevKey = -1, pegDirty = false, portaXx = 0;
     // 01xx/02xx (linear pitch): rate in 1/128 semitone per Furnace tick, poff = offset after the last tick so far. Furnace keeps the slide
     // running across notes and note offs (playback.cpp 0x01/0x02 leave inPorta false; NOTE_ON resets baseFreq, the slide goes on), so each
@@ -647,18 +670,20 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     let kvsIns = -1;
     const kvsCmd = (v: number): number[] => {
       const ops = kind === 'fm' ? m.instruments[kvsIns]?.fm?.operators : undefined;
-      if (!ops || ops.length < 4 || (ch === 5 && m.instruments[ins]?.type === 4)) return [];
+      if (!ops || ops.length < 4 || (fm6 && m.instruments[ins]?.type === 4)) return [];
       const alg = m.instruments[kvsIns]!.fm!.algorithm & 7, att = 127 - v, out: number[] = [];
       for (let i = 0; i < 4; i++) {
         const car = i >= MDS_FIRST_CARRIER[alg], k = ops[i].kvs ?? 2, scaled = k === 1 || (k === 2 && car);
         if (scaled === car) continue;
+        // FM3 special mode scales w_fm3_tl, which EE does not reach.
+        if (op) { lossy.add('FM KVS on an extended channel 3 operator'); continue; }
         const base = (ops[i].tl & 127) + (scaled ? att : -att);
         if (base < 0 || base > 127) lossy.add('FM KVS operator TL beyond 0..127 (clamped)');
         out.push(0xee, i, Math.max(0, Math.min(127, base)));
       }
       return out;
     };
-    const volCmd = (v: number) => [0xe2, kind === 'fm' ? (ch === 5 && m.instruments[ins]?.type === 4 ? pcmDacAtt(dacVol(v)) : 127 - v) : 0x80 | Math.max(0, Math.min(15, v)), ...kvsCmd(v)];
+    const volCmd = (v: number) => [0xe2, kind === 'fm' ? (fm6 && m.instruments[ins]?.type === 4 ? pcmDacAtt(dacVol(v)) : 127 - v) : 0x80 | Math.max(0, Math.min(15, v)), ...kvsCmd(v)];
     // Sequence tick t runs on Furnace tick ceil((t + 1) * fpt) - 1: engine tick f adds N to tempoAccum and consumes every virtual tick
     // that brings it to D (playback.cpp nextTick, accum from 0), so at 180/150 the row ticks 4 and 5 share an engine tick (0,1,2,3,4,4).
     // Counted absolutely so carried phase does not drift.
@@ -829,11 +854,13 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         // an 0/12 arp instrument), so an instrument without one restates the transpose; a chunk head can follow any table.
         const tr = r.mtab < 0 && (chunkStart || mtabOn) ? [0xe4, (kind === 'noise' ? (Number.isNaN(trs) ? (trs = 0) : trs) : trsOut || 0) & 0xff] : [];
         mtabOn = r.mtab >= 0;
-        if (chunkStart && arpHold !== undefined) return [0xe1, r.ins, ...peg, 0xeb, 0, 0xe4, arpHold & 0xff, ...kvsCmd(vol)];
-        return [0xe1, r.ins, ...peg, 0xeb, r.mtab + 1, ...tr, ...kvsCmd(vol)];
+        // EA on a dummy id sets the noise mode: an OP2-OP4 track leaves the LFO to OP1's channel 2 track.
+        const lfo = songLfo && kind === 'fm' && op <= 1 ? [0xea, lfoOf(ins)] : [];
+        if (chunkStart && arpHold !== undefined) return [0xe1, r.ins, ...lfo, ...peg, 0xeb, 0, 0xe4, arpHold & 0xff, ...kvsCmd(vol)];
+        return [0xe1, r.ins, ...lfo, ...peg, 0xeb, r.mtab + 1, ...tr, ...kvsCmd(vol)];
       };
       // FM6 with a sample instrument plays PCM (genesis.cpp: dacMode from the instrument type at each note-on); E1 would leave PCM mode.
-      const isDac = (n: number) => kind === 'fm' && ch === 5 && m.instruments[n]?.type === 4;
+      const isDac = (n: number) => kind === 'fm' && fm6 && m.instruments[n]?.type === 4;
       let curPcm = -1, pcmOn = false;
       baked = arpHold !== undefined; arpT0 = tick; // insCmd(true) restates EB, which restarts the instrument's arp table
       // Chunk head: the channel state a chunk starts from. The loop chunk's head plays once; the wrap restates it from the song-end state.
@@ -873,6 +900,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         const cell = cellAt(ch, c.o, r);
         let nv = cell ? convertFurnaceNoteValue(cell) : -1, shY = 0, shX = 0, shFrom = NaN;
         if (cell && cell.instrument >= 0) ins = cell.instrument;
+        // shortcut: the FM3 voice is OP1's instrument (channel 2 E1); an OP2-OP4 instrument only brings its own operator in Furnace.
+        if (op === 1 && nv >= 0) op1Ins.add(ins);
+        else if (op > 1 && nv >= 0 && !op1Ins.has(ins)) lossy.add('extended channel 3: OP2-OP4 instrument other than OP1\'s (FM3 plays OP1\'s voice)');
         const cmds: number[] = [];
         let pChanged = false, vChanged = false, dacOff = false;
         // EDxx runs the whole row xx ticks late; ECxx keys off xx ticks after the row runs (playback.cpp rowDelay / cut, delayBehavior 2).
@@ -888,6 +918,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (cell && cell.volume >= 0) { vol = cell.volume; vol256 = vol << 8; cmds.push(...volCmd(vol)); }
         for (const e of cell?.effects ?? []) {
           if (e.type < 0 || FX_FLOW.has(e.type)) continue;
+          // 10xy: LFO enable x, speed y (genesis.cpp DIV_CMD_FM_LFO). 80xx: linear pan, on Genesis only full left (00) and right (FF) mute a side.
+          if (e.type === 0x10 && kind === 'fm') { cmds.push(0xf6, 0x22, ((e.value & 7) | ((e.value >> 4) << 3)) & 0xff); continue; }
+          if (e.type === 0x80 && kind === 'fm' && op <= 1) { pan = e.value === 0 ? 0x80 : e.value === 0xff ? 0x40 : 0xc0; cmds.push(0xe9, pan); continue; }
           if (e.type === 0x08 && kind === 'fm') { const l = e.value >> 4, rr = e.value & 15; pan = l && rr ? 0xc0 : l ? 0x80 : rr ? 0x40 : 0xc0; cmds.push(0xe9, pan); continue; }
           // E5xx: Furnace linear pitch offset xx-80 in 1/128 semitone (playback.cpp); MDSDRV dtn is 1/256 semitone, signed byte.
           if (e.type === 0xe5) {
@@ -1037,8 +1070,10 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       if (wrapPass) wrap = bytes;
       else out.push({ bytes, tieStart, head: ci === loopChunk ? (faAt >= 0 ? faAt : bytes.length) : headLen });
     }
-    if (any) tracks.push({ ch, chunks: out, wrap });
+    if (any) tracks.push({ ch, op, chunks: out, wrap });
   }
+
+  if (tracks.some((t) => t.op > 1) && !tracks.some((t) => t.op === 1)) lossy.add('extended channel 3: OP1 never plays, so no FM3 voice is loaded');
 
   // 4. Subroutines: repeated chunk bytes, only where neither this chunk nor the next starts with a tie
   //    (the driver looks ahead for 81 to skip the key-off; a call or return hides it).
@@ -1047,7 +1082,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   for (const t of tracks) for (const c of t.chunks) uses.set(key(c.bytes), (uses.get(key(c.bytes)) ?? 0) + 1);
   const subs = new Map<string, number>();
   const streams = tracks.map((t) => {
-    const b: number[] = [];
+    const b: number[] = t.op ? [0xec, 0x80 | (0xf & ~(1 << (t.op - 1)))] : [];
+    if (t === tracks[0] && songLfo) b.push(0xf6, 0x22, 0x08);
     t.chunks.forEach((c, i) => {
       // FA at the loop chunk's first note (c.head): the loop pass enters with the song-end state (t.wrap), not the first pass's.
       if (i === loopChunk) { b.push(...c.bytes.slice(0, c.head), 0xfa, ...c.bytes.slice(c.head)); return; }
@@ -1064,7 +1100,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   });
   if (items.length > 256) throw new Error(`MDSDRV song table holds 256 items; this song needs ${items.length}`);
   streams.push([...span(0, nIntro), ...(loopChunk >= 0 ? [0xfa, ...span(nIntro, K * nBody), 0xfb, 0x00] : []), 0xff]);
-  const chanIds = [...tracks.map((t) => MDS_CHAN[t.ch]), 0x0f];
+  const chanIds = [...tracks.map((t) => ids[t.ch]), 0x0f];
 
   // 5. Layout.
   const sd: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // two dc.l + pcm_tab dc.w 0
