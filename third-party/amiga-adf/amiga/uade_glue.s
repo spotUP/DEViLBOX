@@ -2100,6 +2100,15 @@ UADE_TABLE_END  equ     UADE_INFO+4*UADE_TABLE_ENTRIES
         fail    "uade_glue.s: _uade_publish_info's locator table reaches UADE_STAGE -- move UADE_STAGE out further in amiga/uade_layout.i"
         endc
 
+; DTP_Interrupt as DeliTracker calls it: a5 = the DTG base (see uade_msg_trap).
+uade_intfunc_tramp:
+        move.l  a5,-(sp)
+        lea     eaglebase,a5
+        move.l  _uade_real_intfunc(pc),a0
+        jsr     (a0)
+        move.l  (sp)+,a5
+        rts
+
 ; ===========================================================================
 ; uade_msg_trap -- installed at TRAP_VECTOR_5 by score's set_message_traps
 ; (PORT 6). Upstream that handler is a bare `rte` because UADE's emulator
@@ -2111,6 +2120,23 @@ UADE_TABLE_END  equ     UADE_INFO+4*UADE_TABLE_ENTRIES
         xdef    uade_msg_trap
 uade_msg_trap:
         movem.l d0-d7/a0-a6,-(sp)
+;*--- PORT: DTP_Interrupt gets a5 = eaglebase. score's ciaa/ciab_interrupt
+;     (score.s) jsr the player's interrupt with whatever a5 the interrupted
+;     code had. Under UADE that is score's own loop, so a5 is eaglebase by
+;     luck; here it is the demo's, so a player calling a DTG function from
+;     its interrupt jumps through garbage (MusicAssembler: song-end check
+;     does movea.l dtg_SongEnd(a5),a0 / jsr (a0) -> ADRE). Every message
+;     score sends lands here, and parse_player_tags is always followed by
+;     messages before set_player_interrupt reads intfunc, so swap intfunc
+;     for the trampoline here (idempotent).
+        move.l  intfunc,d1
+        beq.b   .intfunc_ok
+        cmpi.l  #uade_intfunc_tramp,d1
+        beq.b   .intfunc_ok
+        lea     _uade_real_intfunc(pc),a0
+        move.l  d1,(a0)
+        move.l  #uade_intfunc_tramp,intfunc
+.intfunc_ok:
         move.l  UADE_MSG,d0
 
         cmpi.l  #AMSG_START_OUTPUT,d0
@@ -2856,6 +2882,8 @@ _uade_sub_min:          dc.l 0
 _uade_sub_cur:          dc.l 0
 _uade_sub_max:          dc.l 0
 _uade_reposted:         dc.w 0                  ; song-end re-post in flight (uade_yield)
+        even
+_uade_real_intfunc:     dc.l 0                  ; player's DTP_Interrupt (uade_intfunc_tramp)
         even
 _uade_missing_lvo_ret:  dc.l 0
 _uade_missing_lvo_off:  dc.l 0
