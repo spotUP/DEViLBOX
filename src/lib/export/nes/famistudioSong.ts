@@ -906,8 +906,11 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               // Furnace adds fine pitch (E5xx) and vibrato in 1/128 semitone and rounds once; the engine adds the sent fine
               // offset F to each step, so a step is taken at fine + vibrato minus F (rounding both apart was 1 off, one_sided_love).
               const fp = fineRaw - 128, F = Math.round(X * 2 ** (-fp / 1536)) - 1 - P;
+              // Step i shows the Furnace tick its 60 Hz frame holds, counted from the row's exact time (as the macros do):
+              // floor(i / perTick) ignored a 56 Hz row firing up to half a frame off its tick and ran a frame late (Famitune1).
+              const rowPh = seq[ri].t - seq[ri].frame;
               vib = Array.from({ length: len }, (_, i) => {
-                const phase = vibPos + x * (Math.floor(i / perTick + 1e-9) + 1);
+                const phase = vibPos + x * (tickAtFrame(i, macroRate, rowPh) + 1);
                 if (!linear) return Math.round(-amp * Math.sin(2 * Math.PI * phase / 64));
                 // Furnace: vibTable = (short)(127 sin) truncates; pitch = ((depth * vibTable * vibratoFine(15)) >> 4) / 15, C division truncates.
                 const u = Math.trunc(((y * Math.trunc(127 * Math.sin(2 * Math.PI * (phase & 63) / 64)) * 15) >> 4) / 15);

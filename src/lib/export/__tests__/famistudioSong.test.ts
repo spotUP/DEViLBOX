@@ -239,6 +239,20 @@ describe('furnaceToFamistudio', () => {
     expect(has(music, encodeEnvelope(vib(445), 0, -1, 'pitch'))).toBe(true);
     expect(has(music, encodeEnvelope(vib(440), 0, -1, 'pitch'))).toBe(false);
   });
+  it('steps a 56 Hz vibrato on the Furnace tick each 60 Hz frame shows, from the row\'s exact time (Famitune1 triangle one frame late)', () => {
+    // Row 4 = tick 24 = 60 Hz time 25.71, fired on frame 26 (ph -0.29): tick 25 lands on frame 27 = envelope step 1, which
+    // floor(i / perTick) put on step 2 (every vibrato cycle one frame behind Furnace).
+    const ph = 24 * 60 / 56 - 26;
+    const vib = (tick: (i: number) => number): number[] => Array.from({ length: 34 }, (_, i) => {
+      const X = 1789772.727 / (16 * 440 * 2), P = Math.round(X) - 1;
+      const u = Math.trunc(((3 * Math.trunc(127 * Math.sin(2 * Math.PI * ((6 * (tick(i) + 1)) & 63) / 64)) * 15) >> 4) / 15);
+      return Math.round(X * 2 ** (-u / 1536)) - 1 - P;
+    });
+    const music = furnaceToFamistudio(nesModule({ 0: { 0: A4, 4: fx(0x04, 0x63) } }, { hz: 56 })).music;
+    expect(has(music, encodeEnvelope(vib((i) => tickAtFrame(i, 56 / 60, ph)), 0, -1, 'pitch'))).toBe(true);
+    expect(has(music, encodeEnvelope(vib((i) => Math.floor(i * 56 / 60 + 1e-9)), 0, -1, 'pitch'))).toBe(false);
+  });
+
   it('rounds fine pitch and vibrato together as Furnace does, minus the sent fine offset (one_sided_love pulse1, E57D + 0463)', () => {
     // Furnace sums chan.pitch (E5xx - 0x80) and the vibrato in 1/128 semitone and rounds once; the engine adds the 0x4e fine
     // offset F to every vibrato step, so each step is round(X * 2^(-(u + fp) / 1536)) - 1 - P - F.
