@@ -1064,6 +1064,22 @@
       "cells": 9924,
       "bytes": 9924
     },
+    "sonicArrangerSas": {
+      "exporter": "SpeedyA1Exporter.exportSpeedyA1",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 132892,
+      "bytes": 132892
+    },
+    "markII": {
+      "exporter": "MarkIIExporter.exportMarkII",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 181028,
+      "bytes": 181028
+    },
     "steveBarrett": {
       "exporter": "SteveBarrettExporter.exportSteveBarrett",
       "tier": "byte-exact",

@@ -426,6 +426,13 @@ export async function tryRouteFormat(
 
   // ── Sonic Arranger — native parser provides detection; UADE handles audio.
   if (matchesExt(filename, ['sas'])) {
+    // Speedy A1 System modules use the .sas extension too: editable grid (SpeedyA1SystemParser.ts).
+    const { isSpeedyA1Format, parseSpeedyA1File } = await import('@lib/import/formats/SpeedyA1SystemParser');
+    if (isSpeedyA1Format(new Uint8Array(buffer))) {
+      return withNativeThenUADE('sonicArrangerSas', ctx,
+        (buf: Uint8Array | ArrayBuffer, name: string) => parseSpeedyA1File(buf as ArrayBuffer, name),
+        'SpeedyA1SystemParser', { injectUADE: true });
+    }
     const { isSonicArrangerFormat, parseSonicArrangerFile } = await import('@lib/import/formats/SonicArrangerParser');
     return withNativeThenUADE('sonicArranger', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => {
@@ -2597,14 +2604,14 @@ export async function tryRouteFormat(
     return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['synmod']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
   }
   // ── Mark II (.mk2 / .mkii / MK2.* prefix) ────────────────────────────────
-  // Stub parser: filename-based title + 4 placeholder instruments. UADE classic audio.
+  // Editable step grid (MarkIIParser.ts); playback is the native replayer.
   // Also caught by UADEPrefixParsers for prefix-form files; this handles suffix-form.
   if (matchesExt(filename, ['mk2', 'mkii'])) {
     const mk2Ctx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['mk2', 'mkii']) };
-    const { parseMarkIIFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    const { parseMarkIIFile } = await import('@lib/import/formats/MarkIIParser');
     return withNativeThenUADE('markII', mk2Ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => parseMarkIIFile(buf as ArrayBuffer, name),
-      'SimpleAmigaStubParser', { injectUADE: true });
+      'MarkIIParser', { injectUADE: true });
   }
   // ── SCUMM (.scumm) — native pattern display + UADE classic audio ─────────
   // eagleplayer.conf: scumm.* prefix — self-contained 68k binary (player + data fused).

@@ -134,6 +134,8 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   jankoMrsicFlogel: 'public/data/songs/formats/spacestation.jmf',
   specialFX: 'public/data/songs/formats/wildwheels_ingame.jd',
   steveBarrett: 'public/data/songs/formats/street_fighter.sb',
+  markII: 'public/data/songs/mark-ii/astarrsonix.mk2',
+  sonicArrangerSas: 'public/data/songs/speedy-a1-system/digital voyage.sas',
   robHubbardST: 'public/data/songs/rob-hubbard-st/battleships.rho',
   benDaglish: 'public/data/songs/ben-daglish/motorhead-titleandingame.bd',
   synthDream: 'public/data/songs/formats/sdr.monsterbusiness_5',

@@ -337,12 +337,12 @@
       "cells": 34
     },
     "markII": {
-      "kind": "fixed",
-      "method": "decode-encode",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.168,
-      "cells": 256
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 200
     },
     "mdl": {
       "kind": "variable",
@@ -553,12 +553,12 @@
       "cells": 8448
     },
     "sonicArrangerSas": {
-      "kind": "fixed",
-      "method": "decode-encode",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.1289,
-      "cells": 256
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 137
     },
     "sonixMusicDriver": {
       "kind": "variable",
