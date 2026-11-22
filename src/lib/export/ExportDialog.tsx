@@ -98,6 +98,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
           return await ex.handleExportVectrexCart((b, n) => saveAs(b, n), onClose);
         case 'nesRom':
           return await ex.handleExportNesRom((b, n) => saveAs(b, n), onClose);
+        case 'gbRom':
+          return await ex.handleExportGbRom((b, n) => saveAs(b, n), onClose);
         case 'nsfe':
           return await ex.handleExportNsfe((b, n) => saveAs(b, n), onClose);
         case 'zxBeeperTap':
@@ -414,6 +416,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     >
                       <FileMusic size={24} className="mx-auto mb-2" />
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Vectrex Cartridge (AY-3-8910)</div>
+                    </button>
+                  )}
+                  {ex.gbRomAvailable && (
+                    <button
+                      onClick={() => ex.setExportMode('gbRom')}
+                      className={`
+                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        ${ex.exportMode === 'gbRom'
+                          ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                          : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                        }
+                      `}
+                    >
+                      <FileMusic size={24} className="mx-auto mb-2" />
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">Game Boy Cartridge (.gb)</div>
                     </button>
                   )}
                   {ex.nesRomAvailable && (
@@ -1010,6 +1027,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : ex.exportMode === 'zxTap' || ex.exportMode === 'zxBeeperTap' || ex.exportMode === 'zxQuadToneTap' ? '.tap'
                   : ex.exportMode === 'vectrexCart' ? '.bin'
                   : ex.exportMode === 'nesRom' ? '.nes'
+                  : ex.exportMode === 'gbRom' ? '.gb'
                   : ex.exportMode === 'nsfe' ? '.nsfe'
                   : ex.exportMode === 'tad' ? '.zip'
                   : ex.exportMode === 'adf' ? '.adf'

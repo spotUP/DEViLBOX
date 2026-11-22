@@ -8,6 +8,7 @@
 
 import { furnaceModuleExportAvailable } from '@/lib/export/FurnaceModuleExporter';
 import { furnaceAyScrambleExportAvailable, ayScrambleTempoWarning, type AyScrambleTarget } from '@/lib/export/FurnaceExporter';
+import { gbRomExportAvailable } from '@/lib/export/gb/gbExport';
 import { nesRomExportAvailable, nesTempoWarning, type NesRegionChoice } from '@/lib/export/nes/nesExport';
 import { QUADTONE_PLATFORM } from '@lib/export/zx/zxQuadToneData';
 import { FURNACE_SNES_CHIP_ID } from '@/lib/export/tad/tadSongWriter';
@@ -40,7 +41,7 @@ import { saveFurFileWasm, saveFurTextWasm, loadFurFileWasm } from '@lib/import/w
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'nsfe' | 'tad' | 'adf';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furText' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'zxQuadToneTap' | 'vectrexCart' | 'nesRom' | 'gbRom' | 'nsfe' | 'tad' | 'adf';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -88,6 +89,7 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   zxQuadToneTap: '.tap',
   vectrexCart: '.bin',
   nesRom: '.nes',
+  gbRom: '.gb',
   adf: '.adf',
   nsfe: '.nsfe',
   tad: '.zip',
@@ -389,6 +391,23 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     }
   }, [metadata, nesRegion, nesSubsongs]);
   const handleExportNesRom = useCallback((d: (blob: Blob, filename: string) => void, c: () => void) => exportNes('nes', d, c), [exportNes]);
+  // Game Boy cartridge (hUGEDriver player ROM).
+  const gbRomAvailable = gbRomExportAvailable(furnaceNative?.chipIds);
+  const [gbRomBusy, setGbRomBusy] = useState(false);
+  const handleExportGbRom = useCallback(async (downloadFn: (blob: Blob, filename: string) => void, onClose: () => void) => {
+    setGbRomBusy(true);
+    try {
+      const r = await (await import('@lib/export/gb/gbExport')).exportGbRom();
+      downloadFn(new Blob([r.rom as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.gb`);
+      notify.success(`Game Boy ROM exported (${r.rom.byteLength} bytes).`);
+      r.warnings.forEach((w) => notify.warning(w));
+      onClose();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Game Boy export failed.');
+    } finally {
+      setGbRomBusy(false);
+    }
+  }, [metadata]);
   const handleExportNsfe = useCallback((d: (blob: Blob, filename: string) => void, c: () => void) => exportNes('nsfe', d, c), [exportNes]);
 
   const [zxBeeperReport, setZxBeeperReport] = useState<{ warnings: string[]; seconds: number } | null>(null);
@@ -651,6 +670,9 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     vectrexCartTempoWarning,
     vectrexCartBusy,
     handleExportNesRom,
+    handleExportGbRom,
+    gbRomAvailable,
+    gbRomBusy,
     handleExportNsfe,
     nesRomAvailable,
     nesRegion,
