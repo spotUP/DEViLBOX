@@ -260,7 +260,10 @@ def main():
 
     if player == 'PTK-Prowiz':
         patch_player_for_68000(os.path.join(stage, 'current.uadeplayer'))
-    baked = patch_player_env_defaults(os.path.join(stage, 'current.uadeplayer'), player)
+    # Hippel-7V at the cfg's 24 kHz: the AUD3 mixer IRQ eats the whole 68000, so _music_init never
+    # returns (crumb stays PUBL, audio plays). An A500 keeps the built-in 16 kHz, which reaches PLAY.
+    skip_bake = player == 'JochenHippel-7V' and target == 'a500'
+    baked = None if skip_bake else patch_player_env_defaults(os.path.join(stage, 'current.uadeplayer'), player)
     if baked:
         print(f'{player} defaults baked from {os.path.basename(PLAYER_ENV_DEFAULTS[player][0])}:', baked)
 

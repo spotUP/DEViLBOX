@@ -1094,7 +1094,7 @@
     },
     "JochenHippel-7V": {
       "adf": "JochenHippel-7V.adf",
-      "adfSha256": "3c61daa4dcbe16ec4dcbaaddd47a8cdc012797504c63908168b4a54a40b54958",
+      "adfSha256": "ffe001f67f3b7a11d9c7884edcc9a6ce6ca3162d53576582794c81fe2748c078",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
@@ -1127,7 +1127,7 @@
         "bytes": 45394
       },
       "sources": {
-        "tool": "3ca2a140f5cd6f2571a1720dc0f78394f922087a431bb7a1f57c4743f816d3a4",
+        "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "91f90a57be47174a401fe51ff20fdbe55d5f10dc8bd2f12b4bbfb182f8789b41"
       }
     },
