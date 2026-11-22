@@ -57,6 +57,15 @@ describe('file browser reopens where it was', () => {
     expect(await findByText('songs/formats/mine')).toBeTruthy();
   });
 
+  it('prints the full path in the header, untruncated', async () => {
+    const deep = 'songs/formats/' + 'very-long-folder-name/'.repeat(8) + 'leaf';
+    updateFileBrowserMemory({ fileSource: 'demo', currentPath: deep });
+    const { findByTestId } = render(<FileBrowser isOpen mode="load" onClose={noop} onLoad={noop} onLoadTrackerModule={async () => {}} />);
+    const header = await findByTestId('file-browser-path');
+    expect(header.textContent).toBe(deep);
+    expect(header.className).not.toContain('truncate');
+  });
+
   it('puts the list back at the remembered scroll position', async () => {
     updateFileBrowserMemory({ fileSource: 'demo', currentPath: 'songs' });
     rememberScroll(scrollKey('demo', 'songs'), 240);
