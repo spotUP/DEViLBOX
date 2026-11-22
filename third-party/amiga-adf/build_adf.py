@@ -9,7 +9,7 @@ content via uade123), or --player NAME. Output: <out>/devilbox.adf and <out>/lay
 slot's disk offset and maximum size and the disk offset of the big-endian
 length word the browser patches together with the slot.
 """
-import argparse, hashlib, json, os, re, shutil, subprocess, sys
+import argparse, hashlib, json, os, re, shutil, struct, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UADE_ROOT = os.path.join(HERE, '..', 'uade-3.05')
@@ -73,6 +73,47 @@ def patch_player_for_68000(path):
         elif new not in b:
             sys.exit(f'{path}: PTK-Prowiz {what} not found; the player changed, re-check its 68000 safety')
     open(path, 'wb').write(b)
+
+
+# EMS-6 reads mode / mixing rate / boost from ENV:EaglePlayer/ems_v6.cfg (ems_new.s:88-178).
+# UADE ships that cfg (the reference renderer embeds it), but disks carry no ENV files, so
+# the player would run its dc.l defaults instead: hunk 0 +$E4/+$E8/+$EC = 2, 14000 Hz, 0.
+# The rate sets the tempo rounding (bytesperframe, ems_new.s:811) and the mixed sound, so
+# bake the cfg's values into those defaults. The cfg read then fails on the disk and keeps them.
+EMS6_CFG = os.path.join(UADE_ROOT, 'players', 'ENV', 'EaglePlayer', 'ems_v6.cfg')
+EMS6_DEFAULTS_OFF = 0xE4
+EMS6_DEFAULTS = (2, 14000, 0)
+
+
+def hunk0_offset(b):
+    """File offset of hunk 0's body in a hunk executable with no resident names."""
+    magic, names, n, first, last = struct.unpack_from('>5L', b, 0)
+    if magic != 0x3F3 or names != 0 or first != 0 or last + 1 > n:
+        sys.exit('not a plain hunk executable')
+    off = 20 + 4 * (last - first + 1)
+    if struct.unpack_from('>L', b, off)[0] & 0x3FFFFFFF not in (0x3E9, 0x3EA):
+        sys.exit('hunk 0 is not code/data')
+    return off + 8
+
+
+def ems6_cfg_values(cfg=EMS6_CFG):
+    vals = [int(x) for x in open(cfg).read().split()]
+    if len(vals) != 3 or not (1 <= vals[0] <= 5 and 1000 <= vals[1] <= 65535 and 0 <= vals[2] <= 8):
+        sys.exit(f'{cfg}: expected "mode / rate / boost" (ems_v6.cfg.txt), got {vals}')
+    return tuple(vals)
+
+
+def patch_ems6_defaults(path, cfg=EMS6_CFG):
+    b = bytearray(open(path, 'rb').read())
+    off = hunk0_offset(b) + EMS6_DEFAULTS_OFF
+    got = struct.unpack_from('>3L', b, off)
+    if got != EMS6_DEFAULTS:
+        sys.exit(f'{path}: EMS-6 defaults at hunk 0 +$E4 are {got}, expected {EMS6_DEFAULTS}; the player changed, re-check ems_new.s')
+    want = ems6_cfg_values(cfg)
+    struct.pack_into('>3L', b, off, *want)
+    open(path, 'wb').write(b)
+    assert struct.unpack_from('>3L', open(path, 'rb').read(), off) == want
+    return want
 
 
 def source_hashes(player):
@@ -174,6 +215,9 @@ def main():
 
     if player == 'PTK-Prowiz':
         patch_player_for_68000(os.path.join(stage, 'current.uadeplayer'))
+    if player == 'EMS-6':
+        print('EMS-6 defaults from ems_v6.cfg (mode, rate, boost):',
+              patch_ems6_defaults(os.path.join(stage, 'current.uadeplayer')))
 
     # The slot: UADE_MODULE_BYTES sizes the arena for the largest module the slot
     # takes; _uade_module_len carries the real length and is what the browser patches.
