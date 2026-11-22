@@ -629,7 +629,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     const fx: Array<[number, number]> = [];
     // 2A03 hardware volume state (nes.cpp): 15xx envMode, 16xx length index, volume column = envelope period in envelope modes.
     let envMode = 3, lenIdx = 0x1f, furVol = 15, hwVol = false, baked = false, lastSpd = -1;
-    let bake: { vol: number; vals: number[]; held: boolean; frame: number } | null = null; // the baked note's channel volume and volume macro frames
+    let bake: { vol: number; vals: number[]; held: boolean; loop: number; release: number; frame: number } | null = null; // the baked note's channel volume and volume macro frames
     let slideOps: number[] = [];
     let slVol = ch === 7 ? 63 : 15, slStep = 0, slFrame = 0; // Furnace channel volume under a running 0Axy (volume units), its step per tick
     let loopSlide = ''; // running 0Axy as the first pass enters the loop target
@@ -910,7 +910,11 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               // The envelope holds bake x macro; Furnace now plays v x macro. Send the FamiStudio channel volume c (table =
               // floor(c * e / 15)) with the least error over the macro frames still to play (after a finished macro: v x L only,
               // L = its last value). Matching L alone while the macro runs silenced a decay to 0 (Future_Re-ference pulse 2).
-              const vals = bake.vals.length ? bake.vals : [15], rest = vals.slice(Math.min(seq[ri].frame - bake.frame, vals.length - 1));
+              // Past the loop start the envelope cycles [loop, release) (a Furnace release step is held there until note release):
+              // Future_Re-ference pulse 1 row 4, frame 6 of [15 12 11 10 | 1 3 2] release 3 plays 10, not 2.
+              // shortcut: assumes no note-off since the bake, upgrade if a released note takes a volume row.
+              const at = seq[ri].frame - bake.frame, vals = bake.vals.length ? bake.vals : [15];
+              const rest = bake.loop >= 0 && at >= bake.loop ? vals.slice(bake.loop, bake.release >= 0 ? bake.release : undefined) : vals.slice(Math.min(at, vals.length - 1));
               const err = (c: number): number => rest.reduce((a, L) => a + Math.abs(Math.floor((c * scaleVol(bake!.vol, L, m.compatFlags)) / 15) - scaleVol(furVol, L, m.compatFlags)), 0);
               let c = 0;
               for (let k = 1; k <= 15; k++) if (err(k) < err(c)) c = k;
@@ -934,7 +938,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             const volMac = curIns?.macros.some((x) => x.code === MACRO_VOL && x.length > 0);
             // A running 0Axy changes the channel volume every tick, so it cannot be baked into the envelope: FamiStudio slides it instead.
             baked = !hwVol && ch !== DPCM_CH && ch !== 2 && !!volMac && furVol < 15 && !slideOps.length;
-            if (baked) { const f = macroFrames(curIns!.macros.find((x) => x.code === MACRO_VOL && x.length > 0)!, 'vol', lossy, undefined, macroRate, m.version); bake = { vol: furVol, vals: f.vals, held: f.loop >= 0 || f.release >= 0, frame: seq[ri].frame }; }
+            if (baked) { const f = macroFrames(curIns!.macros.find((x) => x.code === MACRO_VOL && x.length > 0)!, 'vol', lossy, undefined, macroRate, m.version); bake = { vol: furVol, vals: f.vals, held: f.loop >= 0 || f.release >= 0, loop: f.loop, release: f.release, frame: seq[ri].frame }; }
             const key = (hwVol ? idx + 65536 * (1 + (envMode | (furVol << 2) | (lenIdx << 6))) : idx) + (baked ? KEY_BAKE * (1 + furVol) : 0);
             if (key !== lastIns) { insOps.push(0x80 | (insNo(key) << 1)); lastIns = key; }
             const fsVol = hwVol || baked ? 15 : furVol;
