@@ -25,7 +25,8 @@ export interface FamistudioSong { /** Initial tempo accumulator (8.8; 0x600 = en
   /** Bytes of each music-area part: song header + instrument table, DPCM sample table, envelopes, and one entry per channel stream. */ sizes: { header: number; samples: number; envelopes: number; streams: number[] }
   /** The song carries the three VRC6 channels: it needs the mapper-24 player (player-vrc6.nes / .json). */ vrc6?: boolean
   /** Music past 16 KB, assembled for $6000: it needs the FME-7 player (player-fme7.nes / .json). */ fme7?: boolean
-  /** Furnace A-4 tuning (Hz); buildFamistudioRom retunes the player's note table to it. */ tuning?: number }
+  /** Furnace A-4 tuning (Hz); buildFamistudioRom retunes the player's note table to it. */ tuning?: number
+  /** Furnace 2A03 clock (clockSel): the note table rounds on its grid. */ clock?: number }
 
 class Lossy {
   private counts = new Map<string, number>();
@@ -282,6 +283,15 @@ function pcmToDpcm(levels: number[]): number[] {
 const DPCM_RATES = [4181.71, 4709.93, 5264.04, 5593.04, 6257.95, 7046.35, 7919.35, 8363.42, 9419.86, 11186.1, 12604, 13982, 16884.6, 21306.8, 24858, 33143.9];
 /** 2A03 pulse period of FamiStudio note n (index 46 = A-4 at `a4` Hz); the triangle period is half. */
 const periodRawAt = (n: number, a4: number): number => 1789773 / (16 * a4 * 2 ** ((n - 46) / 12));
+
+/** Furnace 2A03 clock per chip flag clockSel (nes.cpp setFlags): NTSC, PAL, Dendy. */
+const NES_CLOCKS = [1789773, 4433618.75 * 3 / 8, 4433618.75 * 2 / 5];
+export const furnaceNesClock = (m: { chipFlags?: string[] }): number => NES_CLOCKS[Number(/clockSel=(\d)/.exec(m.chipFlags?.[0] ?? '')?.[1] ?? 0)] ?? 1789773;
+
+/** NTSC period + 1 for an exact NTSC period + 1 (`raw`), rounded where Furnace rounds: on the song's clock grid. A PAL song
+ *  plays an integer PAL period P; the NTSC ROM sounds the same pitch at round((P + 1) * 1789773 / clock) - 1. Rounding the
+ *  exact NTSC value instead lands +-1 off (turtle_byte, A-4 = 436 PAL: 24 of 96 note-table entries). NTSC: Math.round. */
+export const roundOnClock = (raw: number, clock: number): number => (clock === 1789773 ? Math.round(raw) : Math.round(Math.round(raw * clock / 1789773) * 1789773 / clock));
 const SLIDE_FX = new Set([0x01, 0x02, 0x03, 0xe1, 0xe2]);
 const clamp8 = (v: number): number => Math.max(-127, Math.min(127, Math.round(v)));
 /** Furnace VOL_SCALE_LINEAR_BROKEN (dispatch.h): channel volume x macro volume. Default floors; FamiStudio's volume table
@@ -445,12 +455,12 @@ export function expandRefs(p: PackedStream): number[] {
  * every step is simulated and the closest curve wins. Returns [signed step, summed period error]; an error above 0
  * means no constant FamiStudio step reproduces the slide.
  */
-export function bestSlideStep(o: { rawFrom: number; fromPeriod: number; toPeriod: number; unitsPerTick: number; totalUnits: number; dirUp: boolean; furPitch: number; fsOffset: number; frames: number; perTick: number; guess: number }): [number, number] {
+export function bestSlideStep(o: { rawFrom: number; fromPeriod: number; toPeriod: number; unitsPerTick: number; totalUnits: number; dirUp: boolean; furPitch: number; fsOffset: number; frames: number; perTick: number; guess: number; clock?: number }): [number, number] {
   const sign = o.toPeriod < o.fromPeriod ? -1 : 1;
   const fur: number[] = [];
   for (let f = 0; f < o.frames; f++) {
     const u = Math.min(o.totalUnits, o.unitsPerTick * (Math.floor(f / o.perTick) + 1));
-    fur.push(Math.round(o.rawFrom * 2 ** (-((o.dirUp ? u : -u) + o.furPitch) / 1536)) - 1);
+    fur.push(roundOnClock(o.rawFrom * 2 ** (-((o.dirUp ? u : -u) + o.furPitch) / 1536), o.clock ?? 1789773) - 1);
   }
   let best = Math.max(1, Math.min(127, Math.round(o.guess))), bestCost = Infinity;
   for (let st = 1; st <= 127; st++) {
@@ -472,7 +482,9 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   // Period offsets (fine pitch, vibrato, pitch macro, slides) are taken against the note table buildFamistudioRom
   // retunes to the song's A-4, so they use the same tuning (one_sided_love, A-4 = 445: offsets were 1 off at 440).
   const pulsePeriodRaw = (n: number): number => periodRawAt(n, m.tuning || 440);
-  const pulsePeriod = (n: number): number => Math.max(1, Math.round(pulsePeriodRaw(n)) - 1);
+  // PAL/Dendy songs round every period on their own clock's grid, then map to NTSC (see roundOnClock).
+  const clock = furnaceNesClock(m), rnd = (raw: number): number => roundOnClock(raw, clock);
+  const pulsePeriod = (n: number): number => Math.max(1, rnd(pulsePeriodRaw(n)) - 1);
   // Virtual tempo N/D advances the row counter N/D per engine tick: rows scale by D/N, effects and macros still run at hz.
   const vtScale = s.virtualTempo > 0 && s.virtualTempoD > 0 ? s.virtualTempoD / s.virtualTempo : 1;
   // Linear pitch (Furnace default): slides move in 1/128 semitone x pitchSlideSpeed per tick, not in period units.
@@ -862,7 +874,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           // round(period at base + pitch) - 1), else raw period units subtracted; sent as the period offset from the note's table entry.
           if (tonal && (fineHere || (n > 0 && fineRaw !== 128))) {
             const fp = fineRaw - 128, sn = src || 46;
-            const fine = clamp8(linear ? Math.round(pulsePeriodRaw(sn) * 2 ** (-fp / 1536)) - 1 - pulsePeriod(sn) : -fp);
+            const fine = clamp8(linear ? rnd(pulsePeriodRaw(sn) * 2 ** (-fp / 1536)) - 1 - pulsePeriod(sn) : -fp);
             if (fine !== fineSent) { ops.push(0x4e, fine & 0xff); fineSent = fine; }
           }
           // Arpeggio: effect 00xy wins; else a per-note override of the instrument arp macro when FamiStudio's relative
@@ -927,7 +939,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               const P = pulsePeriod(src || 46), X = pulsePeriodRaw(src || 46);
               // Furnace adds fine pitch (E5xx) and vibrato in 1/128 semitone and rounds once; the engine adds the sent fine
               // offset F to each step, so a step is taken at fine + vibrato minus F (rounding both apart was 1 off, one_sided_love).
-              const fp = fineRaw - 128, F = Math.round(X * 2 ** (-fp / 1536)) - 1 - P;
+              const fp = fineRaw - 128, F = rnd(X * 2 ** (-fp / 1536)) - 1 - P;
               // Step i shows the Furnace tick its 60 Hz frame holds, counted from the row's exact time (as the macros do):
               // floor(i / perTick) ignored a 56 Hz row firing up to half a frame off its tick and ran a frame late (Famitune1).
               const rowPh = seq[ri].t - seq[ri].frame;
@@ -936,7 +948,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 if (!linear) return Math.round(-amp * Math.sin(2 * Math.PI * phase / 64));
                 // Furnace: vibTable = (short)(127 sin) truncates; pitch = ((depth * vibTable * vibratoFine(15)) >> 4) / 15, C division truncates.
                 const u = Math.trunc(((y * Math.trunc(127 * Math.sin(2 * Math.PI * (phase & 63) / 64)) * 15) >> 4) / 15);
-                return Math.round(X * 2 ** (-(u + fp) / 1536)) - 1 - P - F;
+                return rnd(X * 2 ** (-(u + fp) / 1536)) - 1 - P - F;
               });
               vibLen1 = len1;
               pid = envId(encodeEnvelope(vib, 0, -1, 'pitch'));
@@ -948,8 +960,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 // Furnace adds fine pitch (E5xx) and the macro in 1/128 semitone and rounds once; the engine adds the sent fine
                 // offset F, so an absolute value is taken at fine + v minus F (rounding both apart was 1 off). Without fine pitch
                 // the note-period scaling stays as it was.
-                const F = Math.round(X * 2 ** (-fp / 1536)) - 1 - P;
-                const off = (v: number): number => (fp ? Math.round(X * 2 ** (-(v + fp) / 1536)) - 1 - P - F : Math.round(P * (2 ** (-v / 1536) - 1)));
+                const F = rnd(X * 2 ** (-fp / 1536)) - 1 - P;
+                const off = (v: number): number => (fp ? rnd(X * 2 ** (-(v + fp) / 1536)) - 1 - P - F : Math.round(P * (2 ** (-v / 1536) - 1)));
                 const rel = (pm.mode & 1) === 1;
                 // A relative macro under fine pitch: Furnace keeps the running sum in pitch2 and rounds fine + sum once, so each
                 // step is off(sum) - off(previous sum) (macroFrames maps the frames in order). Without fine pitch each increment
@@ -981,7 +993,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             const fp = fineRaw - 128;
             const arpSteps = pid < 0 && linear && fp ? (arpXY !== 0 ? { vals: arp00(), loop: 0 } : n > 0 ? insArp : null) : null;
             if (arpSteps && arpSteps.vals.some((v) => v !== 0)) {
-              const sn = src || 46, fineAt = (k: number): number => Math.round(pulsePeriodRaw(k) * 2 ** (-fp / 1536)) - 1 - pulsePeriod(k);
+              const sn = src || 46, fineAt = (k: number): number => rnd(pulsePeriodRaw(k) * 2 ** (-fp / 1536)) - 1 - pulsePeriod(k);
               const F = fineAt(sn), d = arpSteps.vals.map((v) => fineAt(Math.max(1, Math.min(96, sn + v))) - F);
               if (d.some((v) => v !== 0)) pid = envId(encodeEnvelope(d, arpSteps.loop, -1, 'pitch'));
             }
@@ -1102,7 +1114,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               // Linear pitch: units per tick and whether Furnace stops at the target (03, E1/E2) or slides on (01/02).
               const units = slideFx === 0x03 || slideFx === 0x01 || slideFx === 0x02 ? slideVal * slideUnit : (slideVal >> 4) * 4 * slideUnit;
               const [step, curveErr] = linear && mag <= 127.5
-                ? bestSlideStep({ rawFrom: pulsePeriodRaw(from), fromPeriod: pFrom(from), toPeriod: pFrom(to), unitsPerTick: units, totalUnits: slideFx === 0x01 || slideFx === 0x02 ? Infinity : Math.abs(to - from) * 128, dirUp: to > from, furPitch: fineRaw - 128, fsOffset: fineSent || 0, frames: Math.max(1, span(ri)), perTick, guess: mag })
+                ? bestSlideStep({ rawFrom: pulsePeriodRaw(from), fromPeriod: pFrom(from), toPeriod: pFrom(to), unitsPerTick: units, totalUnits: slideFx === 0x01 || slideFx === 0x02 ? Infinity : Math.abs(to - from) * 128, dirUp: to > from, furPitch: fineRaw - 128, fsOffset: fineSent || 0, frames: Math.max(1, span(ri)), perTick, guess: mag, clock })
                 : [-Math.sign(pFrom(from) - pFrom(to)) * Math.max(1, Math.min(127, Math.round(mag))), 0];
               // one_sided_love triangle frame 295 (148 -> 132): Furnace steps 3,3,4,3,3 periods, no constant FamiStudio step does.
               if (curveErr > 0 && !(Math.abs(to - from) > 2) && mag <= 127.5) { lossy.add('pitch slide curve not reachable with a constant FamiStudio step'); markPitchLossy(); }
@@ -1251,7 +1263,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     for (const [off, target] of fixups[c]) w16(at + off, streamAddr[c] + target);
     for (const [off, id] of envFixups[c]) w16(at + off, envAddr[id]);
   });
-  return { music, dpcm: Uint8Array.from(dpcm), sizes: { header: smpOff, samples: envOff - smpOff, envelopes: streamAddr[0] - base - envOff, streams: streams.map((st) => st.length) }, lossy: lossy.list(), pitchLossy, tempoAcc, channelsWithNotes, firstNotes, firstNoteFrames, tuning: m.tuning, vrc6 };
+  return { music, dpcm: Uint8Array.from(dpcm), sizes: { header: smpOff, samples: envOff - smpOff, envelopes: streamAddr[0] - base - envOff, streams: streams.map((st) => st.length) }, lossy: lossy.list(), pitchLossy, tempoAcc, channelsWithNotes, firstNotes, firstNoteFrames, tuning: m.tuning, clock, vrc6 };
 }
 
 /** On-screen text slot: uppercase ASCII 0x20-0x5F (the player font), space padded to `len`. */
@@ -1279,21 +1291,21 @@ export function buildFamistudioRom(player: Uint8Array, meta: FamistudioMeta, son
   if (meta.taccAddr !== undefined && song.tempoAcc !== undefined) { rom[at(meta.taccAddr)] = song.tempoAcc & 0xff; rom[at(meta.taccAddr) + 1] = song.tempoAcc >> 8; }
   // Always rewrite: also saturates notes below A-1 at 2047 like Furnace (nes.cpp: if (freq>2047) freq=2047), where the
   // stock table's 12-bit periods wrap in $4003/$400B and sound high.
-  retuneNoteTable(rom, song.tuning || 440);
+  retuneNoteTable(rom, song.tuning || 440, song.clock ?? 1789773);
   return rom;
 }
 
 /** FamiStudio NTSC note table entry n (index 46 = A-4 at `a4` Hz), as NoteTables/famistudio_note_table_*.bin holds it. */
-const noteTablePeriod = (n: number, a4: number): number => (n === 0 ? 0 : Math.round(periodRawAt(n, a4)) - 1);
+const noteTablePeriod = (n: number, a4: number, clock = 1789773): number => (n === 0 ? 0 : roundOnClock(periodRawAt(n, a4), clock) - 1);
 
 /** FamiStudio has no song tuning: the engine plays one A-440 table (97 LSBs, then 97 MSBs). Furnace's A-4 tuning
  *  (song.tuning, e.g. 433 or 392) moves every note, so rewrite that table in the ROM for the song's A-4. */
-function retuneNoteTable(rom: Uint8Array, a4: number): void {
+function retuneNoteTable(rom: Uint8Array, a4: number, clock: number): void {
   const N = 97;
   const ref = Uint8Array.from({ length: 2 * N }, (_, i) => (i < N ? noteTablePeriod(i, 440) & 0xff : noteTablePeriod(i - N, 440) >> 8));
   let at = -1;
   for (let i = 0; i + ref.length <= rom.length && at < 0; i++) if (ref.every((b, k) => rom[i + k] === b)) at = i;
   if (at < 0) throw new Error('FamiStudio note table not found in the player ROM: cannot apply the song tuning');
   // Furnace clamps the NES period to 11 bits; the APU drops bits above it.
-  for (let i = 0; i < N; i++) { const p = Math.min(0x7ff, noteTablePeriod(i, a4)); rom[at + i] = p & 0xff; rom[at + N + i] = p >> 8; }
+  for (let i = 0; i < N; i++) { const p = Math.min(0x7ff, noteTablePeriod(i, a4, clock)); rom[at + i] = p & 0xff; rom[at + N + i] = p >> 8; }
 }

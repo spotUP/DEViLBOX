@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { FurnaceModule } from '../../import/formats/FurnaceSongParser';
 import { MESEN } from './nesMesenHarness';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { buildFamistudioRom, compressRefs, expandRefs, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, loopPeriodicTail, mergeVibratoPitch, noiseNote, type FamistudioMeta, bestSlideStep, tickAtFrame } from '../nes/famistudioSong';
+import { buildFamistudioRom, compressRefs, expandRefs, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, loopPeriodicTail, mergeVibratoPitch, noiseNote, type FamistudioMeta, bestSlideStep, tickAtFrame, roundOnClock } from '../nes/famistudioSong';
 
 const ROOT = path.resolve(__dirname, '../../../..');
 const DIR = path.join(ROOT, 'public/nes/famistudio');
@@ -238,6 +238,31 @@ describe('furnaceToFamistudio', () => {
     const music = furnaceToFamistudio(mod).music;
     expect(has(music, encodeEnvelope(vib(445), 0, -1, 'pitch'))).toBe(true);
     expect(has(music, encodeEnvelope(vib(440), 0, -1, 'pitch'))).toBe(false);
+  });
+  it('rounds a PAL song\'s periods on the PAL grid, then maps them to NTSC (turtle_byte, clockSel=1, A-4 = 436)', () => {
+    // Furnace PAL plays the integer period Pp = round(clockPal / (16 f)) - 1; the NTSC ROM sounds it at round((Pp + 1) * K) - 1.
+    const PAL = 4433618.75 * 3 / 8, K = 1789773 / PAL;
+    const furPal = (f: number): number => Math.round(PAL / (16 * f)) - 1, ntscOf = (pp: number): number => Math.round((pp + 1) * K) - 1;
+    let moved = 0;
+    for (let n = 1; n < 97; n++) {
+      const f = 436 * 2 ** ((n - 46) / 12), raw = 1789773 / (16 * f);
+      expect(roundOnClock(raw, PAL) - 1).toBe(ntscOf(furPal(f)));
+      expect(roundOnClock(raw, 1789773)).toBe(Math.round(raw)); // NTSC unchanged
+      if (Math.round(raw) - 1 !== ntscOf(furPal(f))) moved++;
+    }
+    expect(moved).toBeGreaterThan(0); // the exact NTSC rounding was off at these notes
+    // Vibrato steps (cell A-4 = FamiStudio note 58) follow the same PAL rounding.
+    const vib = (pal: boolean): number[] => Array.from({ length: 32 }, (_, i) => {
+      const f = 436 * 2, X = 1789773 / (16 * f), u = Math.trunc(((3 * Math.trunc(127 * Math.sin(2 * Math.PI * ((6 * (i + 1)) & 63) / 64)) * 15) >> 4) / 15);
+      const at = (k: number): number => (pal ? ntscOf(Math.round(PAL / (16 * f) * 2 ** (-k / 1536)) - 1) : Math.round(X * 2 ** (-k / 1536)) - 1);
+      return at(u) - at(0);
+    });
+    expect(vib(true)).not.toEqual(vib(false));
+    const mod = nesModule({ 0: { 0: { ...A4, ...fx(0x04, 0x63) } } });
+    Object.assign(mod, { tuning: 436, chipFlags: ['clockSel=1'] });
+    const music = furnaceToFamistudio(mod).music;
+    expect(has(music, encodeEnvelope(vib(true), 0, -1, 'pitch'))).toBe(true);
+    expect(has(music, encodeEnvelope(vib(false), 0, -1, 'pitch'))).toBe(false);
   });
   it('steps a 56 Hz vibrato on the Furnace tick each 60 Hz frame shows, from the row\'s exact time (Famitune1 triangle one frame late)', () => {
     // Row 4 = tick 24 = 60 Hz time 25.71, fired on frame 26 (ph -0.29): tick 25 lands on frame 27 = envelope step 1, which
