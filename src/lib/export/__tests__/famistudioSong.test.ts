@@ -293,6 +293,17 @@ describe('furnaceToFamistudio', () => {
     expect(has(music, encodeEnvelope(together, -1, -1, 'pitch', true))).toBe(true);
     expect(has(music, encodeEnvelope(apart, -1, -1, 'pitch', true))).toBe(false);
   });
+  it('applies E5 fine pitch to every arp step as Furnace does, via a pitch envelope stepping with the arp (oby1_ingame ins 20 + E590)', () => {
+    // Furnace calcFreq applies chan.pitch (E5xx - 0x80, 1/128 semitone) to the note each arp step gives; the engine adds one
+    // 0x4e offset F taken at the base note. The arp step +12 needs fine(note + 12), so the envelope carries fine(n + 12) - F.
+    const fine = (X: number): number => Math.round(X * 2 ** (-32 / 1536)) - 1 - (Math.round(X) - 1);
+    const X = 1789772.727 / (16 * 440 * 2), d = [fine(X / 2) - fine(X), 0];
+    expect(d[0]).not.toBe(0); // the base note's offset does not fit the +12 step
+    const mod = nesModule({ 0: { 0: { ...A4, instrument: 0, effects: [{ type: 0xe5, value: 0xa0 }] } } });
+    const am = { code: 1, type: 0, mode: 0, speed: 1, delay: 0, length: 2, loop: 255, release: 255, data: [12, 0] };
+    Object.assign(mod, { instruments: [{ type: 34, macros: [am], amiga: { initSample: 0 } }] });
+    expect(has(furnaceToFamistudio(mod).music, encodeEnvelope(d, -1, -1, 'pitch'))).toBe(true);
+  });
   it('keeps the vibrato phase on a 03xx porta note (Furnace clears doNote on a keyed-on channel; one_sided_love frame 3730)', () => {
     // playback.cpp: 03xx with keyOn sets doNote=false, so "commit note on" (vibratoPos=0) is skipped. 4 rows x 6 ticks of 04:63
     // leave vibratoPos at 6 * 24 & 63 = 16; the override sent on the porta row starts there, not at 0.

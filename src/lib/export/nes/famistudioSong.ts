@@ -688,7 +688,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     // Furnace duty is channel state a duty macro writes (nes.cpp chan.duty); FamiStudio's 0x4f value (famistudio_duty_cycle) is what a note of a duty-macro-less instrument plays.
     let furDuty = 0, fsDuty = 0, dutyMac: { vals: number[]; loop: number; t: number } | null = null;
     let vibPos = 0, vibFrame = 0; // Furnace's vibratoPos (64-step sine) at the row start
-    let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, arpXY = 0, arpOn = -1, keyOff = false, noteArp: number[] | null = null, fineRaw = 128, fineSent = 0;
+    let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, arpXY = 0, arpOn = -1, keyOff = false, noteArp: number[] | null = null, insArp: { vals: number[]; loop: number } | null = null, fineRaw = 128, fineSent = 0;
     // Furnace 01xx/02xx is channel state (playback.cpp portaSpeed): it keeps sliding every new note until x00, another
     // slide effect, or the slide reaching its target (note 0 / 179, targetResetsSlides).
     let heldSlide: [number, number] | null = null;
@@ -855,6 +855,32 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             const fine = clamp8(linear ? Math.round(pulsePeriodRaw(sn) * 2 ** (-fp / 1536)) - 1 - pulsePeriod(sn) : -fp);
             if (fine !== fineSent) { ops.push(0x4e, fine & 0xff); fineSent = fine; }
           }
+          // Arpeggio: effect 00xy wins; else a per-note override of the instrument arp macro when FamiStudio's relative
+          // steps would not land on Furnace's note: fixed-note steps (pinned to the flat note value), and every noise arp
+          // (Furnace's noise period comes from noiseNote, not from note & 15 alone).
+          if (n > 0 && ch !== DPCM_CH) {
+            const arpMac = curIns?.macros.find((x) => x.code === MACRO_ARP && x.length > 0);
+            const fixed = !!arpMac && arpMac.data.slice(0, arpMac.length).some(arpIsFixed);
+            const target = (v: number): number => (arpIsFixed(v) ? arpFixedNote(v) : nv + v);
+            // The driver indexes its 97-entry note table with note + arp unchecked (famistudio_ca65.s "apply arpeggio"):
+            // a step past C-1..B-8 reads the MSB table or beyond and plays a garbage high period, so such notes get an
+            // override clamped to the table (entries below A-1 hold 2047, Furnace's saturated period).
+            const inTable = (v: number): number => Math.max(1, Math.min(96, n + target(v) - nv)) - n;
+            const outside = !!arpMac && ch !== NOISE_CH && arpMac.data.slice(0, arpMac.length).some((v) => inTable(v) !== target(v) - nv);
+            if (outside && arpMac.data.slice(0, arpMac.length).some((v) => n + target(v) - nv > 96)) lossy.add('arp step above B-8 (clamped)');
+            noteArp = !arpMac || (!fixed && !outside && ch !== NOISE_CH) ? null
+              : macroEnvelope(arpMac, 'arp', lossy, ch === NOISE_CH ? (v) => noiseNote(target(v), properNoise) - n : inTable, macroRate, m.version);
+            // The steps the driver plays: the override above (phase 0), else the instrument copy at this note's start phase.
+            insArp = arpMac && tonal ? macroFrames(arpMac, 'arp', new Lossy(), inTable, macroRate, m.version, noteArp ? 0 : seq[ri].t + delay * perTick - seq[ri].frame - Math.round(delay * perTick)) : null;
+          }
+          // 00xy arp frames. Frame-exact: frame f plays step floor(f * ticksPerFrame) % 3, looped over the shortest frame count
+          // that holds a whole number of 3-tick cycles (45 frames at 56 Hz); a rounded per-tick frame count drifts a step per cycle.
+          const arp00 = (): number[] => {
+            const steps = [0, arpXY >> 4, arpXY & 15];
+            let len = 3 * Math.max(1, Math.round(perTick));
+            for (let L = 1; L <= 240; L++) if (Math.abs(((L * macroRate) / 3) - Math.round((L * macroRate) / 3)) < 1e-6) { len = L; break; }
+            return Array.from({ length: len }, (_, f) => steps[tickAtFrame(f, macroRate) % 3]);
+          };
           // Vibrato (04xy): looping absolute pitch envelope, a sine over 64/x ticks. Depth y is y/16 semitone in linear
           // pitch (measured with furnace -vgmout), so the amplitude in period units follows the playing note.
           // Without vibrato, a linear-pitch instrument pitch macro (value v = v/128 semitone up) goes through the same
@@ -921,36 +947,24 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 } else pid = envId(encodeEnvelope(mf.vals, mf.loop, -1, 'pitch', mf.relative));
               }
             }
+            // Fine pitch under an arpeggio: Furnace applies E5xx as 1/128 semitone to the note each arp step gives (calcFreq
+            // linear), the engine adds one period offset F taken at the base note. Without vibrato or a pitch macro the
+            // per-step difference goes into a pitch envelope stepping with the arp envelope (same frames and loop; both
+            // restart on the note attack, and a 00xy change restarts both with 0x4b + 0x49).
+            // shortcut: under vibrato or a pitch macro the arp steps keep the base note's offset (needs one merged envelope).
+            const fp = fineRaw - 128;
+            const arpSteps = pid < 0 && linear && fp ? (arpXY !== 0 ? { vals: arp00(), loop: 0 } : n > 0 ? insArp : null) : null;
+            if (arpSteps && arpSteps.vals.some((v) => v !== 0)) {
+              const sn = src || 46, fineAt = (k: number): number => Math.round(pulsePeriodRaw(k) * 2 ** (-fp / 1536)) - 1 - pulsePeriod(k);
+              const F = fineAt(sn), d = arpSteps.vals.map((v) => fineAt(Math.max(1, Math.min(96, sn + v))) - F);
+              if (d.some((v) => v !== 0)) pid = envId(encodeEnvelope(d, arpSteps.loop, -1, 'pitch'));
+            }
             // An override persists across notes and instrument changes in the engine: send it only when it changes.
             if (pid >= 0) { if (vibOn !== pid) ops.push(0x49, { env: pid }); vibOn = pid; }
             else if (vibOn !== -1) { ops.push(0x4a); vibOn = -1; lastIns = -1; }
           }
-          // Arpeggio: effect 00xy wins; else a per-note override of the instrument arp macro when FamiStudio's relative
-          // steps would not land on Furnace's note: fixed-note steps (pinned to the flat note value), and every noise arp
-          // (Furnace's noise period comes from noiseNote, not from note & 15 alone).
-          if (n > 0 && ch !== DPCM_CH) {
-            const arpMac = curIns?.macros.find((x) => x.code === MACRO_ARP && x.length > 0);
-            const fixed = !!arpMac && arpMac.data.slice(0, arpMac.length).some(arpIsFixed);
-            const target = (v: number): number => (arpIsFixed(v) ? arpFixedNote(v) : nv + v);
-            // The driver indexes its 97-entry note table with note + arp unchecked (famistudio_ca65.s "apply arpeggio"):
-            // a step past C-1..B-8 reads the MSB table or beyond and plays a garbage high period, so such notes get an
-            // override clamped to the table (entries below A-1 hold 2047, Furnace's saturated period).
-            const inTable = (v: number): number => Math.max(1, Math.min(96, n + target(v) - nv)) - n;
-            const outside = !!arpMac && ch !== NOISE_CH && arpMac.data.slice(0, arpMac.length).some((v) => inTable(v) !== target(v) - nv);
-            if (outside && arpMac.data.slice(0, arpMac.length).some((v) => n + target(v) - nv > 96)) lossy.add('arp step above B-8 (clamped)');
-            noteArp = !arpMac || (!fixed && !outside && ch !== NOISE_CH) ? null
-              : macroEnvelope(arpMac, 'arp', lossy, ch === NOISE_CH ? (v) => noiseNote(target(v), properNoise) - n : inTable, macroRate, m.version);
-          }
           if (ch !== DPCM_CH && (fxChanged || n > 0)) {
-            let env: number[] | null = null;
-            if (arpXY !== 0) {
-              // Frame-exact: frame f plays step floor(f * ticksPerFrame) % 3, looped over the shortest frame count that holds
-              // a whole number of 3-tick cycles (45 frames at 56 Hz); a rounded per-tick frame count drifts a step per cycle.
-              const x = arpXY >> 4, y = arpXY & 15, steps = [0, x, y];
-              let len = 3 * Math.max(1, Math.round(perTick));
-              for (let L = 1; L <= 240; L++) if (Math.abs(((L * macroRate) / 3) - Math.round((L * macroRate) / 3)) < 1e-6) { len = L; break; }
-              env = encodeEnvelope(Array.from({ length: len }, (_, f) => steps[tickAtFrame(f, macroRate) % 3]), 0, -1, 'arp');
-            } else env = noteArp;
+            const env = arpXY !== 0 ? encodeEnvelope(arp00(), 0, -1, 'arp') : noteArp;
             if (env) { const id = envId(env); if (arpOn !== id) ops.push(0x4b, { env: id }); arpOn = id; }
             else if (arpOn !== -1) { ops.push(0x4c); arpOn = -1; lastIns = -1; }
           }
