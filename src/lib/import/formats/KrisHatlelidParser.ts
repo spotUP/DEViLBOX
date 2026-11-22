@@ -7,6 +7,7 @@
  * - Multiple fixed-offset big-endian word/longword checks
  * - Supports single-file and two-file variants distinguished at offset 44
  */
+import { buildKrisHatlelidGrid } from './KrisHatlelidGrid';
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
@@ -213,6 +214,21 @@ export function parseKrisHatlelidFile(buffer: ArrayBuffer, filename: string): Tr
       originalInstrumentCount: forms.length,
     },
   };
+
+  const grid = buildKrisHatlelidGrid(buf);
+  if (grid) {
+    return {
+      name: `${moduleName} [Kris Hatlelid]`,
+      format: 'MOD' as TrackerFormat,
+      patterns: [grid.pattern], instruments,
+      songPositions: [0], songLength: 1, restartPosition: 0,
+      numChannels: 4, initialSpeed: 6, initialBPM: 125, linearPeriods: false,
+      uadePlayerTickGrid: true,
+      uadeVariableLayout: grid.layout,
+      uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+      uadeEditableFileName: filename,
+    } as TrackerSong;
+  }
 
   return {
     name: `${moduleName} [Kris Hatlelid]`,

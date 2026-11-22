@@ -109,6 +109,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   stp: 'public/data/songs/formats/noname.stp',
   unic: 'public/data/songs/formats/african dreams.unic',
   ashleyHogg: 'public/data/songs/ashley-hogg/ash.nobby the aardvark',
+  krisHatlelid: 'public/data/songs/kris-hatlelid/fiendish freddys - songs.kh',
   seanConnolly: 'public/data/songs/sean-connolly/surf ninjas.scn',
   mikeDavies: 'public/data/songs/mike-davies/strider.md',
   scumm: 'public/data/songs/formats/zaktitle.scumm',

@@ -64,6 +64,14 @@
       "cells": 38444,
       "bytes": 38444
     },
+    "krisHatlelid": {
+      "exporter": "KrisHatlelidExporter.exportKrisHatlelid",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 37788,
+      "bytes": 37788
+    },
     "beathoven": {
       "exporter": "BeathovenExporter.exportBeathoven",
       "tier": "byte-exact",

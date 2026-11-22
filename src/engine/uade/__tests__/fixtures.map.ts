@@ -39,6 +39,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "artOfNoise", fixture: "public/data/songs/art-of-noise/inside.blipp.aon", kind: "fixed" },
   { formatId: "ams", fixture: "public/data/songs/velvet-studio/kernel.ams", kind: "variable" },
   { formatId: "ashleyHogg", fixture: "public/data/songs/ashley-hogg/ash.nobby the aardvark", kind: "variable" },
+  { formatId: "krisHatlelid", fixture: "public/data/songs/kris-hatlelid/fiendish freddys - songs.kh", kind: "variable" },
   { formatId: "deltaMusic2", fixture: "public/data/songs/delta-music-2/asperity megademo 3.dm2", kind: "fixed" },
   { formatId: "digiBoosterPro", fixture: "public/data/songs/digibooster-pro/invisibility.dbm", kind: "variable" },
   { formatId: "graoumfTracker2_gt2", fixture: "public/data/songs/graoumf-tracker-2/living-on-video.gt2", kind: "fixed" },

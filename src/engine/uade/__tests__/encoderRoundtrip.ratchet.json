@@ -32,6 +32,14 @@
       "matchPct": 1,
       "cells": 1
     },
+    "krisHatlelid": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 16
+    },
     "benDaglish": {
       "kind": "variable",
       "method": "encode-pattern",
