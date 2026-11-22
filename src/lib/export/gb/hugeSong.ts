@@ -7,8 +7,10 @@
  * item that does not survive is counted in `lossy` (shown to the user and listed in the plan).
  *
  * Song layout (third-party/hugedriver/hUGEDriver.asm, `hUGE_init`): descriptor
- * `db tempo; dw order_cnt, order1..4, duty_instruments, wave_instruments, noise_instruments, routines, waves`,
- * all pointers absolute in bank 1 ($4000). Patterns are 64 rows x 3 bytes (`dn` macro of hUGE.inc).
+ * `db tempo; dw order_cnt, order1..4, duty_instruments, wave_instruments, noise_instruments, routines, waves, order_banks`,
+ * all pointers absolute. Patterns are 64 rows x 3 bytes (`dn` macro of hUGE.inc). The blob is the ROM image from
+ * file offset $2000: bank 0 tail, then bank 1, 2, ... ($4000-$7FFF each, MBC5); `order_banks` (vendored driver)
+ * names the bank each order's four patterns live in.
  */
 import type { FurnaceModule, FurnaceWavetable } from '../../import/formats/FurnaceSongParser';
 import type { FurnaceInstrument, FurnaceMacro } from '../../import/formats/furnace/FurnaceInstrumentParser';
@@ -36,7 +38,7 @@ export interface HugeSong {
 
 const ROWS = 64;
 const NO_NOTE = 90;
-/** Song address in huge-player.gb (tiny 32 KiB link, song at $2000-$7FFF); the gbHugeSong test checks it against huge-player.json. */
+/** Song address in huge-player.gb (MBC5, song from $2000); the gbHugeSong test checks it against huge-player.json. */
 export const HUGE_SONG_BASE = 0x2000;
 const BASE = HUGE_SONG_BASE;
 /** hUGE note 0 is C_3 in hUGE naming = 65.4 Hz = Furnace C-2 (flat value 24). */
@@ -65,18 +67,21 @@ function macro(ins: FurnaceInstrument, code: number): FurnaceMacro | undefined {
 }
 
 /** Per-tick table (arp in the note column, volume or duty in the effect column), max 32 rows. */
-function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy, waveNo: (w: number) => number): number[] | undefined {
+function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy, waveNo: (w: number) => number, synth?: number[]): number[] | undefined {
   const arp = macro(ins, MACRO_ARP);
   const vol = kind === 'wave' ? undefined : macro(ins, MACRO_VOL);
   const duty = kind === 'duty' ? macro(ins, MACRO_DUTY) : undefined;
   // Wave channel: wave macro -> table 9 (driver wave select + retrigger, as gb.cpp keys on after a
   // wave change); volume macro -> table C on gbVolMap steps. Pan macro -> table 8 (per-channel NR51).
-  const waveM = kind === 'wave' && (macro(ins, MACRO_WAVE)?.length ?? 0) > 1 ? macro(ins, MACRO_WAVE) : undefined;
+  // A wave synth arrives as per-tick hUGE wave slots; it replaces the wave macro (gb.cpp lets the synth own wave RAM).
+  const synthM: FurnaceMacro | undefined = synth && synth.length > 1
+    ? { code: MACRO_WAVE, length: synth.length, loop: -1, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: synth } : undefined;
+  const waveM = synthM ?? (kind === 'wave' && (macro(ins, MACRO_WAVE)?.length ?? 0) > 1 ? macro(ins, MACRO_WAVE) : undefined);
   const wvol = kind === 'wave' ? macro(ins, MACRO_VOL) : undefined;
   const pan = macro(ins, MACRO_PAN);
   // Duty beside a volume macro rides in effect C's param: bit 6 = duty changed, bits 5-4 = duty
   // (driver fx_table_volume). Noise duty (NR43 mode) has no such path.
-  let dutyCol = vol && duty && kind === 'duty' ? duty : undefined;
+  const dutyCol = vol && duty && kind === 'duty' ? duty : undefined;
   const fx = vol ?? duty ?? waveM ?? wvol ?? pan;
   if (wvol && fx !== wvol) lossy.add('wave channel volume macro beside a wave macro');
   if (pan && fx !== pan) lossy.add('pan macro beside another macro (one table effect column)');
@@ -108,7 +113,7 @@ function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy, waveNo: (w
     const arpRows: number[] = [], fxRows: number[] = [], dutyRows: number[] = [];
     const seen = new Map<string, number>();
     let loop = -1;
-    for (let t = 0; t < 64; t++) {
+    for (let t = 0; t < 160; t++) {
       const k = `${key(sa)}|${key(sf)}|${key(sd)}`;
       const hit = seen.get(k);
       if (hit !== undefined) { loop = hit; break; }
@@ -117,17 +122,31 @@ function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy, waveNo: (w
       if (sf && fx) { sf = step(fx, sf); fxRows.push(sf.val); }
       if (sd && dc) { sd = step(dc, sd); dutyRows.push(sd.val); }
     }
-    return { arpRows, fxRows, dutyRows, loop, len: Math.max(arpRows.length, fxRows.length) };
+    return { arpRows, fxRows, dutyRows, loop, len: Math.max(arpRows.length, fxRows.length, dutyRows.length) };
   };
-  let sim = simulate(dutyCol);
-  // The duty column multiplies the joint period; when that overflows the table, keep arp + volume exact.
-  if (dutyCol && (sim.loop < 0 || sim.len > 31)) {
-    const plain = simulate(undefined);
-    if (plain.loop >= 0 && plain.len <= 31) { lossy.add('duty macro beside a volume macro (joint period over 31 rows)'); dutyCol = undefined; sim = plain; }
-  }
+  const sim = simulate(dutyCol);
   const { arpRows, fxRows, dutyRows } = sim;
   let { loop, len } = sim;
-  if (loop < 0 || len > 31) { lossy.add('macro longer than 31 table rows'); len = Math.min(len, 31); loop = len - 1; }
+  // Value at tick t of the true per-tick sequence (past the end it loops, or holds the last value).
+  const at = (rows: number[], t: number) => rows.length === 0 ? 0
+    : t < rows.length ? rows[t] : sim.loop >= 0 ? rows[sim.loop + ((t - sim.loop) % (rows.length - sim.loop))] : rows[rows.length - 1];
+  if (loop < 0 || len > 31) {
+    // Table holds 31 rows + the loop row: keep the first 31 ticks exact, then loop back to the row whose
+    // continuation matches the true sequence on the most ticks (arp + volume weigh over duty).
+    let best = 30, bestScore = -1, exact = false;
+    for (let j = 0; j < 31; j++) {
+      let score = 0, ok = true;
+      for (let t = 0; t < 96; t++) {
+        const a = 31 + t, b = j + (t % (31 - j));
+        const hit = (at(arpRows, a) === at(arpRows, b) ? 2 : 0) + (at(fxRows, a) === at(fxRows, b) ? 2 : 0) + (at(dutyRows, a) === at(dutyRows, b) ? 1 : 0);
+        if (hit < 5) ok = false;
+        score += hit;
+      }
+      if (score > bestScore) { bestScore = score; best = j; exact = ok; }
+    }
+    if (!exact) lossy.add('macro table loop approximated past 31 rows');
+    len = 31; loop = best;
+  }
   const out: number[] = [];
   let prevFx = waveM && fx === waveM ? waveM.data[0] : -1, prevDuty = -1; // the instrument already loads wave data[0]
   // Extra row `len` is itself one tick. With a loop it replays the loop row and jumps on to the row
@@ -139,18 +158,18 @@ function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy, waveNo: (w
     const i = looped ? loop : Math.min(r, len - 1);
     let note = NO_NOTE;
     if (arp) {
-      const a = arpRows[Math.min(i, arpRows.length - 1)];
+      const a = at(arpRows, i);
       // Furnace calcArp: fixed when bit 30 differs from the sign bit
       if ((a < 0) !== !!(a & 0x40000000)) { lossy.add('fixed-note arpeggio macro'); } else note = Math.max(0, Math.min(71, 36 + (a | 0)));
     }
     let effect = 0;
     if (fx && (!extra || looped)) {
-      const v = fxRows[Math.min(i, fxRows.length - 1)];
-      const d = dutyCol ? dutyRows[Math.min(i, dutyRows.length - 1)] & 3 : -1;
+      const v = at(fxRows, i);
+      const d = dutyCol ? at(dutyRows, i) & 3 : -1;
       if (v !== prevFx || d !== prevDuty) {
         effect = fx === vol ? 0xc00 | (d !== prevDuty ? 0x40 | (d << 4) : 0) | (v & 15)
           : fx === duty ? 0x900 | ((v & 3) << 6)
-          : fx === waveM ? 0x900 | waveNo(v)
+          : fx === waveM ? 0x900 | (synthM ? v : waveNo(v))
           : fx === wvol ? 0xc00 | waveVol(v)
           : 0x800 | (v & 2 ? 0x10 : 0) | (v & 1);
       }
@@ -181,16 +200,49 @@ function envelope(ins: FurnaceInstrument, lossy: Lossy): number {
   return ((gb.envVol & 15) << 4) | (gb.envDir ? 8 : 0) | (gb.envLen & 7);
 }
 
-function waveTo4bit(w: FurnaceWavetable, invert: boolean): number[] {
+/** Furnace DivWaveSynth::changeWave1 levels: 32 steps scaled to height 15 by the file's wave max. */
+function waveLevels(w: FurnaceWavetable | undefined): number[] {
   const out: number[] = [];
-  // Furnace DivWaveSynth::changeWave1 (height = the file's wave max) then gb.cpp invertWave (chip flag, default on).
   for (let i = 0; i < 32; i++) {
-    const v = w.height < 1 ? 0 : Math.trunc(((w.data[Math.floor((i * w.width) / 32)] ?? 0) * 15) / w.height);
-    out.push((invert ? 15 : 0) ^ Math.max(0, Math.min(15, v)));
+    const v = !w || w.height < 1 ? 0 : Math.trunc(((w.data[Math.floor((i * w.width) / 32)] ?? 0) * 15) / w.height);
+    out.push(Math.max(0, Math.min(15, v)));
   }
+  return out;
+}
+
+/** 32 levels -> 16 wave RAM bytes, with gb.cpp invertWave (chip flag, default on). */
+function packWave(levels: number[], invert: boolean): number[] {
   const bytes: number[] = [];
-  for (let i = 0; i < 32; i += 2) bytes.push((out[i] << 4) | out[i + 1]);
+  for (let i = 0; i < 32; i += 2) bytes.push((((invert ? 15 : 0) ^ levels[i]) << 4) | ((invert ? 15 : 0) ^ levels[i + 1]));
   return bytes;
+}
+
+/**
+ * Furnace wave synth (instrument WS tab), as DivWaveSynth::tick renders it on a GB note: per-tick
+ * wave levels from key-on until the output stops changing. Only effects that settle are rendered;
+ * the rest return undefined (lossy).
+ */
+function waveSynthFrames(ins: FurnaceInstrument, waves: FurnaceWavetable[], lossy: Lossy): number[][] | undefined {
+  const ws = (ins as { fm?: { ws?: { enabled: boolean; wave1: number; wave2: number; rateDivider: number; effect: number; speed: number; param1: number } } }).fm?.ws;
+  if (!ws?.enabled) return undefined;
+  if (ws.effect !== 0x82) { lossy.add(`wave synth effect ${ws.effect}`); return undefined; }
+  // DIV_WS_FADE: each full pass (speed + 1 steps) writes wave1 + ((wave2 - wave1) * stage) >> 9, stage += 1 + param1 per wrap.
+  const w1 = waveLevels(waves[ws.wave1]), w2 = waveLevels(waves[ws.wave2]);
+  const out = [...w1];
+  const frames: number[][] = [];
+  let pos = 0, stage = 0, div = 0;
+  for (let t = 0; t < 64; t++) {
+    if (--div <= 0) {
+      for (let i = 0; i <= ws.speed; i++) {
+        out[pos] = w1[pos] + (((w2[pos] - w1[pos]) * stage) >> 9);
+        if (++pos >= 32) { pos = 0; stage = Math.min(512, stage + 1 + ws.param1); }
+      }
+      div = ws.rateDivider;
+    }
+    frames.push([...out]);
+    if (stage >= 512 && pos === 0 && frames.length > 1 && frames[frames.length - 2].join() === out.join()) break;
+  }
+  return frames;
 }
 
 /** CH3 volume 0-15 -> the hUGE C value whose driver quantisation (>=10, >=5, >0) lands on Furnace's gbVolMap step. */
@@ -255,17 +307,29 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
     return map.get(i)!;
   };
 
-  const waveIdx = new Map<number, number>();
-  const waveNo = (w: number): number => {
-    if (!waveIdx.has(w)) { if (waveIdx.size >= 16) { lossy.add('wavetables past 16'); return 0; } waveIdx.set(w, waveIdx.size); }
-    return waveIdx.get(w)!;
+  const gbChip = m.systems.indexOf(0x04);
+  const invert = !/invertWave=(false|0)\b/.test(m.chipFlags?.[Math.max(0, gbChip)] ?? '');
+  // hUGE wave slots, deduplicated by wave RAM bytes (file wavetables and wave synth frames share them).
+  const waveSlots: number[][] = [];
+  const waveKey = new Map<string, number>();
+  const waveSlot = (bytes: number[]): number => {
+    const k = bytes.join();
+    if (waveKey.has(k)) return waveKey.get(k)!;
+    if (waveSlots.length < 16) { waveKey.set(k, waveSlots.push(bytes) - 1); return waveSlots.length - 1; }
+    // All 16 slots taken: play the closest wave (sum of nibble distances).
+    lossy.add('wavetables past 16 (closest slot played)');
+    const dist = (w: number[]) => w.reduce((d, x, i) => d + Math.abs((x >> 4) - (bytes[i] >> 4)) + Math.abs((x & 15) - (bytes[i] & 15)), 0);
+    return waveSlots.reduce((best, w, i) => (dist(w) < dist(waveSlots[best]) ? i : best), 0);
   };
+  const waveNo = (w: number): number => waveSlot(packWave(waveLevels(m.wavetables[w]), invert));
 
   // Pass 2: cells, 64-row chunks, deduplicated per pattern bytes.
   const patterns: number[][] = [];
   const patKey = new Map<string, number>();
   const orderLists: number[][] = [[], [], [], []];
   const lastIns = [-1, -1, -1, -1];
+  const lastNote = [-1, -1, -1, -1]; // hUGE note per channel, for E1xy / E2xy targets
+  const fine = [0x80, 0x80, 0x80, 0x80]; // E5xx per channel: one that keeps the current pitch is a no-op
   for (let o = 0; o < s.ordersLen; o++) {
     for (let c0 = 0; c0 < orderLen[o]; c0 += ROWS) {
       const rows = Math.min(ROWS, orderLen[o] - c0);
@@ -288,6 +352,14 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
               if (hn < 0 || hn > 71) lossy.add('note outside hUGE range C-2..B-7 (clamped)');
               note = Math.max(0, Math.min(71, hn));
             }
+            // E1xy / E2xy (playback.cpp): porta to note +- y at speed x*4, the 03xx units -> hUGE 3xx with that note.
+            // With a note in the same row Furnace plays the note first and slides on from it; hUGE cannot (one note, one effect).
+            const slide = cell.effects.find((e) => (e.type === 0xe1 || e.type === 0xe2) && (e.value & 0xf0) && (e.value & 0x0f));
+            if (slide && kind !== 'noise') {
+              if (note !== NO_NOTE || lastNote[ch] < 0) lossy.add('E1xy/E2xy note slide on a row with a note');
+              else { note = Math.max(0, Math.min(71, lastNote[ch] + (slide.type === 0xe1 ? 1 : -1) * (slide.value & 15))); effect = 0x300 | ((slide.value >> 4) * 4); }
+            }
+            if (note !== NO_NOTE) lastNote[ch] = note;
             // Furnace keeps duty (12xx) and the channel volume when the same instrument plays again; a hUGE instrument
             // reload resets both, so a repeat of a macro-less instrument plays as instrument 0 (no reload).
             const ci = cell.instrument >= 0 || kind !== 'duty' ? cell.instrument : lastIns[ch];
@@ -296,9 +368,10 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
               instr = kind === 'duty' && plain && ci === lastIns[ch] ? 0 : insNo(kind, ci);
               lastIns[ch] = ci;
             }
-            const fxs = cell.effects.filter((e) => e.type >= 0);
+            const fxs = cell.effects.filter((e) => e.type >= 0 && e !== slide);
             let pan = -1;
             for (const e of fxs) {
+              if (e.type === 0xe5) { const same = (e.value & 0xff) === fine[ch]; fine[ch] = e.value & 0xff; if (same) continue; }
               const h = mapEffect(e.type, e.value, kind, (ord) => orderStart[ord] ?? 0, waveNo);
               if (h === undefined) { if (!((e.type === 0 || e.type === 3) && (e.value & 0xff) === 0)) lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}${FX_NAMES[e.type] ? ` (${FX_NAMES[e.type]})` : ''}`); continue; }
               if ((h & 0xf00) === 0x800) pan = h;
@@ -353,11 +426,12 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
       if (!ins) continue;
       const { len, enable } = lengthBits(ins);
       const high = 0x80 | (enable ? 0x40 : 0);
-      const table = buildTable(ins, kind, lossy, waveNo);
+      const synth = kind === 'wave' ? waveSynthFrames(ins, m.wavetables, lossy)?.map((f) => waveSlot(packWave(f, invert))) : undefined;
+      const table = buildTable(ins, kind, lossy, waveNo, synth);
       if (table) tableRefs.push({ kind, slot: hi - 1, table: tables.push(table) - 1 });
       const duty0 = macro(ins, MACRO_DUTY)?.data[0] ?? 2;
       if (kind === 'duty') instrBytes.duty[hi - 1] = [0x00, ((duty0 & 3) << 6) | len, envelope(ins, lossy), 0, 0, high];
-      else if (kind === 'wave') instrBytes.wave[hi - 1] = [len, 0x20, waveNo(macro(ins, MACRO_WAVE)?.data[0] ?? 0), 0, 0, high];
+      else if (kind === 'wave') instrBytes.wave[hi - 1] = [len, 0x20, synth?.[0] ?? waveNo(macro(ins, MACRO_WAVE)?.data[0] ?? 0), 0, 0, high];
       else instrBytes.noise[hi - 1] = [envelope(ins, lossy), 0, 0, (duty0 & 1 ? 0x80 : 0) | (enable ? 0x40 : 0) | (len & 0x3f), 0, 0];
     }
   }
@@ -365,13 +439,16 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   // Layout.
   const out: number[] = [];
   const w16 = (at: number, v: number) => { out[at] = v & 0xff; out[at + 1] = (v >> 8) & 0xff; };
-  out.length = 21;
+  out.length = 23;
   out.fill(0);
   out[0] = Math.max(1, s.speed1);
   const here = () => BASE + out.length;
   w16(1, here()); out.push((hOrders * 2) & 0xff, (hOrders * 2) >> 8);
   const orderAt: number[] = [];
   for (let ch = 0; ch < 4; ch++) { w16(3 + ch * 2, here()); orderAt.push(out.length); out.push(...new Array(hOrders * 2).fill(0)); }
+  w16(21, here());
+  const bankAt = out.length;
+  out.push(...new Array(hOrders * 2).fill(0));
   const insAt: Record<Kind, number> = { duty: 0, wave: 0, noise: 0 };
   (['duty', 'wave', 'noise'] as Kind[]).forEach((kind, k) => {
     w16(11 + k * 2, here()); insAt[kind] = out.length;
@@ -383,26 +460,47 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   for (let i = 0; i < 16; i++) out.push(retAddr & 0xff, retAddr >> 8);
   out.push(0xc9);
   w16(19, here());
-  const gbChip = m.systems.indexOf(0x04);
-  const invert = !/invertWave=(false|0)\b/.test(m.chipFlags?.[Math.max(0, gbChip)] ?? '');
-  const waveList = [...waveIdx.keys()];
-  for (let i = 0; i < Math.max(1, waveList.length); i++) out.push(...(m.wavetables[waveList[i]] ? waveTo4bit(m.wavetables[waveList[i]], invert) : new Array(16).fill(0)));
+  for (let i = 0; i < Math.max(1, waveSlots.length); i++) out.push(...(waveSlots[i] ?? new Array(16).fill(0)));
   for (const t of tableRefs) {
     const at = insAt[t.kind] + t.slot * 6 + (t.kind === 'noise' ? 1 : 3);
     w16(at, here()); out.push(...tables[t.table]);
   }
-  const patAt = patterns.map((p) => { const a = here(); out.push(...p); return a; });
-  for (let ch = 0; ch < 4; ch++) orderLists[ch].forEach((p, i) => w16(orderAt[ch] + i * 2, patAt[p]));
-  if (out.length > 0x6000) throw new Error(`song data ${out.length} bytes exceeds the 24 KiB song area`); // shortcut: no MBC banking, add it when a real song needs more
+  // Patterns: contiguous up to $7FFF with bank 1; when an order's patterns do not fit, the next bank opens at
+  // $4000. A pattern wholly below $4000 is seen from every bank; one in an older bank is copied again.
+  const commonEnd = here();
+  const PAT = ROWS * 3;
+  let bank = 1;
+  const winEnd = () => (bank + 1) * 0x4000 - BASE; // blob length where the current bank's window ends
+  const placed = new Map<number, { at: number; bank: number }>();
+  const seen = (p: number) => { const x = placed.get(p); return x && (x.at + PAT <= 0x4000 || x.bank === bank) ? x.at : undefined; };
+  for (let o = 0; o < hOrders; o++) {
+    const ps = orderLists.map((l) => l[o]);
+    const need = () => [...new Set(ps.filter((p) => seen(p) === undefined))];
+    if (out.length + need().length * PAT > winEnd()) {
+      out.push(...new Array(winEnd() - out.length).fill(0xff));
+      bank++;
+      if (bank > 255) throw new Error('song needs more than 255 ROM banks (4 MiB)');
+    }
+    for (const p of need()) { placed.set(p, { at: BASE + out.length - (bank - 1) * 0x4000, bank }); out.push(...patterns[p]); }
+    ps.forEach((p, ch) => w16(orderAt[ch] + o * 2, seen(p)!));
+    out[bankAt + o * 2] = bank;
+  }
+  if (bank > 1 && commonEnd > 0x4000) throw new Error(`song tables ${commonEnd - BASE} bytes exceed the 8 KiB bank 0 area a banked song needs`);
   return { blob: Uint8Array.from(out), lossy: lossy.list(), orders: hOrders, screen: { title: m.name, author: m.author, timerTma } };
 }
 
-/** Patch the song into the player ROM and recompute the global checksum (header checksum is unchanged). */
+/** Patch the song into the player ROM (grown to the banks the song needs, MBC5 ROM size byte) and recompute both checksums. */
 export function buildHugeRom(player: Uint8Array, meta: HugePlayerMeta, blob: Uint8Array, screen: HugeScreen): Uint8Array {
-  if (blob.length > meta.songCapacity) throw new Error(`song ${blob.length} bytes exceeds ${meta.songCapacity}`);
-  const rom = player.slice();
+  let size = player.length;
+  while (size < meta.songOffset + blob.length) size *= 2;
+  const rom = new Uint8Array(size).fill(0xff);
+  rom.set(player);
   rom.fill(0xff, meta.songOffset, meta.songOffset + meta.songCapacity);
   rom.set(blob, meta.songOffset);
+  rom[0x148] = Math.log2(size / 0x8000);
+  let hsum = 0;
+  for (let i = 0x134; i <= 0x14c; i++) hsum = (hsum - rom[i] - 1) & 0xff;
+  rom[0x14d] = hsum;
   rom[meta.rateOffset] = screen.timerTma;
   rom.set(nesScreenText(screen.title, 11), meta.titleOffset);
   rom.set(nesScreenText(screen.author, 17), meta.authorOffset);

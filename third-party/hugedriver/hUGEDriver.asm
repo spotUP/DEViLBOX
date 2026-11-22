@@ -51,6 +51,8 @@ noise_instruments: dw
 ;; Misc. pointers
 routines: dw
 waves: dw
+;; DEViLBOX: MBC5 ROM bank per order (word per order, low byte = bank), set by load_patterns
+order_banks: dw
 _end_song_descriptor_pointers:
 
 ;; Pointers to the current patterns (sort of a cache)
@@ -239,9 +241,27 @@ ENDC
     call .load_pattern
 
     ld hl, order4
-    ;; fallthrough
+    call .load_pattern
+
+    ;; DEViLBOX: select the order's ROM bank (MBC5 $2000); all four patterns of an order share it
+    ld hl, order_banks
+    call .order_entry
+    ld a, [hl]
+    ld [$2000], a
+    ret
 
 .load_pattern:
+    call .order_entry
+    ld a, [hl+]
+    ld [de], a
+    inc de
+    ld a, [hl]
+    ld [de], a
+    inc de
+    ret
+
+;; HL = [HL] + [current_order]
+.order_entry:
     ld a, [hl+]
     ld h, [hl]
     ld l, a
@@ -251,13 +271,6 @@ ENDC
     ld a, [current_order+1]
     adc h
     ld h, a
-
-    ld a, [hl+]
-    ld [de], a
-    inc de
-    ld a, [hl]
-    ld [de], a
-    inc de
     ret
 
 IF DEF(GBDK)

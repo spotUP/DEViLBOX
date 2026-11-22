@@ -10,7 +10,7 @@ H="$ROOT/third-party/hugedriver"
 rgbasm -I "$H" -o "$D/driver.o" "$H/hUGEDriver.asm"
 rgbasm -I "$H" -I "$ROOT/public/gb" -o "$D/player.o" "$ROOT/public/gb/huge-player.asm"
 rgblink -t -o "$D/p.gb" -n "$D/p.sym" "$D/player.o" "$D/driver.o"
-rgbfix -v -c -p 0xFF -t DEVILBOX "$D/p.gb"
+rgbfix -v -c -m 0x19 -p 0xFF -t DEVILBOX "$D/p.gb"
 cp "$D/p.gb" "$ROOT/public/gb/huge-player.gb"
 python3 - "$D/p.sym" "$ROOT" <<'PY'
 import hashlib, json, sys

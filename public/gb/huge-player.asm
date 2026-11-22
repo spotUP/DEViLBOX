@@ -414,8 +414,9 @@ scr_title:: ds 11, $20
 scr_author:: ds 17, $20
 scr_scroll:: ds 256, $20
 
-; 32 KiB ROM-only cart linked tiny (rgblink -t): $0000-$7FFF is one flat space, so the song gets 24 KiB
-; without MBC banking (hUGEDriver reads song data through plain pointers).
+; MBC5 cart linked tiny (rgblink -t): the base ROM is 32 KiB with the song from $2000 (bank 1 mapped at $4000).
+; A larger song grows the ROM in buildHugeRom: common song data stays in bank 0, patterns go in banks 1-255 and
+; the vendored driver's load_patterns selects each order's bank (descriptor order_banks).
 SECTION "Song", ROM0[$2000]
 song::
     ds $6000, $FF

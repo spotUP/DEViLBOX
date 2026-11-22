@@ -24,7 +24,7 @@ describe('hUGEDriver Game Boy export', () => {
     expect(song.orders).toBe(28 * 2); // 28 Furnace orders of 128 rows -> 2 hUGE orders of 64 rows each
     expect(song.lossy.length).toBeGreaterThan(0);
     const end = HUGE_SONG_BASE + song.blob.length;
-    for (let i = 1; i < 21; i += 2) { // descriptor: tempo byte, then 10 little-endian pointers
+    for (let i = 1; i < 23; i += 2) { // descriptor: tempo byte, then 11 little-endian pointers
       const p = song.blob[i] | (song.blob[i + 1] << 8);
       expect(p).toBeGreaterThanOrEqual(HUGE_SONG_BASE);
       expect(p).toBeLessThan(end);
