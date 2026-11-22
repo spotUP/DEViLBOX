@@ -767,8 +767,55 @@ fx_set_pan:
     ;; DEViLBOX: per-channel pan (Furnace gb.cpp lastPan). C bit 4 = left, bit 0 = right for
     ;; this channel only; both are shifted by the channel ID and merged into NR51, so one
     ;; channel's pan no longer overwrites the others.
+    ;; Param bit 7 set: a pan pair the converter moved out of busy cells. Bit 6 = pair (CH1+CH2 or
+    ;; CH3+CH4), bits 5-4 = which of the two change, bits 3-2 = first L/R, bits 1-0 = second L/R.
     push bc
     push de
+    bit 7, c
+    jr nz, .pair
+    call .merge
+    jr .done
+.pair:
+    ld e, c
+    ld a, c
+    and $40
+    rlca
+    rlca
+    rlca
+    ld b, a
+    bit 4, e
+    jr z, .second
+    ld a, e
+    and $08
+    add a, a
+    bit 2, e
+    jr z, .l1
+    inc a
+.l1:
+    ld c, a
+    push bc
+    call .merge
+    pop bc
+.second:
+    inc b
+    bit 5, e
+    jr z, .done
+    ld a, e
+    and $02
+    add a, a
+    add a, a
+    add a, a
+    bit 0, e
+    jr z, .l2
+    inc a
+.l2:
+    ld c, a
+    call .merge
+.done:
+    pop de
+    pop bc
+    ret
+.merge:
     ld a, c
     and $11
     ld c, a
@@ -776,19 +823,17 @@ fx_set_pan:
     inc b
 .shift:
     dec b
-    jr z, .merge
+    jr z, .apply
     sla a
     sla c
     jr .shift
-.merge:
+.apply:
     cpl
     ld d, a
     ldh a, [rAUDTERM]
     and d
     or c
     ldh [rAUDTERM], a
-    pop de
-    pop bc
     ret
 
 
@@ -1618,7 +1663,7 @@ ENDC
     call setup_instrument_pointer
     ld a, [highmask1]
     res 7, a ; Turn off the "initial" flag
-    jr z, .write_mask1
+    jr z, .no_ins1
 
     checkMute 0, .do_setvol1
 
@@ -1639,6 +1684,16 @@ ENDC
 
     ld a, [hl]
 
+    jr .write_mask1
+.no_ins1:
+    ;; DEViLBOX: a note with no instrument retriggers (Furnace plays it as a new note), except under 3xx.
+    ld e, a
+    ld a, b
+    and $0F
+    cp 3
+    ld a, e
+    jr z, .write_mask1
+    set 7, a
 .write_mask1:
     ld [highmask1], a
 
@@ -1684,7 +1739,7 @@ process_ch2:
     call setup_instrument_pointer
     ld a, [highmask2]
     res 7, a ; Turn off the "initial" flag
-    jr z, .write_mask2
+    jr z, .no_ins2
 
     checkMute 1, .do_setvol2
 
@@ -1705,6 +1760,16 @@ process_ch2:
 
     ld a, [hl]
 
+    jr .write_mask2
+.no_ins2:
+    ;; DEViLBOX: a note with no instrument retriggers (Furnace plays it as a new note), except under 3xx.
+    ld e, a
+    ld a, b
+    and $0F
+    cp 3
+    ld a, e
+    jr z, .write_mask2
+    set 7, a
 .write_mask2:
     ld [highmask2], a
 

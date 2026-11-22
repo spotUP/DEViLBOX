@@ -205,7 +205,7 @@ function mapEffect(type: number, value: number, kind: Kind, jumpTarget: (order: 
     case 0x00: return v === 0 ? undefined : v;
     case 0x01: return 0x100 | v;
     case 0x02: return 0x200 | v;
-    case 0x03: return 0x300 | v;
+    case 0x03: return v === 0 ? undefined : 0x300 | v; // 0300 = portamento off: the note plays normally
     case 0x04: return 0x400 | v;
     case 0x0a: return 0xa00 | v;
     case 0x0b: { const t = jumpTarget(v); return t < 255 ? 0xb00 | (t + 1) : undefined; } // hUGE stores order + 1 in one byte
@@ -265,11 +265,13 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   const patterns: number[][] = [];
   const patKey = new Map<string, number>();
   const orderLists: number[][] = [[], [], [], []];
+  const lastIns = [-1, -1, -1, -1];
   for (let o = 0; o < s.ordersLen; o++) {
     for (let c0 = 0; c0 < orderLen[o]; c0 += ROWS) {
       const rows = Math.min(ROWS, orderLen[o] - c0);
       const chunk: number[][] = [[], [], [], []];
       const fxFree: boolean[][] = [[], [], [], []];
+      const spill: Array<{ r: number; ch: number; lr: number }> = [];
       for (let ch = 0; ch < 4; ch++) {
         const kind = KIND[ch];
         for (let r = 0; r < ROWS; r++) {
@@ -286,18 +288,30 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
               if (hn < 0 || hn > 71) lossy.add('note outside hUGE range C-2..B-7 (clamped)');
               note = Math.max(0, Math.min(71, hn));
             }
-            if (cell.instrument >= 0 && note !== NO_NOTE) instr = insNo(kind, cell.instrument);
+            // Furnace keeps duty (12xx) and the channel volume when the same instrument plays again; a hUGE instrument
+            // reload resets both, so a repeat of a macro-less instrument plays as instrument 0 (no reload).
+            const ci = cell.instrument >= 0 || kind !== 'duty' ? cell.instrument : lastIns[ch];
+            if (ci >= 0 && note !== NO_NOTE) {
+              const plain = !m.instruments[ci]?.macros.some((x) => x.length > 0);
+              instr = kind === 'duty' && plain && ci === lastIns[ch] ? 0 : insNo(kind, ci);
+              lastIns[ch] = ci;
+            }
             const fxs = cell.effects.filter((e) => e.type >= 0);
+            let pan = -1;
             for (const e of fxs) {
               const h = mapEffect(e.type, e.value, kind, (ord) => orderStart[ord] ?? 0, waveNo);
-              if (h === undefined) { if (!(e.type === 0 && (e.value & 0xff) === 0)) lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}${FX_NAMES[e.type] ? ` (${FX_NAMES[e.type]})` : ''}`); continue; }
-              if (effect < 0) effect = h; else lossy.add('second effect in one cell (hUGE has one effect column)');
+              if (h === undefined) { if (!((e.type === 0 || e.type === 3) && (e.value & 0xff) === 0)) lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}${FX_NAMES[e.type] ? ` (${FX_NAMES[e.type]})` : ''}`); continue; }
+              if ((h & 0xf00) === 0x800) pan = h;
+              else if (effect < 0) effect = h; else lossy.add('second effect in one cell (hUGE has one effect column)');
             }
             if (cell.volume >= 0) {
               if (effect < 0) effect = 0xc00 | (kind === 'wave' ? waveVol(cell.volume & 15) : cell.volume & 15);
               else lossy.add('volume column beside an effect');
             }
+            // A pan in a busy cell moves to a free slot of the row as a channel-pair pan (driver fx_set_pan param bit 7).
+            if (pan >= 0) { if (effect < 0) effect = pan; else spill.push({ r, ch, lr: (pan & 0x10 ? 2 : 0) | (pan & 1) }); }
           }
+          if (cell && cell.instrument < 0 && (effect & 0xf00) === 0x300) instr = 0; // portamento keeps the old instrument, no reload
           fxFree[ch].push(effect < 0);
           chunk[ch].push(...dn(note, instr, Math.max(0, effect)));
         }
@@ -306,7 +320,18 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
         const last = rows - 1;
         const ch = [0, 1, 2, 3].find((c) => fxFree[c][last]);
         if (ch === undefined) lossy.add('short pattern end with every effect slot used (plays to row 64)');
-        else { chunk[ch][last * 3 + 1] = (chunk[ch][last * 3 + 1] & 0xf0) | 0x0d; chunk[ch][last * 3 + 2] = 0x01; } // D01 = break to row 0
+        else { chunk[ch][last * 3 + 1] = (chunk[ch][last * 3 + 1] & 0xf0) | 0x0d; chunk[ch][last * 3 + 2] = 0x01; fxFree[ch][last] = false; } // D01 = break to row 0
+      }
+      // Pair param: bit 7 set, bit 6 = pair (CH1+2 / CH3+4), bits 5-4 = changed channels, bits 3-2 / 1-0 = L/R of each.
+      const pairs = new Map<number, number>();
+      for (const { r, ch, lr } of spill) {
+        const k = r * 2 + (ch >> 1), second = ch & 1;
+        pairs.set(k, (pairs.get(k) ?? 0x80 | ((ch >> 1) << 6)) | (0x10 << second) | (lr << (second ? 0 : 2)));
+      }
+      for (const [k, param] of pairs) {
+        const r = k >> 1, ch = [0, 1, 2, 3].find((c) => fxFree[c][r]);
+        if (ch === undefined) { lossy.add('pan beside another effect with every effect slot of the row used'); continue; }
+        chunk[ch][r * 3 + 1] = (chunk[ch][r * 3 + 1] & 0xf0) | 0x08; chunk[ch][r * 3 + 2] = param; fxFree[ch][r] = false;
       }
       for (let ch = 0; ch < 4; ch++) {
         const key = chunk[ch].join(',');
