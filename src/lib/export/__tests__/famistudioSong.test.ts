@@ -635,6 +635,19 @@ describe('furnaceToFamistudio', () => {
     expect(has(out, env(0.2))).toBe(true);
     expect(has(out, env(0))).toBe(false);
   });
+  it('resamples a tonal arp at the note\'s own sub-frame phase (turtle_byte triangle kick: hold on frames 1-2, not 2-3)', () => {
+    // 50 Hz, speed 6: row 1 starts at frame 7.2 (ph 0.2). The instrument envelope is resampled at phase 0, so the note needs its own override.
+    const arp = [2, 0, -2, -4, -6, -8, -9], rate = 50 / 60;
+    const m = nesModule({ 2: { 1: { ...A4, instrument: 0 } } }, { hz: 50, patLen: 16 });
+    Object.assign(m, { instruments: [{ type: 34, macros: [{ code: 1, type: 0, mode: 0, speed: 1, delay: 0, length: arp.length, loop: 255, release: 255, data: arp }], amiga: { initSample: 0 } }] });
+    const env = (ph: number): number[] => {
+      const vals: number[] = [];
+      for (let f = 0; tickAtFrame(f, rate, ph) < arp.length || tickAtFrame(f - 1, rate, ph) < arp.length - 1; f++) vals.push(arp[Math.min(arp.length - 1, tickAtFrame(f, rate, ph))]);
+      return encodeEnvelope(vals, -1, -1, 'arp');
+    };
+    const out = furnaceToFamistudio(m).music;
+    expect(has(out, env(0.2))).toBe(true);
+  });
   it('reports a dpcmMode=false song sample note as PCM played as DPCM until an NES-type note switches Furnace to DPCM', () => {
     const pcmLossy = (insType: number): boolean => {
       const m = nesModule({ 4: { 0: { note: 1, octave: 4, instrument: 0 } } });

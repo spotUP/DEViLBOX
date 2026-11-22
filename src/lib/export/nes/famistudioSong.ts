@@ -321,10 +321,12 @@ export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2
   // unslid), then both.
   // Macro phase copies past the 64-instrument cap: the least-used instruments fall back to one copy.
   const noPhase = new Set<number>();
+  // Per-note arp override at the note's own phase for instruments that lost their phase copies: kept only when the song still fits the first music area.
+  let phaseArp = false;
   const conv = (cuts: boolean, held: boolean, b: number, loop: boolean): FamistudioSong => {
     for (;;) {
       const stat: PhaseStat = { over: false, uses: new Map(), copies: new Map() };
-      const song = convert(m, subsong, dpcmCap, cuts, held, b, loop, noPhase, stat);
+      const song = convert(m, subsong, dpcmCap, cuts, held, b, loop, noPhase, stat, phaseArp);
       const multi = [...stat.copies].filter(([, c]) => c.size > 1).sort((x, y) => (stat.uses.get(x[0]) ?? 0) - (stat.uses.get(y[0]) ?? 0));
       if (!stat.over || !multi.length) {
         if (noPhase.size) song.lossy.push(`macro start phase copies dropped for ${noPhase.size} instruments (64-instrument cap)`);
@@ -334,24 +336,32 @@ export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2
       for (const [k, c] of multi) { noPhase.add(k); excess -= c.size - 1; if (excess <= 0) break; }
     }
   };
-  let base = 0x8000;
-  let cap = MUSIC_CAP;
-  let song = conv(true, true, base, true);
-  if (song.music.length > cap) song = conv(true, true, base, false);
-  // shortcut: VRC6 songs stay on the 16 KB mapper-24 player; give player-vrc6 a second music bank when one needs it.
-  if (song.music.length > cap && !song.vrc6) {
-    base = FME7_MUSIC_ADDR;
-    cap = FME7_MUSIC_CAP;
-    song = conv(true, true, base, true);
-  }
-  for (const [cuts, held] of [[true, true], [false, true], [true, false], [false, false]]) {
-    if (song.music.length <= cap) break;
-    song = conv(cuts, held, base, false);
-    if (!cuts) song.lossy.push(`note cut EC dropped to fit the ${cap / 1024} KiB music area`);
-    if (!held) song.lossy.push(`01/02 slide held over later notes dropped to fit the ${cap / 1024} KiB music area`);
-  }
-  if (base === FME7_MUSIC_ADDR) song.fme7 = true;
-  return song;
+  const fit = (): FamistudioSong => {
+    let base = 0x8000;
+    let cap = MUSIC_CAP;
+    let song = conv(true, true, base, true);
+    if (song.music.length > cap) song = conv(true, true, base, false);
+    // shortcut: VRC6 songs stay on the 16 KB mapper-24 player; give player-vrc6 a second music bank when one needs it.
+    if (song.music.length > cap && !song.vrc6) {
+      base = FME7_MUSIC_ADDR;
+      cap = FME7_MUSIC_CAP;
+      song = conv(true, true, base, true);
+    }
+    for (const [cuts, held] of [[true, true], [false, true], [true, false], [false, false]]) {
+      if (song.music.length <= cap) break;
+      song = conv(cuts, held, base, false);
+      if (!cuts) song.lossy.push(`note cut EC dropped to fit the ${cap / 1024} KiB music area`);
+      if (!held) song.lossy.push(`01/02 slide held over later notes dropped to fit the ${cap / 1024} KiB music area`);
+    }
+    if (base === FME7_MUSIC_ADDR) song.fme7 = true;
+    return song;
+  };
+  const fitDrops = (x: FamistudioSong): number => x.lossy.filter((l) => l.includes('to fit the')).length;
+  phaseArp = false;
+  const plain = fit();
+  phaseArp = true;
+  const rich = fit();
+  return !!rich.fme7 === !!plain.fme7 && fitDrops(rich) <= fitDrops(plain) ? rich : plain;
 }
 
 const APU_LENGTH = [10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30];
@@ -475,7 +485,7 @@ export function bestSlideStep(o: { rawFrom: number; fromPeriod: number; toPeriod
   return [sign * best, bestCost];
 }
 
-function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean, base: number, withLoop: boolean, noPhase: Set<number> = new Set(), stat?: PhaseStat): FamistudioSong {
+function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean, base: number, withLoop: boolean, noPhase: Set<number> = new Set(), stat?: PhaseStat, withPhaseArp = true): FamistudioSong {
   const lossy = new Lossy();
   const pitchLossy: PitchLossySpan[] = [];
   const s = m.subsongs[subsong];
@@ -893,7 +903,14 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             if (outside && arpMac.data.slice(0, arpMac.length).some((v) => n + target(v) - nv > 96)) lossy.add('arp step above B-8 (clamped)');
             // The override restarts at the note's attack, so it is resampled at the note's own sub-frame phase (like insArp below).
             const arpPh = seq[ri].t + delay * perTick - seq[ri].frame - Math.round(delay * perTick);
-            noteArp = !arpMac || (!fixed && !outside && ch !== NOISE_CH) ? null
+            // The instrument's own arp envelope is resampled at phase 0: a note starting off the frame grid (50 Hz song, ph != 0)
+            // shows other ticks per frame, so it gets the override too (turtle_byte triangle kick, ph 0.2: hold at frames 1-2, not 2-3).
+            // An instrument that kept its start-phase copies (phaseKey) already plays this note's phase; only one dropped to its
+            // phase-0 copy (64-instrument cap) needs the per-note override, which costs stream bytes and splits shared rows.
+            const phaseDiffers = !!arpMac && ch === 2 && macroRate !== 1 && arpPh !== 0 && withPhaseArp && noPhase.has(curInsIdx >= 0 ? curInsIdx : 0)
+              && JSON.stringify(macroFrames(arpMac, 'arp', new Lossy(), inTable, macroRate, m.version, 0))
+                !== JSON.stringify(macroFrames(arpMac, 'arp', new Lossy(), inTable, macroRate, m.version, arpPh));
+            noteArp = !arpMac || (!fixed && !outside && ch !== NOISE_CH && !phaseDiffers) ? null
               : macroEnvelope(arpMac, 'arp', lossy, ch === NOISE_CH ? (v) => noiseNote(target(v), properNoise) - n : inTable, macroRate, m.version, arpPh);
             // The steps the driver plays: the override above (phase 0), else the instrument copy at this note's start phase.
             insArp = arpMac && tonal ? macroFrames(arpMac, 'arp', new Lossy(), inTable, macroRate, m.version, noteArp ? 0 : arpPh) : null;
