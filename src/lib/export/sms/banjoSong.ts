@@ -23,7 +23,6 @@ export interface BanjoLayout {
   sn_tone_rom: number;
 }
 
-/** hz: the whole-number tick rate the player steps the song at (it spreads the ticks over the console's 50 or 60 Hz frames). */
 /** hz: the whole-number tick rate the player steps the song at (it spreads the ticks over the console's 50 or 60 Hz frames).
  *  tune: the song's tuning left after whole-semitone transposition, in semitones (0 <= tune < 1); smsRom.ts retunes the period table by it. */
 export interface BanjoSong { bytes: Uint8Array; lossy: string[]; hz: number; tune: number }
@@ -115,10 +114,44 @@ function convertInstrument(ins: FurnaceInstrument, version: number, linear: bool
   return out;
 }
 
+const SN_CLOCK = 3579545;
+
+/** Driver period of Banjo note b: sn_tone_lookup (A = 110 Hz at note 9, retuned by tune) halved per octave. */
+function banjoPeriod(b: number, tune: number): number {
+  const k = b - 9, o = Math.floor(k / 12);
+  return Math.round(SN_CLOCK / 32 / (110 * 2 ** ((k - 12 * o + tune) / 12))) >> o;
+}
+
+/** Pitched noise (20xy with x = 1) takes tone 3's period. Furnace computes it with the noise divider (60 on TI chip types,
+ *  64 on Sega) and, on linear-pitch songs, its "easy noise" ramp (period 16, 15, ... one per semitone above a threshold);
+ *  Banjo runs the note through its tone table. Pick the Banjo note whose period is nearest Furnace's (sms.cpp snCalcFreq). */
+function pitchedNoiseNote(m: FurnaceModule, linear: boolean, tuneSemis: number, tune: number): (nv: number) => number {
+  const flags = m.chipFlags?.[0] ?? '';
+  const chipType = Number(/chipType=(\d+)/.exec(flags)?.[1] ?? 0);
+  const noiseDiv = chipType >= 1 && chipType <= 7 ? 60 : 64;
+  const easy = !/noEasyNoise=true/.test(flags);
+  const tuning = m.tuning || 440;
+  const thr = Math.round(128 * 12 * Math.log2(SN_CLOCK / (16 * noiseDiv) / (0.0625 * tuning))) - 384 + 64 + 60 * 128;
+  return (nv) => {
+    const cur = (nv + 60) * 128;
+    const want = linear && easy && cur > thr
+      ? Math.max(1, (2048 - (cur - thr)) >> 7)
+      : Math.min(1023, SN_CLOCK / 32 / (110 * 2 ** ((nv + tuneSemis - 9) / 12)) * 64 / noiseDiv);
+    let best = 9;
+    for (let b = 9; b < 128; b++) {
+      if (Math.abs(Math.log(Math.max(1, banjoPeriod(b, tune)) / want)) < Math.abs(Math.log(Math.max(1, banjoPeriod(best, tune)) / want))) best = b;
+    }
+    return best;
+  };
+}
+
+/** Driver noise mode while a noise-channel pattern converts: bit 1 = tone 3 pitch, bit 0 = white (Banjo and Furnace start at 3). */
+interface NoiseState { mode: number; note: (nv: number) => number }
+
 /** One channel pattern as Banjo commands (json2sms pattern loop, SN76489 channel). */
 function convertPattern(
   cellAt: (r: number) => { note: number; octave: number; instrument: number; volume: number; effects: { type: number; value: number }[] } | undefined,
-  rows: number, sub: number, tb1: number, nIns: number, transpose: number, lossy: Lossy,
+  rows: number, sub: number, tb1: number, nIns: number, transpose: number, lossy: Lossy, noise?: NoiseState,
 ): number[] {
   const out: number[] = [];
   let curIns = -1, curVol = -1, lastWasEnd = false;
@@ -131,7 +164,11 @@ function convertPattern(
       if (curIns < nIns) push(INSTRUMENT_CHANGE, curIns);
     }
     for (const { type: t, value: v } of fx) {
-      if (t === 0x20) push(SN_NOISE_MODE, (v & 1) | ((v & 0x10) >> 3));
+      if (t === 0x20) {
+        const mode = (v & 1) | ((v & 0x10) >> 3);
+        if (noise) noise.mode = mode;
+        push(SN_NOISE_MODE, mode);
+      }
       else if (t === 0x00) { if (v) push(ARPEGGIO, v); else push(ARPEGGIO_OFF); }
       else if (t === 0x01 || t === 0x02 || t === 0x03) { if (v) push(t === 0x01 ? SLIDE_UP : t === 0x02 ? SLIDE_DOWN : SLIDE_PORTA, v); else push(SLIDE_OFF); }
       else if (t === 0x04) {
@@ -153,7 +190,7 @@ function convertPattern(
     }
     if (cell && cell.volume !== -1 && cell.volume !== curVol) { push(VOLUME_CHANGE | Math.min(15, cell.volume)); curVol = cell.volume; }
     const nv = cell ? convertFurnaceNoteValue(cell) : -1;
-    if (nv >= 0 && nv < 253) push(NOTE_ON | (Math.max(0, nv + transpose) & 0x7f));
+    if (nv >= 0 && nv < 253) push(NOTE_ON | (Math.max(0, noise ? (noise.mode & 2 ? noise.note(nv) : nv) : nv + transpose) & 0x7f));
     else if (nv === 253) push(NOTE_OFF);
     else if (nv === 254 || nv === 255) push(NOTE_RELEASE);
     for (const { type: t, value: v } of fx) if (t === 0xec) push(NOTE_DELAY, v, NOTE_OFF);
@@ -213,12 +250,19 @@ export function furnaceToBanjo(m: FurnaceModule, subsong: number, layout: BanjoL
 
   const patAddr = new Map<string, number>();
   const patBlobs: number[][] = [];
+  // Noise-channel notes depend on the noise mode the pattern starts in, so that pattern converts once per start mode, walked in
+  // order. shortcut: 20xy only; a duty macro that switches the mode is not followed, upgrade if a song needs it.
+  const orderKeys: string[][] = [];
+  const noise: NoiseState = { mode: 3, note: pitchedNoiseNote(m, linear, tuneSemis, tune) };
   for (let ch = 0; ch < CHANNELS; ch++) {
+    orderKeys[ch] = [];
     for (let o = 0; o < ordersLen; o++) {
       const pat = s.orders[ch]?.[o] ?? 0;
-      const key = `${ch}_${pat}`;
+      const startMode = noise.mode;
+      const key = ch === 3 ? `${ch}_${pat}_${startMode}` : `${ch}_${pat}`;
+      orderKeys[ch][o] = key;
+      const b = convertPattern((r) => cellAt(ch, pat, r), s.patLen, ch, tb1, instruments.length, ch < 3 ? transpose : 0, lossy, ch === 3 ? noise : undefined);
       if (patAddr.has(key)) continue;
-      const b = convertPattern((r) => cellAt(ch, pat, r), s.patLen, ch, tb1, instruments.length, ch < 3 ? transpose : 0, lossy);
       patAddr.set(key, at);
       patBlobs.push(b);
       at += b.length;
@@ -239,7 +283,7 @@ export function furnaceToBanjo(m: FurnaceModule, subsong: number, layout: BanjoL
   for (let c = 0; c < CHANNELS; c++) out.push(...w16(layout.banjo_mute_channel_sn));
   for (const b of blobs) out.push(...b);
   for (let o = 0; o < ordersLen; o++) out.push(...w16(orderRowsAt + o * CHANNELS * 2));
-  for (let o = 0; o < ordersLen; o++) for (let ch = 0; ch < CHANNELS; ch++) out.push(...w16(patAddr.get(`${ch}_${s.orders[ch]?.[o] ?? 0}`) ?? 0));
+  for (let o = 0; o < ordersLen; o++) for (let ch = 0; ch < CHANNELS; ch++) out.push(...w16(patAddr.get(orderKeys[ch][o]) ?? 0));
   for (const b of patBlobs) out.push(...b);
   if (base + out.length !== at) throw new Error('Banjo layout mismatch');
   return { bytes: Uint8Array.from(out.map((x) => x & 0xff)), lossy: lossy.list(), hz, tune };
