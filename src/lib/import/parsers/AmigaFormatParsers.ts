@@ -2978,6 +2978,17 @@ export async function tryRouteFormat(
       'SimpleAmigaStubParser', { injectUADE: true });
   }
 
+  // ── Forgotten Worlds (.fw / fw.*) — native editable grid; UADE handles audio.
+  if (matchesExt(filename, ['fw'])) {
+    const { isForgottenWorldsFormat, parseForgottenWorldsFile } = await import('@lib/import/formats/ForgottenWorldsParser');
+    return withNativeThenUADE('forgottenWorlds', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        const ab = buf instanceof Uint8Array ? buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer : buf as ArrayBuffer;
+        return isForgottenWorldsFormat(ab) ? parseForgottenWorldsFile(ab, name) : null;
+      },
+      'ForgottenWorldsParser', { injectUADE: true });
+  }
+
   // ── UADE-only prefix formats + catch-all ─────────────────────────────────
   { const uadeResult = await tryUADEPrefixParse(buffer, filename, originalFileName, prefs, subsong, preScannedMeta, companionFiles, uadeEngine);
     if (uadeResult) return uadeResult; }

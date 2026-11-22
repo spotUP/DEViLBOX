@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { FurnaceModule } from '../../import/formats/FurnaceSongParser';
 import { MESEN } from './nesMesenHarness';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
+import { convertFurnaceNoteValue } from '../../import/formats/furnace/FurnacePatternParser';
 import { buildFamistudioRom, compressRefs, expandRefs, famistudioText, encodeEnvelope, expandProcMacro, furnaceToFamistudio, loopPeriodicTail, mergeVibratoPitch, noiseNote, type FamistudioMeta, bestSlideStep, tickAtFrame, roundOnClock } from '../nes/famistudioSong';
 
 const ROOT = path.resolve(__dirname, '../../../..');
@@ -619,6 +620,20 @@ describe('furnaceToFamistudio', () => {
     expect(ins([0, 5], [0, 1, 2, 3]) - ins([0], [0, 1, 2, 3])).toBe(0); // row 5 = 36 frames: phase 0 again
     expect(ins([0, 1, 2, 3, 4], [2, 2]) - ins([0], [2, 2])).toBe(0); // a flat macro looks the same at every phase
     expect(tickAtFrame(1, 50 / 60, 0.4)).toBe(0);
+  });
+  it('resamples a noise arp override at the note\'s own sub-frame phase (turtle_byte noise: period 5 for 12 on frame 117)', () => {
+    // 50 Hz, speed 6: row 1 starts at frame 7.2 (ph 0.2), so frame 2 shows tick 1, not tick 2. The 0x4b override ran at phase 0.
+    const arp = [-2, -30, 3, 17, 2, 0], nv = convertFurnaceNoteValue({ ...empty(), ...A4 }), n = noiseNote(nv, false), rate = 50 / 60;
+    const m = nesModule({ 3: { 1: { ...A4, instrument: 0 } } }, { hz: 50, patLen: 16 });
+    Object.assign(m, { instruments: [{ type: 34, macros: [{ code: 1, type: 0, mode: 0, speed: 1, delay: 0, length: arp.length, loop: 255, release: 255, data: arp }], amiga: { initSample: 0 } }] });
+    const env = (ph: number): number[] => {
+      const vals: number[] = [];
+      for (let f = 0; tickAtFrame(f, rate, ph) < arp.length; f++) vals.push(noiseNote(nv + arp[tickAtFrame(f, rate, ph)], false) - n);
+      return encodeEnvelope(vals, -1, -1, 'arp');
+    };
+    const out = furnaceToFamistudio(m).music;
+    expect(has(out, env(0.2))).toBe(true);
+    expect(has(out, env(0))).toBe(false);
   });
   it('reports a dpcmMode=false song sample note as PCM played as DPCM until an NES-type note switches Furnace to DPCM', () => {
     const pcmLossy = (insType: number): boolean => {

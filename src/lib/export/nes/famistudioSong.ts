@@ -891,10 +891,12 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             const inTable = (v: number): number => Math.max(1, Math.min(96, n + target(v) - nv)) - n;
             const outside = !!arpMac && ch !== NOISE_CH && arpMac.data.slice(0, arpMac.length).some((v) => inTable(v) !== target(v) - nv);
             if (outside && arpMac.data.slice(0, arpMac.length).some((v) => n + target(v) - nv > 96)) lossy.add('arp step above B-8 (clamped)');
+            // The override restarts at the note's attack, so it is resampled at the note's own sub-frame phase (like insArp below).
+            const arpPh = seq[ri].t + delay * perTick - seq[ri].frame - Math.round(delay * perTick);
             noteArp = !arpMac || (!fixed && !outside && ch !== NOISE_CH) ? null
-              : macroEnvelope(arpMac, 'arp', lossy, ch === NOISE_CH ? (v) => noiseNote(target(v), properNoise) - n : inTable, macroRate, m.version);
+              : macroEnvelope(arpMac, 'arp', lossy, ch === NOISE_CH ? (v) => noiseNote(target(v), properNoise) - n : inTable, macroRate, m.version, arpPh);
             // The steps the driver plays: the override above (phase 0), else the instrument copy at this note's start phase.
-            insArp = arpMac && tonal ? macroFrames(arpMac, 'arp', new Lossy(), inTable, macroRate, m.version, noteArp ? 0 : seq[ri].t + delay * perTick - seq[ri].frame - Math.round(delay * perTick)) : null;
+            insArp = arpMac && tonal ? macroFrames(arpMac, 'arp', new Lossy(), inTable, macroRate, m.version, noteArp ? 0 : arpPh) : null;
           }
           // 00xy arp frames. Frame-exact: frame f plays step floor(f * ticksPerFrame) % 3, looped over the shortest frame count
           // that holds a whole number of 3-tick cycles (45 frames at 56 Hz); a rounded per-tick frame count drifts a step per cycle.
