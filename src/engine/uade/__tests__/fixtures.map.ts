@@ -121,7 +121,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "soundfx", fixture: "public/data/songs/formats/operation_stealth.sfx", kind: "fixed" },
   { formatId: "soundMon", fixture: "public/data/songs/bp-soundmon-2/nicktune1.bp", kind: "fixed" },
   { formatId: "soundPlayer", fixture: "public/data/songs/formats/Scott Johnston/sjs.awesome", kind: "fixed" },
-  { formatId: "specialFX", fixture: "public/data/songs/formats/wildwheels_ingame.jd", kind: "fixed" },
+  { formatId: "specialFX", fixture: "public/data/songs/formats/wildwheels_ingame.jd", kind: "variable" },
   { formatId: "steveBarrett", fixture: "public/data/songs/formats/street_fighter.sb", kind: "fixed" },
   { formatId: "steveTurner", fixture: "public/data/songs/formats/offroad.jpo", kind: "variable" },
   { formatId: "stm", fixture: "public/data/songs/formats/slideshow i.stm", kind: "fixed" },

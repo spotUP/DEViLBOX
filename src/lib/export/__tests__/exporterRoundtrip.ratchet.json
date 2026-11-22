@@ -1056,6 +1056,14 @@
       "cells": 3816,
       "bytes": 3816
     },
+    "specialFX": {
+      "exporter": "SpecialFXExporter.exportSpecialFX",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 9924,
+      "bytes": 9924
+    },
     "robHubbardST": {
       "exporter": "RobHubbardSTExporter.exportRobHubbardST",
       "tier": "byte-exact",
