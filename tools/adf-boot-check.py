@@ -158,7 +158,7 @@ def env_corr(a, sr, b, rsr):
 CRASH_CRUMBS = (b"ADRE", b"BUSE", b"PRIV", b"CHK ", b"TRPV", b"TRCE", b"UNIN", b"SPUR", b"ILVL", b"ILLG", b"DIV0", b"LINA")
 
 
-def check(adf, purpose, target, ref, keep_wav, extra="", dump=None, dump_at=2.0):
+def check(adf, purpose, target, ref, keep_wav, extra="", dump=None, dump_at=2.0, capture=8.0):
     work = tempfile.mkdtemp(prefix="adfbc-")
     name = os.path.basename(adf)
     cfg, wav = os.path.join(work, "run.uae"), os.path.join(work, "rec.wav")
@@ -178,7 +178,7 @@ def check(adf, purpose, target, ref, keep_wav, extra="", dump=None, dump_at=2.0)
             raise RuntimeError("ADF not open in the emulator pid")
         ipc(sock, "AUDIO_RECORD\t" + wav)
         t0, tplay, crumb = time.time(), None, b""
-        while time.time() - t0 < 90:
+        while tplay or time.time() - t0 < 90:  # after PLAY, run on for --capture s
             c = rd(sock, 0x400, 4).to_bytes(4, "big")
             if c != crumb:
                 crumb = c; print("%.1f s crumb %r" % (time.time() - t0, c), flush=True)
@@ -186,7 +186,7 @@ def check(adf, purpose, target, ref, keep_wav, extra="", dump=None, dump_at=2.0)
                 r["crash"] = c.decode(); r["crash_pc"] = "%08x" % rd(sock, 0x40E, 4); break
             if c == b"PLAY" and tplay is None:
                 tplay = time.time(); r["play_s"] = round(tplay - t0, 1)
-            if tplay and time.time() - tplay > 8:
+            if tplay and time.time() - tplay > capture:
                 break
             time.sleep(0.2)
         r["dmaconr"] = []
@@ -253,6 +253,7 @@ def main():
     ap.add_argument("--dump", help="addr:len[,addr:len] chip/fast RAM to save (hex ok) at PLAY+--dump-at s, emulator paused; files kept next to the WAV")
     ap.add_argument("--dump-at", type=float, default=2.0)
     ap.add_argument("--keep-wav", action="store_true")
+    ap.add_argument("--capture", type=float, default=8.0, help="seconds to keep recording after the PLAY crumb (e.g. song length + 15 for a loop check)")
     a = ap.parse_args()
     res = json.load(open(RESULTS)) if os.path.exists(RESULTS) else {}
     man = {t["adf"]: t["target"] for t in json.load(open(MANIFEST))["templates"].values()}
@@ -268,7 +269,7 @@ def main():
         if not a.only and not a.failed and old == "PASS":
             print("skip %s (PASS recorded)" % name); continue
         target = a.target or man.get(name, "a500")
-        r = check(adf, a.purpose, target, a.ref, a.keep_wav, a.cfg_extra, a.dump, a.dump_at)
+        r = check(adf, a.purpose, target, a.ref, a.keep_wav, a.cfg_extra, a.dump, a.dump_at, a.capture)
         res[name] = r
         os.makedirs(os.path.dirname(RESULTS), exist_ok=True)
         json.dump(res, open(RESULTS, "w"), indent=1)
