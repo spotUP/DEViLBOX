@@ -533,7 +533,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
 
   // Frame at which each row starts (speed effects in any channel apply to all; tick rate scales frames per tick).
   const rowFrame: number[][] = [], rowFrameT: number[][] = [], rowSpeed: number[][] = [];
-  let songEndFrame = 0, songEndT = 0;
+  let songEndT = 0;
   {
     let f = 0, cur = 0;
     let sp = [...speeds];
@@ -555,7 +555,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         cur = (cur + 1) % sp.length;
       }
     }
-    songEndFrame = Math.round(f); songEndT = f;
+    songEndT = f;
   }
   // The engine adds a 8.8 step of 256 x tempo / 150 per frame and starts a row when the integer part reaches the speed.
   // A rounded step drifts a row by a frame every few hundred rows (virtual tempo 155/112: step 354.29), so speeds and
