@@ -128,6 +128,8 @@ export interface FurnaceModuleSong {
   systemPanFR?: number;
   /** Write the extended-FM chip (0xa6, 17 channels): channels 1-4 are FM 2 OP1-OP4. */
   extendedFm?: boolean;
+  /** Another chip than the Neo Geo (the NES feature-test song): system id, channel count, instrument synth type, per-channel volume maximum. */
+  chip?: { id: number; channels: number; synthType: string; volMax: (ch: number) => number; chipFlags: string; name: string };
 }
 
 export interface FurnaceModuleResult {
@@ -387,7 +389,7 @@ function toFileMacro(m: FurnaceMacro): FileMacro {
 /** True for an ADPCM-A / ADPCM-B voice that carries its own sample (the rule the live synth uses). */
 function hasUserSample(cfg: FurnaceConfig): cfg is FurnaceConfig & { userSample: FurnaceUserSample } {
   const type = resolveInsType(cfg);
-  return (type === DIV_INS_ADPCMA || type === DIV_INS_ADPCMB) && !!cfg.userSample;
+  return (type === DIV_INS_ADPCMA || type === DIV_INS_ADPCMB || type === 0 /* NES DPCM: plain instrument + sample */) && !!cfg.userSample;
 }
 
 /** One module sample: the PCM data and the ADPCM voice type that plays it. */
@@ -474,14 +476,15 @@ function checkInstrument(inst: InstrumentConfig, cfg: FurnaceConfig, problems: s
 export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResult {
   const problems: string[] = [];
   const warnings: string[] = [];
-  const system = song.extendedFm ? FUR_SYSTEM_YM2610_EXT : FUR_SYSTEM_YM2610;
-  const chans = song.extendedFm ? FUR_NEO_GEO_EXT_CHANNELS : FUR_NEO_GEO_CHANNELS;
+  const system = song.chip?.id ?? (song.extendedFm ? FUR_SYSTEM_YM2610_EXT : FUR_SYSTEM_YM2610);
+  const chans = song.chip?.channels ?? (song.extendedFm ? FUR_NEO_GEO_EXT_CHANNELS : FUR_NEO_GEO_CHANNELS);
+  const voiceOf = (i: InstrumentConfig): boolean => (song.chip ? i.synthType === song.chip.synthType && !!i.furnace : isNeoGeoInstrument(i));
 
   // Instruments: Neo Geo voices in song order; the cells' ids map to file indices.
-  const neo = song.instruments.filter(isNeoGeoInstrument);
+  const neo = song.instruments.filter(voiceOf);
   const insIndexById = new Map<number, number>();
   neo.forEach((inst, i) => insIndexById.set(inst.id, i));
-  const skipped = song.instruments.filter((i) => !isNeoGeoInstrument(i));
+  const skipped = song.instruments.filter((i) => !voiceOf(i));
   if (skipped.length > 0) {
     warnings.push(`Left out ${skipped.length} instrument(s) that are not Neo Geo voices: ${skipped.map((i) => `${i.id} "${i.name}"`).join(', ')}`);
   }
@@ -525,7 +528,7 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
         const cell = r < p.length ? src?.rows[r] : undefined;
         rows.push(cell && src
           ? cellToFile(cell, insIndexById, `Pattern ${pi} channel ${ch + 1} row ${r}`, problems, effectNotationOf(src.channelMeta), warnings,
-            trackerArpStopAt(song.patterns, song.songPositions, pi, ch, r), neoGeoChannelVolMax(ch, !!song.extendedFm))
+            trackerArpStopAt(song.patterns, song.songPositions, pi, ch, r), song.chip ? song.chip.volMax(ch) : neoGeoChannelVolMax(ch, !!song.extendedFm))
           : { note: -1, ins: -1, vol: -1, fx: Array.from({ length: MAX_FX_COLUMNS }, () => ({ type: -1, val: -1 })) });
       }
       if (p.length < patLen && !breakWritten.has(pi)) {
@@ -538,7 +541,7 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
       for (const row of rows) {
         row.fx.forEach((f, k) => { if (f.type >= 0 || f.val >= 0) fxColumns[ch] = Math.max(fxColumns[ch], k + 1); });
       }
-      const body = new Bytes().u8(0).u8(ch).u16(pi).str('').bytes(encodeRows(rows).toUint8Array());
+      const body = new Bytes().u8(0).u8(ch).u16(pi).str(song.chip ? p.name : '').bytes(encodeRows(rows).toUint8Array());
       patnBlocks.push(block('PATN', body));
     }
   }
@@ -575,7 +578,7 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   // Chip flags of the YM2610 (fur.cpp, "CHIP FLAGS": key=value lines, zero-terminated). Furnace
   // loads a module without this block at SSG volume 128, half the level of the chip, which
   // furtool then compensates in the wrong amount (see FUR_NEO_GEO_CHIP_FLAGS).
-  const flag = block('FLAG', new Bytes().str(song.chipFlags ?? FUR_NEO_GEO_CHIP_FLAGS));
+  const flag = block('FLAG', new Bytes().str(song.chipFlags ?? song.chip?.chipFlags ?? FUR_NEO_GEO_CHIP_FLAGS));
   // Asset directories (instruments, waves, samples): one empty directory each.
   const adir = block('ADIR', new Bytes().u32(0));
 
@@ -606,7 +609,7 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
     compat[1].forEach((v) => b.u8(v));
     b.u16(vN).u16(vD);
     b.str('').str('').u8(0).u8(0).u8(0).u8(0); // first subsong name and notes, no more subsongs, reserved
-    b.str(song.systemName || 'Neo Geo MVS').str(song.album ?? '').str('').str('').str('').str('');
+    b.str(song.systemName || song.chip?.name || 'Neo Geo MVS').str(song.album ?? '').str('').str('').str('').str('');
     b.f32(sysVol).f32(sysPan).f32(sysPanFR); // chip volume, panning, front/rear panning
     b.u32(0).u8(1); // patchbay: no connections, automatic
     compat[2].forEach((v) => b.u8(v));

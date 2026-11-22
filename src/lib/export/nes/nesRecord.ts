@@ -7,8 +7,7 @@ import { buildNsfe } from './nsfe';
 import { NES_REGIONS, type NesRegion, type NesSubsongInput } from './nesStream';
 import { isSunsoft, nesChipsOf, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
 import { buildFamistudioRom, furnaceToFamistudio, type FamistudioMeta } from './famistudioSong';
-import { saveFurFileWasm } from '../../import/wasm/FurnaceFileOps';
-import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
+import { liveFurnaceModule } from '../liveFurModule';
 import { switchSubsong } from '../../tracker/subsongSwitch';
 import { orderPassLength } from '../orderPassLength';
 
@@ -65,13 +64,12 @@ export async function exportNesFamistudioRom(title: string, author?: string): Pr
     ]);
     return { player, meta };
   };
-  const [plain, fur] = await Promise.all([load('player'), saveFurFileWasm()]); // fur: the module the engine holds, as the .fur export reads it
-  const m = await parseFurnaceSong(fur instanceof ArrayBuffer ? fur : new Uint8Array(fur).buffer);
-  const song = furnaceToFamistudio(m, useFormatStore.getState().furnaceActiveSubsong, plain.meta.dpcmCap);
+  const [plain, live] = await Promise.all([load('player'), liveFurnaceModule()]);
+  const song = furnaceToFamistudio(live.module, live.subsong, plain.meta.dpcmCap);
   // 2A03 + VRC6: the mapper-24 build of the same engine; 2A03 music past 16 KB: the FME-7 build (24 KB at $6000)
   const { player, meta } = song.vrc6 ? await load('player-vrc6') : song.fme7 ? await load('player-fme7') : plain;
   const rom = buildFamistudioRom(new Uint8Array(player), meta, song, { title, author });
-  return { rom, warnings: song.lossy.map((l) => `Not carried to the FamiStudio engine: ${l}`) };
+  return { rom, warnings: [...live.warnings, ...song.lossy.map((l) => `Not carried to the FamiStudio engine: ${l}`)] };
 }
 
 /** NSFe: records the song per region (live worklet) and writes the register streams for the NSF player. */
