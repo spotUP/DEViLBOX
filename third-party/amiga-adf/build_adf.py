@@ -129,7 +129,8 @@ def main():
     ap.add_argument('--module', required=True, help='module file; stage it from a directory holding only it')
     ap.add_argument('--out', required=True)
     ap.add_argument('--player', help='eagleplayer.conf player name; default: what the module matches')
-    ap.add_argument('--slot-bytes', type=int, default=SLOT_BYTES)
+    ap.add_argument('--slot-bytes', type=int,
+                    help=f'module slot size (default {SLOT_BYTES}, shrunk to what the memory map leaves when it does not fit)')
     ap.add_argument('--companion-slot-bytes', type=int, default=0,
                     help='second slot for the format\'s companion file (TFMX smpl.*, SynthDream smp.*); the staged companion is padded to it')
     ap.add_argument('--publish', metavar='DIR', help='also copy the ADF to DIR/<player>.adf and update DIR/manifest.json '
@@ -158,7 +159,6 @@ def main():
     target = a.target or ('a1200' if player in needs_020 else 'a500')
     t = TARGETS[target]
     IMG_BASE, IMG_END, CHIP_BASE, CHIP_END = t['IMG_BASE'], t['IMG_END'], t['CHIP_BASE'], t['CHIP_END']
-    slot_bytes = a.slot_bytes
     # A measured player gets the stager's per-player sizes (high-water + margin);
     # an unmeasured one keeps the phase-1 64K/64K, which PTK-Prowiz was proven with.
     sizes_args = [] if player in uade_arena_table.load() else [
@@ -177,15 +177,12 @@ def main():
 
     # The slot: UADE_MODULE_BYTES sizes the arena for the largest module the slot
     # takes; _uade_module_len carries the real length and is what the browser patches.
+    # The slot costs its size twice: once in the image (incbin, imgram) and once in the
+    # chip arena (UADE_ARENA_BYTES), so a big player (reloc), pool or MEMF_ANY arena
+    # can leave no room for the default slot on the A500 map.
     mod = open(os.path.join(stage, 'current.uademod'), 'rb').read()
-    if len(mod) > slot_bytes:
-        sys.exit(f'module is {len(mod)} B, slot holds {slot_bytes} B')
-    open(os.path.join(stage, 'current.uademod'), 'wb').write(mod + bytes(slot_bytes - len(mod)))
     sizes = os.path.join(stage, 'uade_sizes.i')
-    s = open(sizes).read()
-    s, n = re.subn(r'^UADE_MODULE_BYTES\s+equ\s+\d+', f'UADE_MODULE_BYTES       equ     {slot_bytes}', s, flags=re.M)
-    assert n == 1, 'uade_sizes.i: no UADE_MODULE_BYTES line'
-    open(sizes, 'w').write(s + f'UADE_MODULE_LEN         equ     {len(mod)}\n')
+    sizes_src = open(sizes).read()
 
     comp_n = 0
     if a.companion_slot_bytes:
@@ -198,12 +195,6 @@ def main():
 
     inc = ['-I', HERE, '-I', os.path.join(HERE, 'score'), '-I', stage,
            '-I', os.path.join(UADE_ROOT, 'amigasrc', 'score')]
-    objs = []
-    for src in ('amiga/uade_probe.s', 'amiga/uade_glue.s', 'amiga/input_sdk.s', 'amiga/screen.s'):
-        o = os.path.join(stage, os.path.basename(src) + '.o')
-        run(asm + inc + ['-o', o, os.path.join(HERE, src)], cwd=HERE)
-        objs.append(o)
-
     ld = os.path.join(stage, 'adf.ld')
     open(ld, 'w').write(f"""MEMORY {{
   chipram : org = 0x{CHIP_BASE:X}, len = 0x{CHIP_END - CHIP_BASE:X}
@@ -217,10 +208,45 @@ SECTIONS {{
 """)
     img = os.path.join(stage, 'image.bin')
     mapf = os.path.join(stage, 'image.map')
-    run(['vlink', '-brawbin2', '-T', ld, '-M' + mapf, '-o', img] + objs)
-    sym = {}
-    for m in re.finditer(r'0x([0-9a-fA-F]+)\s+(\w+)', open(mapf).read()):
-        sym.setdefault(m.group(2), int(m.group(1), 16))
+
+    def link(slot):
+        """Assemble + link with a slot of `slot` bytes. Returns (symbols, None) or (None, vlink output)."""
+        if len(mod) > slot:
+            sys.exit(f'module is {len(mod)} B, slot holds {slot} B')
+        open(os.path.join(stage, 'current.uademod'), 'wb').write(mod + bytes(slot - len(mod)))
+        s, n = re.subn(r'^UADE_MODULE_BYTES\s+equ\s+\d+', f'UADE_MODULE_BYTES       equ     {slot}', sizes_src, flags=re.M)
+        assert n == 1, 'uade_sizes.i: no UADE_MODULE_BYTES line'
+        open(sizes, 'w').write(s + f'UADE_MODULE_LEN         equ     {len(mod)}\n')
+        objs = []
+        for src in ('amiga/uade_probe.s', 'amiga/uade_glue.s', 'amiga/input_sdk.s', 'amiga/screen.s'):
+            o = os.path.join(stage, os.path.basename(src) + '.o')
+            run(asm + inc + ['-o', o, os.path.join(HERE, src)], cwd=HERE)
+            objs.append(o)
+        cmd = ['vlink', '-brawbin2', '-T', ld, '-M' + mapf, '-o', img] + objs
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode:
+            return None, f"FAILED: {' '.join(cmd)}\n{r.stdout[-3000:]}\n{r.stderr[-3000:]}"
+        sym = {}
+        for m in re.finditer(r'0x([0-9a-fA-F]+)\s+(\w+)', open(mapf).read()):
+            sym.setdefault(m.group(2), int(m.group(1), 16))
+        return sym, None
+
+    slot_bytes = a.slot_bytes or SLOT_BYTES
+    sym, err = link(slot_bytes)
+    if err and not a.slot_bytes and 'Error 158' in err:
+        # Default slot does not fit: link once with the smallest slot that holds this
+        # module to measure the fixed cost, then hand the slot what both regions have
+        # left (each 4K of slot is 4K in chip and 4K in the image), capped at the default.
+        small = -(-len(mod) // 4096) * 4096
+        sym, err = link(small)
+        if not err:
+            free = min(CHIP_END - sym['_chip_end'], IMG_END - sym['_bss_end'])
+            slot_bytes = min(SLOT_BYTES, small + free // 4096 * 4096)
+            print(f'slot: default {SLOT_BYTES} B does not fit {target}; shrunk to {slot_bytes} B')
+            if slot_bytes != small:
+                sym, err = link(slot_bytes)
+    if err:
+        sys.exit(err)
     need = ('_start', '_uade_module_len', *(('_uade_files_blob', 'uade_file_table') if a.companion_slot_bytes else ()), '_uade_module_src', '_adf_title', '_img_end', '_bss_end', '_chip_end')
     miss = [k for k in need if k not in sym]
     if miss:
