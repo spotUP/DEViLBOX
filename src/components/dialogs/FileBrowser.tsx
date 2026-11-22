@@ -107,8 +107,32 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             data-testid="file-browser-path"
             className="flex-shrink-0 flex items-start gap-1.5 px-4 py-2 bg-dark-bgTertiary border-b border-dark-border text-[10px] font-mono text-text-muted select-text break-all"
           >
-            <FolderOpen size={12} className="shrink-0 mt-px" />
-            <span>{nav.currentPath || '/'}</span>
+            <button
+              type="button"
+              aria-label="Go to top folder"
+              className="shrink-0 mt-px hover:text-accent-primary"
+              onClick={() => nav.setCurrentPath(nav.currentPath.startsWith('/') ? '/' : '')}
+            >
+              <FolderOpen size={12} />
+            </button>
+            <span>
+              {nav.currentPath.startsWith('/') && '/'}
+              {nav.currentPath.split('/').filter(Boolean).map((part, i, parts) => {
+                const target = (nav.currentPath.startsWith('/') ? '/' : '') + parts.slice(0, i + 1).join('/');
+                return (
+                  <span key={target}>
+                    <button
+                      type="button"
+                      className="hover:text-accent-primary hover:underline"
+                      onClick={() => nav.setCurrentPath(target)}
+                    >
+                      {part}
+                    </button>
+                    {i < parts.length - 1 && '/'}
+                  </span>
+                );
+              })}
+            </span>
           </div>
         )}
 

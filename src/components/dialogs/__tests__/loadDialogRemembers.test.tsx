@@ -53,8 +53,8 @@ describe('Online search keeps its query and results', () => {
 describe('file browser reopens where it was', () => {
   it('shows the remembered folder', async () => {
     updateFileBrowserMemory({ fileSource: 'demo', currentPath: 'songs/formats/mine' });
-    const { findByText } = render(<FileBrowser isOpen mode="load" onClose={noop} onLoad={noop} onLoadTrackerModule={async () => {}} />);
-    expect(await findByText('songs/formats/mine')).toBeTruthy();
+    const { findByTestId } = render(<FileBrowser isOpen mode="load" onClose={noop} onLoad={noop} onLoadTrackerModule={async () => {}} />);
+    expect((await findByTestId('file-browser-path')).textContent).toBe('songs/formats/mine');
   });
 
   it('prints the full path in the header, untruncated', async () => {
@@ -64,6 +64,13 @@ describe('file browser reopens where it was', () => {
     const header = await findByTestId('file-browser-path');
     expect(header.textContent).toBe(deep);
     expect(header.className).not.toContain('truncate');
+  });
+
+  it('clicking a path segment opens that folder', async () => {
+    updateFileBrowserMemory({ fileSource: 'demo', currentPath: 'songs/formats/mine' });
+    const { findByTestId, findByText } = render(<FileBrowser isOpen mode="load" onClose={noop} onLoad={noop} onLoadTrackerModule={async () => {}} />);
+    fireEvent.click(await findByText('songs'));
+    await waitFor(async () => expect((await findByTestId('file-browser-path')).textContent).toBe('songs'));
   });
 
   it('puts the list back at the remembered scroll position', async () => {
