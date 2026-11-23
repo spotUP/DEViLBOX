@@ -50,8 +50,25 @@
 
 .org 0x0038
 vblank_interrupt:
+	; frame interrupt: scroll 0 for the static screen, wake frame_loop;
+	; line interrupt (just above the scroller row): scroll that row
 	push af
-	in a, (VDP_CONTROL_PORT)	; acknowledge the frame interrupt
+	in a, (VDP_CONTROL_PORT)	; acknowledge; bit 7 = frame interrupt
+	rla
+	jr c, +
+	ld a, (scr_hscroll)
+	out (VDP_CONTROL_PORT), a
+	ld a, 0x88
+	out (VDP_CONTROL_PORT), a
+	pop af
+	ei
+	reti
++:	xor a
+	out (VDP_CONTROL_PORT), a
+	ld a, 0x88
+	out (VDP_CONTROL_PORT), a
+	ld a, 1
+	ld (scr_vblank), a
 	pop af
 	ei
 	reti
@@ -83,15 +100,25 @@ init:
 	ld hl, SONG_ADDR
 	call banjo_play_song
 
-	; display on, frame interrupt on
+	call screen_init
+
+	; mode 4, left column blank, line interrupt on; display and frame interrupt on
+	ld hl, VDP_WRITE_REGISTER | (0 << 8) | 0b00110110
+	call vdp_reg
 	ld hl, VDP_WRITE_REGISTER | (1 << 8) | 0b11100000
-	ld c, VDP_CONTROL_PORT
-	out (c), l
-	out (c), h
+	call vdp_reg
 	ei
 
 frame_loop:
-	halt
+	; clear first: a flag left over from an earlier frame would start the
+	; VRAM blast at the line interrupt (line 172), inside the active display
+	xor a
+	ld (scr_vblank), a
+-:	halt
+	ld a, (scr_vblank)		; the line interrupt also ends halt
+	or a
+	jr z, -
+	call screen_vblank
 	ld a, (song_hz)
 	ld hl, tick_acc
 	add a, (hl)			; acc < console_hz and song_hz <= 195, so no carry
@@ -105,6 +132,7 @@ frame_loop:
 	ld hl, console_hz
 	jr -
 +:	ld (tick_acc), a
+	call screen_update
 	jr frame_loop
 
 ; Counts V counter changes between two frame flags: 262 lines on NTSC
@@ -143,6 +171,9 @@ song_hz:
 
 .incdir "../../third-party/banjo/music_driver/sn"
 .include "banjo_sn.asm"
+
+.incdir "."
+.include "screen.asm"
 
 .SMSHEADER
 	PRODUCTCODE 0, 0, 0

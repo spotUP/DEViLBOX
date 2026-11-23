@@ -96,7 +96,7 @@ for (const file of walk(SONGS)) {
     const song = furnaceToBanjo(m, 0, LAYOUT);
     const gameGear = /game ?gear/i.test(m.systemName ?? '');
     const system = gameGear ? 'gamegear' : 'sg1000m3';
-    const rom = buildSmsRom(PLAYER, LAYOUT, song, gameGear);
+    const rom = buildSmsRom(PLAYER, LAYOUT, song, gameGear, m.name, { author: m.author, comments: m.comment });
     // The player spreads the song's ticks over the console's frames, so a 50 Hz song plays at 50 Hz on MAME's 60 Hz consoles.
     const got = starts(runMame(system, rom, dir, SECONDS)).filter((g) => g.t < SECONDS);
     v = { inputHash, file: rel, pass: got.length > 0, seconds: SECONDS, system, hz: m.subsongs[0].hz, romBytes: rom.length, lossy: song.lossy, mameStarts: got.length };

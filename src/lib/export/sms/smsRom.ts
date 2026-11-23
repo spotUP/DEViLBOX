@@ -2,6 +2,7 @@
 // Layout (tools/sms-player/sms-player.asm): bank 0 = player, bank 1 = header only, banks 2-3 = song, which the player
 // maps into slots 1-2 (Z80 0x4000-0xBFFF) through the Sega mapper.
 import type { BanjoLayout, BanjoSong } from './banjoSong';
+import { nesScreenText, nesScrollText, type NesScreenInfo } from '../nes/nesCartridge';
 
 const ROM_BYTES = 0x10000;
 const HEADER = 0x7ff0;
@@ -11,7 +12,7 @@ const SN_CLOCK = 3579545;
 const REGION_SMS_EXPORT = 4;
 const REGION_GG_INTERNATIONAL = 7;
 
-export function buildSmsRom(player: Uint8Array, layout: BanjoLayout, song: BanjoSong, gameGear: boolean): Uint8Array {
+export function buildSmsRom(player: Uint8Array, layout: BanjoLayout, song: BanjoSong, gameGear: boolean, title = '', info: NesScreenInfo = {}): Uint8Array {
   if (player.length !== ROM_BYTES) throw new Error(`Master System player is ${player.length} bytes, expected ${ROM_BYTES}`);
   if (song.bytes.length > SONG_WINDOW) {
     throw new Error(`Song data is ${song.bytes.length} bytes; the cartridge has room for ${SONG_WINDOW}`);
@@ -25,6 +26,10 @@ export function buildSmsRom(player: Uint8Array, layout: BanjoLayout, song: Banjo
     rom[layout.sn_tone_rom + 2 * i] = period & 0xff;
     rom[layout.sn_tone_rom + 2 * i + 1] = period >> 8;
   }
+  // Player screen text (same font range and scroller fallback as the NES players).
+  rom.set(nesScreenText(title, 21), layout.scr_title_rom);
+  rom.set(nesScreenText(info.author ?? '', 27), layout.scr_author_rom);
+  rom.set(nesScrollText(title, info, 256), layout.scr_scroll_rom);
   rom[0x7fff] = ((gameGear ? REGION_GG_INTERNATIONAL : REGION_SMS_EXPORT) << 4) | SIZE_64K;
   // Checksum for the 64 KB size code: 16-bit sum of every byte except the 16-byte header at 0x7FF0.
   let sum = 0;

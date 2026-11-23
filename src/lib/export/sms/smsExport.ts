@@ -19,7 +19,7 @@ export async function exportSmsRom(gameGear: boolean): Promise<{ rom: Uint8Array
   ]);
   const song = furnaceToBanjo(live.module, live.subsong, layout);
   return {
-    rom: buildSmsRom(new Uint8Array(player), layout, song, gameGear),
+    rom: buildSmsRom(new Uint8Array(player), layout, song, gameGear, live.module.name, { author: live.module.author, comments: live.module.comment }),
     warnings: song.lossy.map((l) => `Not carried to Banjo: ${l}`),
   };
 }

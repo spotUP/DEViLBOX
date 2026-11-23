@@ -20,17 +20,17 @@ printf '[objects]\n%s\n\n[ramsections]\nbank 0 slot 3 "BANJO_RAM"\n' "$WORK/play
 mkdir -p "$OUT"
 cp "$WORK/player.sms" "$OUT/player.sms"
 
-HASH="$(cat "$SRC/sms-player.asm" "$ROOT"/third-party/banjo/music_driver/banjo/*.asm "$ROOT"/third-party/banjo/music_driver/banjo/*.inc "$ROOT"/third-party/banjo/music_driver/sn/* "$ROOT/third-party/banjo/music_driver/banjo_defines_wladx.inc" | shasum -a 256 | cut -c1-16)"
+HASH="$(cat "$SRC/sms-player.asm" "$SRC/screen.asm" "$SRC/screen_font.inc" "$ROOT"/third-party/banjo/music_driver/banjo/*.asm "$ROOT"/third-party/banjo/music_driver/banjo/*.inc "$ROOT"/third-party/banjo/music_driver/sn/* "$ROOT/third-party/banjo/music_driver/banjo_defines_wladx.inc" | shasum -a 256 | cut -c1-16)"
 node -e '
 const fs = require("fs");
 const sym = fs.readFileSync(process.argv[1], "utf8");
-const want = ["song_data", "song_hz", "banjo_init_sn", "banjo_update_channels_sn", "banjo_mute_channel_sn", "banjo_mute_all_sn", "banjo_song_stop", "sn_tone_lookup"];
+const want = ["song_data", "song_hz", "banjo_init_sn", "banjo_update_channels_sn", "banjo_mute_channel_sn", "banjo_mute_all_sn", "banjo_song_stop", "sn_tone_lookup", "scr_title", "scr_author", "scr_scroll"];
 const out = { sourceHash: process.argv[3] };
 for (const line of sym.split("\n")) {
   const m = /^([0-9a-f]+):([0-9a-f]+) (\S+)$/i.exec(line.trim());
   if (m && want.includes(m[3])) out[m[3]] = parseInt(m[2], 16);
   // ROM file offset = bank * 0x4000 + offset inside the 16 KB slot
-  const romKey = { song_data: "song_rom", song_hz: "song_hz", sn_tone_lookup: "sn_tone_rom" }[m ? m[3] : ""];
+  const romKey = { song_data: "song_rom", song_hz: "song_hz", sn_tone_lookup: "sn_tone_rom", scr_title: "scr_title_rom", scr_author: "scr_author_rom", scr_scroll: "scr_scroll_rom" }[m ? m[3] : ""];
   if (romKey) out[romKey] = parseInt(m[1], 16) * 0x4000 + (parseInt(m[2], 16) & 0x3fff);
 }
 for (const w of want) if (out[w] === undefined) { console.error("missing symbol " + w); process.exit(1); }

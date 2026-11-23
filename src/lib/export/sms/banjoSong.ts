@@ -21,6 +21,10 @@ export interface BanjoLayout {
   song_hz: number;
   /** ROM file offset of the driver's SN76489 period table (sn_tone_lookup: 12 semitones x 16 fine steps, from A = 110 Hz). */
   sn_tone_rom: number;
+  /** ROM file offsets of the player screen text blocks (tools/sms-player/screen.asm): 21, 27 and 256 bytes. */
+  scr_title_rom: number;
+  scr_author_rom: number;
+  scr_scroll_rom: number;
 }
 
 /** hz: the whole-number tick rate the player steps the song at (it spreads the ticks over the console's 50 or 60 Hz frames).
