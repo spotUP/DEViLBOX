@@ -34,7 +34,14 @@ void player_set_sample_rate(int rate) { if (rate >= 8000 && rate <= 192000) g_ra
 
 int player_render(float *out, int frames) {
     if (!g_song || frames <= 0) return 0;
-    return (int)pt4_render_f32(g_song, out, (size_t)frames, g_rate);
+    int n = (int)pt4_render_f32(g_song, out, (size_t)frames, g_rate);
+    /* +3 dB: the PT4 engine plays about 4 dB under the app's MOD path. Soft knee above 0.8 keeps hard-panned songs from clipping. */
+    for (int i = 0; i < n * 2; i++) {
+        float x = out[i] * 1.4125f, a = x < 0 ? -x : x;
+        if (a > 0.8f) { float t = (a - 0.8f) / 0.2f; a = 0.8f + 0.2f * (t / (1.0f + t)) * 1.0f; x = x < 0 ? -a : a; }
+        out[i] = x;
+    }
+    return n;
 }
 
 void player_stop(void) { if (g_song) { pt4_seek_ms(g_song, 0); apply_mutes(); } }
