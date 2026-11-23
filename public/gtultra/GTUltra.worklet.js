@@ -103,6 +103,7 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._saveSng = this.module.cwrap('gt_save_sng', 'number', ['number', 'number']);
           this._exportPrg = this.module.cwrap('gt_export_prg', 'number', ['number', 'number']);
           this._exportSid = this.module.cwrap('gt_export_sid', 'number', ['number', 'number']);
+          this._exportEx = this.module.cwrap('gt_export_ex', 'number', ['number', 'number', 'number', 'number', 'number']);
 
           // Instrument editing
           this._setInstrumentAD = this.module.cwrap('gt_set_instrument_ad', null, ['number', 'number', 'number']);
@@ -502,31 +503,20 @@ class GTUltraProcessor extends AudioWorkletProcessor {
         break;
       }
 
-      case 'exportPrg': {
+      case 'exportPrg':
+      case 'exportSid':
+      case 'exportBin': {
         if (!this.ready) return;
+        const fmt = { exportSid: 0, exportPrg: 1, exportBin: 2 }[msg.type];
+        const reply = { exportSid: 'sidData', exportPrg: 'prgData', exportBin: 'binData' }[msg.type];
         const bufSize = 1024 * 1024;
         const ptr = this.module._malloc(bufSize);
-        const size = this._exportPrg(ptr, bufSize);
+        const size = this._exportEx(fmt, msg.loadAddress ?? 0x1000, msg.zeroPage ?? 0xfc, ptr, bufSize);
         if (size > 0) {
           const data = this.module.HEAPU8.slice(ptr, ptr + size);
-          this.port.postMessage({ type: 'prgData', data: data.buffer }, [data.buffer]);
+          this.port.postMessage({ type: reply, data: data.buffer }, [data.buffer]);
         } else {
-          this.port.postMessage({ type: 'prgData', data: null });
-        }
-        this.module._free(ptr);
-        break;
-      }
-
-      case 'exportSid': {
-        if (!this.ready) return;
-        const bufSize = 1024 * 1024;
-        const ptr = this.module._malloc(bufSize);
-        const size = this._exportSid(ptr, bufSize);
-        if (size > 0) {
-          const data = this.module.HEAPU8.slice(ptr, ptr + size);
-          this.port.postMessage({ type: 'sidData', data: data.buffer }, [data.buffer]);
-        } else {
-          this.port.postMessage({ type: 'sidData', data: null });
+          this.port.postMessage({ type: reply, data: null });
         }
         this.module._free(ptr);
         break;
