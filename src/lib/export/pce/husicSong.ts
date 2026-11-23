@@ -283,7 +283,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       const nv = cell ? convertFurnaceNoteValue(cell) : -1;
       if (nv >= 0 && nv < 253) dropSnap(at);
       if (!portaSet && portaDone >= 0 && at >= portaDone) { porta = 0; portaDone = -1; }
-      if (nv >= 0 && nv < 253 && porta && toneOn && curNv >= 0 && !(ch >= 4 && noiseFx)) {
+      if (nv >= 0 && nv < 253 && porta && toneOn && curNv >= 0 && !(ch >= 4 && (noiseFx || framesOf(Math.max(0, ins), MACRO_DUTY, 'noise')?.vals.some((v) => v > 0)))) {
         const from = Math.round(curNv), p0 = period(noteByte(from)), p1 = period(noteByte(nv));
         const ticks = Math.max(1, Math.ceil(linear ? (Math.abs(nv - curNv) * 128) / (porta * slideMul) : Math.abs(p1 - p0) / porta));
         const fa = frameOf(row.tick + delay + ticks);
