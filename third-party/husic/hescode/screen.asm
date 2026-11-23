@@ -1,5 +1,5 @@
 ; DEViLBOX native player screen (matches thoughts/shared/design/player-ui/player-screens.html, pce entry)
-; 32x28 cells: logo/title rows 1-3, six VU bars rows 5-22, labels 23, time+song 24, scroll 26.
+; 32x28 cells in a 64-wide BAT (init_vdc size, row stride 64): logo/title rows 1-3, six VU bars rows 5-22, labels 23, time+song 24, scroll 26.
 	.macro stxt
 	  ldx	#\1
 	  lda	#\2
@@ -20,10 +20,10 @@ s_at:
 	  sta	s_t
 	  lsr	A
 	  lsr	A
-	  lsr	A
 	  sta	s_h
 	  lda	s_t
-	  and	#7
+	  and	#3
+	  asl	A
 	  asl	A
 	  asl	A
 	  asl	A
