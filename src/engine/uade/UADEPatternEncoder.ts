@@ -16,6 +16,7 @@
 
 import type { TrackerCell } from '@/types';
 import { periodToNote as amigaPeriodToNote } from '@/lib/amiga/periodNotes';
+import { isLowOctaveNote } from '@/lib/tracker/noteValue';
 
 // ─── Pattern Layout Descriptor ────────────────────────────────────────────────
 
@@ -149,7 +150,9 @@ export function encodeStoredCell(
   stored?: Uint8Array,
 ): Uint8Array | null {
   const note = cell.note ?? 0;
-  if (!transposesNotes(layout) || note < 1 || note > 96) return layout.encodeCell(cell, stored, channel);
+  // storeNote takes the grid value itself, so the octave below C-0 (negative values) goes through it too.
+  const storable = (note >= 1 && note <= 96) || (!!layout.storeNote && isLowOctaveNote(note));
+  if (!transposesNotes(layout) || !storable) return layout.encodeCell(cell, stored, channel);
   const fields = storedNoteFields(layout, pattern, row, channel, note);
   if (!fields) return null;
   const bytes = layout.encodeCell({ ...cell, ...fields }, stored, channel);

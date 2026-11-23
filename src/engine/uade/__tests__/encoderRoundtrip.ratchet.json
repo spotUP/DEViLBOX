@@ -784,6 +784,14 @@
       "matchPct": 1,
       "cells": 2560
     },
+    "tronic": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 6208
+    },
     "ult": {
       "kind": "variable",
       "method": "encode-pattern",

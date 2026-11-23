@@ -1128,6 +1128,14 @@
       "cells": 102144,
       "bytes": 102144
     },
+    "tronic": {
+      "exporter": "TronicExporter.exportTronic",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 12552,
+      "bytes": 12552
+    },
     "uade_vss": {
       "exporter": "VoodooSupremeExporter.exportVoodooSupreme",
       "tier": "byte-exact",

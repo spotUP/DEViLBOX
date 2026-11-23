@@ -242,3 +242,4 @@ registerEditableFormat({ formatId: "synthPack", label: "SynthPack", patternCodec
 registerEditableFormat({ formatId: "maximumEffect", label: "Maximum Effect", patternCodec: { kind: "fixed" }, exporter: { module: "MaximumEffectExporter", fn: "exportMaximumEffect", byLayout: true } });
 registerEditableFormat({ formatId: "desire", label: "Desire", patternCodec: { kind: "fixed" }, exporter: { module: "DesireExporter", fn: "exportDesire", byLayout: true } });
 registerEditableFormat({ formatId: "peterVerswyvelenPacker", label: "Peter Verswyvelen Packer", patternCodec: { kind: "fixed" }, exporter: { module: "PeterVerswyvelenPackerExporter", fn: "exportPeterVerswyvelenPacker", byLayout: true } });
+registerEditableFormat({ formatId: "tronic", label: "Tronic", patternCodec: { kind: "fixed" }, exporter: { module: "TronicExporter", fn: "exportTronic", byLayout: true, ext: "dp" } });

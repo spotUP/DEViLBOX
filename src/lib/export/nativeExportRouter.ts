@@ -469,9 +469,9 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
 
   // The octave below C-0 (noteValue.ts) is held only by the writers that name notes by the pitch their player
   // plays: Hippel (TFMX/7V and CoSo, patched in place; an unplayable note comes back in `refused`) and Future
-  // Player, Custom Made, Major Tom and Infogrames (patched in place through the module's period table). Every other native writer would drop such a note or write it an octave off: refuse the song instead.
+  // Player, Custom Made, Major Tom, Infogrames and Tronic (patched in place through the module's period table). Every other native writer would drop such a note or write it an octave off: refuse the song instead.
   const holdsLowOctave = (!!song.hippelFileData && (layoutFormatId === 'hippelCoSo' || layoutFormatId === 'tfmx7v'))
-    || layoutFormatId === 'futurePlayer' || layoutFormatId === 'customMade' || layoutFormatId === 'majortom' || layoutFormatId === 'infogrames' || layoutFormatId === 'lme' || layoutFormatId === 'silmarils' || layoutFormatId === 'robHubbardST' || layoutFormatId === 'jankoMrsicFlogel';
+    || layoutFormatId === 'futurePlayer' || layoutFormatId === 'customMade' || layoutFormatId === 'majortom' || layoutFormatId === 'infogrames' || layoutFormatId === 'lme' || layoutFormatId === 'silmarils' || layoutFormatId === 'robHubbardST' || layoutFormatId === 'jankoMrsicFlogel' || layoutFormatId === 'tronic';
   if (!holdsLowOctave) {
     const refusal = lowOctaveExportRefusal(song.patterns ?? [], layoutFormatId || format || 'This format');
     if (refusal) throw new Error(refusal);

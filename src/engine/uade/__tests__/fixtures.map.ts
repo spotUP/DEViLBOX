@@ -38,6 +38,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   // cell edits are written into the event bytes by the module model, not by a UADE cell layout.
   { formatId: "aProSys", fixture: "public/data/songs/formats/action.aps", kind: "fixed" },
   { formatId: "peterVerswyvelenPacker", fixture: "public/data/songs/formats/zarathrusta title.pvp", kind: "fixed" },
+  { formatId: "tronic", fixture: "public/data/songs/formats/crystal.dp", kind: "fixed" },
   { formatId: "artOfNoise", fixture: "public/data/songs/art-of-noise/inside.blipp.aon", kind: "fixed" },
   { formatId: "artAndMagic", fixture: "public/data/songs/formats/agony-level1.aam", kind: "variable" },
   { formatId: "lme", fixture: "public/data/songs/leggless-music-editor/the punisher gameover.lme", kind: "fixed" },

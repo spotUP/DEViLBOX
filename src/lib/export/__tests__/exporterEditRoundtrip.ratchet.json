@@ -606,6 +606,12 @@
       "slotClean": null,
       "detail": ""
     },
+    "tronic": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
     "uade_vss": {
       "verdict": "pass",
       "edited": "note",

@@ -8,6 +8,7 @@
  */
 import './ActionamicsEncoder';
 import './PeterVerswyvelenPackerEncoder';
+import './TronicEncoder';
 import './AMFEncoder';
 import './AMOSMusicBankEncoder';
 import './AMSEncoder';
