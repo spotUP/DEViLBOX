@@ -7,7 +7,7 @@
  * "unexpected fetch ... /nuade/Nuade.js" and the 17 tests of 2026-10-13 broke. This answers the same questions from the
  * same Nuade.wasm, loaded by Node, once per test file and only when a test asks.
  */
-import { setNuadeProbe, setNuadeVoiceCounter } from '@/engine/nuade/nuadeProbe';
+import { setNuadeImportModule, setNuadeProbe, setNuadeVoiceCounter } from '@/engine/nuade/nuadeProbe';
 
 let headless: Promise<import('@/engine/nuade/nuadeHeadless').NuadeHeadless> | null = null;
 const nu = (): Promise<import('@/engine/nuade/nuadeHeadless').NuadeHeadless> => {
@@ -15,6 +15,7 @@ const nu = (): Promise<import('@/engine/nuade/nuadeHeadless').NuadeHeadless> => 
   return headless;
 };
 
+setNuadeImportModule(async () => (await nu()).m);
 setNuadeProbe(async (id, bytes, name) => (await nu()).probeWith(id, bytes, name));
 setNuadeVoiceCounter(async (bytes, fileName, playerId, companions) => {
   const n = await nu();

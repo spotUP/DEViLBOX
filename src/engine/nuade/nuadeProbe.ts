@@ -20,6 +20,18 @@ let probe: NuadeProbe = async (playerId, bytes, fileName) => {
 
 export function nuadeProbe(): NuadeProbe { return probe; }
 
+let loadImportModule: () => Promise<NuadeModule> = () => (module ??= loadNuadeModuleFromPublic());
+
+/** The nuade module for import-side entries (C++/C importers called from TypeScript). */
+export function nuadeImportModule(): Promise<NuadeModule> { return loadImportModule(); }
+
+/** Replace the import module loader (tests load it from disk); returns the previous one. */
+export function setNuadeImportModule(next: () => Promise<NuadeModule>): () => Promise<NuadeModule> {
+  const previous = loadImportModule;
+  loadImportModule = next;
+  return previous;
+}
+
 /** Replace the probe (tests); returns the previous one. */
 export function setNuadeProbe(next: NuadeProbe): NuadeProbe {
   const previous = probe;

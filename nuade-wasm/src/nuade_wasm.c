@@ -21,6 +21,7 @@
 
 #include "nuade/nuade.h"
 #include "nuade/players/medley.h"
+#include "nuade/players/seanconran.h"
 
 #define NW_MAX_VOICES 64
 #define NW_SNAPSHOT_MAX_VOICES 32
@@ -536,4 +537,39 @@ EMSCRIPTEN_KEEPALIVE int nw_key_render(float *stereo, int frames) {
     stereo[2 * i + 1] = x;
   }
   return (int)r.frames;
+}
+
+// Sean Conran: the build the module's 68000 code hash picks, for the editable grid importer. out (int32):
+// [0] hash low, [1] hash high, [2] subsong count, [3] flags (1 doubled entries, 2 length ends at zero,
+// 4 marker rechecked, 8 pitch index bytes), [4..7] track tables, [8..67] command letters (voice * 15 + slot), then the track list
+// start of each subsong and voice at 68 + subsong * 4 + voice. Returns the ints written, -1 if refused.
+EMSCRIPTEN_KEEPALIVE int nw_scr_layout(const uint8_t *data, int len, int32_t *out, int cap) {
+  if (!data || len <= 0 || !out) return -1;
+  ScrPlayer *player = scr_create(data, (size_t)len);
+  if (!player) return -1;
+  const ScrModule *m = player->module;
+  const ScrBuild *b = m->build;
+  int n = 68 + 4 * (int)m->subsong_count;
+  if (cap < n) { scr_destroy(player); return -1; }
+  out[0] = (int32_t)(uint32_t)b->code_hash;
+  out[1] = (int32_t)(uint32_t)(b->code_hash >> 32);
+  out[2] = (int32_t)m->subsong_count;
+  out[3] = (b->track_entries_doubled ? 1 : 0) | (b->length_ends_at_zero ? 2 : 0) | (b->marker_rechecked ? 4 : 0)
+           | (b->pitch_index_bytes ? 8 : 0);
+  for (int v = 0; v < SCR_VOICES; v++) {
+    out[4 + v] = (int32_t)b->track_tables[v];
+    for (int c = 0; c < SCR_COMMAND_SLOTS; c++) out[8 + v * SCR_COMMAND_SLOTS + c] = (uint8_t)b->commands[v][c];
+  }
+  for (uint32_t s = 0; s < m->subsong_count; s++) {
+    for (int v = 0; v < SCR_VOICES; v++) {
+      uint32_t at = b->track_lists[v];
+      if (b->song_table) {
+        uint32_t w = b->song_table + 8 * s + 2 * v;
+        at = (uint32_t)(int32_t)(int16_t)((m->data[w] << 8) | m->data[w + 1]);
+      }
+      out[68 + 4 * s + v] = (int32_t)at;
+    }
+  }
+  scr_destroy(player);
+  return n;
 }
