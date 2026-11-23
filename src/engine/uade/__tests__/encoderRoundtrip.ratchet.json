@@ -24,6 +24,14 @@
       "matchPct": 1,
       "cells": 1728
     },
+    "artAndMagic": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 15
+    },
     "artOfNoise": {
       "kind": "fixed",
       "method": "decode-encode",
@@ -797,7 +805,6 @@
     "actionamics",
     "amf",
     "amosMusicBank",
-    "artAndMagic",
     "c67",
     "chuckBiscuits",
     "composer667",

@@ -202,7 +202,7 @@ export interface FormatEnginePreferences {
   dariusZendeh?: FormatEngineChoice;     // .dz/dz.* → SimpleAmigaStubParser vs UADE
   silmarils?: FormatEngineChoice;        // .mok/mok.* → SimpleAmigaStubParser vs UADE
   markII?: FormatEngineChoice;           // .mk2/mk2.* → SimpleAmigaStubParser vs UADE
-  artAndMagic?: FormatEngineChoice;      // .aam/aam.* → SimpleAmigaStubParser vs UADE
+  artAndMagic?: FormatEngineChoice;      // .aam/aam.* → ArtAndMagicParser vs UADE
   sonicArrangerSas: FormatEngineChoice; // .sas/sas.* → SimpleAmigaStubParser vs UADE
   mikeDavies?: FormatEngineChoice;       // .md/md.* → SimpleAmigaStubParser vs UADE
   aProSys?: FormatEngineChoice;          // .aps/aps.* → AProSysParser vs UADE

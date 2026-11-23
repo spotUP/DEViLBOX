@@ -2979,13 +2979,13 @@ export async function tryRouteFormat(
   }
 
   // ── ArtAndMagic (.aam / AAM.*) ───────────────────────────────────────────
-  // Stub parser for title + UADE classic audio.
+  // Native editable step grid over the note streams; UADE handles audio.
   if (matchesExt(filename, ['aam'])) {
     const aamCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['aam']) };
-    const { parseArtAndMagicFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    const { parseArtAndMagicFile } = await import('@lib/import/formats/ArtAndMagicParser');
     return withNativeThenUADE('artAndMagic', aamCtx,
       (buf: Uint8Array | ArrayBuffer, name: string) => parseArtAndMagicFile(buf as ArrayBuffer, name),
-      'SimpleAmigaStubParser', { injectUADE: true });
+      'ArtAndMagicParser', { injectUADE: true });
   }
 
   // ── Forgotten Worlds (.fw / fw.*) — native editable grid; UADE handles audio.

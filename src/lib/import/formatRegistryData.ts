@@ -2547,7 +2547,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     family: 'amiga-native',
     matchMode: 'prefix',
     prefixes: ['aam.'],
-    nativeParser: { module: '@lib/import/formats/SimpleAmigaStubParser', parseFn: 'parseArtAndMagicFile' },
+    nativeParser: { module: '@lib/import/formats/ArtAndMagicParser', parseFn: 'parseArtAndMagicFile' },
     uadeFallback: true,
   },
   {
