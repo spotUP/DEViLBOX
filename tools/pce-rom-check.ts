@@ -24,11 +24,11 @@ const MESEN = path.join(homedir(), 'Applications/Mesen.app/Contents/MacOS/Mesen'
 const FURNACE = process.env.FURNACE_CLI ?? '/Applications/Furnace.app/Contents/MacOS/furnace';
 const PSG_CLOCK = 3579545, VGM_RATE = 44100, CH = 6;
 
-interface Verdict { inputHash: string; file: string; pass: boolean; seconds: number; hz?: number; romBytes?: number; lossy?: string[]; romStarts?: number; furnaceStarts?: number; keyOnMatch?: number; pitchMatch?: number; volumeMatch?: number; volumeExact?: number; panMatch?: number; waveMatch?: number; error?: string }
+interface Verdict { inputHash: string; file: string; pass: boolean; seconds: number; hz?: number; romBytes?: number; lossy?: string[]; romStarts?: number; furnaceStarts?: number; keyOnMatch?: number; pitchMatch?: number; volumeMatch?: number; volumeExact?: number; panMatch?: number; waveMatch?: number; noiseMatch?: number; error?: string }
 /** One register write; tick = 60 Hz tick it belongs to. */
-type W = { tick: number; reg: number; val: number };
+type W = { tick: number; reg: number; val: number; cy?: number };
 /** Channel state after a tick: period 0 = silent. */
-type St = { on: boolean; per: number; vol: number; noise: boolean; pan: number };
+type St = { on: boolean; per: number; vol: number; noise: boolean; nfreq: number; pan: number };
 
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : undefined;
@@ -72,7 +72,10 @@ function mesenWrites(rom: Uint8Array, dir: string, ticks: number): W[] {
   writeFileSync(path.join(dir, 'p.pce'), rom);
   writeFileSync(path.join(dir, 'tap.lua'), `local f=0
 emu.addEventCallback(function() f=f+1 if f>=${ticks + 120} then print("DONE") emu.stop(0) end end, emu.eventType.endFrame)
-emu.addMemoryCallback(function(a,v) print(string.format("W %d %d %d",f,a&15,v&0xFF)) end, emu.callbackType.write, 0x0800, 0x0809)
+-- tick = driver interrupt, not the emulator frame: the interrupt starts within a few thousand cycles of the frame boundary,
+-- so its first writes (channel 0) would land in the previous frame bucket. Each interrupt selects channels 0..5 in order.
+local g,last=0,0
+emu.addMemoryCallback(function(a,v) v=v&0xFF if (a&15)==0 then if v==0 and last~=0 then g=g+1 end last=v end print(string.format("W %d %d %d %d",g,a&15,v,${process.env.PCE_CYCLES ? 'emu.getState()["cpu.cycleCount"]' : 0})) end, emu.callbackType.write, 0x0800, 0x0809)
 `);
   const set = path.join(homedir(), 'Library/Application Support/Mesen2');
   mkdirSync(set, { recursive: true });
@@ -81,14 +84,14 @@ emu.addMemoryCallback(function(a,v) print(string.format("W %d %d %d",f,a&15,v&0x
   const out = execFileSync(MESEN, ['--testRunner', `--timeout=${timeout}`, '--doNotSaveSettings', '--enableStdout', '--PcEngine.Port1.Type=PceController', path.join(dir, 'tap.lua'), path.join(dir, 'p.pce')],
     { encoding: 'utf8', timeout: timeout * 1000 + 30000, maxBuffer: 1 << 28 });
   if (!out.includes('DONE')) throw new Error(`Mesen2 run did not reach DONE: ${out.slice(-300)}`);
-  return out.split('\n').filter((l) => l.startsWith('W ')).map((l) => { const [, t, r, v] = l.trim().split(' ').map(Number); return { tick: t, reg: r, val: v }; });
+  return out.split('\n').filter((l) => l.startsWith('W ')).map((l) => { const [, t, r, v, cy] = l.trim().split(' ').map(Number); return { tick: t, reg: r, val: v, cy }; });
 }
 
 /** Register writes -> per-tick channel state, re-timed from the first sounding tick. */
 function states(ws: W[]): St[][] {
   const pan = new Array<number>(CH).fill(255), per = new Array<number>(CH).fill(0), ctl = new Array<number>(CH).fill(0), nz = new Array<number>(CH).fill(0);
   let sel = 0, i = 0;
-  const snap = () => Array.from({ length: CH }, (_, c) => ({ on: (ctl[c] & 0x80) !== 0 && (ctl[c] & 31) > 0, per: per[c], vol: ctl[c] & 31, noise: c >= 4 && (nz[c] & 0x80) !== 0, pan: pan[c] }));
+  const snap = () => Array.from({ length: CH }, (_, c) => ({ on: (ctl[c] & 0x80) !== 0 && (ctl[c] & 31) > 0, per: per[c], vol: ctl[c] & 31, noise: c >= 4 && (nz[c] & 0x80) !== 0, nfreq: nz[c] & 31, pan: pan[c] }));
   const all: St[][] = [];
   const last = ws.length ? ws[ws.length - 1].tick : 0;
   for (let t = 0; t <= last; t++) {
@@ -185,8 +188,20 @@ for (const file of walk(SONGS)) {
       else if (detail) console.log(`  tick ${t} ch${ch} want ${(PSG_CLOCK / 32 / a.per).toFixed(1)} got ${(PSG_CLOCK / 32 / b.per).toFixed(1)} Hz (${cents} cents)`);
       if (Math.abs(a.vol - b.vol) <= 1) volOk++;
       if (a.vol === b.vol) volEq++;
+      else if (process.env.PCE_VOLDIFF) console.log(`  vol tick ${t} ch${ch} fur ${a.vol} rom ${b.vol}`);
       if (a.pan === b.pan) panOk++;
     }
+    // noise channels 4-5: sounding, noise-enable and noise frequency per tick, over ticks where either side sounds
+    let nz = 0, nzEq = 0;
+    for (let t = 0; t < Math.min(want.length, got.length); t++) for (let ch = 4; ch < CH; ch++) {
+      const a = want[t][ch], b = got[t][ch];
+      if (!a.on && !b.on) continue;
+      nz++;
+      const same = a.on === b.on && a.noise === b.noise && (!a.noise || a.nfreq === b.nfreq);
+      if (same) nzEq++;
+      else if (process.env.PCE_VOLDIFF) console.log(`  noise tick ${t} ch${ch} fur on=${a.on} noise=${a.noise} f=${a.nfreq} rom on=${b.on} noise=${b.noise} f=${b.nfreq}`);
+    }
+    v.noiseMatch = pct(nzEq, nz);
     Object.assign(v, { furnaceStarts: wantStarts.length, keyOnMatch: pct(hit, wantStarts.length), pitchMatch: pct(inTune, tone), volumeMatch: pct(volOk, tone), volumeExact: pct(volEq, tone), panMatch: pct(panOk, tone) });
     const fw = waves(furW), rw = waves(romW);
     v.waveMatch = pct([...rw].filter((x) => fw.has(x)).length, rw.size); // ROM waves that Furnace also writes (it writes extra ones at start-up)
