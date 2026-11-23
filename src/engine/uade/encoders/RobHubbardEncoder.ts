@@ -56,6 +56,9 @@ export function encodeRobHubbardPattern(rows: TrackerCell[]): Uint8Array {
     out.push((cell.period ?? 0) & 0xFF);
     if (len >= 2) out.push((cell.pan ?? 0) & 0xFF);
     if (len >= 3) out.push((cell.resonance ?? 0) & 0xFF);
+    // 4- and 5-byte commands (Sean Conran A/B) carry their last bytes in envMod / flag1
+    if (len >= 4) out.push((cell.envMod ?? 0) & 0xFF);
+    if (len >= 5) out.push((cell.flag1 ?? 0) & 0xFF);
   }
   return new Uint8Array(out);
 }

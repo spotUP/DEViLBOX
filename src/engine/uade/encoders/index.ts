@@ -82,6 +82,7 @@ import './S3MEncoder';
 import './SawteethEncoder';
 import './SCUMMEncoder';
 import './SeanConnollyEncoder';
+import './SeanConranEncoder';
 import './SidMon1Encoder';
 import './SidMon2Encoder';
 import './SimpleAmigaStubEncoder';
