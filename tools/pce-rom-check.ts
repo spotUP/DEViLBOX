@@ -17,23 +17,24 @@ import { furnaceToHusic, husicSystemsSupported, type HusicLayout } from '../src/
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SONGS = path.join(ROOT, 'public/data/songs/furnace');
-const RESULTS = path.join(ROOT, 'test-data/pce-rom-check.json');
-const PLAYER = readFileSync(path.join(ROOT, 'public/pce/player.pce'));
-const LAYOUT = JSON.parse(readFileSync(path.join(ROOT, 'public/pce/player.json'), 'utf8')) as HusicLayout;
+const RESULTS = process.env.PCE_RESULTS ?? path.join(ROOT, 'test-data/pce-rom-check.json');
+const PLAYER = readFileSync(process.env.PCE_PLAYER ?? path.join(ROOT, 'public/pce/player.pce'));
+const LAYOUT = JSON.parse(readFileSync(process.env.PCE_LAYOUT ?? path.join(ROOT, 'public/pce/player.json'), 'utf8')) as HusicLayout;
 const MESEN = path.join(homedir(), 'Applications/Mesen.app/Contents/MacOS/Mesen');
 const FURNACE = process.env.FURNACE_CLI ?? '/Applications/Furnace.app/Contents/MacOS/furnace';
 const PSG_CLOCK = 3579545, VGM_RATE = 44100, CH = 6;
 
-interface Verdict { inputHash: string; file: string; pass: boolean; seconds: number; hz?: number; romBytes?: number; lossy?: string[]; romStarts?: number; furnaceStarts?: number; keyOnMatch?: number; pitchMatch?: number; volumeMatch?: number; error?: string }
+interface Verdict { inputHash: string; file: string; pass: boolean; seconds: number; hz?: number; romBytes?: number; lossy?: string[]; romStarts?: number; furnaceStarts?: number; keyOnMatch?: number; pitchMatch?: number; volumeMatch?: number; volumeExact?: number; panMatch?: number; waveMatch?: number; error?: string }
 /** One register write; tick = 60 Hz tick it belongs to. */
 type W = { tick: number; reg: number; val: number };
 /** Channel state after a tick: period 0 = silent. */
-type St = { on: boolean; per: number; vol: number; noise: boolean };
+type St = { on: boolean; per: number; vol: number; noise: boolean; pan: number };
 
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : undefined;
 const failedOnly = args.includes('--failed');
 const detail = args.includes('--detail');
+const dumpTo = process.env.PCE_DUMP; // dir: writes <name>.rom.json / <name>.fur.json raw register writes
 const convertOnly = args.includes('--convert-only');
 const SECONDS = args.includes('--seconds') ? Number(args[args.indexOf('--seconds') + 1]) : 10;
 const TICKS = SECONDS * 60;
@@ -85,9 +86,9 @@ emu.addMemoryCallback(function(a,v) print(string.format("W %d %d %d",f,a&15,v&0x
 
 /** Register writes -> per-tick channel state, re-timed from the first sounding tick. */
 function states(ws: W[]): St[][] {
-  const per = new Array<number>(CH).fill(0), ctl = new Array<number>(CH).fill(0), nz = new Array<number>(CH).fill(0);
+  const pan = new Array<number>(CH).fill(255), per = new Array<number>(CH).fill(0), ctl = new Array<number>(CH).fill(0), nz = new Array<number>(CH).fill(0);
   let sel = 0, i = 0;
-  const snap = () => Array.from({ length: CH }, (_, c) => ({ on: (ctl[c] & 0x80) !== 0 && (ctl[c] & 31) > 0, per: per[c], vol: ctl[c] & 31, noise: c >= 4 && (nz[c] & 0x80) !== 0 }));
+  const snap = () => Array.from({ length: CH }, (_, c) => ({ on: (ctl[c] & 0x80) !== 0 && (ctl[c] & 31) > 0, per: per[c], vol: ctl[c] & 31, noise: c >= 4 && (nz[c] & 0x80) !== 0, pan: pan[c] }));
   const all: St[][] = [];
   const last = ws.length ? ws[ws.length - 1].tick : 0;
   for (let t = 0; t <= last; t++) {
@@ -98,6 +99,7 @@ function states(ws: W[]): St[][] {
         if (reg === 2) per[sel] = (per[sel] & 0xf00) | val;
         else if (reg === 3) per[sel] = (per[sel] & 0xff) | ((val & 15) << 8);
         else if (reg === 4) ctl[sel] = val;
+        else if (reg === 5) pan[sel] = val;
         else if (reg === 7) nz[sel] = val;
       }
     }
@@ -105,6 +107,18 @@ function states(ws: W[]): St[][] {
   }
   const first = all.findIndex((s) => s.some((c) => c.on));
   return first < 0 ? [] : all.slice(first, first + TICKS);
+}
+
+/** Complete 32-sample waveforms written to wave RAM (reg 6, channel off), as strings. */
+function waves(ws: W[]): Set<string> {
+  const buf = new Map<number, number[]>(), out = new Set<string>();
+  let sel = 0;
+  for (const { reg, val } of ws) {
+    if (reg === 0) sel = val & 7;
+    else if (reg === 6) { const b = buf.get(sel) ?? []; b.push(val & 31); if (b.length === 32) { out.add(b.join(',')); b.length = 0; } buf.set(sel, b); }
+    else if (reg === 4) buf.set(sel, []);
+  }
+  return out;
 }
 
 /** Note starts: silent -> sounding, or a period jump of at least 80 cents in one tick on a sounding tone channel (a new note or an
@@ -148,17 +162,20 @@ for (const file of walk(SONGS)) {
   let v: Verdict;
   try {
     const song = furnaceToHusic(m, 0, PLAYER, LAYOUT);
-    const got = states(mesenWrites(song.rom, dir, TICKS));
+    const romW = mesenWrites(song.rom, dir, TICKS);
+    const got = states(romW);
     const romStarts = starts(got);
     v = { inputHash, file: rel, pass: false, seconds: SECONDS, hz: m.subsongs[0].hz, romBytes: song.rom.length, lossy: song.lossy, romStarts: romStarts.length };
     if (!existsSync(FURNACE)) throw new Error(`Furnace CLI not found at ${FURNACE}`);
     execFileSync(FURNACE, ['-console', '-nostatus', '-nocontrols', '-noreport', '-loglevel', 'error', '-loops', '0', '-vgmout', path.join(dir, 'f.vgm'), file], { stdio: 'ignore', timeout: 120000 });
-    const want = states(vgmWrites(path.join(dir, 'f.vgm')));
+    const furW = vgmWrites(path.join(dir, 'f.vgm'));
+    if (dumpTo) { mkdirSync(dumpTo, { recursive: true }); writeFileSync(path.join(dumpTo, `${name}.rom.json`), JSON.stringify(romW)); writeFileSync(path.join(dumpTo, `${name}.fur.json`), JSON.stringify(furW)); }
+    const want = states(furW);
     const wantStarts = starts(want).filter((w) => w.t < TICKS - 60);
     const hits = wantStarts.map((w) => romStarts.some((g) => g.ch === w.ch && Math.abs(g.t - w.t) <= 2));
     const hit = hits.filter(Boolean).length;
     if (detail) wantStarts.forEach((w, i) => { if (!hits[i]) console.log(`  missed start tick ${w.t} ch${w.ch}${want[w.t][w.ch].noise ? ' (noise)' : ''}`); });
-    let tone = 0, inTune = 0, volOk = 0;
+    let tone = 0, inTune = 0, volOk = 0, volEq = 0, panOk = 0;
     for (let t = 0; t < Math.min(want.length, got.length); t++) for (let ch = 0; ch < CH; ch++) {
       const a = want[t][ch], b = got[t][ch];
       if (!a.on || !b.on || a.noise || b.noise || !a.per || !b.per) continue;
@@ -167,8 +184,12 @@ for (const file of walk(SONGS)) {
       if (Math.abs(cents) < 50) inTune++;
       else if (detail) console.log(`  tick ${t} ch${ch} want ${(PSG_CLOCK / 32 / a.per).toFixed(1)} got ${(PSG_CLOCK / 32 / b.per).toFixed(1)} Hz (${cents} cents)`);
       if (Math.abs(a.vol - b.vol) <= 1) volOk++;
+      if (a.vol === b.vol) volEq++;
+      if (a.pan === b.pan) panOk++;
     }
-    Object.assign(v, { furnaceStarts: wantStarts.length, keyOnMatch: pct(hit, wantStarts.length), pitchMatch: pct(inTune, tone), volumeMatch: pct(volOk, tone) });
+    Object.assign(v, { furnaceStarts: wantStarts.length, keyOnMatch: pct(hit, wantStarts.length), pitchMatch: pct(inTune, tone), volumeMatch: pct(volOk, tone), volumeExact: pct(volEq, tone), panMatch: pct(panOk, tone) });
+    const fw = waves(furW), rw = waves(romW);
+    v.waveMatch = pct([...rw].filter((x) => fw.has(x)).length, rw.size); // ROM waves that Furnace also writes (it writes extra ones at start-up)
     v.pass = romStarts.length > 0 && (v.keyOnMatch ?? 0) >= 90 && (v.pitchMatch ?? 0) >= 90;
   } catch (e) {
     v = { inputHash, file: rel, pass: false, seconds: SECONDS, error: e instanceof Error ? e.message.split('\n')[0] : String(e) };

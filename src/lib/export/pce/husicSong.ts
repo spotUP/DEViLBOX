@@ -23,7 +23,7 @@ const FREQ_TABLE = 0x19; // `_freq` sits right after LL0's two strings in the co
 const NOISE_FREQ = [4, 13, 15, 18, 21, 23, 25, 27, 29, 31, 0, 2]; // Furnace pce.cpp noiseFreq (old noise layout)
 // HuSIC track commands (hmckc output / hus.c SEQ_xx)
 const SLUR = 0xe9, PORTA = 0xeb, PAN = 0xf0, WAVE = 0xf1, NOISE = 0xf2, WAIT = 0xf4, NOTE_ENV = 0xf7, PITCH_ENV = 0xf8, REST = 0xfc, VOLUME = 0xfd, WAVE_ENV = 0xfe, JUMP = 0xee;
-const HANDLED = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0f, 0x10, 0x11, 0xec, 0xed]);
+const HANDLED = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0f, 0x10, 0x11, 0x80, 0xec, 0xed]);
 
 interface Frames { vals: number[]; loop: number }
 // glide: a slurred note (no envelope reset, no key-on volume); with port, the driver then slides by port per frame.
@@ -78,6 +78,9 @@ export const arpNv = (nv: number, v: number): number =>
 
 /** Furnace calcArp: the arp value is a fixed note (not an offset from the played note). */
 export const arpIsFixed = (v: number): boolean => arpNv(0, v) !== v;
+
+/** Furnace 80xx (linear 00 left .. FF right) as the PCE pan register: convertPanLinearToSplit(v, 8, 255), high nibbles. */
+export const linearPan = (v: number): number => (Math.min(255, Math.floor(((255 - v) * 510) / 255)) & 0xf0) | (Math.min(255, Math.floor((v * 510) / 255)) >> 4);
 
 export function macroOf(ins: FurnaceInstrument | undefined, code: number): FurnaceMacro | undefined {
   return ins?.macros?.find((x) => x.code === code && x.length > 0);
@@ -262,6 +265,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       let volChanged = false, slideSet = false, e12Semis = 0, e12Speed = 0, portaSet = false;
       for (const { type: t, value: v } of fxOf(ch, row.o, row.r)) {
         if (t === 0x08) cmds.push(PAN, v);
+        else if (t === 0x80) cmds.push(PAN, linearPan(v));
         else if (t === 0x10) { waveFx = v; if (!framesOf(Math.max(0, ins), MACRO_WAVE, 'wave')) cmds.push(WAVE, v); }
         else if (t === 0x11) { if (ch >= 4) noiseFx = v > 0; else lossy.add('noise effect on channels 1-4'); }
         else if (t === 0x00) arpFx = v;
@@ -505,7 +509,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   if (!m.wavetables.length) lossy.add('song has no wavetables (triangle used)');
   const waveTable = alloc(new Array<number>(waves.length * 2).fill(0));
   waves.forEach((w, i) => {
-    const n = Math.max(1, w.width || w.data.length), top = Math.max(1, (w.height || 32) - 1);
+    const n = Math.max(1, w.width || w.data.length), top = Math.max(1, w.height || 31); // Furnace height = maximum sample value (31 on PCE)
     put16(waveTable + 2 * i, alloc(Array.from({ length: 32 }, (_, k) => Math.max(0, Math.min(31, Math.round(((w.data[Math.floor((k * n) / 32)] ?? 0) * 31) / top))))));
   });
   ptrs.forEach((p, i) => put16(header + 2 * i, p));
