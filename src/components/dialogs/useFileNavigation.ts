@@ -70,7 +70,7 @@ export type FileSource = 'demo' | 'cloud' | 'online' | 'modland' | 'hvsc';
 export const TRACKER_EXTENSIONS = [
   // Standard tracker formats (libopenmpt)
   '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.669', '.amf', '.ams', '.dbm',
-  '.dmf', '.dsm', '.far', '.ftm', '.gdm', '.imf', '.mdl', '.med', '.mt2', '.mtm',
+  '.dmf', '.dsm', '.far', '.ftm', '.0cc', '.dnm', '.gdm', '.imf', '.mdl', '.med', '.mt2', '.mtm',
   '.okt', '.psm', '.ptm', '.sfx', '.stm', '.ult', '.umx',
   // HivelyTracker / AHX
   '.hvl', '.ahx',
@@ -524,7 +524,7 @@ export function useFileNavigation({
             {
               description: 'All Supported Files',
               accept: {
-                'application/octet-stream': ['.dbx', '.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm', '.sqs', '.seq', '.mid', '.midi', '.xrns'],
+                'application/octet-stream': ['.dbx', '.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm', '.0cc', '.dnm', '.sqs', '.seq', '.mid', '.midi', '.xrns'],
               },
             },
           ],

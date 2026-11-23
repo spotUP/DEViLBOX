@@ -12,6 +12,9 @@
 #ifndef _FILEOPS_PREEMPT_H
 #define _FILEOPS_PREEMPT_H
 
+// Furnace sources (dmf.cpp, ftm.cpp) call pow/ceil/fmax without including <cmath>
+#include <math.h>
+
 // ============================================================
 // Block ta-log.h — uses fmt::make_printf_args which we don't have
 // ============================================================

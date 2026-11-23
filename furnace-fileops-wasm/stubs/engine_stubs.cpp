@@ -23,14 +23,9 @@ void DivEngine::changeSongP(size_t index) {
 }
 
 // ============================================================
-// Loader stubs — only loadFur and loadDMF are real; others stub out
+// Loader stubs — only loadFur, loadDMF and loadFTM are real; others stub out
 // since load() in fileOpsCommon.cpp dispatches by magic bytes
 // ============================================================
-bool DivEngine::loadFTM(unsigned char* file, size_t len, bool dnm, bool dnm2, bool eft) {
-  lastError="FTM loading not supported in WASM build";
-  delete[] file;
-  return false;
-}
 bool DivEngine::loadFC(unsigned char* file, size_t len) {
   lastError="FC loading not supported in WASM build";
   delete[] file;

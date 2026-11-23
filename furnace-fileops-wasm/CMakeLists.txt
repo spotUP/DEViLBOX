@@ -44,6 +44,7 @@ set(FILEOPS_SOURCES
   # File operations
   ${FURNACE_ENGINE}/fileOps/fur.cpp
   ${FURNACE_ENGINE}/fileOps/dmf.cpp
+  ${FURNACE_ENGINE}/fileOps/ftm.cpp
   ${FURNACE_ENGINE}/fileOpsIns.cpp
   ${FURNACE_SRC}/fileutils.cpp
   src/fileOpsCommon_patched.cpp

@@ -154,6 +154,16 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
     customDispatch: true, // Magic byte disambiguation (DDMF vs DefleMask)
   },
+  {
+    key: 'famitracker',
+    label: 'FamiTracker',
+    description: 'FamiTracker / 0CC-FamiTracker / Dn-FamiTracker — Furnace WASM loader (.ftm is shared with Face the Music, told apart by magic)',
+    family: 'furnace',
+    matchMode: 'extension',
+    extRegex: /\.(0cc|dnm)$/i,
+    nativeOnly: true,
+    customDispatch: true,
+  },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // AMIGA NATIVE — Native parser + UADE fallback

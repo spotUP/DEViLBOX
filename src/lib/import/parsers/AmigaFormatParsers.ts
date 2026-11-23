@@ -217,6 +217,17 @@ export async function tryRouteFormat(
     { const { parseFurnaceFile } = await import('./FurnaceToSong'); return parseFurnaceFile(buffer, originalFileName, subsong); }
   }
 
+  // ── FamiTracker / 0CC / Dn-FamiTracker (.ftm .0cc .dnm) ───────────────────
+  // `.ftm` is also Face the Music (magic "FTMN"), so decide by magic, not extension; the Furnace WASM
+  // loader (ftm.cpp) does the actual parse.
+  if (matchesExt(filename, ['ftm', '0cc', 'dnm'])) {
+    const head = new TextDecoder('latin1').decode(new Uint8Array(buffer, 0, Math.min(21, buffer.byteLength)));
+    if (head.startsWith('FamiTracker Module') || head.startsWith('DN-FamiTracker Module')) {
+      const { parseFurnaceFile } = await import('./FurnaceToSong');
+      return parseFurnaceFile(buffer, originalFileName, subsong);
+    }
+  }
+
   // ── Oktalyzer ────────────────────────────────────────────────────────────
   if (matchesExt(filename, ['okt', 'okta'])) {
     const { parseOktalyzerFile } = await import('@lib/import/formats/OktalyzerParser');

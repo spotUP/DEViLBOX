@@ -21,7 +21,15 @@ export function installFurnaceFileOpsWasm(): void {
       (0, eval)(js);
       const g = globalThis as unknown as { createFurnaceFileOps: (o?: object) => Promise<unknown> };
       const factory = g.createFurnaceFileOps;
-      g.createFurnaceFileOps = (o = {}) => factory({ ...o, wasmBinary });
+      g.createFurnaceFileOps = (o = {}) => factory({
+        ...o,
+        wasmBinary,
+        // Emscripten 7 glue ignores wasmBinary and fetches the .wasm itself
+        instantiateWasm: (imports: WebAssembly.Imports, done: (i: WebAssembly.Instance, m: WebAssembly.Module) => void) => {
+          void WebAssembly.instantiate(wasmBinary, imports).then((r) => done(r.instance, r.module));
+          return {};
+        },
+      });
       queueMicrotask(() => node.onload?.(new Event('load')));
       return node;
     }
