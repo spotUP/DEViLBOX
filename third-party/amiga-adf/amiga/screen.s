@@ -251,6 +251,16 @@ _screen_init:
         subq.l  #1,a1
         bra.b   .f2
 .f5:    rts
+        ; d0+1 bytes at a2: d2 = 1 when one is neither NUL nor printable ASCII
+.vf:    move.b  (a2)+,d1
+        beq.b   .vg
+        cmp.b   #$20,d1
+        blo.b   .vb
+        cmp.b   #$7f,d1
+        blo.b   .vg
+.vb:    moveq   #1,d2
+.vg:    dbf     d0,.vf
+        rts
 .notthx:
         moveq   #19,d0
 .tc:    move.b  (a0)+,d1
@@ -272,7 +282,22 @@ _screen_init:
         dbf     d0,.tag
         bra.b   .stok
 .st15:  moveq   #14,d7
-.stok:  lea     20(a0),a2
+.stok:  ; Not a MOD-family file (compiled player, hunk file, unknown format): the title and the sample
+        ; names must be NUL or printable ASCII, else show the exported file name and no scroller.
+        moveq   #0,d2
+        move.l  a0,a2
+        moveq   #19,d0
+        bsr.w   .vf
+        move.w  d7,d3
+.vn:    moveq   #21,d0
+        bsr.w   .vf
+        lea     8(a2),a2
+        dbf     d3,.vn
+        tst.b   d2
+        beq.b   .vok
+        lea     title,a1
+        bra.w   .ntitle
+.vok:   lea     20(a0),a2
         lea     msg,a1
 .sn:    move.l  a2,a3
         move.l  a1,a4
