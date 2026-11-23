@@ -52,7 +52,7 @@ registerEditableFormat({ formatId: "amosMusicBank", label: "AMOS Music Bank", ne
 registerEditableFormat({ formatId: "ams", label: "", patternCodec: { kind: "variable" }, exporter: { module: "AMSExporter", fn: "exportAMS", byLayout: true } });
 registerEditableFormat({ formatId: "artOfNoise", label: "Art of Noise", patternCodec: { kind: "fixed" }, exporter: { module: "ArtOfNoiseExporter", fn: "exportArtOfNoise", byLayout: true } });
 registerEditableFormat({ formatId: "aProSys", label: "A-Pro-Sys", patternCodec: { kind: "fixed" }, exporter: { module: "AProSysExporter", fn: "exportAProSys", ext: "aps", byLayout: true } });
-registerEditableFormat({ formatId: "artAndMagic", label: "Art and Magic", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "artAndMagic", label: "Art and Magic", patternCodec: { kind: "variable" }, exporter: { module: "ArtAndMagicExporter", fn: "exportArtAndMagic", ext: "aam", byLayout: true } });
 registerEditableFormat({ formatId: "benDaglish", label: "Ben Daglish", newSong: { template: "templates/benDaglish.bd", name: "Ben Daglish" }, patternCodec: { kind: "variable" }, exporter: { module: "BenDaglishExporter", fn: "exportBenDaglish", ext: "bd", byLayout: true } });
 registerEditableFormat({ formatId: "c67", label: "", newSong: { template: "templates/c67.c67", name: "CDFM Composer 670" }, patternCodec: { kind: "variable" }, exporter: { module: "CDFM67Exporter", fn: "exportCDFM67", byLayout: true } });
 registerEditableFormat({ formatId: "chuckBiscuits", label: "Chuck Biscuits", newSong: { template: "templates/chuckBiscuits.cba" }, patternCodec: { kind: "fixed" }, exporter: { module: "ChuckBiscuitsExporter", fn: "exportChuckBiscuits", byLayout: true } });

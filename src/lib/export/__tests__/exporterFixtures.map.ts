@@ -144,6 +144,8 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   markII: 'public/data/songs/mark-ii/astarrsonix.mk2',
   sonicArrangerSas: 'public/data/songs/speedy-a1-system/digital voyage.sas',
   robHubbardST: 'public/data/songs/rob-hubbard-st/battleships.rho',
+  artAndMagic: 'public/data/songs/formats/agony-level1.aam',
+  aProSys: 'public/data/songs/formats/action.aps',
   benDaglish: 'public/data/songs/ben-daglish/motorhead-titleandingame.bd',
   synthDream: 'public/data/songs/formats/sdr.monsterbusiness_5',
   dynamicSynthesizer: 'public/data/songs/formats/dns.ptc',

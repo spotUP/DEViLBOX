@@ -48,6 +48,22 @@
       "cells": 4738,
       "bytes": 4738
     },
+    "aProSys": {
+      "exporter": "AProSysExporter.exportAProSys",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 1890,
+      "bytes": 1890
+    },
+    "artAndMagic": {
+      "exporter": "ArtAndMagicExporter.exportArtAndMagic",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 57522,
+      "bytes": 57522
+    },
     "artOfNoise": {
       "exporter": "ArtOfNoiseExporter.exportArtOfNoise",
       "tier": "byte-exact",
