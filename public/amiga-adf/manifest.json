@@ -3363,6 +3363,46 @@
         "psa"
       ]
     },
+    "Protracker4": {
+      "adf": "Protracker4.adf",
+      "adfSha256": "a52fb99c1a9854127dd24ab1b1159a3224725aacfd3eea01b466b90af6153512",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 29740,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 29736,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 259584,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 325888,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x3F800",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC57800",
+        "BSS_LEN": "0x700C",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x4F900",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "pt4x_40.mod",
+        "bytes": 2962
+      },
+      "sources": {
+        "tool": "9933f3bee67ef7296db408805d6949cded234efcdb64c858697487c4a106fb1a",
+        "player": "09add0c45e40735b8a0e8483535b8b05ddd247aa04e6acc0aa09c903b6b7bc44"
+      },
+      "native": "pt4"
+    },
     "PumaTracker": {
       "adf": "PumaTracker.adf",
       "adfSha256": "32e675a616319f8314323b8973c0b51055c1b245527ccfdbc410461517f98171",

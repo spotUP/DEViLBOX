@@ -33,6 +33,18 @@ ANY_BYTES = 65536
 TITLE_BYTES = 29              # screen.s TW
 ASM = ['vasmm68k_mot', '-Fvobj', '-nowarn=62', '-quiet', '-no-opt', '-m68000',
        '-DAMIGA=1', '-DUADE_NATIVE=1', '-DUADE_PROBE=1']
+# Native templates (--native): the format's own replayer compiled with vbcc in place of
+# UADE's eagleplayer. pt4: ProTracker 4's libpt4 (amiga/pt4_glue.s + amiga/pt4_amiga.c).
+LIBPT4 = os.path.join(HERE, '..', 'protracker4', 'libpt4')
+VBCC = os.environ.get('VBCC', '/opt/homebrew/opt/vbcc')
+NATIVE = {
+    'Protracker4': dict(
+        key='pt4', glue='amiga/pt4_glue.s',
+        c=[os.path.join(LIBPT4, 'src', f) for f in ('load.c', 'replay.c', 'voice.c', 'tables.c')]
+          + [os.path.join(HERE, 'amiga', 'pt4_amiga.c')],
+        hash=['src/load.c', 'src/replay.c', 'src/voice.c', 'src/tables.c', 'src/pt4_internal.h', 'include/pt4.h'],
+        pool_extra=64 * 1024),   # pt4_song + chunk tables on top of patterns + sample arena (<= module)
+}
 
 
 def run(cmd, **kw):
@@ -175,6 +187,12 @@ def source_hashes(player):
                 path = os.path.join(d, f)
                 h.update(os.path.relpath(path, top).encode() + b'\0')
                 h.update(hashlib.sha256(open(path, 'rb').read()).digest())
+    if player in NATIVE:   # a native template's "player" is the replayer source it compiles
+        p = hashlib.sha256()
+        for f in NATIVE[player]['hash']:
+            p.update(f.encode() + b'\0')
+            p.update(hashlib.sha256(open(os.path.join(LIBPT4, f), 'rb').read()).digest())
+        return {'tool': h.hexdigest(), 'player': p.hexdigest()}
     ply = hashlib.sha256(open(os.path.join(UADE_ROOT, 'players', player), 'rb').read()).hexdigest()
     return {'tool': h.hexdigest(), 'player': ply}
 
@@ -211,7 +229,9 @@ def publish(adf_path, layout, pub_dir, name=None):
         'sources': source_hashes(layout['player']),
         # The browser routes a module with no magic test of its own by these eagleplayer.conf names
         # (adfTemplateFor). A variant template (MED-A1200) is reached by its magic only.
-        **({'prefixes': eagle_prefixes(key)} if key == layout['player'] else {}),
+        # A native template has no eagleplayer.conf entry: reached by its magic only.
+        **({'prefixes': eagle_prefixes(key)} if key == layout['player'] and 'native' not in layout else {}),
+        **({'native': layout['native']} if 'native' in layout else {}),
     }
     man['templates'] = dict(sorted(man['templates'].items()))
     with open(man_path, 'w') as fh:
@@ -233,7 +253,14 @@ def main():
     ap.add_argument('--publish-name', help='manifest key and file stem when it is not the player name (MED-A1200)')
     ap.add_argument('--target', choices=sorted(TARGETS),
                     help='default: a1200 for players in uade_player_min_cpu.tsv, else a500')
+    ap.add_argument('--native', choices=sorted(v['key'] for v in NATIVE.values()),
+                    help='native template: the format\'s own replayer (pt4 = libpt4) instead of a UADE player')
     a = ap.parse_args()
+    native = next((dict(v, player=k) for k, v in NATIVE.items() if v['key'] == a.native), None)
+    if native:
+        if a.companion_slot_bytes:
+            sys.exit('--native takes no companion slot')
+        return package(a, native['player'], ASM, a.target or 'a500', native)
     entry = uade_lookup.lookup(a.module, UADE_ROOT, a.player)
     player = entry['player']
     # UADE ignores the end report of these players (SONG_END_NOT_POSSIBLE -> $12C = 0); match it.
@@ -281,7 +308,33 @@ def main():
     baked = None if skip_bake else patch_player_env_defaults(os.path.join(stage, 'current.uadeplayer'), player)
     if baked:
         print(f'{player} defaults baked from {os.path.basename(PLAYER_ENV_DEFAULTS[player][0])}:', baked)
+    package(a, player, asm, target, None)
 
+
+def compile_native(native, stage):
+    """vbcc objects (hunk format) of a native template's replayer + its C glue."""
+    objs = []
+    env = dict(os.environ, VBCC=VBCC)
+    for src in native['c']:
+        o = os.path.join(stage, os.path.basename(src) + '.o')
+        run(['vc', '+aos68k', '-c99', '-cpu=68000', '-O2', '-c', '-I' + os.path.join(LIBPT4, 'src'),
+             '-I' + os.path.join(LIBPT4, 'include'), '-o', o, src], env=env)
+        objs.append(o)
+    return objs + [os.path.join(VBCC, 'targets', 'm68k-amigaos', 'lib', 'vc.lib')]
+
+
+def package(a, player, asm, target, native):
+    """Assemble, link, write the ADF and its layout (and publish). The stage dir holds
+    current.uademod (and the UADE stager's files) except for a native template."""
+    t = TARGETS[target]
+    IMG_BASE, IMG_END, CHIP_BASE, CHIP_END = t['IMG_BASE'], t['IMG_END'], t['CHIP_BASE'], t['CHIP_END']
+    out = os.path.abspath(a.out)
+    stage = os.path.join(out, 'stage')
+    if native:
+        shutil.rmtree(stage, ignore_errors=True)
+        os.makedirs(stage)
+        shutil.copyfile(a.module, os.path.join(stage, 'current.uademod'))
+        cobjs = compile_native(native, stage)
     # The slot: UADE_MODULE_BYTES sizes the arena for the largest module the slot
     # takes; _uade_module_len carries the real length and is what the browser patches.
     # The slot costs its size twice: once in the image (incbin, imgram) and once in the
@@ -289,7 +342,7 @@ def main():
     # can leave no room for the default slot on the A500 map.
     mod = open(os.path.join(stage, 'current.uademod'), 'rb').read()
     sizes = os.path.join(stage, 'uade_sizes.i')
-    sizes_src = open(sizes).read()
+    sizes_src = None if native else open(sizes).read()
 
     comp_n = 0
     if a.companion_slot_bytes:
@@ -309,8 +362,8 @@ def main():
 }}
 SECTIONS {{
   chip : {{ *(uadechip) . = ALIGN(4); _chip_end = .; }} > chipram
-  image : {{ *(code) *(text) *(uadesoundcore) *(data) *(uadedata) . = ALIGN(512); _img_end = .; }} > imgram
-  bss : {{ *(uadelowbss) *(uadeany) *(uadestack) . = ALIGN(4); _bss_end = .; }} > imgram
+  image : {{ *(code) *(text) *(CODE) *(uadesoundcore) *(data) *(DATA) *(uadedata) . = ALIGN(512); _img_end = .; }} > imgram
+  bss : {{ *(uadelowbss) *(uadeany) *(uadestack) *(BSS) . = ALIGN(4); _bss_end = .; }} > imgram
 }}
 """)
     img = os.path.join(stage, 'image.bin')
@@ -321,15 +374,20 @@ SECTIONS {{
         if len(mod) > slot:
             sys.exit(f'module is {len(mod)} B, slot holds {slot} B')
         open(os.path.join(stage, 'current.uademod'), 'wb').write(mod + bytes(slot - len(mod)))
-        s, n = re.subn(r'^UADE_MODULE_BYTES\s+equ\s+\d+', f'UADE_MODULE_BYTES       equ     {slot}', sizes_src, flags=re.M)
-        assert n == 1, 'uade_sizes.i: no UADE_MODULE_BYTES line'
-        open(sizes, 'w').write(s + f'UADE_MODULE_LEN         equ     {len(mod)}\n')
+        if native:   # the pool holds the song state, patterns and the sample arena (chip)
+            defs = [f'-DPT4_MODULE_LEN={len(mod)}', f'-DPT4_POOL_BYTES={slot + native["pool_extra"]}']
+        else:
+            s, n = re.subn(r'^UADE_MODULE_BYTES\s+equ\s+\d+', f'UADE_MODULE_BYTES       equ     {slot}', sizes_src, flags=re.M)
+            assert n == 1, 'uade_sizes.i: no UADE_MODULE_BYTES line'
+            open(sizes, 'w').write(s + f'UADE_MODULE_LEN         equ     {len(mod)}\n')
+            defs = []
         objs = []
-        for src in ('amiga/uade_probe.s', 'amiga/uade_glue.s', 'amiga/input_sdk.s', 'amiga/screen.s'):
+        glue = native['glue'] if native else 'amiga/uade_glue.s'
+        for src in ('amiga/uade_probe.s', glue, 'amiga/input_sdk.s', 'amiga/screen.s'):
             o = os.path.join(stage, os.path.basename(src) + '.o')
-            run(asm + inc + ['-o', o, os.path.join(HERE, src)], cwd=HERE)
+            run(asm + defs + inc + ['-o', o, os.path.join(HERE, src)], cwd=HERE)
             objs.append(o)
-        cmd = ['vlink', '-brawbin2', '-T', ld, '-M' + mapf, '-o', img] + objs
+        cmd = ['vlink', '-brawbin2', '-T', ld, '-M' + mapf, '-o', img] + objs + (cobjs if native else [])
         r = subprocess.run(cmd, capture_output=True, text=True)
         if r.returncode:
             return None, f"FAILED: {' '.join(cmd)}\n{r.stdout[-3000:]}\n{r.stderr[-3000:]}"
@@ -416,6 +474,7 @@ SECTIONS {{
                       'note': 'the slot is outside the bootblock, so patching it keeps the checksum valid'},
         'memory': {k: f'0x{v:X}' for k, v in defs.items()},
         'stagedModule': {'name': os.path.basename(a.module), 'bytes': len(mod)},
+        **({'native': native['key']} if native else {}),
     }
     json.dump(layout, open(os.path.join(out, 'layout.json'), 'w'), indent=2)
     print(json.dumps(layout, indent=2))
