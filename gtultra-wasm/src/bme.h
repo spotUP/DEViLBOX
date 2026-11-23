@@ -306,4 +306,30 @@ static inline void SDL_CloseAudio(void) {}
 static inline void SDL_LockAudio(void) {}
 static inline void SDL_UnlockAudio(void) {}
 
+/* BME file helpers (bme_end.c, bme_io_stub.c). Without these prototypes the
+ * callers in greloc.c / gsong.c / gsound.c got implicit `int f()` declarations;
+ * wasm-ld then linked the void definitions through signature-mismatch stubs
+ * that trap with `unreachable`, which aborted gt_export_prg. */
+#include <stdio.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+void fwrite8(FILE *file, unsigned data);
+void fwritele16(FILE *file, unsigned data);
+void fwritele32(FILE *file, unsigned data);
+unsigned fread8(FILE *file);
+unsigned freadle16(FILE *file);
+unsigned freadle32(FILE *file);
+unsigned freadhe16(FILE *file);
+unsigned freadhe32(FILE *file);
+void io_setfilemode(int usedf);
+int io_openlinkeddatafile(unsigned char *ptr);
+int io_open(char *name);
+void io_close(int handle);
+int io_lseek(int handle, int offset, int whence);
+unsigned char io_read8(int handle);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* BME_H */
