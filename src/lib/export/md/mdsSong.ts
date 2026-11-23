@@ -52,7 +52,7 @@ const isExt = (sys: readonly number[]) => sys[0] === 0xa0 || sys[0] === 0x42;
  */
 const FM_TRANSPOSE = 0x30;
 const MAX_NOTE = 0xdf - 0x82;
-const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_PITCH = 4;
+const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_PITCH = 4;
 const FX_FLOW = new Set([0x0b, 0x0d, 0x09, 0x0f, 0xff]);
 const NTSC_HZ = 59.922743;
 /** Furnace SN noise mode bits (sms.cpp snNoiseMode: bit 0 white, bit 1 PSG3 period) -> MDSDRV `EA` (mdsseq.md). Reset value 3. */
@@ -236,6 +236,17 @@ function ticksOf(m: FurnaceMacro, lossy: Lossy, what: string): { vals: number[];
   if (m.release >= 0 && m.release < m.length) lossy.add(`${what} macro release point (ignored)`);
   const vals = m.data.slice(0, m.length).flatMap((v) => Array<number>(sp).fill(v));
   return { vals, loop: m.loop >= 0 && m.loop < m.length && m.loop !== 255 ? m.loop * sp : -1 };
+}
+
+/** Furnace macro step at engine tick f after macroInit (macroInt.cpp doMacro): step 0 on the first tick, step 1 after delay+1 ticks
+ *  (speed when no delay), then one per speed; past the end it loops or holds. on: Furnace's `has` after this step (false once the
+ *  last step of a non-looping macro is read). */
+export function macroStep(m: FurnaceMacro, f: number): { k: number; v: number; on: boolean } {
+  const sp = Math.max(1, m.speed), first = m.delay > 0 ? m.delay + 1 : sp;
+  const k = f < first ? 0 : 1 + Math.floor((f - first) / sp);
+  const loop = m.loop >= 0 && m.loop < m.length && m.loop !== 255 ? m.loop : -1;
+  const w = k < m.length ? k : loop >= 0 ? loop + ((k - m.length) % (m.length - loop)) : m.length - 1;
+  return { k, v: m.data[w], on: loop >= 0 || k < m.length - 1 };
 }
 
 /** 30-byte FM voice in register order (+0,+4,+8,+C). Furnace operators are already stored in register order (genesis.cpp writes op[i] at opOffs[i] = 4*i), as MDSDRV reads them (mdsdrv.68k load inst data). */
@@ -664,7 +675,6 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       const pm = macro(ins, MACRO_PITCH, m.version), am = macro(ins, MACRO_ARP, m.version);
       // Furnace runs macros once per engine tick at hz; virtual tempo only moves the row counter (playback.cpp tempoAccum), so envelopes use hz, not `rate`.
       const peg = pm && pitchEnvelope(pm, lossy, hz), mt = am && arpTable(am, lossy, undefined, 1 / fpt);
-      if (kind === 'fm' && macro(ins, MACRO_VOL, m.version)) lossy.add('FM volume macro (ignored)');
       v = { ins: item(kind === 'fm' ? fmVoice(ins, lossy) : psgEnvelope(ins, m.version, lossy, hz)), peg: peg ? item(peg) : -1, mtab: mt ? tbItem(mt) : -1 };
       insCache.set(key, v);
     }
@@ -686,7 +696,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const tracks: Array<{ ch: number; op: number; chunks: Array<{ bytes: number[]; tieStart: boolean; head: number }>; wrap: number[] }> = [];
   for (let ch = 0; ch < nCh; ch++) {
     const kind = kinds[ch], op = ext ? EXT_OP[ch] : 0, fm6 = ids[ch] === 5;
-    let envPh: HitPhase | undefined, trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0, slideEnd = 0, prevKey = -1, pegDirty = false, portaXx = 0;
+    let envPh: HitPhase | undefined, trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0, slideEnd = 0, prevKey = -1, pegDirty = false, portaXx = 0, legato = 0;
     // 01xx/02xx (linear pitch): rate in 1/128 semitone per Furnace tick, poff = offset after the last tick so far. Furnace keeps the slide
     // running across notes and note offs (playback.cpp 0x01/0x02 leave inPorta false; NOTE_ON resets baseFreq, the slide goes on), so each
     // key-on restarts the envelope from 0 and only 01 00 / 02 00 / 03xx stop it, holding the reached offset until the next note.
@@ -728,6 +738,22 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // that brings it to D (playback.cpp nextTick, accum from 0), so at 180/150 the row ticks 4 and 5 share an engine tick (0,1,2,3,4,4).
     // Counted absolutely so carried phase does not drift.
     const fTick = (t: number) => furnaceTickOf(t, fpt);
+    // Per-note macro the driver has no envelope for: FM volume (genesis.cpp outVol = VOL_SCALE_LOG_BROKEN(vol, val, 127)) and the noise
+    // duty macro (sms.cpp snNoiseMode = val, the 20xy bits). outV: Furnace outVol, what E2 carries; a running volume macro owns it
+    // (DIV_CMD_VOLUME only sets it while the macro is not running). macT: Furnace tick of the note-on, macK: last step emitted.
+    let outV = vol, mac: FurnaceMacro | undefined, macT = 0, macK = -1, macOn = false;
+    const vScale = (v: number, x: number) => m.compatFlags.newVolumeScaling ? Math.max(0, Math.min(127, v + x - 127)) : Math.floor((v * x + (m.compatFlags.ceilVolumeScaling ? 126 : 0)) / 127);
+    const macStep = (t: number): number[] | null => {
+      if (!mac || !macOn) return null;
+      const s = macroStep(mac, fTick(t) - macT);
+      if (s.k === macK) return null;
+      macK = s.k; macOn = s.on;
+      if (kind === 'fm') { const o = vScale(vol, Math.min(127, s.v)); if (o === outV) return null; outV = o; return volCmd(outV); }
+      const nm = s.v & 3;
+      if (nm === noise) return null;
+      if ((nm ^ noise) & 2 && sounding && macK > 0) lossy.add('noise duty macro switches the PSG3 rate mode mid-note');
+      noise = nm; return [0xea, NOISE_EA[noise]];
+    };
     let prate = 0, poff = 0, pInit = false, curNv = -1, curKey = 0, dtnOut = 0;
     // PSG: E6 carries E5xx plus psgFix(key); each PSG chunk restates it, since a subroutine chunk can follow any detune.
     const psgOffs = () => psgOffsets(m.instruments[ins], m.version, vDepth ? vibOffsets(vRate, vDepth, vFine) : undefined, vDepth && !m.compatFlags.continuousVibrato ? (t) => vibOffAt(vRate, vDepth, vFine, t) : undefined);
@@ -839,7 +865,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       if (vol256 > vmax << 8) { vol256 = vmax << 8; if (!m.compatFlags.noVolSlideReset) vspeed = 0; }
       else if (vol256 < 0) { vol256 = m.compatFlags.legacyVolumeSlides ? (vmax << 8) + 1 : 0; if (!m.compatFlags.noVolSlideReset) vspeed = 0; }
       vol = vol256 >> 8;
-      return vol !== before ? volCmd(vol) : null;
+      if (vol === before || (kind === 'fm' && macOn)) return null;
+      outV = vol; return volCmd(outV);
     };
     // tpf: sequence ticks per frame; fpf: Furnace ticks per frame (what per-frame pitch envelopes step through).
     const pss = Number(m.compatFlags.pitchSlideSpeed) || 1, tpf = (tempo + 1) / 128, fpf = tpf * fpt;
@@ -903,18 +930,18 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         mtabOn = r.mtab >= 0;
         // EA on a dummy id sets the noise mode: an OP2-OP4 track leaves the LFO to OP1's channel 2 track.
         const lfo = songLfo && kind === 'fm' && op <= 1 ? [0xea, lfoOf(ins)] : [];
-        if (chunkStart && arpHold !== undefined) return [0xe1, vIns, ...lfo, ...peg, 0xeb, 0, 0xe4, arpHold & 0xff, ...kvsCmd(vol, true)];
-        return [0xe1, vIns, ...lfo, ...peg, 0xeb, r.mtab + 1, ...tr, ...kvsCmd(vol, true)];
+        if (chunkStart && arpHold !== undefined) return [0xe1, vIns, ...lfo, ...peg, 0xeb, 0, 0xe4, arpHold & 0xff, ...kvsCmd(outV, true)];
+        return [0xe1, vIns, ...lfo, ...peg, 0xeb, r.mtab + 1, ...tr, ...kvsCmd(outV, true)];
       };
       // FM6 with a sample instrument plays PCM (genesis.cpp: dacMode from the instrument type at each note-on); E1 would leave PCM mode.
       const isDac = (n: number) => kind === 'fm' && fm6 && m.instruments[n]?.type === 4;
       let curPcm = -1, pcmOn = false;
       baked = arpHold !== undefined; arpT0 = tick; // insCmd(true) restates EB, which restarts the instrument's arp table
       // Chunk head: the channel state a chunk starts from. The loop chunk's head plays once; the wrap restates it from the song-end state.
-      const head = (): number[] => [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && any ? vibCmd(tick) : []), ...volCmd(vol), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(sA && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
+      const head = (): number[] => [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && any ? vibCmd(tick) : []), ...volCmd(outV), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(sA && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
       const bytes = head(), headLen = bytes.length;
       // One sequence tick's mid-row commands: 0Axy volume step and the per-tick slide.
-      const tickPre = (t: number): number[] | null => { const v = volStep(), sl = sA && (sounding || fTick(t) <= sTail) ? slideCmd(t) : []; return v || sl.length ? [...(v ?? []), ...sl] : null; };
+      const tickPre = (t: number): number[] | null => { const v = [...(volStep() ?? []), ...(macStep(t) ?? [])], sl = sA && (sounding || fTick(t) <= sTail) ? slideCmd(t) : []; return v.length || sl.length ? [...v, ...sl] : null; };
       let curIns = ins;
       type Tok = { cmd: 'note' | 'tie' | 'rest'; n: number; t: number; pre: number[] };
       const tok: Tok[] = [];
@@ -965,7 +992,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (cutAt >= c.ticks[i]) { lossy.add('ECxx cut not inside the row (ignored)'); cutAt = 0; }
         i0 = i === 0;
         for (let k = 0; k < delay; k++) addTick(tickPre(tick + k));
-        if (cell && cell.volume >= 0) { vol = cell.volume; vol256 = vol << 8; cmds.push(...volCmd(vol)); }
+        if (cell && cell.volume >= 0) { vol = cell.volume; vol256 = vol << 8; if (!(kind === 'fm' && macOn)) cmds.push(...volCmd(outV = vol)); }
         for (const e of cell?.effects ?? []) {
           if (e.type < 0 || FX_FLOW.has(e.type)) continue;
           // 10xy: LFO enable x, speed y (genesis.cpp DIV_CMD_FM_LFO). 80xx: linear pan, on Genesis only full left (00) and right (FF) mute a side.
@@ -977,7 +1004,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (op) { lossy.add('12xx-16xy on an extended channel 3 operator'); continue; }
             const r = FM_ORDER[o], live = kvsIns >= 0 && !isDac(ins);
             if (e.type === 0x16) { mulOv[r] = e.value & 15; if (live) cmds.push(0xed, 0x30 + 4 * r, (items[insRef(kind, kvsIns).ins][r] & 0xf0) | mulOv[r]); }
-            else { tlOv[r] = e.value & 127; if (live) cmds.push(...kvsCmd(vol, false, r)); }
+            else { tlOv[r] = e.value & 127; if (live) cmds.push(...kvsCmd(outV, false, r)); }
             continue;
           }
           if (e.type === 0x80 && kind === 'fm' && op <= 1) { pan = e.value === 0 ? 0x80 : e.value === 0xff ? 0x40 : 0xc0; cmds.push(0xe9, pan); continue; }
@@ -993,6 +1020,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (!(noise & 2)) lossy.add('noise fixed-rate mode (20xy, x=0)');
             cmds.push(0xea, NOISE_EA[noise]); continue;
           }
+          // EAxx legato: a note keys no new note-on and restarts no macro, only the pitch moves (playback.cpp DIV_CMD_LEGATO), as E0.
+          if (e.type === 0xea) { legato = e.value; continue; }
+          if (e.type === 0x30 && kind === 'fm') { lossy.add('effect 30 (FM hard reset: MDSDRV has no command for it)'); continue; }
           if (e.type === 0x0a) { vspeed = !e.value ? 0 : e.value & 15 ? -(e.value & 15) * 64 : (e.value >> 4) * 64; continue; }
           if (e.type === 0xec || e.type === 0xed) continue;
           // 17xx sets dacMode; the next note-on sets it again from the instrument, so only 1700 over a playing sample is heard (it stops).
@@ -1021,6 +1051,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         }
         const vs = volStep();
         if (vs) cmds.push(...vs);
+        const ms = macStep(tick + delay);
+        if (ms) cmds.push(...ms);
         // With a note, Furnace keys the note on (shorthandPorta skips the porta commit) and slides from it to note +-y; without one
         // it slides from the pitch playing to the current note +-y, as a 03xx slur. Both become a slide onto the target note.
         // shortcut: a note-less E1/E2 on a keyed-off channel (Furnace slides the release tail) is dropped.
@@ -1060,6 +1092,26 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (isNote || isOff || cmds.length || i === 0) {
           if (tok.length) emit(tok.pop()!);
           if (isNote) {
+            // 03xx: slur into the note (no key-off, envelope keeps running) and slide from the previous key; E7 00 turns it off again.
+            // 03xx on a keyed-off channel is a plain note-on in Furnace (playback.cpp keeps doNote, NOTE_ON sets baseFreq to the target): no slide, PSG too.
+            // Pitch reached at the end of the previous Furnace tick: this tick's porta step runs after the row (playback.cpp nextTick).
+            const fNow = fTick(tick + delay), from = Number.isNaN(shFrom) ? prevKey * 128 + slideOff(fNow - 1) + flyOff(fNow - 1) + rowPoff : shFrom;
+            // A retarget (no 03 on the row) still commits the note (doNote stays true), so it resets the vibrato phase (playback.cpp commit note on).
+            const retarget = !portaXx && pXx > 0 && sounding && from !== prevKey * 128;
+            if (retarget) portaXx = pXx;
+            // 03xx on a keyed-on channel is no note-on (playback.cpp: doNote=false), so the vibrato phase is not reset.
+            const portaSlur = portaXx > 0 && sounding && Number.isNaN(shFrom);
+            const slur = portaSlur || (legato > 0 && sounding && Number.isNaN(shFrom) && kind !== 'noise');
+            if (legato > 0 && sounding && kind === 'noise') lossy.add('EAxx legato on the noise channel (keyed on)');
+            if (!slur) {
+              // Note-on: macroInit restarts the volume / noise macro; without one Furnace sets outVol = vol (genesis.cpp NOTE_ON).
+              mac = kind === 'fm' ? (fm6 && m.instruments[ins]?.type === 4 ? undefined : macro(m.instruments[ins], MACRO_VOL, m.version)) : kind === 'noise' ? macro(m.instruments[ins], MACRO_DUTY, m.version) : undefined;
+              macT = fTick(tick + delay); macK = -1; macOn = !!mac;
+              if (mac && mac.release >= 0 && mac.release < mac.length) lossy.add(`${kind === 'fm' ? 'FM volume' : 'noise duty'} macro release point (ignored)`);
+              if (!mac && kind === 'fm' && outV !== vol) cmds.push(...volCmd(outV = vol));
+              const ms0 = macStep(tick + delay);
+              if (ms0) cmds.push(...ms0);
+            }
             let n = kind === 'fm' ? nv : kind === 'noise' && noise & 2 ? noiseKey(m, nv, lossy) : nv;
             // Keys above the note-byte range go through track transpose (E4). shortcut: trs state is linear, not re-set at the loop point.
             if (kind === 'noise' && !(n - trs >= 0 && n - trs <= MAX_NOTE)) { trs = n > MAX_NOTE ? n - MAX_NOTE : 0; cmds.push(0xe4, trs); }
@@ -1074,18 +1126,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
               if (t) { const k = t.join(','); if (!noiseArps.has(k)) noiseArps.set(k, tbItem(t)); cmds.push(0xeb, noiseArps.get(k)! + 1); trs = NaN; }
             }
             if (kind === 'psg' && effDtn() !== dtnOut) { dtnOut = effDtn(); cmds.push(0xe6, dtnOut & 0xff); }
-            // 03xx: slur into the note (no key-off, envelope keeps running) and slide from the previous key; E7 00 turns it off again.
-            // 03xx on a keyed-off channel is a plain note-on in Furnace (playback.cpp keeps doNote, NOTE_ON sets baseFreq to the target): no slide, PSG too.
-            // Pitch reached at the end of the previous Furnace tick: this tick's porta step runs after the row (playback.cpp nextTick).
-            const fNow = fTick(tick + delay), from = Number.isNaN(shFrom) ? prevKey * 128 + slideOff(fNow - 1) + flyOff(fNow - 1) + rowPoff : shFrom;
-            // A retarget (no 03 on the row) still commits the note (doNote stays true), so it resets the vibrato phase (playback.cpp commit note on).
-            const retarget = !portaXx && pXx > 0 && sounding && from !== prevKey * 128;
-            if (retarget) portaXx = pXx;
             const slide = (kind === 'psg' || kind === 'fm') && (Number.isNaN(shFrom) ? sounding && prevKey >= 0 : true) && portaXx > 0 && from !== nv * 128;
-            // 03xx on a keyed-on channel is no note-on (playback.cpp: doNote=false), so the vibrato phase is not reset.
-            const portaSlur = portaXx > 0 && sounding && Number.isNaN(shFrom);
             // E0 slurs every such note, also a PSG 03xx onto the note already reached (no slide): a key-on would restart the macros.
-            if ((kind === 'fm' || kind === 'psg') && portaSlur) cmds.push(0xe0);
+            if ((kind === 'fm' || kind === 'psg') && slur) cmds.push(0xe0);
             const fresh = !m.compatFlags.continuousVibrato && !portaSlur;
             if (!m.compatFlags.continuousVibrato && (!portaSlur || retarget)) { vPos = 0; vAt = tick + delay; }
             if (vDepth) { vSync(tick + delay); eT = tick + delay; eP = vPos; } // the note byte restarts E8 (slide steps below score on it)
@@ -1104,7 +1147,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             else if (pegDirty) cmds.push(0xe8, insRef(kind, ins).peg + 1);
             if (trsOut || sA || (kind === 'fm' && dtnOut !== effDtn())) cmds.push(...slideCmd(tick + delay));
             pegDirty = slide || prate !== 0; portaXx = 0;
-            if (!portaSlur) { arpT0 = tick + delay; if (baked && insRef(kind, ins).mtab >= 0) cmds.push(0xeb, insRef(kind, ins).mtab + 1); baked = false; }
+            if (!slur) { arpT0 = tick + delay; if (baked && insRef(kind, ins).mtab >= 0) cmds.push(0xeb, insRef(kind, ins).mtab + 1); baked = false; }
             if (vDepth) {
               if ((slide && !sA) || prate || insRef(kind, ins).peg >= 0) lossy.add('04xy with a pitch slide or pitch macro (vibrato replaces it)');
               cmds.push(...vibCmd(tick + delay, fresh)); pegDirty = true;

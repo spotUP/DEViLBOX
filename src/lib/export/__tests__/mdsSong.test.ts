@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { arpTable, frameTempos, furnaceTickOf, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, psgOffsets, vibNodeOff, vibOffsets, vibratoEnvelope } from '../md/mdsSong';
+import { arpTable, frameTempos, furnaceTickOf, furnaceToMds, Lossy, macroStep, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, psgOffsets, vibNodeOff, vibOffsets, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
 // Bytes per command e0..ff, opcode included (mdsdrv.68k @cmd_length_table, as mdsSong.ts farLayout has it).
@@ -50,7 +50,7 @@ function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1, arg2
         else if (c === 0xfa) depth++;
         else if (c === 0xe4) trs = (sd[p++] << 24) >> 24;
         else if (c === 0xe8) peg = sd[p++]; // slurs: the E8 pitch envelope the note plays
-        else if (ARG1.has(c)) p++;
+        else if (ARG1.has(c)) { const v = sd[p++]; arg2?.(ch, c, v, -1); }
         else if (CMD_LEN[c - 0xe0] === 3) { arg2?.(ch, c, sd[p], sd[p + 1]); p += 2; }
         else if (c === 0xec) p++;
         else throw new Error(`unknown command ${c?.toString(16)} on track ${i}`);
@@ -645,5 +645,40 @@ describe('furnaceToMds', () => {
     expect(ee).toBeGreaterThan(0);
     expect(mul).toBeGreaterThan(0);
   });
+  it('macroStep: step 0 on the note-on tick, step 1 after delay+1 ticks, then one per speed; a non-looping macro holds its last value', () => {
+    const mc = { code: 0, length: 3, loop: -1, release: -1, delay: 16, speed: 2, type: 0, data: [127, 100, 80] } as unknown as Parameters<typeof macroStep>[0];
+    expect([0, 16, 17, 18, 19, 40].map((f) => macroStep(mc, f).v)).toEqual([127, 127, 100, 100, 80, 80]);
+    expect(macroStep(mc, 19).on).toBe(false);
+    expect(macroStep({ ...mc, loop: 1 }, 21)).toEqual({ k: 3, v: 100, on: true });
+  });
+  // Kobito: FM volume macros with a 16-22 tick delay (instruments 26-30) and the hat noise duty macro (instruments 0-3)
+  // (thoughts/spot/2026-11-23-kobito-md-audit.md). Counted against the same song with those macros stripped.
+  it('Kobito: the FM volume macro adds E2 steps and the noise duty macro adds EA noise-mode switches', async () => {
+    const count = async (strip: boolean) => {
+      const m = await parse('Kobito_of_the_Shining_Needle.fur');
+      if (strip) for (const ins of m.instruments) ins.macros = ins.macros.filter((x) => x.code !== 0 && x.code !== 2);
+      const r = furnaceToMds(m);
+      let e2 = 0, ea = 0;
+      decode(r.seq, false, false, -1, (_ch, c, a) => { if (c === 0xe2) e2++; else if (c === 0xea && (a === 0xe3 || a === 0xe7)) ea++; });
+      return { e2, ea, lossy: r.lossy };
+    };
+    const on = await count(false), off = await count(true);
+    console.log(`Kobito E2 ${off.e2} -> ${on.e2}, EA noise ${off.ea} -> ${on.ea}`);
+    expect(on.e2).toBeGreaterThan(off.e2);
+    expect(on.ea).toBeGreaterThan(off.ea);
+    expect(on.lossy.filter((l) => /volume macro|macro delay/.test(l))).toEqual([]);
+  });
+  // RaveOfDoom: 48 EAxx (legato) uses. A legato note is a slur (E0): no key-on, no macro restart (playback.cpp DIV_CMD_LEGATO).
+  it('RaveOfDoom: EAxx legato notes become E0 slurs, not a lossy effect', async () => {
+    const slurs = async (strip: boolean) => {
+      const m = await parse('RaveOfDoom.fur');
+      if (strip) for (const p of m.patterns.values()) for (const c of p.rows) if (c?.effects) c.effects = c.effects.filter((e) => e.type !== 0xea);
+      const r = furnaceToMds(m);
+      return { s: decode(r.seq, false, true).filter((k) => k.s).length, lossy: r.lossy };
+    };
+    const on = await slurs(false), off = await slurs(true);
+    console.log(`RaveOfDoom slurs ${off.s} -> ${on.s}`);
+    expect(on.lossy.filter((l) => /^effect EA/.test(l))).toEqual([]);
+    expect(on.s).toBeGreaterThan(off.s);
+  });
 });
-
