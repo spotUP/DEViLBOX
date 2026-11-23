@@ -12,16 +12,19 @@ describe('Peter Verswyvelen Packer editable grid', () => {
   const layout = song.uadePatternLayout!;
   const bytes = new Uint8Array(load());
 
-  it('reads patterns with notes at their step-table offsets', () => {
+  it('reads 16-row patterns with notes at their run-start offsets', () => {
     expect(song.patterns.length).toBeGreaterThan(1);
     expect(song.patterns.some((p) => p.channels.some((c) => c.rows.some((r) => r.note > 0)))).toBe(true);
+    expect(song.patterns.every((p) => p.length === 16)).toBe(true);
     expect(layout.getCellFileOffset!(0, 0, 0)).toBeGreaterThanOrEqual(256);
   });
 
-  it('every cell re-encodes to its file bytes', () => {
+  it('every placed cell re-encodes over its stored bytes to the same bytes', () => {
     song.patterns.forEach((pat, p) => pat.channels.forEach((c, ch) => c.rows.forEach((cell, r) => {
       const off = layout.getCellFileOffset!(p, r, ch);
-      expect([...layout.encodeCell(cell)]).toEqual([...bytes.subarray(off, off + 4)]);
+      if (off < 0) return; // a repeat row of the note above: no file place
+      const stored = bytes.subarray(off, off + 4);
+      expect([...layout.encodeCell(cell, stored)]).toEqual([...stored]);
     })));
   });
 });
@@ -61,6 +64,6 @@ describe('Peter Verswyvelen Packer export', () => {
     const diff = [...out].map((v, i) => (v !== orig[i] ? i : -1)).filter((i) => i >= 0);
     expect(diff.length).toBeGreaterThan(0);
     expect(diff.every((i) => i >= off && i < off + 2)).toBe(true);
-    expect(((out[off] & 0x0f) << 8) | out[off + 1]).toBe(want);
+    expect(((out[off] & 0x03) << 8) | out[off + 1]).toBe(want);
   });
 });

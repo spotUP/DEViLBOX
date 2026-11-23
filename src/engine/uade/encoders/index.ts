@@ -7,6 +7,7 @@
  * Generated over src/engine/uade/encoders/*.ts. Keep in sync when adding an encoder.
  */
 import './ActionamicsEncoder';
+import './PeterVerswyvelenPackerEncoder';
 import './AMFEncoder';
 import './AMOSMusicBankEncoder';
 import './AMSEncoder';

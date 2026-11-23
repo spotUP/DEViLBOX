@@ -18,22 +18,13 @@
  *   Step table starting at offset 256: (patCount - 2) words, each must be
  *     even, bit 15 clear, <= limit, and non-decreasing
  *
- * Binary layout:
- *   0x00-0xF7: 31 sample headers × 8 bytes each
- *     +0: u16BE length (in words), +2: u16BE volume (0-64),
- *     +4: u16BE repeat offset (in words), +6: u16BE repeat length (in words)
- *   0xF8: u16BE patCount (number of patterns)
- *   0xFA: u16BE songLen (number of positions × 2, i.e. songLen/2 positions)
- *   0xFC: u16BE val252 (unused for extraction)
- *   0xFE: u16BE limit
- *   0x100: Step table — (patCount - 2) words, non-decreasing offsets
- *   After step table: pattern data (each pattern = 64 rows × 4 channels × 4 bytes)
- *
- * Pattern cell format (4 bytes, standard MOD-like):
- *   byte 0: upper 4 bits = instrument high nibble, lower 4 bits = period high byte (bits 8-11)
- *   byte 1: period low byte (bits 0-7)
- *   byte 2: upper 4 bits = instrument low nibble, lower 4 bits = effect type
- *   byte 3: effect parameter
+ * Binary layout (nuade third-party/nuade/players/peterverswyvelen/peterverswyvelen.c):
+ *   0x00-0xF7: 31 sample headers x 8 bytes (length words, volume, loop start words, loop words)
+ *   0xF8: table count, 0xFA: sequence count, 0xFC: restart entry, 0xFE: pattern data bytes
+ *   0x100: table of (table count) words, byte offsets into pattern data
+ *   then sequence entries of 4 words, one per voice: a byte index into the table
+ *   then pattern data: run-length coded 4-byte notes, 16 rows per table pattern
+ *   (cell layout: src/engine/uade/encoders/PeterVerswyvelenPackerEncoder.ts)
  *
  * File prefix: "PVP."
  * Actual audio playback is delegated to UADE.
@@ -44,14 +35,13 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, Pattern, TrackerCell, ChannelData } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
-import { periodToPtNote } from '@/lib/amiga/periodNotes';
+import { decodePeterVerswyvelenPackerCell, encodePeterVerswyvelenPackerCell } from '@/engine/uade/encoders/PeterVerswyvelenPackerEncoder';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
 const MIN_FILE_SIZE = 260;
 const NUM_CHANNELS = 4;
-const ROWS_PER_PATTERN = 64;
+const ROWS_PER_PATTERN = 16; // PV_PATTERN_ROWS
 const BYTES_PER_CELL = 4;
 const NUM_SAMPLES = 31;
 
@@ -59,18 +49,6 @@ const NUM_SAMPLES = 31;
 
 function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
-}
-
-// ── Note conversion ─────────────────────────────────────────────────────────
-
-/**
- * Convert an Amiga period value to a tracker note (1-96, FT2 style).
- * Searches the PVP period table for the closest match.
- * Period table index 0 = C-1 (ProTracker) = tracker note 1.
- */
-function periodToNote(period: number): number {
-  // ProTracker naming, one table: src/lib/amiga/periodNotes.ts.
-  return periodToPtNote(period);
 }
 
 // ── Format detection ────────────────────────────────────────────────────────
@@ -146,133 +124,80 @@ export function isPeterVerswyvelenPackerFormat(buffer: ArrayBuffer | Uint8Array)
 
 // ── Pattern extraction ──────────────────────────────────────────────────────
 
-/**
- * Parse a single 4-byte MOD-like pattern cell.
- * Returns { period, instrument, effTyp, eff }.
- */
-function parseCell(buf: Uint8Array, off: number): { period: number; instrument: number; effTyp: number; eff: number } {
-  const b0 = buf[off];
-  const b1 = buf[off + 1];
-  const b2 = buf[off + 2];
-  const b3 = buf[off + 3];
-  const instrument = (b0 & 0xF0) | ((b2 >> 4) & 0x0F);
-  const period = ((b0 & 0x0F) << 8) | b1;
-  const effTyp = b2 & 0x0F;
-  const eff = b3;
-  return { period, instrument, effTyp, eff };
-}
+const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
 
 /**
- * Extract patterns from the PVP binary. The step table entries are offsets
- * that map song positions to pattern data. Unique offsets correspond to
- * unique patterns.
+ * Layout per nuade peterverswyvelen.c: a word table at 0x100 (tableCount words,
+ * byte offsets into pattern data), then seqCount sequence entries of 4 words
+ * (one per voice, a byte index into the table), then patternBytes of
+ * run-length coded notes. Every 16 rows each voice reads the table pattern its
+ * sequence word names; a note covers 1 + duration rows. One grid pattern per
+ * distinct sequence entry; the run-start row is the stored cell, the rows it
+ * repeats on show its copy (sounding) or stay empty, with no file place.
  */
 function extractPVPPatterns(
   buf: Uint8Array,
-  patCount: number,
-  songLen: number,
-): { patterns: Pattern[]; songPositions: number[]; instrumentCount: number; patternOffsets: number[] } | null {
-  const stepCount = patCount >= 2 ? patCount - 2 : 0;
-  const stepTableStart = 0x100; // offset 256
-  const patternDataStart = stepTableStart + stepCount * 2;
+  tableCount: number,
+  seqCount: number,
+): { patterns: Pattern[]; songPositions: number[]; instrumentCount: number; cellOffsets: number[][] } | null {
+  const tableAt = 0x100;
+  const seqAt = tableAt + tableCount * 2;
+  const patAt = seqAt + seqCount * 8;
+  const patEnd = patAt + u16BE(buf, 0xfe);
+  if (patEnd > buf.length) return null;
 
-  // Read step table entries (offsets into pattern data)
-  const stepEntries: number[] = [];
-  for (let i = 0; i < stepCount; i++) {
-    stepEntries.push(u16BE(buf, stepTableStart + i * 2));
-  }
-
-  // Build unique pattern offsets and a position-to-pattern map
-  // Each step table entry is a byte offset relative to pattern data start (shifted).
-  // Deduplicate to get unique patterns.
-  const uniqueOffsets: number[] = [];
-  const offsetToPatIdx = new Map<number, number>();
-  for (const off of stepEntries) {
-    if (!offsetToPatIdx.has(off)) {
-      offsetToPatIdx.set(off, uniqueOffsets.length);
-      uniqueOffsets.push(off);
-    }
-  }
-
-  // Song positions: songLen is stored as 2× actual positions
-  const numPositions = Math.floor(songLen / 2);
-  const songPositions: number[] = [];
-  for (let i = 0; i < numPositions && i < stepEntries.length; i++) {
-    songPositions.push(offsetToPatIdx.get(stepEntries[i]) ?? 0);
-  }
-  if (songPositions.length === 0) songPositions.push(0);
-
-  // Parse each unique pattern
-  const patternSize = ROWS_PER_PATTERN * NUM_CHANNELS * BYTES_PER_CELL; // 1024 bytes
+  const keyToPat = new Map<string, number>();
   const patterns: Pattern[] = [];
-  const patternOffsets: number[] = [];
+  const cellOffsets: number[][] = [];
+  const songPositions: number[] = [];
   let maxInstrument = 0;
 
-  for (let p = 0; p < uniqueOffsets.length; p++) {
-    // The step entry offset may be a shifted value — try as direct byte offset first
-    const dataOff = patternDataStart + uniqueOffsets[p];
-    if (dataOff + patternSize > buf.length) continue;
-    patternOffsets.push(dataOff);
-
-    const channels: ChannelData[] = [];
-    for (let ch = 0; ch < NUM_CHANNELS; ch++) {
-      const rows: TrackerCell[] = [];
-      for (let r = 0; r < ROWS_PER_PATTERN; r++) {
-        const cellOff = dataOff + (r * NUM_CHANNELS + ch) * BYTES_PER_CELL;
-        if (cellOff + BYTES_PER_CELL > buf.length) {
-          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-          continue;
+  for (let s = 0; s < seqCount; s++) {
+    const words = [0, 1, 2, 3].map(v => u16BE(buf, seqAt + s * 8 + v * 2));
+    const key = words.join(',');
+    let idx = keyToPat.get(key);
+    if (idx === undefined) {
+      idx = patterns.length;
+      keyToPat.set(key, idx);
+      const offsets = new Array<number>(ROWS_PER_PATTERN * NUM_CHANNELS).fill(-1);
+      const channels: ChannelData[] = words.map((w, ch) => {
+        const rows: TrackerCell[] = [];
+        let p = tableAt + w + 2 <= seqAt ? patAt + u16BE(buf, tableAt + w) : patEnd;
+        while (rows.length < ROWS_PER_PATTERN && p + BYTES_PER_CELL <= patEnd) {
+          const bytes = buf.subarray(p, p + BYTES_PER_CELL);
+          const cell = decodePeterVerswyvelenPackerCell(bytes);
+          if (cell.instrument > maxInstrument) maxInstrument = cell.instrument;
+          offsets[rows.length * NUM_CHANNELS + ch] = p;
+          rows.push(cell);
+          const sounding = (bytes[0] & 0x04) !== 0;
+          for (let d = bytes[2] >> 4; d > 0 && rows.length < ROWS_PER_PATTERN; d--) {
+            rows.push(sounding ? { ...cell } : emptyCell());
+          }
+          p += BYTES_PER_CELL;
         }
-        const cell = parseCell(buf, cellOff);
-        const note = periodToNote(cell.period);
-        if (cell.instrument > maxInstrument) maxInstrument = cell.instrument;
-        rows.push({
-          note,
-          instrument: cell.instrument,
-          volume: 0,
-          effTyp: cell.effTyp,
-          eff: cell.eff,
-          effTyp2: 0,
-          eff2: 0,
-          period: cell.period, // carrier: an off-table period survives the export byte-exact (cellPeriod)
-        });
-      }
-      channels.push({
-        id: `channel-${ch}`,
-        name: `Channel ${ch + 1}`,
-        muted: false,
-        solo: false,
-        collapsed: false,
-        volume: 100,
-        pan: (ch === 0 || ch === 3) ? -50 : 50,
-        instrumentId: null,
-        color: null,
-        rows,
+        while (rows.length < ROWS_PER_PATTERN) rows.push(emptyCell());
+        return {
+          id: `channel-${ch}`,
+          name: `Channel ${ch + 1}`,
+          muted: false,
+          solo: false,
+          collapsed: false,
+          volume: 100,
+          pan: (ch === 0 || ch === 3) ? -50 : 50,
+          instrumentId: null,
+          color: null,
+          rows,
+        };
       });
+      patterns.push({ id: `pattern-${idx}`, name: `Pattern ${idx}`, length: ROWS_PER_PATTERN, channels });
+      cellOffsets.push(offsets);
     }
-
-    patterns.push({
-      id: `pattern-${p}`,
-      name: `Pattern ${p}`,
-      length: ROWS_PER_PATTERN,
-      channels,
-    });
+    songPositions.push(idx);
   }
 
-  if (patterns.length === 0) return null;
-
-  // Count notes to verify we actually extracted something meaningful
-  let totalNotes = 0;
-  for (const pat of patterns) {
-    for (const ch of pat.channels) {
-      for (const row of ch.rows) {
-        if (row.note > 0 && row.note < 97) totalNotes++;
-      }
-    }
-  }
+  const totalNotes = patterns.reduce((n, pat) => n + pat.channels.reduce((m, c) => m + c.rows.filter(r => r.note > 0 && r.note < 97).length, 0), 0);
   if (totalNotes === 0) return null;
-
-  return { patterns, songPositions, instrumentCount: maxInstrument, patternOffsets };
+  return { patterns, songPositions, instrumentCount: maxInstrument, cellOffsets };
 }
 
 // ── Main parser ─────────────────────────────────────────────────────────────
@@ -309,13 +234,13 @@ export function parsePeterVerswyvelenPackerFile(buffer: ArrayBuffer, filename: s
   // ── Extract patterns ──────────────────────────────────────────────────────
   let patterns: Pattern[] = [];
   let songPositions: number[] = [0];
-  let patternOffsets: number[] = [];
+  let cellOffsets: number[][] = [];
 
   const extracted = extractPVPPatterns(buf, patCount, songLen);
   if (extracted) {
     patterns = extracted.patterns;
     songPositions = extracted.songPositions;
-    patternOffsets = extracted.patternOffsets;
+    cellOffsets = extracted.cellOffsets;
 
     // Ensure we have at least as many instruments as referenced in patterns
     while (instruments.length < extracted.instrumentCount) {
@@ -387,15 +312,18 @@ export function parsePeterVerswyvelenPackerFile(buffer: ArrayBuffer, filename: s
     uadeEditableFileName: filename,
     uadePatternLayout: {
       formatId: 'peterVerswyvelenPacker',
-      patternDataFileOffset: patternOffsets[0] ?? 0,
+      patternDataFileOffset: cellOffsets[0]?.find(o => o >= 0) ?? 0,
       bytesPerCell: 4,
       rowsPerPattern: ROWS_PER_PATTERN,
       numChannels: NUM_CHANNELS,
       numPatterns: patterns.length,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      // Patterns sit at step-table offsets, not back to back after a header; the empty fallback pattern has no file place.
-      getCellFileOffset: (pat, row, ch) => (patternOffsets[pat] === undefined ? -1 : patternOffsets[pat] + (row * NUM_CHANNELS + ch) * BYTES_PER_CELL),
+      encodeCell: encodePeterVerswyvelenPackerCell,
+      encodeOverStored: true,
+      decodeCell: decodePeterVerswyvelenPackerCell,
+      // Run-start rows hold their note's file offset; repeat rows and the empty fallback pattern have no file place.
+      getCellFileOffset: (pat, row, ch) => cellOffsets[pat]?.[row * NUM_CHANNELS + ch] ?? -1,
+      propagateSharedCells: true,
     } satisfies UADEPatternLayout,
   };
 }

@@ -472,6 +472,14 @@
       "matchPct": 1,
       "cells": 14
     },
+    "peterVerswyvelenPacker": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 2376
+    },
     "plm": {
       "kind": "fixed",
       "method": "decode-encode",

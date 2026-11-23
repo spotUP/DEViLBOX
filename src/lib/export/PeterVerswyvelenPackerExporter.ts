@@ -1,6 +1,6 @@
 /**
  * PeterVerswyvelenPackerExporter.ts - save a Peter Verswyvelen Packer (.pvp) song: the module it was loaded from, with each edited grid
- * cell's 4-byte MOD-style cell written where the parser's layout puts it (PeterVerswyvelenPackerParser.ts). Same length, and
+ * cell's 4-byte run-length note cell (PeterVerswyvelenPackerEncoder) written where the parser's layout puts it (PeterVerswyvelenPackerParser.ts). Same length, and
  * byte-exact where nothing was edited. Notes typed on rows the module has no place for come back as warnings.
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
