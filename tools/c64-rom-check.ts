@@ -1,7 +1,7 @@
 // Headless check, C64 route: .fur -> furnaceToGoatTracker -> GTUltra relocator -> buildC64Prg (.prg) -> VICE x64sc (-sounddev dump logs every
 // SID write with its cycle delta) -> per 50 Hz frame SID state, compared with the Furnace dispatch reference (furnace_dispatch_reg_writes,
 // captured by src/engine/__tests__/c64SidReference.capture.test.ts; the Furnace CLI -vgmout has no SID command).
-// Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/c64-rom-check.ts [--only <name>] [--failed] [--seconds N] [--keep <dir>]
+// Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/c64-rom-check.ts [--only <name>] [--failed] [--seconds N] [--keep <dir>] [--dump <states.json>]
 // Songs: every .fur under public/data/songs/furnace whose only chip is one SID. Results: test-data/c64-rom-check.json (skips recorded input hashes).
 // Per frame and voice: sounding = gate bit set with a waveform selected. Both sides start at their own first sounding frame.
 // keyOnMatch = share of Furnace gate-on edges with a .prg gate-on edge on the same voice within 2 frames. pitchMatch = share of frames where both
@@ -13,12 +13,13 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseFurnaceSong } from '../src/lib/import/formats/FurnaceSongParser';
+import { furnaceSidNtsc } from '../src/lib/export/c64/goatSong';
+import { c64CpuClock } from '../src/lib/export/c64/c64Prg';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SONGS = path.join(ROOT, 'public/data/songs/furnace');
 const RESULTS = path.join(ROOT, 'test-data/c64-rom-check.json');
 const VICE = process.env.X64SC ?? '/opt/homebrew/bin/x64sc';
-const PAL_FRAME = 63 * 312, PAL_CPU = 985248;
 const SID_SYSTEMS = new Set([0x47, 0x07]); // C64 8580, C64 6581
 
 interface Verdict { inputHash: string; file: string; pass: boolean; seconds: number; prgBytes?: number; prgStarts?: number; furnaceStarts?: number; keyOnMatch?: number; pitchMatch?: number; volumeMatch?: number; error?: string }
@@ -29,13 +30,14 @@ const opt = (k: string) => (args.includes(k) ? args[args.indexOf(k) + 1] : undef
 const only = opt('--only'), keep = opt('--keep'), failedOnly = args.includes('--failed');
 const SECONDS = Number(opt('--seconds') ?? 10), FRAMES = SECONDS * 50;
 
-/** VICE dump lines: "<cycles since previous write> <register> <value>" -> registers at the end of each PAL frame. */
-function viceFrames(prg: string, dir: string): number[][] {
+/** VICE dump lines: "<cycles since previous write> <register> <value>" -> registers at the end of each 1/50 s, on a PAL or NTSC machine. */
+function viceFrames(prg: string, dir: string, ntsc: boolean): number[][] {
+  const cpu = c64CpuClock(ntsc), frame = cpu / 50;
   const dump = path.join(dir, 'sid.dump');
   // Boot (autostart types RUN) takes about 3 s of emulated time; run long enough to cover it and FRAMES after the first note.
-  const cycles = (SECONDS + 8) * PAL_CPU;
+  const cycles = Math.round((SECONDS + 8) * cpu);
   try {
-    execFileSync(VICE, ['-default', '-console', '-silent', '-warp', '-sounddev', 'dump', '-soundarg', dump, '-autostartprgmode', '1', '-limitcycles', String(cycles), '-autostart', prg],
+    execFileSync(VICE, ['-default', ntsc ? '-ntsc' : '-pal', '-console', '-silent', '-warp', '-sounddev', 'dump', '-soundarg', dump, '-autostartprgmode', '1', '-limitcycles', String(cycles), '-autostart', prg],
       { stdio: 'ignore', timeout: 120000, cwd: dir });
   } catch { /* -limitcycles ends VICE with exit 1 */ }
   if (!existsSync(dump)) throw new Error('VICE wrote no SID dump');
@@ -45,7 +47,7 @@ function viceFrames(prg: string, dir: string): number[][] {
     const [d, r, v] = line.trim().split(/\s+/).map(Number);
     if (!Number.isFinite(v)) continue;
     cyc += d;
-    while ((frames.length + 1) * PAL_FRAME <= cyc) frames.push([...reg]);
+    while ((frames.length + 1) * frame <= cyc) frames.push([...reg]);
     if (r < 25) reg[r] = v;
   }
   frames.push([...reg]);
@@ -95,7 +97,8 @@ for (const file of walk(SONGS)) {
     const prg = path.join(dir, 'song.prg');
     execFileSync('npx', ['tsx', '--tsconfig', 'tsconfig.app.json', 'tools/c64-rom-save.ts', rel, prg], { cwd: ROOT, stdio: 'ignore', timeout: 120000 });
     if (keep) copyFileSync(prg, path.join(keep, `${name}.prg`));
-    const got = states(viceFrames(prg, dir)), want = states(furnaceFrames(rel, dir));
+    const got = states(viceFrames(prg, dir, furnaceSidNtsc(m))), want = states(furnaceFrames(rel, dir));
+    if (opt('--dump')) writeFileSync(opt('--dump')!, JSON.stringify({ got, want }));
     const romStarts = starts(got), wantStarts = starts(want).filter((w) => w.t < FRAMES - 50);
     const hit = wantStarts.filter((w) => romStarts.some((g) => g.ch === w.ch && Math.abs(g.t - w.t) <= 2)).length;
     let tone = 0, inTune = 0, volOk = 0;

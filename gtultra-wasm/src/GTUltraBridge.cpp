@@ -10,6 +10,7 @@
 #include <emscripten.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 /* Define GOATTRK2_C before including header so externs become definitions */
 #define GOATTRK2_C
@@ -447,6 +448,23 @@ int gt_save_sng(unsigned char* outBuf, int maxLen) {
 
 /* --- Export PRG/SID --- */
 
+/* The player's note table is gplay.c's PAL one (A-4 = 440 Hz at 985248 Hz). An NTSC song
+ * (editorInfo.ntsc) runs on a 1022727 Hz SID, so the exported table is recomputed for that
+ * clock for the relocation only; the editor's own playback keeps the PAL table. */
+static void relocateForClock(void) {
+    unsigned char lo[96], hi[96];
+    memcpy(lo, freqtbllo, 96); memcpy(hi, freqtblhi, 96);
+    if (editorInfo.ntsc) {
+        for (int c = 0; c < 96; c++) {
+            int f = (int)(440.0 * pow(2.0, (c - 57) / 12.0) * 16777216.0 / 1022727.0 + 0.5);
+            if (f > 0xffff) f = 0xffff;
+            freqtbllo[c] = f & 0xff; freqtblhi[c] = f >> 8;
+        }
+    }
+    relocator(&gtObject, 0, 1);
+    memcpy(freqtbllo, lo, 96); memcpy(freqtblhi, hi, 96);
+}
+
 EMSCRIPTEN_KEEPALIVE
 int gt_export_prg(unsigned char* outBuf, int maxLen) {
     if (editorInfo.maxSIDChannels == 0) editorInfo.maxSIDChannels = 3;
@@ -462,7 +480,7 @@ int gt_export_prg(unsigned char* outBuf, int maxLen) {
 
     songExported = 0;
     songExportSuccessFlag = 0;
-    relocator(&gtObject, 0, 1);
+    relocateForClock();
 
     if (!songExported) return 0;
 
@@ -492,7 +510,7 @@ int gt_export_sid(unsigned char* outBuf, int maxLen) {
 
     songExported = 0;
     songExportSuccessFlag = 0;
-    relocator(&gtObject, 0, 1);
+    relocateForClock();
 
     if (!songExported) return 0;
 

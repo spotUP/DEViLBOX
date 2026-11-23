@@ -86,7 +86,13 @@ class Asm {
   }
 }
 
-export function buildC64Prg(playerPrg: Uint8Array, title: string, author: string, message?: string): Uint8Array {
+/** CPU clock of the machine the .prg targets: NTSC 1022727 Hz, PAL 985248 Hz. */
+export const c64CpuClock = (ntsc: boolean): number => (ntsc ? 1022727 : 985248);
+
+/** `hz` player calls per second, driven by CIA 1 timer A so any rate plays exact on the target machine (`ntsc`). */
+export function buildC64Prg(playerPrg: Uint8Array, title: string, author: string, message?: string, timing = { hz: 50, ntsc: false }): Uint8Array {
+  const latch = Math.round(c64CpuClock(timing.ntsc) / timing.hz) - 1, fps = Math.min(255, Math.max(1, Math.round(timing.hz))); // shortcut: clock runs fast above 255 Hz, upgrade if a song needs it
+  if (latch < 0x400 || latch > 0xffff) throw new Error(`tick rate ${timing.hz} Hz does not fit the CIA timer`);
   if (playerPrg.length < 3 || (playerPrg[0] | (playerPrg[1] << 8)) !== PLAYER) throw new Error('player must load at $1000');
   const playerEnd = PLAYER + playerPrg.length - 2;
   const [scr, col] = c64Screen(title, author);
@@ -107,17 +113,18 @@ export function buildC64Prg(playerPrg: Uint8Array, title: string, author: string
   s.o(LDA_I, 0x00); s.a(0x20, PLAYER); //         jsr init (subtune 0)
   s.o(LDA_I, 0); const irqLo = s.b.length - 1; s.a(STA, 0x0314);
   s.o(LDA_I, 0); const irqHi = s.b.length - 1; s.a(STA, 0x0315);
-  s.o(LDA_I, 0x01); s.a(STA, 0xd01a); //          raster IRQ on
-  s.o(LDA_I, 0x1b); s.a(STA, 0xd011); //          raster bit 8 clear, text mode
-  s.o(LDA_I, 0x80); s.a(STA, 0xd012); //          raster line $80
+  s.o(LDA_I, latch & 0xff); s.a(STA, 0xdc04); s.o(LDA_I, latch >> 8); s.a(STA, 0xdc05); // CIA 1 timer A period = clock / hz
+  s.o(LDA_I, 0x81); s.a(STA, 0xdc0d); //          timer A IRQ on
+  s.o(LDA_I, 0x11); s.a(STA, 0xdc0e); //          load latch, run continuous
+  s.o(LDA_I, 0x1b); s.a(STA, 0xd011); //          text mode
   s.o(0x58); //                                   cli
   s.l('loop'); s.a(0x4c, 'loop');
   const irq = s.pc;
-  s.a(INC, 0xd019); //                            ack
+  s.a(LDA, 0xdc0d); //                            ack the timer IRQ
   s.a(0x20, PLAYER + 3); //                       jsr play
-  // Time: mm:ss in screen RAM, one second per 50 frames (PAL).
+  // Time: mm:ss in screen RAM, one second per `fps` player calls.
   s.a(DEC, 'FRM'); s.br(BNE, 'scroll');
-  s.o(LDA_I, 50); s.a(STA, 'FRM');
+  s.o(LDA_I, fps); s.a(STA, 'FRM');
   for (const [d, lim] of [[4, 0x3a], [3, 0x36], [1, 0x3a]] as const) {
     s.a(INC, timeAt + d); s.a(LDA, timeAt + d); s.o(CMP_I, lim); s.br(BNE, 'scroll'); s.o(LDA_I, 0x30); s.a(STA, timeAt + d);
   }
@@ -129,7 +136,7 @@ export function buildC64Prg(playerPrg: Uint8Array, title: string, author: string
   s.a(0xae, 'MP'); s.a(LDA_X, 'MSG'); s.br(BNE, 'put'); s.o(0xa2, 0x00); s.a(LDA, 'MSG');
   s.l('put'); s.a(STA, rowMsg + 38); s.o(0xe8); s.a(0x8e, 'MP');
   s.l('out'); s.a(0x4c, 0xea31); //               KERNAL keyboard scan + register restore
-  s.l('FRM'); s.o(50); s.l('SCF'); s.o(8); s.l('MP'); s.o(0);
+  s.l('FRM'); s.o(fps); s.l('SCF'); s.o(8); s.l('MP'); s.o(0);
   // Screen code 0 is '@' and ends the message; screenCode never yields it.
   s.l('MSG'); s.o(...msgCodes, 0);
   const code = s.done();

@@ -27,6 +27,6 @@ if (!w.cwrap('gt_load_sng', 'number', ['number', 'number'])(p, sng.length)) thro
 const MAX = 65536, o = w._malloc(MAX);
 const n = w.cwrap('gt_export_prg', 'number', ['number', 'number'])(o, MAX);
 if (!n) throw new Error('GT relocator failed');
-const prg = buildC64Prg(b.heap().slice(o, o + n), m.name, m.author);
+const prg = buildC64Prg(b.heap().slice(o, o + n), m.name, m.author, undefined, { hz: g.hz, ntsc: g.settings.ntsc });
 writeFileSync(out, prg);
 console.log(`wrote ${out} ${prg.length} B (player ${n} B, ${g.song.patterns.length} patterns); lossy: ${g.lossy.join('; ') || 'none'}`);

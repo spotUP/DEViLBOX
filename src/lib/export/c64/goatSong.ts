@@ -4,8 +4,9 @@
  * relocator (gt_export_prg) and booted by c64Prg.ts.
  *
  * Milestone 1 scope: notes, note off/release, instrument changes, instrument
- * ADSR, waveform, ring/sync, initial duty, initial filter, speed (tempo) and
- * the PAL/NTSC tick rate. Everything else is reported in `lossy`.
+ * ADSR, waveform, ring/sync, initial duty, initial filter, speed (tempo), the
+ * tick rate (`hz`, played from a CIA timer) and the chip clock (clockSel: NTSC or
+ * PAL machine and note table). Everything else is reported in `lossy`.
  */
 import type { FurnaceModule } from '../../import/formats/FurnaceSongParser';
 import type { FurnaceInstrument } from '../../import/formats/furnace/FurnaceInstrumentParser';
@@ -22,8 +23,13 @@ const GT_KEYOFF = 0xbe;
 const GT_MAX_ROWS = 128;
 const GT_MAX_PATT = 208;
 const CMD_SETTEMPO = 0x0f;
+const CMD_FUNKTEMPO = 0x0e;
 
-export interface GoatSong { song: GTSongData; settings: GTPlaySettings; lossy: string[] }
+/** `hz`: player calls per second. `settings.ntsc`: the song's SID runs at the NTSC clock (machine + note table). */
+export interface GoatSong { song: GTSongData; settings: GTPlaySettings; hz: number; lossy: string[] }
+
+/** Furnace c64.cpp setFlags clockSel: 0 NTSC 1022727 Hz, 1 PAL 985248 Hz, 2 SSI 2001 (894886 Hz, no C64 runs it). */
+export const furnaceSidNtsc = (m: { chipFlags?: string[] }): boolean => Number(/clockSel=(\d)/.exec(m.chipFlags?.[0] ?? '')?.[1] ?? 0) !== 1;
 
 export function goatSystemsSupported(sys: readonly number[]): boolean {
   return sys.length === 1 && C64_SYSTEM_IDS.includes(sys[0]);
@@ -70,12 +76,14 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
   const instruments: GTInstrument[] = [emptyGTInstrument()];
   for (let i = 0; i < Math.min(m.instruments.length, GT_MAX_INSTR - 1); i++) instruments.push(instrumentOf(m.instruments[i], i, tables, lossy));
 
-  const ntsc = Math.round(s.hz) === 60;
-  if (Math.round(s.hz) !== 50 && !ntsc) lossy.add(`tick rate ${s.hz} Hz (played at 50 Hz)`);
-  if (s.speed1 !== s.speed2) lossy.add('alternating speeds (speed 1 used)');
+  const ntsc = furnaceSidNtsc(m);
+  if (/clockSel=2/.test(m.chipFlags?.[0] ?? '')) lossy.add('SSI 2001 clock (played on an NTSC C64)');
   if (s.virtualTempo !== s.virtualTempoD) lossy.add('virtual tempo');
-  const tempo = Math.max(3, s.speed1);
-  if (s.speed1 < 3) lossy.add(`speed ${s.speed1} (GT tempo minimum 3)`);
+  const tempo = Math.max(3, s.speed1), tempo2 = Math.max(3, s.speed2);
+  if (Math.min(s.speed1, s.speed2) < 3) lossy.add(`speed ${Math.min(s.speed1, s.speed2)} (GT tempo minimum 3)`);
+  // Furnace alternates speed1 / speed2 per row: GT funktempo, one speedtable pair (1-based pointer).
+  let funk = 0;
+  if (tempo !== tempo2) { tables[3].left.push(tempo); tables[3].right.push(tempo2); funk = tables[3].left.length; }
 
   // One GT pattern per (Furnace pattern, 128-row slice); shared across channels like Furnace's per-channel patterns are not.
   const patterns: number[][][] = [];
@@ -111,7 +119,7 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
               if (cell.volume >= 0) lossy.add('volume column');
               for (const e of cell.effects) if (e.type >= 0) lossy.add(`effect ${e.type.toString(16).padStart(2, '0')}`);
             }
-            if (first && r === 0) { cmd = CMD_SETTEMPO; data = tempo; }
+            if (first && r === 0) { cmd = funk ? CMD_FUNKTEMPO : CMD_SETTEMPO; data = funk || tempo; }
             rows.push([note, ins, cmd, data]);
           }
           gi = patterns.length;
@@ -127,5 +135,5 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
   for (let t = 0; t < 3; t++) if (tables[t].left.length > 255) throw new Error(`GT table ${t} overflows (${tables[t].left.length} rows)`);
 
   const song: GTSongData = { name: m.name.slice(0, 32), author: m.author.slice(0, 32), copyright: '', orderlists: [orderlists], instruments, tables, patterns };
-  return { song, settings: { multiplier: 1, ntsc, adparam: 0x0f00, optimizeRealtime: true }, lossy: lossy.list() };
+  return { song, settings: { multiplier: 1, ntsc, adparam: 0x0f00, optimizeRealtime: true }, hz: s.hz, lossy: lossy.list() };
 }
