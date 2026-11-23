@@ -282,7 +282,9 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   // Tick rate: VBlank when it is the Furnace GB default, else the timer at 4096 / (256 - TMA) Hz (16-4096 Hz).
   const timerTma = Math.abs(s.hz - VBLANK_HZ) <= 0.5 ? 0 : 256 - Math.min(255, Math.max(1, Math.round(4096 / s.hz)));
   if (timerTma && Math.abs(4096 / (256 - timerTma) - s.hz) > 0.5) lossy.add(`tick rate ${s.hz} Hz played at ${(4096 / (256 - timerTma)).toFixed(2)} Hz`);
-  if (s.speed2 !== s.speed1) lossy.add(`speed 2 (${s.speed2}) and groove: played at speed 1 (${s.speed1})`);
+  const speeds = s.speedPattern?.length ? s.speedPattern : [s.speed1, s.speed2];
+  if (speeds.length > 2) lossy.add(`speed pattern of ${speeds.length} steps (first two kept)`);
+  const speedAlt = speeds[1] !== undefined && speeds[1] !== speeds[0] ? Math.min(255, Math.max(1, speeds[1])) : 0;
   if (m.subsongs.length > 1) lossy.add('other subsongs (only one exported)');
   const cellAt = (ch: number, o: number, r: number): FurnacePatternCell | undefined => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o]}`)?.rows[r];
 
@@ -439,9 +441,10 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   // Layout.
   const out: number[] = [];
   const w16 = (at: number, v: number) => { out[at] = v & 0xff; out[at + 1] = (v >> 8) & 0xff; };
-  out.length = 23;
+  out.length = 24; // 23 descriptor bytes + the alternate speed
   out.fill(0);
-  out[0] = Math.max(1, s.speed1);
+  out[0] = Math.max(1, speeds[0]);
+  out[23] = speedAlt;
   const here = () => BASE + out.length;
   w16(1, here()); out.push((hOrders * 2) & 0xff, (hOrders * 2) >> 8);
   const orderAt: number[] = [];

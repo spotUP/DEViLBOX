@@ -63,6 +63,9 @@ pattern4: dw
 
 ;; How long a row lasts in ticks (1 = one row per call to `hUGE_dosound`, etc. 0 translates to 256)
 ticks_per_row: db
+;; DEViLBOX: Furnace speed alternation. The other speed of a two-entry speed pattern (0 = none);
+;; swapped with ticks_per_row at every row boundary. Outside start_zero so hUGE_init keeps it.
+speed_alt: db
 
 _hUGE_current_wave::
 hUGE_current_wave::
@@ -192,6 +195,10 @@ hUGE_init::
     inc de
     dec c
     jr nz, .copy_song_descriptor_loop
+
+    ;; DEViLBOX: the byte after the descriptor pointers is the alternate speed
+    ld a, [hl]
+    ld [speed_alt], a
 
 IF !DEF(PREVIEW_MODE)
     ;; Zero some ram
@@ -2074,6 +2081,17 @@ ENDC
     sub [hl]
     ret nz ; Nope.
     ld [hl+], a ; Reset tick to 0
+    ;; DEViLBOX: speed pattern of two entries, swap speeds per row
+    ld a, [speed_alt]
+    and a
+    jr z, .no_speed_alt
+    ld b, a
+    ld a, [ticks_per_row]
+    ld [speed_alt], a
+    ld a, b
+    ld [ticks_per_row], a
+.no_speed_alt:
+    xor a
     ;; Below code relies on a == 0
 
     assert tick + 1 == row_break
