@@ -19,6 +19,8 @@ export async function applyPxtoneGridEdits(song: TrackerSong, edits: readonly Li
   }
   if (!events) return null;
   song.pxtoneEvents = events;
+  const { useFormatStore } = await import('@/stores/useFormatStore');
+  useFormatStore.setState({ pxtoneEvents: events });
   const { PxtoneEngine } = await import('./PxtoneEngine');
   if (PxtoneEngine.hasInstance()) await PxtoneEngine.getInstance().setEvents(events);
   return events;

@@ -201,6 +201,8 @@ export const NAMED_EXPORTERS: NamedExporterTarget[] = [
   { id: 'symphoniePro', label: 'Symphonie (SymphonieProExporter)', fixture: 'public/data/songs/symphonie/pas 2 jade.symmod' },
   // Store-dependent: reads useTrackerStore/useInstrumentStore, not the passed song. Headless
   // it exports from empty stores; kept for completeness, measured honestly.
+  // Needs the Pxtone wasm (browser bundle); round trip and edit are measured in src/engine/__tests__/pxtoneExport.test.ts.
+  { id: 'pxtone', label: 'PxTone (PxtoneExporter, wasm-dependent)', fixture: 'public/data/songs/piston-collage/obj1263-1.ptcop', storeDependent: true },
   { id: 'preTracker', label: 'PreTracker (PreTrackerExporter, store-dependent)', fixture: 'public/data/songs/pretracker/the little things.prt', storeDependent: true },
   // No committed fixture found (reported missing-fixture — Task 1.3):
   { id: 'adPlug', label: 'AdPlug (AdPlugExporter)', fixture: 'public/templates/adplug.rad' },

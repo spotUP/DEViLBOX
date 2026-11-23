@@ -760,6 +760,14 @@
       "cells": 0,
       "bytes": 0
     },
+    "pxtone": {
+      "exporter": "PxTone (PxtoneExporter, wasm-dependent)",
+      "tier": "pattern-data",
+      "status": "store-dependent",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
+    },
     "psa": {
       "exporter": "PSAExporter.exportPSA",
       "tier": "byte-exact",

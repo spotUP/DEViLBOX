@@ -117,6 +117,7 @@ export function liveTrackerSong(overrides: Partial<TrackerSong> = {}): TrackerSo
     gmeTracks: fmt.nativeSubsongs?.engine === 'Gme' ? fmt.nativeSubsongs.count : undefined,
     fileSubsongs: fmt.fileSubsongs ?? undefined,
     asapSong: fmt.asapSong ?? undefined,
+    pxtoneEvents: fmt.pxtoneEvents ?? undefined,
   };
   // Every native engine binary, from the one list that names them.
   const store = fmt as unknown as Record<string, unknown>;
