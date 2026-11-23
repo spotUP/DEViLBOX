@@ -159,6 +159,8 @@ async function measure(t: ExporterTarget): Promise<FormatResult> {
   try {
     raw = readFixture(t.fixture);
     song = await parseAs(t.fixture, raw);
+    // The app's load route (AmigaFormatParsers) also keeps the source bytes; the TFMX exporter patches those.
+    if (t.id === 'tfmx') (song as { tfmxFileData?: ArrayBuffer }).tfmxFileData = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
   } catch (e) {
     return { ...base, status: 'parse-error', error: `parse: ${(e as Error).message}` };
   }

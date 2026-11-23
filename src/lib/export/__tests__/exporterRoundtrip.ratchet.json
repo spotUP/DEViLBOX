@@ -1090,11 +1090,11 @@
     },
     "tfmx": {
       "exporter": "TFMXExporter.exportTFMX",
-      "tier": "pattern-data",
-      "status": "pattern-match",
-      "matchPct": 0.8587,
-      "cells": 5824,
-      "bytes": 34304
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 7108,
+      "bytes": 7108
     },
     "tfmx7v": {
       "exporter": "Tfmx7vExporter.exportTfmx7v",
