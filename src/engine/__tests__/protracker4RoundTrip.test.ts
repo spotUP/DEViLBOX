@@ -78,3 +78,31 @@ describe.skipIf(!existsSync(showcase))('ProTracker 4: 32-channel showcase', () =
     setGridBaseline(null);
   });
 });
+
+// Effect and volume edits: MOD cells have no volume column, so volume lives in effect C (set volume). Both must reach the bytes.
+describe('ProTracker 4: effect and volume cell edits', () => {
+  it.each([
+    ['effect', { effTyp: 0xF, eff: 0x05 }, 0xF, 0x05],
+    ['volume (effect C)', { effTyp: 0xC, eff: 0x20 }, 0xC, 0x20],
+  ])('a %s edit exports into that cell only and re-parses', async (_label, patch, effTyp, eff) => {
+    const name = 'libpt4-pt4x_40.mod';
+    const bytes = load(name);
+    const song = await parseProTracker4File(bytes, name);
+    const at = { p: 0, ch: 0, row: 0 };
+    setGridBaseline(baselineOf(song.patterns));
+    const original = new Uint8Array(bytes);
+    const cell = song.patterns[at.p].channels[at.ch].rows[at.row];
+    song.patterns[at.p].channels[at.ch].rows[at.row] = { ...cell, ...patch };
+    const edited = exportProTracker4(song).data;
+    const off = 1084 + (at.p * 64 + at.row) * song.numChannels * 4 + at.ch * 4;
+    const changed: number[] = [];
+    edited.forEach((v, i) => { if (v !== original[i]) changed.push(i); });
+    expect(changed.every((i) => i >= off && i < off + 4), `only the cell at ${off} changed, got ${changed}`).toBe(true);
+    expect(edited[off + 2] & 0x0f, 'effect nibble in the file').toBe(effTyp);
+    expect(edited[off + 3], 'effect parameter in the file').toBe(eff);
+    const again = await parseProTracker4File(edited.buffer.slice(edited.byteOffset, edited.byteOffset + edited.byteLength) as ArrayBuffer, name);
+    const back = again.patterns[at.p].channels[at.ch].rows[at.row];
+    expect([back.effTyp, back.eff]).toEqual([effTyp, eff]);
+    setGridBaseline(null);
+  });
+});

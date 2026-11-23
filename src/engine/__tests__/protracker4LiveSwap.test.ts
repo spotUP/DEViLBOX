@@ -50,4 +50,15 @@ describe('ProTracker 4: an edit is heard while the song plays', { timeout: 30000
       useTrackerStore.getState().setCell(cell.ch, cell.row, { note: cur + (cur > 60 ? -2 : 2) });
     });
   });
+
+  it('an effect (set volume, effect C) written on a note cell: heard live, same as the edited module', async () => {
+    await importSong(spec.file);
+    const { useTrackerStore } = await import('@/stores/useTrackerStore');
+    const cells: LiveCell[] = [];
+    useTrackerStore.getState().patterns.slice(0, 4).forEach((pat, p) => pat.channels.forEach((c, ch) => c.rows.forEach((cell, row) => { if (row >= 4 && cell.note > 0 && cell.note < 97) cells.push({ p, ch, row }); })));
+    cells.sort((a, b) => a.p - b.p || a.row - b.row);
+    await assertLiveSwap(expect as never, spec, cells.slice(0, 10), (cell) => {
+      useTrackerStore.getState().setCell(cell.ch, cell.row, { effTyp: 0xC, eff: 0x08 });
+    });
+  });
 });
