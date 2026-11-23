@@ -19,11 +19,11 @@ function makePVPBuffer(): ArrayBuffer {
   // offset 248: patCount = 2 (non-zero, bit-15 clear)
   buf[248] = 0x00; buf[249] = 0x02;
 
-  // offset 250: songLen = 2 (non-zero, bit-15 clear, even)
-  buf[250] = 0x00; buf[251] = 0x02;
+  // offset 250: songLen = 4 (non-zero, bit-15 clear, even)
+  buf[250] = 0x00; buf[251] = 0x04;
 
-  // offset 252: val252 = 4 (songLen < val252: 2 < 4 OK)
-  buf[252] = 0x00; buf[253] = 0x04;
+  // offset 252: restart entry = 2 (the player faults when songLen <= it; nuade check_header)
+  buf[252] = 0x00; buf[253] = 0x02;
 
   // offset 254: limit = 10 (non-zero, bit-15 clear)
   buf[254] = 0x00; buf[255] = 0x0a;
@@ -50,13 +50,13 @@ describe('isPeterVerswyvelenPackerFormat', () => {
 
   it('rejects odd songLen', () => {
     const buf = new Uint8Array(makePVPBuffer());
-    buf[251] = 0x03; // songLen = 3 (odd)
+    buf[251] = 0x05; // songLen = 5 (odd)
     expect(isPeterVerswyvelenPackerFormat(buf)).toBe(false);
   });
 
-  it('rejects songLen >= val252', () => {
+  it('rejects songLen <= restart entry', () => {
     const buf = new Uint8Array(makePVPBuffer());
-    buf[252] = 0x00; buf[253] = 0x02; // val252 = 2 == songLen (not strictly less)
+    buf[252] = 0x00; buf[253] = 0x04; // restart entry = 4 == songLen
     expect(isPeterVerswyvelenPackerFormat(buf)).toBe(false);
   });
 
