@@ -156,7 +156,9 @@ export async function exportDSMDyn(
   // Version 0x20
   output[4] = 0x20;
   // Title (20 bytes)
-  writeStringPadded(output, 5, song.name || '', 20);
+  // The parser fills an empty title with the file's base name; writing it back would invent bytes.
+  const srcBase = (song.patterns[0]?.importMetadata?.sourceFile ?? '').replace(/\.[^/.]+$/, '');
+  writeStringPadded(output, 5, song.name === srcBase ? '' : song.name || '', 20);
   // Artist (20 bytes) — not stored in TrackerSong, leave blank
   writeStringPadded(output, 25, '', 20);
   // numChannels
@@ -192,7 +194,8 @@ export async function exportDSMDyn(
   for (let patIdx = 0; patIdx < numPatterns; patIdx++) {
     for (let ch = 0; ch < channels; ch++) {
       const pat = song.patterns[patIdx];
-      const name = pat?.channels[ch]?.name ?? `Channel ${ch + 1}`;
+      const rawName = pat?.channels[ch]?.name ?? '';
+      const name = rawName === `Channel ${ch + 1}` ? '' : rawName; // parser default, not source bytes
       writeStringPadded(output, cur, name.substring(0, 8), 8);
       cur += 8;
     }

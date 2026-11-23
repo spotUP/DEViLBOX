@@ -121,6 +121,10 @@ export async function invokeLayoutExport(id: string, song: TrackerSong): Promise
 /** Invoke a named-format serializer with its real call signature. */
 export async function invokeNamedExport(id: string, song: TrackerSong): Promise<Uint8Array> {
   switch (id) {
+    case 'adPlug': {
+      const { exportAdPlug } = await import('../AdPlugExporter');
+      return normalizeExport(await exportAdPlug(song, 'rad'));
+    }
     case 'jamCracker': {
       const { exportAsJamCracker } = await import('../JamCrackerExporter');
       return normalizeExport(await exportAsJamCracker(song));

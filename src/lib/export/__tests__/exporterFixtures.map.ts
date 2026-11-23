@@ -159,6 +159,11 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   beathoven: 'public/data/songs/formats/beathoven_smallest.bss',
   howieDavies: 'public/data/songs/formats/blazing_thunder.hd',
   chuckBiscuits: 'public/templates/chuckBiscuits.cba',
+  jasonPage: 'public/data/songs/jason-page/jpn.fire and ice-1',
+  synthesis: 'public/data/songs/synthesis/space sound.syn',
+  dsm_dyn: 'public/templates/dsm_dyn.dsm',
+  xmf: 'public/templates/xmf.xmf',
+  amosMusicBank: 'public/templates/amosMusicBank.abk',
   // No committed fixture found (reported missing-fixture by the harness — Task 1.3):
   //   amosMusicBank, synthesis, dsm_dyn, xmf
 };
@@ -198,5 +203,5 @@ export const NAMED_EXPORTERS: NamedExporterTarget[] = [
   // it exports from empty stores; kept for completeness, measured honestly.
   { id: 'preTracker', label: 'PreTracker (PreTrackerExporter, store-dependent)', fixture: 'public/data/songs/pretracker/the little things.prt', storeDependent: true },
   // No committed fixture found (reported missing-fixture — Task 1.3):
-  { id: 'adPlug', label: 'AdPlug (AdPlugExporter)', fixture: undefined },
+  { id: 'adPlug', label: 'AdPlug (AdPlugExporter)', fixture: 'public/templates/adplug.rad' },
 ];

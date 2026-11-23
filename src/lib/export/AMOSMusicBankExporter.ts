@@ -389,7 +389,9 @@ export function exportAMOSMusicBank(song: TrackerSong): ArrayBuffer {
   writeU16BE(view, songDataBase + 0x0A, 0); // unused
 
   // Song name (16 bytes)
-  writeString(view, songDataBase + 0x0C, song.name ?? '', 16);
+  // The parser fills an empty name with the file's base name; writing it back would invent bytes.
+  const srcBase = (song.uadeEditableFileName ?? '').replace(/\.[^/.]+$/, '');
+  writeString(view, songDataBase + 0x0C, song.name === srcBase ? '' : song.name ?? '', 16);
 
   // Write playlists for all 4 channels (same pattern indices)
   for (let ch = 0; ch < 4; ch++) {

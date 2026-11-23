@@ -19,18 +19,18 @@
     "adPlug": {
       "exporter": "AdPlug (AdPlugExporter)",
       "tier": "pattern-data",
-      "status": "missing-fixture",
-      "matchPct": 0,
-      "cells": 0,
-      "bytes": 0
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 4032,
+      "bytes": 61
     },
     "amosMusicBank": {
       "exporter": "AMOSMusicBankExporter.exportAMOSMusicBank",
-      "tier": "pattern-data",
-      "status": "missing-fixture",
-      "matchPct": 0,
-      "cells": 0,
-      "bytes": 0
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 142,
+      "bytes": 142
     },
     "ams": {
       "exporter": "AMSExporter.exportAMS",
@@ -234,11 +234,11 @@
     },
     "dsm_dyn": {
       "exporter": "DSMDynExporter.exportDSMDyn",
-      "tier": "pattern-data",
-      "status": "missing-fixture",
-      "matchPct": 0,
-      "cells": 0,
-      "bytes": 0
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 1157,
+      "bytes": 1157
     },
     "dynamicSynthesizer": {
       "exporter": "DynamicSynthesizerExporter.exportDynamicSynthesizer",
@@ -458,11 +458,11 @@
     },
     "jasonPage": {
       "exporter": "JasonPageExporter.exportJasonPage",
-      "tier": "pattern-data",
-      "status": "missing-fixture",
-      "matchPct": 0,
-      "cells": 0,
-      "bytes": 0
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 5374,
+      "bytes": 5374
     },
     "jeroenTel": {
       "exporter": "JeroenTelExporter.exportJeroenTel",
@@ -1058,11 +1058,11 @@
     },
     "synthesis": {
       "exporter": "SynthesisExporter.exportSynthesis",
-      "tier": "pattern-data",
-      "status": "missing-fixture",
-      "matchPct": 0,
-      "cells": 0,
-      "bytes": 0
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 2416,
+      "bytes": 2416
     },
     "synthPack": {
       "exporter": "SynthPackExporter.exportSynthPack",
@@ -1187,10 +1187,10 @@
     "xmf": {
       "exporter": "XMFExporter.exportXMF",
       "tier": "pattern-data",
-      "status": "missing-fixture",
-      "matchPct": 0,
-      "cells": 0,
-      "bytes": 0
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 256,
+      "bytes": 6407
     },
     "zoundMonitor": {
       "exporter": "ZoundMonitorExporter.exportZoundMonitor",
@@ -1201,12 +1201,5 @@
       "bytes": 2442
     }
   },
-  "missingFixture": [
-    "adPlug",
-    "amosMusicBank",
-    "dsm_dyn",
-    "jasonPage",
-    "synthesis",
-    "xmf"
-  ]
+  "missingFixture": []
 }
