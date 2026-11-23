@@ -36,6 +36,7 @@ export interface EncoderFixture {
 export const ENCODER_FIXTURES: EncoderFixture[] = [
   // activisionPro left the harness: since 8c7aedfa0 its grid is the replayer's event stream and
   // cell edits are written into the event bytes by the module model, not by a UADE cell layout.
+  { formatId: "aProSys", fixture: "public/data/songs/formats/action.aps", kind: "fixed" },
   { formatId: "artOfNoise", fixture: "public/data/songs/art-of-noise/inside.blipp.aon", kind: "fixed" },
   { formatId: "ams", fixture: "public/data/songs/velvet-studio/kernel.ams", kind: "variable" },
   { formatId: "ashleyHogg", fixture: "public/data/songs/ashley-hogg/ash.nobby the aardvark", kind: "variable" },
