@@ -19,8 +19,9 @@ import { exportToGBS, canExportGBS, type GBSExportOptions } from './GBSExporter'
 import { exportToSPC, canExportSPC, type SPCExportOptions } from './SPCExporter';
 import { exportToS98, canExportS98, type S98ExportOptions } from './S98Exporter';
 import { exportToSNDH, canExportSNDH, type SNDHExportOptions } from './SNDHExporter';
+import { exportToPSG, exportToTAYM, canExportPSG, type PSGExportOptions } from './PSGExporter';
 
-export type ChipExportFormat = 'vgm' | 'zsm' | 'sap' | 'tiuna' | 'gym' | 'nsf' | 'gbs' | 'spc' | 's98' | 'sndh';
+export type ChipExportFormat = 'vgm' | 'zsm' | 'sap' | 'tiuna' | 'gym' | 'nsf' | 'gbs' | 'spc' | 's98' | 'sndh' | 'psg' | 'taym';
 
 export interface ChipExportOptions {
   format: ChipExportFormat;
@@ -39,6 +40,8 @@ export interface ChipExportOptions {
   spc?: Partial<SPCExportOptions>;
   s98?: Partial<S98ExportOptions>;
   sndh?: Partial<SNDHExportOptions>;
+  psg?: Partial<PSGExportOptions>;
+  taym?: Partial<PSGExportOptions>;
 }
 
 export interface ChipExportResult {
@@ -155,6 +158,20 @@ export const FORMAT_INFO: Record<ChipExportFormat, {
     mimeType: 'application/octet-stream',
     description: 'Atari ST music format for YM2149 (AY-compatible) chip.',
     supportedChips: [FurnaceChipType.AY]
+  },
+  psg: {
+    name: 'PSG (AY register dump)',
+    extension: 'psg',
+    mimeType: 'application/octet-stream',
+    description: 'Bulba PSG dump of the AY-3-8910 registers at 50 Hz. Plays in ZXTune, AYEmul and Vortex Tracker.',
+    supportedChips: [FurnaceChipType.AY]
+  },
+  taym: {
+    name: 'TAYM (AY container)',
+    extension: 'taym',
+    mimeType: 'application/octet-stream',
+    description: 'TAYM container holding the AY register dump (PSG0 chunk), no timers.',
+    supportedChips: [FurnaceChipType.AY]
   }
 };
 
@@ -213,6 +230,10 @@ export function getAvailableFormats(writes: RegisterWrite[]): ChipExportFormat[]
   // SNDH requires AY/YM2149
   if (canExportSNDH(writes)) {
     formats.push('sndh');
+  }
+
+  if (canExportPSG(writes)) {
+    formats.push('psg', 'taym');
   }
 
   return formats;
@@ -348,6 +369,14 @@ export async function exportChipMusic(
         composer: options.author,
         ...options.sndh
       });
+      break;
+
+    case 'psg':
+      data = exportToPSG(writes, { ...options.psg });
+      break;
+
+    case 'taym':
+      data = exportToTAYM(writes, { title: options.title, ...options.taym });
       break;
 
     default:

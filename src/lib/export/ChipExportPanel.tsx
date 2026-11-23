@@ -320,6 +320,8 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
                 tiuna: { supported: false, type: 'none' },
                 s98: { supported: true, type: 'custom' },
                 sndh: { supported: false, type: 'none' },
+                psg: { supported: false, type: 'none' },
+                taym: { supported: false, type: 'none' },
               }[fmt] ?? { supported: false, type: 'none' };
 
               return (
@@ -367,6 +369,8 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
                   tiuna: 'none',
                   s98: 'custom',
                   sndh: 'none',
+                  psg: 'none',
+                  taym: 'none',
                 }[chipFormat] ?? 'none';
 
                 if (loopType === 'custom') {

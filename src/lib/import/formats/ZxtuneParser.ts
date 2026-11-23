@@ -32,7 +32,9 @@ export function isZxtuneFormat(data: ArrayBuffer): boolean {
   if (bytes[0] === 0x61 && bytes[1] === 0x79) return true; // "ay"
   if (bytes[0] === 0x79 && bytes[1] === 0x6D) return true; // "ym"
 
-  // PSG: 0x1A at offset 0 (PSG dump marker)
+  // PSG: "PSG" 0x1A at offset 0 (Bulba AY dump)
+  if (bytes[0] === 0x50 && bytes[1] === 0x53 && bytes[2] === 0x47 && bytes[3] === 0x1A) return true;
+  // legacy loose check: 0x1A first byte
   if (bytes[0] === 0x1A) return true;
 
   // PT3: "ProTracker 3" or "Vortex Tracker" at offset 0
