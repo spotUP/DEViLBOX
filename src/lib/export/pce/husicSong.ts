@@ -22,7 +22,7 @@ const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PITCH 
 const FREQ_TABLE = 0x19; // `_freq` sits right after LL0's two strings in the const bank
 const NOISE_FREQ = [4, 13, 15, 18, 21, 23, 25, 27, 29, 31, 0, 2]; // Furnace pce.cpp noiseFreq (old noise layout)
 // HuSIC track commands (hmckc output / hus.c SEQ_xx)
-const SLUR = 0xe9, PORTA = 0xeb, PAN = 0xf0, WAVE = 0xf1, NOISE = 0xf2, WAIT = 0xf4, NOTE_ENV = 0xf7, REST = 0xfc, VOLUME = 0xfd, WAVE_ENV = 0xfe, JUMP = 0xee;
+const SLUR = 0xe9, PORTA = 0xeb, PAN = 0xf0, WAVE = 0xf1, NOISE = 0xf2, WAIT = 0xf4, NOTE_ENV = 0xf7, PITCH_ENV = 0xf8, REST = 0xfc, VOLUME = 0xfd, WAVE_ENV = 0xfe, JUMP = 0xee;
 const HANDLED = new Set([0x00, 0x03, 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0f, 0x10, 0x11, 0xec, 0xed]);
 
 interface Frames { vals: number[]; loop: number }
@@ -56,9 +56,11 @@ class EnvTable {
   }
   /** Level-style envelope (volume, wave index): values, then $FF; the loop jumps to the loop frame or holds the last value. */
   level(f: Frames): number { return this.add([...f.vals, 0xff], f.loop >= 0 ? f.loop : f.vals.length - 1); }
-  /** Note envelope: HuSIC adds each byte to the current note (bit 7 = down), so absolute offsets become deltas. */
-  note(f: Frames): number {
-    const enc = (x: number) => (x < 0 ? 0x80 | Math.min(127, -x) : Math.min(127, x));
+  /** Note / pitch envelope: HuSIC adds each byte to the current value (bit 7 = down; $FF is the end mark, so -127
+   * cannot be stored), so absolute offsets become deltas. `wrap`: the target register wraps at this size (noise). */
+  note(f: Frames, wrap = 0): number {
+    const w = (x: number) => (wrap ? ((((x % wrap) + wrap + wrap / 2 - 1) % wrap) - wrap / 2 + 1) : x);
+    const enc = (d: number) => { const x = w(d); return x < 0 ? 0x80 | Math.min(126, -x) : Math.min(127, x); };
     const a = f.vals, last = a.length - 1;
     const bytes = a.map((v, i) => enc(v - (i ? a[i - 1] : 0)));
     bytes.push(0xff);
@@ -139,7 +141,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   };
 
   // 3. Envelopes and instrument setup.
-  const volEnv = new EnvTable(), noteEnv = new EnvTable(), waveEnv = new EnvTable();
+  const volEnv = new EnvTable(), noteEnv = new EnvTable(), waveEnv = new EnvTable(), pitchEnv = new EnvTable();
   const scale = (x: number, y: number) => (newVol ? Math.max(0, Math.min(31, x + y - 31)) : ceilVol ? Math.ceil((x * y) / 31) : Math.floor((x * y) / 31));
   const insFrames = new Map<string, Frames | undefined>();
   const framesOf = (insIdx: number, code: number, what: string) => {
@@ -164,10 +166,13 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       const n = Math.max(3, Math.round((3 * FRAME_HZ) / hz));
       return { vals: Array.from({ length: n }, (_, f) => ticks[Math.floor((f * 3) / n)]), loop: 0 };
     }
-    const f = framesOf(insIdx, MACRO_ARP, 'arpeggio');
-    if (f && f.vals.some((v) => (v & 0x40000000) !== 0)) { lossy.add('fixed-note arpeggio macro'); return undefined; }
-    return f;
+    return framesOf(insIdx, MACRO_ARP, 'arpeggio');
   };
+  // Furnace calcArp: bit 30 marks a fixed note (set on a positive value, clear on a negative one); else note + arp.
+  const arpNv = (nv: number, v: number) =>
+    v >= 0 && v & 0x40000000 ? v & ~0x40000000 : v < 0 && !(v & 0x40000000) ? v | 0x40000000 : nv + v;
+  const noiseReg = (n: number) => (properNoise ? n & 31 : NOISE_FREQ[((n % 12) + 12) % 12]);
+  const envIdx = (i: number, what: string) => { if (i < 0xff) return i; lossy.add(`more than 255 ${what} envelopes (envelope dropped)`); return 0xff; };
 
   // 4. Per-channel events on the 60 Hz frame grid.
   const tracks: Ev[][] = [];
@@ -228,9 +233,15 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         const df = ch >= 4 ? framesOf(insIdx, MACRO_DUTY, 'noise') : undefined;
         if (df && new Set(df.vals).size > 1) lossy.add('noise mode changing inside a duty macro (first value kept)');
         const noise = ch >= 4 && (noiseFx || (df ? df.vals[0] > 0 : false));
-        const note = noise ? (properNoise ? nv & 31 : NOISE_FREQ[((nv % 12) + 12) % 12]) : noteByte(nv);
+        // Arp as note offsets per frame (fixed notes resolved against this note). Noise: the driver's note env does not
+        // reach the noise register, its pitch env does (drv_pitchenv adds to noise_freq), so arp goes there as register deltas.
+        const nvs = af ? af.vals.map((v) => arpNv(nv, v)) : [nv];
+        const arpOn = nvs.some((x) => x !== nv);
+        const note = noise ? noiseReg(nvs[0]) : noteByte(nv);
+        const ne = arpOn && !noise ? envIdx(noteEnv.note({ vals: nvs.map((x) => x - nv), loop: af!.loop }), 'note') : 0xff;
+        const pe = arpOn && noise ? envIdx(pitchEnv.note({ vals: nvs.map((x) => noiseReg(x) - note), loop: af!.loop }, 32), 'pitch') : 0xff;
         evs.push({ frame: at, kind: 'note', cmds: [...cmds, NOISE, noise ? 1 : 0, ...(wave < 0 ? [WAVE_ENV, -1 - wave] : [WAVE, wave]),
-          NOTE_ENV, af ? noteEnv.note(af) : 0xff], note, vol: volCode(insIdx, chanVol) });
+          NOTE_ENV, ne, PITCH_ENV, pe], note, vol: volCode(insIdx, chanVol) });
       } else if (nv === 253) { dropSnap(at); toneOn = false; evs.push({ frame: at, kind: 'off', cmds }); }
       else if (cmds.length || volChanged) evs.push({ frame: at, kind: 'cont', cmds, vol: volChanged ? volCode(Math.max(0, ins), chanVol) : undefined });
       if (nv === 254 || nv === 255) lossy.add('note release (keeps sounding)');
@@ -333,8 +344,8 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     ptrs[at + 1] = alloc(new Array<number>(t.items.length * 2).fill(0));
     t.items.forEach((it, i) => { const body = alloc(it.bytes); put16(ptrs[at] + 2 * i, body); put16(ptrs[at + 1] + 2 * i, body + it.lp); });
   };
-  table(volEnv, 2); table(noteEnv, 9); table(waveEnv, 11);
-  ptrs[4] = ptrs[5] = ptrs[6] = ptrs[13] = ptrs[14] = alloc([0, 0]); // pitch / LFO / multi envelopes: unused
+  table(volEnv, 2); table(noteEnv, 9); table(waveEnv, 11); table(pitchEnv, 4);
+  ptrs[6] = ptrs[13] = ptrs[14] = alloc([0, 0]); // LFO / multi envelopes: unused
   const waves = m.wavetables.length ? m.wavetables : [{ width: 32, height: 32, data: Array.from({ length: 32 }, (_, i) => (i < 16 ? i * 2 : 62 - i * 2)) }];
   if (!m.wavetables.length) lossy.add('song has no wavetables (triangle used)');
   const waveTable = alloc(new Array<number>(waves.length * 2).fill(0));
