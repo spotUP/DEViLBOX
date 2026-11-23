@@ -137,7 +137,7 @@ export function parseSpeedyA1File(buffer: ArrayBuffer, filename: string): Tracke
   } : undefined;
 
   const instruments: InstrumentConfig[] = [...usedInstruments].sort((a, b) => a - b).map((id) => ({
-    id, name: `Sample ${id - 1}`, type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+    id, name: '', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
   } as InstrumentConfig));
 
   const baseName = filename.split('/').pop() ?? filename;

@@ -150,7 +150,7 @@ export function readQuartetPcmSamples(set: Uint8Array): QuartetPcmSample[] {
       const pcm = set.slice(from, Math.min(size, from + 2 * (override || lengthWords)));
       const nameAt = 0x10 + (slot >> 2) * 0x50 + (slot & 3) * 0x10;
       const name = String.fromCharCode(...set.subarray(nameAt, nameAt + 16)).replace(/[^\x20-\x7e]/g, '').trim();
-      if (pcm.length > 0) out.push({ slot, name: name || `Sample ${slot + 1}`, pcm, loops: ((loopMask >> slot) & 1) === 1 });
+      if (pcm.length > 0) out.push({ slot, name, pcm, loops: ((loopMask >> slot) & 1) === 1 });
     }
     if (stored > SET_MIN_WORDS) start += 2 * (stored + 2);
   }
@@ -169,6 +169,6 @@ export function buildQuartetPcmInstruments(grid: QuartetPcmGrid, set: Uint8Array
     const s = bySlot.get(slot);
     return s
       ? createSamplerInstrument(slot + 1, s.name, s.pcm, 64, GRID_SAMPLE_RATE, 0, s.loops ? s.pcm.length : 0)
-      : createSamplerInstrument(slot + 1, `Sample ${slot + 1}`, new Uint8Array(2), 64, GRID_SAMPLE_RATE, 0, 0);
+      : createSamplerInstrument(slot + 1, '', new Uint8Array(2), 64, GRID_SAMPLE_RATE, 0, 0);
   });
 }

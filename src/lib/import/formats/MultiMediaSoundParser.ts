@@ -131,7 +131,7 @@ export function parseMultiMediaSoundFile(buffer: ArrayBuffer, filename: string):
   for (let i = 0; i < NUM_LONGS; i++) {
     instruments.push({
       id: i + 1,
-      name: u32BE(buf, i * 4) > 0 ? `Sample ${i + 1}` : '',
+      name: '',
       type: 'synth' as const,
       synthType: 'Synth' as const,
       effects: [],

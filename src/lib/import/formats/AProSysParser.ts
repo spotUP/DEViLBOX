@@ -128,7 +128,7 @@ export function parseAProSysFile(buffer: ArrayBuffer, filename: string): Tracker
 
   const numInstruments = Math.floor(instr.len / INSTRUMENT_SIZE);
   const instruments: InstrumentConfig[] = Array.from({ length: Math.max(1, numInstruments) }, (_, i) => ({
-    id: i + 1, name: `Instrument ${i + 1}`,
+    id: i + 1, name: '',
     type: 'synth' as const, synthType: 'Synth' as const,
     effects: [], volume: 0, pan: 0,
   } as InstrumentConfig));

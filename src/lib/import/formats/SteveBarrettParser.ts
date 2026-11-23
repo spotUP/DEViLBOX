@@ -326,7 +326,7 @@ export function parseSteveBarrettFile(buffer: ArrayBuffer, filename: string): Tr
   } : undefined;
 
   const instruments: InstrumentConfig[] = [...usedInstruments].sort((a, c) => a - c).map((id) => ({
-    id, name: `Wave ${id - 1}`, type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+    id, name: '', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
   } as InstrumentConfig));
 
   const songPositions = patterns.map((_, i) => i);

@@ -146,7 +146,7 @@ export async function parseTronicFile(buffer: ArrayBuffer, filename: string): Pr
 
   const instruments: InstrumentConfig[] = Array.from({ length: mod.instrumentCount }, (_, i) => ({
     id: i + 1,
-    name: `Instrument ${i + 1}`,
+    name: '',
     type: 'synth' as const,
     synthType: 'Synth' as const,
     effects: [],

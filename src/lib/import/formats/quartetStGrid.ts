@@ -192,7 +192,7 @@ export function readQuartetStSamples(smp: Uint8Array): QuartetStSample[] {
     const loopStart = loopLen > 0 && loopLen <= len ? len - loopLen : 0;
     const loopEnd = loopLen > 0 && loopLen <= len ? len : 0;
     const raw = String.fromCharCode(...smp.subarray(2 + slot * 7, 2 + slot * 7 + 7));
-    const name = raw.replace(/[^\x20-\x7e]/g, '').trim() || `Sample ${slot + 1}`;
+    const name = raw.replace(/[^\x20-\x7e]/g, '').trim();
     out.push({ slot, name, pcm, loopStart, loopEnd });
   }
   return out;
@@ -210,6 +210,6 @@ export function buildQuartetStInstruments(grid: QuartetStGrid, smp: Uint8Array |
     const s = bySlot.get(slot);
     return s
       ? createSamplerInstrument(slot + 1, s.name, s.pcm, 64, GRID_SAMPLE_RATE, s.loopStart, s.loopEnd)
-      : createSamplerInstrument(slot + 1, `Sample ${slot + 1}`, new Uint8Array(2), 64, GRID_SAMPLE_RATE, 0, 0);
+      : createSamplerInstrument(slot + 1, '', new Uint8Array(2), 64, GRID_SAMPLE_RATE, 0, 0);
   });
 }

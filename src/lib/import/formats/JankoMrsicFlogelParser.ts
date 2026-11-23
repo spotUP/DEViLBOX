@@ -336,7 +336,7 @@ export function parseJankoMrsicFlogelFile(buffer: ArrayBuffer, filename: string)
   } : undefined;
 
   const instruments: InstrumentConfig[] = [1, 2].map((id) => ({
-    id, name: id === 1 ? 'Wave A' : 'Wave B', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+    id, name: '', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
   } as InstrumentConfig));
 
   const songPositions = patterns.map((_, i) => i);
