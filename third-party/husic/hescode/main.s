@@ -3866,6 +3866,8 @@ LL185:
 	  rts
 	.endp
 
+	.include "screen.asm"
+
 	.proc _main
 	__addmi	-9,__stack
 	__stbi_s	1,0
@@ -3890,7 +3892,8 @@ LL185:
 	  call	_disp_on
 ; DEViLBOX: start song 0 at boot (upstream waits on SELECT SONG for RUN).
 	__stbi_s	0,0
-	  call	_display_title
+	  stz	s_mode
+	  call	s_screen
 	__ldb_s	0
 	  call	_drv_init
 LL192:
@@ -3900,197 +3903,9 @@ LL192:
 	__lbeq	LL193
 	  ldy	#0
 	  call	_vsync
-	__ldw	_seq_ptr
-	__phw	4,4
-	__ldwi	4
-	__phb	2
-	__ldwi	13
-	__phb	1
-	__ldwi	3
-	  call	_put_hex.4
-	__ldb	_ch_topbank
-	__phw	4,4
-	__ldwi	2
-	__phb	2
-	__ldwi	20
-	__phb	1
-	__ldwi	3
-	  call	_put_hex.4
-	__ldb	_ch_nowbank
-	__phw	4,4
-	__ldwi	2
-	__phb	2
-	__ldwi	23
-	__phb	1
-	__ldwi	3
-	  call	_put_hex.4
-	__stwi_s	0,7
-LL194:
-
-	__ldw_s	7
-	__stw	<__temp
-	__ldwi	6
-	  jsr	ltzp
-	__lbne	LL196
-	__lbra	LL197
-LL195:
-
-	__ldw_s	7
-	__incw_s	7
-	__lbra	LL194
-LL196:
-
-	__stwi_s	2,3
-	__ldw_s	7
-	__phw	4,4
-	__ldwi	2
-	__phb	2
-	__ldw_s	3
-	__phb	1
-	__ldwi	5
-	__addw_s	7
-	  call	_put_hex.4
-	__ldw_s	3
-	__addwi	3
-	__stw_s	3
-	__ldwi	_ch_lastcmd
-	__addw_s	7
-	__ldb_p
-	__phw	4,4
-	__ldwi	2
-	__phb	2
-	__ldw_s	3
-	__phb	1
-	__ldwi	5
-	__addw_s	7
-	  call	_put_hex.4
-	__ldw_s	3
-	__addwi	3
-	__stw_s	3
-	__ldwi	_ch_cnt
-	__addw_s	7
-	__ldb_p
-	__phw	4,4
-	__ldwi	2
-	__phb	2
-	__ldw_s	3
-	__phb	1
-	__ldwi	5
-	__addw_s	7
-	  call	_put_hex.4
-	__ldw_s	3
-	__addwi	3
-	__stw_s	3
-	__ldwi	_note_data
-	__addw_s	7
-	__ldb_p
-	__phw	4,4
-	__ldwi	2
-	__phb	2
-	__ldw_s	3
-	__phb	1
-	__ldwi	5
-	__addw_s	7
-	  call	_put_hex.4
-	__ldw_s	3
-	__addwi	3
-	__stw_s	3
-	__ldwi	_ch_bank
-	__addw_s	7
-	__ldb_p
-	__phw	4,4
-	__ldwi	2
-	__phb	2
-	__ldw_s	3
-	__phb	1
-	__ldwi	5
-	__addw_s	7
-	  call	_put_hex.4
-	__ldw_s	3
-	__addwi	3
-	__stw_s	3
-	__ldw_s	7
-	__aslw
-	__addwi	_seq_pos
-	__stw	__ptr
-	__ldwp	__ptr
-	__phw	4,4
-	__ldwi	4
-	__phb	2
-	__ldw_s	3
-	__phb	1
-	__ldwi	5
-	__addw_s	7
-	  call	_put_hex.4
-	__ldw_s	3
-	__addwi	5
-	__stw_s	3
-	__ldw_s	7
-	__aslw
-	__addwi	_seq_freq
-	__stw	__ptr
-	__ldwp	__ptr
-	__phw	4,4
-	__ldwi	4
-	__phb	2
-	__ldw_s	3
-	__phb	1
-	__ldwi	5
-	__addw_s	7
-	  call	_put_hex.4
-	__ldw_s	3
-	__addwi	5
-	__stw_s	3
-	__lbra	LL195
-LL197:
-
-	__stwi_s	0,7
-LL198:
-
-	__ldw_s	7
-	__stw	<__temp
-	__ldwi	2
-	  jsr	ltzp
-	__lbne	LL200
-	__lbra	LL201
-LL199:
-
-	__ldw_s	7
-	__incw_s	7
-	__lbra	LL198
-LL200:
-
-	__stwi_s	1,3
-	__ldw_s	7
-	__aslw
-	__addwi	_xpcm_addr
-	__stw	__ptr
-	__ldwp	__ptr
-	__phw	4,4
-	__ldwi	4
-	__phb	2
-	__ldw_s	3
-	__phb	1
-	__ldwi	14
-	__addw_s	7
-	  call	_put_hex.4
-	__ldw_s	3
-	__addwi	5
-	__stw_s	3
-	__ldw_s	7
-	__aslw
-	__addwi	_xpcm_len
-	__stw	__ptr
-	__ldwp	__ptr
-	__phw	4,4
-	__ldwi	4
-	__phb	2
-	__ldw_s	3
-	__phb	1
-	__ldwi	14
-	__addw_s	7
-	  call	_put_hex.4
-	__lbra	LL199
+	  lda	#1
+	  sta	s_mode
+	  call	s_screen
 LL201:
 
 	__lbra	LL192
@@ -4190,3 +4005,35 @@ __arg:
 ;	constant pool:32
 ;	global pool:3680
 ;	Macro pool:1432
+
+	.bss
+s_fb:	.ds 1
+s_fbh:	.ds 1
+s_cb:	.ds 1
+s_cbh:	.ds 1
+s_pal:	.ds 1
+s_c:	.ds 1
+s_t:	.ds 1
+s_t2:	.ds 1
+s_tg:	.ds 1
+s_h:	.ds 1
+s_i:	.ds 1
+s_r:	.ds 1
+s_m:	.ds 1
+s_col:	.ds 1
+s_base:	.ds 1
+s_ka:	.ds 1
+s_kb:	.ds 1
+s_f:	.ds 1
+s_sec:	.ds 1
+s_min:	.ds 1
+s_sd:	.ds 1
+s_sp:	.ds 1
+s_len:	.ds 1
+s_lvl:	.ds 6
+s_cap:	.ds 6
+s_hold:	.ds 6
+s_title:	.ds 13
+s_author:	.ds 12
+s_msg:	.ds 48
+s_mode:	.ds 1
