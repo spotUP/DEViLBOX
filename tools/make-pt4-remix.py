@@ -198,8 +198,11 @@ def main(src_path, out_path, nch=8, layers=None, title=b' pt4 echo'):
     # --- write ---------------------------------------------------------------------------------------------
     rowlen, tag = nch * 4, b'8CHN' if nch == 8 else b'%dCH' % nch
     pats = bytearray(songlen * 64 * rowlen)
+    played = set(tl)                                               # rows after a Dxx break never play: leave them empty
     for pos, pat in enumerate(order):
         for row in range(64):
+            if (pos, row) not in played:
+                continue
             for ch in range(4):
                 o = (pos * 64 + row) * rowlen + ch * 4
                 pats[o:o + 4] = src_cell(pat, row, ch)
