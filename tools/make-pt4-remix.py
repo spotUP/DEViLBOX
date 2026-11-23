@@ -197,21 +197,28 @@ def main(src_path, out_path, nch=8, layers=None, title=b' pt4 echo'):
 
     # --- write ---------------------------------------------------------------------------------------------
     rowlen, tag = nch * 4, b'8CHN' if nch == 8 else b'%dCH' % nch
-    pats = bytearray(songlen * 64 * rowlen)
-    played = set(tl)                                               # rows after a Dxx break never play: leave them empty
-    for pos, pat in enumerate(order):
-        for row in range(64):
-            if (pos, row) not in played:
-                continue
-            for ch in range(4):
-                o = (pos * 64 + row) * rowlen + ch * 4
-                pats[o:o + 4] = src_cell(pat, row, ch)
+    # The rows that play are packed back to back into full 64-row patterns: no Dxx break, no dead rows in the grid.
+    outlen = (T + 63) // 64
+    pats = bytearray(outlen * 64 * rowlen)
+    for t, (pos, row) in enumerate(tl):
+        for ch in range(4):
+            c = bytearray(src_cell(order[pos], row, ch))
+            if c[2] & 15 == 13:
+                c[2] &= 0xF0
+                c[3] = 0                                           # Dxx is gone: the pattern now holds only played rows
+            o = t * rowlen + ch * 4
+            pats[o:o + 4] = c
     for ch in range(4, nch):
         for t, c in enumerate(echo[ch]):
             if c:
                 s, per, e, p = c
-                o = (tl[t][0] * 64 + tl[t][1]) * rowlen + ch * 4
+                o = t * rowlen + ch * 4
                 pats[o:o + 4] = bytes([(s & 0xF0) | per >> 8, per & 255, (s & 15) << 4 | e, p])
+    if T % 64:                                                     # last pattern is short: break to position 0 so the song loops as before
+        o = (T - 1) * rowlen + (nch - 1) * 4
+        assert not any(pats[o:o + 4]) or pats[o + 2] & 15 == 0, 'no free cell for the loop break'
+        pats[o + 2] |= 13
+    songlen = outlen
 
     out = bytearray(d[:950])
     out[:20] = (name_of_song(d) + title).ljust(20, b'\0')[:20]
