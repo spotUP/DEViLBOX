@@ -4,9 +4,9 @@
 // Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/c64-rom-check.ts [--only <name>] [--failed] [--seconds N] [--keep <dir>] [--dump <states.json>]
 // Songs: every .fur under public/data/songs/furnace whose only chip is one SID. Results: test-data/c64-rom-check.json (skips recorded input hashes).
 // Per frame and voice: sounding = gate bit set with a waveform selected. Both sides start at their own first sounding frame.
-// keyOnMatch = share of Furnace gate-on edges with a .prg gate-on edge on the same voice within 2 frames. pitchMatch = share of frames where both
-// voices sound with the frequency registers within 50 cents. volumeMatch = same frames, sustain nibble and master volume equal.
-// pass = the .prg sounded and keyOnMatch and pitchMatch are both at least 90 %.
+// Per voice: keyOn = share of Furnace gate-on edges with a .prg gate-on edge on that voice within 2 frames. pitch = share of frames where both
+// sides sound with the frequency registers within 50 cents. volume = same frames, sustain nibble, master volume and $D417 filter routing bit equal.
+// A voice passes when keyOn and pitch are both at least 90 %, or when neither side sounds on it; pass = every voice passes.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -22,8 +22,9 @@ const RESULTS = path.join(ROOT, 'test-data/c64-rom-check.json');
 const VICE = process.env.X64SC ?? '/opt/homebrew/bin/x64sc';
 const SID_SYSTEMS = new Set([0x47, 0x07]); // C64 8580, C64 6581
 
-interface Verdict { inputHash: string; file: string; pass: boolean; seconds: number; prgBytes?: number; prgStarts?: number; furnaceStarts?: number; keyOnMatch?: number; pitchMatch?: number; volumeMatch?: number; error?: string }
-type St = { on: boolean; freq: number; sus: number; vol: number };
+interface Voice { pass: boolean; prgStarts: number; furnaceStarts: number; keyOn: number; pitch: number; volume: number }
+interface Verdict { inputHash: string; file: string; pass: boolean; seconds: number; prgBytes?: number; voices?: Voice[]; error?: string }
+type St = { on: boolean; freq: number; sus: number; vol: number; filt: number };
 
 const args = process.argv.slice(2);
 const opt = (k: string) => (args.includes(k) ? args[args.indexOf(k) + 1] : undefined);
@@ -65,7 +66,7 @@ function furnaceFrames(rel: string, dir: string): number[][] {
 function states(frames: number[][]): St[][] {
   const all = frames.map((r) => [0, 1, 2].map((v) => {
     const b = v * 7, ctl = r[b + 4];
-    return { on: (ctl & 1) === 1 && (ctl & 0xf0) !== 0, freq: r[b] | (r[b + 1] << 8), sus: r[b + 6] >> 4, vol: r[24] & 15 };
+    return { on: (ctl & 1) === 1 && (ctl & 0xf0) !== 0, freq: r[b] | (r[b + 1] << 8), sus: r[b + 6] >> 4, vol: r[24] & 15, filt: (r[23] >> v) & 1 };
   }));
   const first = all.findIndex((s) => s.some((c) => c.on));
   return first < 0 ? [] : all.slice(first, first + FRAMES);
@@ -100,18 +101,21 @@ for (const file of walk(SONGS)) {
     const got = states(viceFrames(prg, dir, furnaceSidNtsc(m))), want = states(furnaceFrames(rel, dir));
     if (opt('--dump')) writeFileSync(opt('--dump')!, JSON.stringify({ got, want }));
     const romStarts = starts(got), wantStarts = starts(want).filter((w) => w.t < FRAMES - 50);
-    const hit = wantStarts.filter((w) => romStarts.some((g) => g.ch === w.ch && Math.abs(g.t - w.t) <= 2)).length;
-    let tone = 0, inTune = 0, volOk = 0;
-    for (let t = 0; t < Math.min(want.length, got.length); t++) for (let ch = 0; ch < 3; ch++) {
-      const a = want[t][ch], b = got[t][ch];
-      if (!a.on || !b.on || !a.freq || !b.freq) continue;
-      tone++;
-      if (Math.abs(1200 * Math.log2(a.freq / b.freq)) < 50) inTune++;
-      if (a.sus === b.sus && a.vol === b.vol) volOk++;
-    }
-    v = { inputHash, file: rel, pass: false, seconds: SECONDS, prgBytes: statSync(prg).size, prgStarts: romStarts.length, furnaceStarts: wantStarts.length,
-      keyOnMatch: pct(hit, wantStarts.length), pitchMatch: pct(inTune, tone), volumeMatch: pct(volOk, tone) };
-    v.pass = romStarts.length > 0 && (v.keyOnMatch ?? 0) >= 90 && (v.pitchMatch ?? 0) >= 90;
+    const voices = [0, 1, 2].map((ch): Voice => {
+      const ws = wantStarts.filter((w) => w.ch === ch), rs = romStarts.filter((g) => g.ch === ch);
+      const hit = ws.filter((w) => rs.some((g) => Math.abs(g.t - w.t) <= 2)).length;
+      let tone = 0, inTune = 0, volOk = 0;
+      for (let t = 0; t < Math.min(want.length, got.length); t++) {
+        const a = want[t][ch], b = got[t][ch];
+        if (!a.on || !b.on || !a.freq || !b.freq) continue;
+        tone++;
+        if (Math.abs(1200 * Math.log2(a.freq / b.freq)) < 50) inTune++;
+        if (a.sus === b.sus && a.vol === b.vol && a.filt === b.filt) volOk++;
+      }
+      const keyOn = pct(hit, ws.length), pitch = pct(inTune, tone);
+      return { pass: ws.length ? keyOn >= 90 && pitch >= 90 : rs.length === 0, prgStarts: rs.length, furnaceStarts: ws.length, keyOn, pitch, volume: pct(volOk, tone) };
+    });
+    v = { inputHash, file: rel, pass: romStarts.length > 0 && voices.every((x) => x.pass), seconds: SECONDS, prgBytes: statSync(prg).size, voices };
   } catch (e) {
     v = { inputHash, file: rel, pass: false, seconds: SECONDS, error: e instanceof Error ? e.message.split('\n')[0] : String(e) };
   } finally { rmSync(dir, { recursive: true, force: true }); }

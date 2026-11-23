@@ -88,7 +88,7 @@ const at = (t: Track | undefined, tick: number, dflt: number): number => {
 /** One instrument: ADSR, wave program (waveform + gate, arpeggio), pulse program, filter program, from the
  * instrument and its arp / wave / duty / cutoff / filter mode / resonance macros. */
 function instrumentOf(ins: FurnaceInstrument | undefined, idx: number, tables: GTSongData['tables'], lossy: Lossy,
-  version: number, multiplyRel: boolean): GTInstrument {
+  version: number, multiplyRel: boolean, voices: number): GTInstrument {
   const g = emptyGTInstrument();
   const c = ins?.c64;
   if (!ins || !c) return g;
@@ -154,8 +154,10 @@ function instrumentOf(ins: FurnaceInstrument | undefined, idx: number, tables: G
       if (t === fs.loop) loopRow = rows.length;
       const md = at(mode, t, mode0), rs = at(res, t, c.res & 15), key = `${md},${rs}`;
       // A $80-$F0 parameter row and the $00 cutoff row after it run in the same frame (player.s mt_setfilt).
-      // shortcut: the filter routes this instrument's channel only when it starts the filter, toFilter elsewhere is lossy.
-      if (key !== last || t === fs.loop) rows.push([0x80 | ((md & 7) << 4), (rs << 4) | 0x07]);
+      // $D417 low nibble is absolute: route the voices this instrument plays on (Furnace toFilter), never all three.
+      // shortcut: the mask is per instrument for the whole song, so a voice stays routed after another instrument takes it
+      // over until the next filter program runs; upgrade to a per-note filter command if a song needs it.
+      if (key !== last || t === fs.loop) rows.push([0x80 | ((md & 7) << 4), (rs << 4) | (c.toFilter ? voices : 0)]);
       last = key;
       rows.push([0x00, (at(cut, t, c.cut) >> 3) & 0xff]);
     }
@@ -179,7 +181,12 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
   if (m.instruments.length > GT_MAX_INSTR - 1) lossy.add('instruments past 63', m.instruments.length - (GT_MAX_INSTR - 1));
   const instruments: GTInstrument[] = [emptyGTInstrument()];
   const multiplyRel = /multiplyRel=true/.test(m.chipFlags?.[0] ?? '');
-  for (let i = 0; i < Math.min(m.instruments.length, GT_MAX_INSTR - 1); i++) instruments.push(instrumentOf(m.instruments[i], i, tables, lossy, m.version, multiplyRel));
+  // Voices each instrument plays on (bit per SID voice), for the filter routing mask.
+  const voices = new Array<number>(m.instruments.length).fill(0);
+  for (let ch = 0; ch < 3; ch++) for (let o = 0; o < s.ordersLen; o++) {
+    for (const cell of m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o] ?? 0}`)?.rows ?? []) if (cell && cell.instrument >= 0) voices[cell.instrument] |= 1 << ch;
+  }
+  for (let i = 0; i < Math.min(m.instruments.length, GT_MAX_INSTR - 1); i++) instruments.push(instrumentOf(m.instruments[i], i, tables, lossy, m.version, multiplyRel, voices[i]));
   // GT's note table is A-4 = 440 Hz.
   if (Math.abs((m.tuning ?? 440) - 440) > 0.5) lossy.add(`tuning ${m.tuning} Hz (GT plays A-4 = 440 Hz)`);
 
