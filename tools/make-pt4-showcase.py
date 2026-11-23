@@ -33,7 +33,7 @@ SEQ_STEPS = (0, 12, 7, 12, 0, 12, 19, 12)                         # root, octave
 LAYERS = [  # channels (1-based), side, what
     ('1-4', 'L R R L', 'source song, untouched'),
     ('5-8', 'R L L R', 'echo 1: 3 rows late, half volume, other side; carries the effect plan and the DYN orch-hit'),
-    ('9-12', 'L R R L', 'echo 2: 6 rows late, three eighths volume, source side'),
+    ('9-12', 'L R R L', 'echo 2: 6 rows late, same volume as echo 1, source side'),
     ('13-16', 'R L L R', 'double: the source on the other side, tonal samples on finetune +1 copies (chorus)'),
     ('17', 'L', 'pad A: pulse wave on the bass root, arpeggio 07C on every row'),
     ('18', 'R', 'pad B: saw a fifth above the root, vibrato 4xy / tremolo 7xy by section'),
@@ -129,7 +129,7 @@ def layers(L):
             for u in range(t, t + len(blk)):
                 root[u] = best
 
-    # --- echo 2 (9-12): echo 1 again 3 rows later at three quarters of its volume, back on the source side --------------------
+    # --- echo 2 (9-12): echo 1 again 3 rows later at its volume, back on the source side --------------------
     for k in range(4):
         ls = 0
         for t, c in enumerate(list(echo[remix.ECHO_CH[k]])):
@@ -137,7 +137,7 @@ def layers(L):
                 continue
             ls = c[0] or ls
             if c[1] and ls:
-                put(8 + k, t + 3, ls, c[1], 12, max(1, (c[3] if c[2] == 12 else info[ls - 32][2] // 2) * 3 // 4))
+                put(8 + k, t + 3, ls, c[1], 12, max(1, c[3] if c[2] == 12 else info[ls - 32][2] // 2))
             elif c[2] == 12 and not c[3]:
                 put(8 + k, t + 3, 0, 0, 12, 0)
 
@@ -166,7 +166,7 @@ def layers(L):
         strike = r != prev or row % 32 == 0
         since = 0 if strike else since + 1   # rows since the pad struck
         # pluck: arpeggio (a per-row effect) for 4 rows, then a volume slide down so the pad decays instead of holding
-        put(16, t, pulse if strike else 0, per(12 + r) if strike else 0, *((0, 0x7C) if since < 4 else (10, 0x02)))
+        put(16, t, pulse if strike else 0, per(12 + r) if strike else 0, *((0, 0x7C) if since < 3 else (10, 0x04)))
         # pad B: vibrato / tremolo for 6 rows after the strike, then a slow volume slide so it decays too
         put(17, t, saw if strike else 0, per(19 + r) if strike else 0,
             *(((7, 0x46) if pos % 8 >= 4 else (4, 0x42)) if since < 6 else (10, 0x01)))
@@ -188,9 +188,14 @@ def layers(L):
         if cs[0][t] == longbase and period:
             if e in (1, 2, 3):
                 p = max(1, round(p * 0.63))                       # 8 semitones up: slide steps shrink with the period
-            elif e not in (10, 12):
+            elif e not in (10, 12) and not (e == 0 and p):          # keep the arpeggio: it must stay in key with the source
                 e = p = 0
             put(18, t, sub if s or not on else 0, per(note_idx(period) + 8), e, p)
+            for dt in range(4, 24):                           # fade the sub out after the strike: no drone between notes
+                if t + dt < T and not src(t + dt, 0)[1] and not echo[18][t + dt]:
+                    put(18, t + dt, 0, 0, 10, 0x03)
+                else:
+                    break
             on = True
         elif period and on:
             put(18, t, 0, 0, 12, 0)
@@ -208,10 +213,12 @@ def layers(L):
                     p = max(1, p // 2)
                 elif e == 12:
                     p = p // 3
-                elif e != 4:
+                elif e != 4 and not (e == 0 and p):                # arpeggio stays: the double must follow the chord
                     e = p = 0
                 if period or e or p:
-                    put(ch, t, saw if period and e != 3 else 0, per(note_idx(period) + up[cs[k][t]]) if period else 0, e, p)
+                    idx = note_idx(period) + up[cs[k][t]] if period else 0
+                    idx -= 12 if idx > 35 else 0               # stay inside the normal period range: no piercing top notes
+                    put(ch, t, saw if period and e != 3 else 0, per(idx) if period else 0, e, p)
                 if period:
                     feeding[ch] = k
             elif period and feeding.get(ch) == k:
@@ -246,6 +253,20 @@ def layers(L):
         if row == 0 and pos % 4 == 0 and t:
             for ch in (30, 31):
                 put(ch, t, 0, 0, 12, 0)
+    # --- held notes on the copies (5-16): the source repeats the same note on every row (a drone); after 8 rows the copy
+    # fades it instead, so a drone is one note, not four stacked. Channels 1-4 stay untouched. ---
+    for ch in range(4, 16):
+        run, last = 0, None
+        for t in range(T):
+            c = echo[ch][t]
+            key = (c[0], c[1]) if c and c[1] else None
+            run = run + 1 if key and key == last else 0
+            if key:
+                last = key
+            elif c and not any(c):
+                last = None
+            if run >= 8:
+                echo[ch][t] = [0, 0, 10, 0x01]
     return extra
 
 
