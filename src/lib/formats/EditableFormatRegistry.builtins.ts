@@ -180,7 +180,6 @@ registerEditableFormat({ formatId: "tcbTracker", label: "TCB Tracker", newSong: 
 registerEditableFormat({ formatId: "tfmx", label: "TFMX", newSong: { template: "templates/tfmx.rocknroll" }, patternCodec: { kind: "fixed" }, exporter: { module: "TFMXExporter", fn: "exportTFMX", byLayout: true } });
 registerEditableFormat({ formatId: "ult", label: "", patternCodec: { kind: "variable" }, exporter: { module: "ULTExporter", fn: "exportULT", byLayout: true } });
 registerEditableFormat({ formatId: "unic", label: "", newSong: { template: "templates/unic.unic", name: "UNIC Tracker" }, patternCodec: { kind: "fixed" }, exporter: { module: "UNICExporter", fn: "exportUNIC", byLayout: true } });
-registerEditableFormat({ formatId: "wantedTeamDaveLowe", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "xm", label: "XM", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "xmf", label: "XMF", newSong: { template: "templates/xmf.xmf" }, patternCodec: { kind: "fixed" }, exporter: { module: "XMFExporter", fn: "exportXMF", byLayout: true } });
 registerEditableFormat({ formatId: "zoundMonitor", label: "Zound Monitor", newSong: { template: "templates/zoundMonitor.sng" }, patternCodec: { kind: "fixed" }, exporter: { module: "ZoundMonitorExporter", fn: "exportZoundMonitor", byLayout: true } });

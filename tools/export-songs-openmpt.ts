@@ -1486,7 +1486,6 @@ const TEST_CASES: TestCase[] = [
   // { file: 'formats/riffraff_test.riff', format: 'RIFF', parserModule: 'ThomasHermannParser', parseFn: 'parseThomasHermannFile', isAsync: true, noteExportOffset: 36 },
   // { file: 'formats/suntronic_test.sun', format: 'SUNT', parserModule: 'TronicParser', parseFn: 'parseTronicFile', isAsync: true, noteExportOffset: 36 },
   // { file: 'formats/ufo_test.ufo', format: 'UFO', parserModule: 'UFOParser', parseFn: 'parseUFOFile', isAsync: false, noteExportOffset: 36 },
-  { file: 'formats/davelowewtd_test.dlw', format: 'DLW', parserModule: 'WantedTeamDaveLoweParser', parseFn: 'parseWantedTeamDaveLoweFile', isAsync: false, noteExportOffset: 36 },
   // { file: 'formats/iffsmus_test.smus', format: 'SMUS', parserModule: 'IffSmusParser', parseFn: 'parseIffSmusFile', isAsync: true, noteExportOffset: 36 },
   { file: 'formats/bendaglishsid_test.bds', format: 'BSID', parserModule: 'BenDaglishSIDParser', parseFn: 'parseBenDaglishSIDFile', isAsync: true, noteExportOffset: 36 },
 

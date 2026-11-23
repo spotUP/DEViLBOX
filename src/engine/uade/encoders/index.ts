@@ -103,7 +103,6 @@ import './TFMXEncoder';
 import './TomyTrackerEncoder';
 import './ULTEncoder';
 import './UNICEncoder';
-import './WantedTeamDaveLoweEncoder';
 import './XMEncoder';
 import './XMFEncoder';
 import './XTrackerEncoder';
