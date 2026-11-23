@@ -51,7 +51,16 @@ export async function getPxtoneWasm(): Promise<PxtoneWasmModule> {
     ]);
     const factory = new Function(jsText + '; return createPxtone;')() as
       (opts?: Record<string, unknown>) => Promise<PxtoneWasmModule>;
-    wasmModule = await factory({ wasmBinary, print: () => {}, printErr: () => {} });
+    wasmModule = await factory({
+      wasmBinary,
+      // Emscripten 7 glue ignores wasmBinary and fetches Pxtone.wasm next to the page (the dev server answers with HTML).
+      instantiateWasm: (imports: WebAssembly.Imports, done: (i: WebAssembly.Instance, m: WebAssembly.Module) => void) => {
+        void WebAssembly.instantiate(wasmBinary, imports).then((r) => done(r.instance, r.module));
+        return {};
+      },
+      print: () => {},
+      printErr: () => {},
+    });
     return wasmModule;
   })();
   try {

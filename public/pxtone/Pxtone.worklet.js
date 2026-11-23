@@ -203,7 +203,14 @@ class PxtoneProcessor extends AudioWorkletProcessor {
       };
 
       const config = {};
-      if (wasmBinary) config.wasmBinary = wasmBinary;
+      if (wasmBinary) {
+        config.wasmBinary = wasmBinary;
+        // Emscripten 7 glue ignores wasmBinary and fetches; an AudioWorklet has no fetch or XMLHttpRequest.
+        config.instantiateWasm = (imports, done) => {
+          WebAssembly.instantiate(wasmBinary, imports).then((r) => done(r.instance, r.module));
+          return {};
+        };
+      }
 
       try {
         this.module = await globalThis.Pxtone(config);
