@@ -203,8 +203,8 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   };
   // Pitch env as raw signed bytes per frame (the caller picks delta or absolute meaning); the tail is cut to its
   // shortest repeating period, which the driver loops ($FF jumps to the loop pointer).
-  const bakePitch = (v: number[]): number => {
-    if (v.some((x) => Math.abs(x) > 126)) lossy.add('pitch move past the driver pitch envelope step (clamped)');
+  /** Shortest repeating tail of a per-frame sequence (keys compared as strings): frames [start, start + p) loop. */
+  const tailOf = (v: readonly (number | string)[]) => {
     const n = v.length;
     let best = { start: n - 1, p: 1 };
     for (let p = 1; p <= Math.min(128, n >> 1); p++) {
@@ -212,8 +212,12 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       while (st > 0 && v[st - 1] === v[st - 1 + p]) st--;
       if (n - st >= 2 * p && st + p < best.start + best.p) best = { start: st, p };
     }
+    return best;
+  };
+  const bakePitch = (v: number[], tail = tailOf(v)): number => {
+    if (v.some((x) => Math.abs(x) > 126)) lossy.add('pitch move past the driver pitch envelope step (clamped)');
     const enc = (x: number) => (x < 0 ? 0x80 | Math.min(126, -x) : Math.min(126, x));
-    return envIdx(pitchEnv.add([...v.slice(0, best.start + best.p).map(enc), 0xff], best.start), 'pitch');
+    return envIdx(pitchEnv.add([...v.slice(0, tail.start + tail.p).map(enc), 0xff], tail.start), 'pitch');
   };
 
   // 4. Per-channel events on the 60 Hz frame grid.
@@ -348,7 +352,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       const next = sorted.find((e) => e.frame > p.ev.frame && (e.kind === 'note' || e.kind === 'off'));
       const n = Math.min(600, Math.max(1, (next ? next.frame : endFrame) - p.ev.frame));
       let p2 = 0;
-      const offs: number[] = [];
+      const offs: number[] = [], tgt: number[] = [];
       let moves = false;
       // f counts from the note's key-on; a segment (f0 > 0) bakes only its own frames.
       for (let f = 0; f < p.f0 + n; f++) {
@@ -361,13 +365,36 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         if (p.noise) { offs.push(noiseReg(a + Math.round(p2)) - p.ev.note!); if (offs[offs.length - 1]) moves = true; continue; }
         const r = rawT[Math.min(rawT.length - 1, p.tick + Math.floor((f * hz) / FRAME_HZ))] + p2;
         if (r) moves = true;
-        offs.push(Math.round((linear ? furPeriod(a + r / 128) : furPeriod(a) - r) - period(noteByte(a))));
+        const want = linear ? furPeriod(a + r / 128) : furPeriod(a) - r;
+        tgt.push(want);
+        offs.push(Math.round(want - period(noteByte(a))));
       }
       if (!moves) continue;
       // Without a note env seq_freq / noise_freq carry over, so bytes are deltas; with one set_note resets seq_freq
       // every frame before the pitch env runs, so bytes are absolute offsets.
       const w = (x: number) => (p.noise ? ((((x % 32) + 47) % 32) - 15) : x);
       const bytes = p.arpOn && !p.noise ? offs : offs.map((v, i) => w(v - (i ? offs[i - 1] : 0)));
+      if (!p.noise && bytes.some((x) => Math.abs(x) > 126)) {
+        // A pitch env byte moves the period by at most 126 per frame (drv_pitchenv), less than a semitone at low notes,
+        // so a fast drop (kick pitch macro, wide slide) is split: a note env carries the nearest driver note per frame
+        // (drv_noteenv steps note_data in semitones, set_note resets seq_freq) and the pitch env the absolute residual.
+        const semi = (nb: number) => (nb >> 4) * 12 + (nb & 15);
+        const nearest = tgt.map((t) => {
+          let best = 0, err = Infinity;
+          for (let s2 = 0; s2 < 96; s2++) {
+            const nb = ((s2 / 12) << 4) | s2 % 12, e = Math.abs(t - period(nb));
+            if (e < err) { err = e; best = nb; }
+          }
+          return best;
+        });
+        const base = semi(p.ev.note!);
+        const notes = nearest.map((nb) => semi(nb) - base), res = nearest.map((nb, i) => Math.round(tgt[i] - period(nb)));
+        const tail = tailOf(notes.map((x, i) => `${x},${res[i]}`));
+        const cut = tail.start + tail.p;
+        p.ev.cmds[p.ev.cmds.length - 3] = envIdx(noteEnv.note({ vals: notes.slice(0, cut), loop: tail.start }), 'note');
+        p.ev.cmds[p.ev.cmds.length - 1] = bakePitch(res, tail);
+        continue;
+      }
       p.ev.cmds[p.ev.cmds.length - 1] = bakePitch(bytes);
     }
     tracks.push(sorted);
