@@ -437,6 +437,10 @@ export async function parseUADEFile(
         const { parseDigiBoosterFile } = await import('./DigiBoosterParser');
         return parseDigiBoosterFile(buffer, filename);
       },
+      'DariusZendeh': async () => {
+        const { parseDariusZendehFile } = await import('./DariusZendehParser');
+        return parseDariusZendehFile(buffer, filename);
+      },
       'Tronic': async () => {
         const { parseTronicFile } = await import('./TronicParser');
         return parseTronicFile(buffer, filename);

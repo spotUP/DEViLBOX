@@ -23,6 +23,7 @@
 #include "nuade/players/medley.h"
 #include "nuade/players/seanconran.h"
 #include "nuade/players/bendaglishsid.h"
+#include "nuade/players/dariuszendeh.h"
 
 #define NW_MAX_VOICES 64
 #define NW_SNAPSHOT_MAX_VOICES 32
@@ -606,5 +607,39 @@ EMSCRIPTEN_KEEPALIVE int nw_bds_layout(const uint8_t *data, int len, int32_t *ou
     }
   }
   bds_destroy(r.player);
+  return n;
+}
+
+/* Darius Zendeh: the tables dz_locate finds in the replayer code (dz_locate.c), for the editable grid.
+ * out: [0] version (0 S, 1 '1', 2 '2'), [1] song count, [2] period table, [3] instrument table, [4] 1 = 8-byte
+ * instrument entries, [5] sample base, [6] 1 = a note with bit 7 set slides, then per song: start list, loop list, pattern base, record size, voices.
+ * Returns the longs written, -1 when the module does not load. */
+EMSCRIPTEN_KEEPALIVE int nw_dz_layout(const uint8_t *data, int len, int32_t *out, int cap) {
+  if (!data || len <= 0 || !out) return -1;
+  DzPlayer *p = dz_create(data, (size_t)len);
+  if (!p) return -1;
+  const DzLayout *l = &p->layout;
+  const int n = 7 + 5 * l->song_count;
+  if (cap < n) {
+    dz_destroy(p);
+    return -1;
+  }
+  out[0] = (int32_t)l->version;
+  out[1] = l->song_count;
+  out[2] = (int32_t)l->period_table;
+  out[3] = (int32_t)l->instrument_table;
+  out[4] = l->wide_instruments ? 1 : 0;
+  out[5] = (int32_t)l->sample_base;
+  out[6] = l->slide ? 1 : 0;
+  for (int s = 0; s < l->song_count; s++) {
+    const DzSong *g = &l->songs[s];
+    int32_t *o = out + 7 + 5 * s;
+    o[0] = (int32_t)g->start_list;
+    o[1] = (int32_t)g->loop_list;
+    o[2] = (int32_t)g->pattern_base;
+    o[3] = (int32_t)g->record_size;
+    o[4] = g->voices;
+  }
+  dz_destroy(p);
   return n;
 }

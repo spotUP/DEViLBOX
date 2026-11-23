@@ -9,6 +9,7 @@
 import './ActionamicsEncoder';
 import './PeterVerswyvelenPackerEncoder';
 import './TronicEncoder';
+import './DariusZendehEncoder';
 import './AMFEncoder';
 import './AMOSMusicBankEncoder';
 import './AMSEncoder';

@@ -39,6 +39,7 @@ const PARSE_FALLBACK: Record<string, { module: string; fn: string }> = {
   sqt: { module: '@lib/import/formats/QuartetParser', fn: 'parseQuartetFile' },
   mmdc: { module: '@lib/import/formats/MMDCParser', fn: 'parseMMDCFile' },
   vss: { module: '@lib/import/formats/VoodooSupremeSynthesizerParser', fn: 'parseVoodooSupremeSynthesizerFile' },
+  dz: { module: '@lib/import/formats/DariusZendehParser', fn: 'parseDariusZendehFile' },
 };
 
 /** Parse a fixture (or exported bytes under the fixture's name). */

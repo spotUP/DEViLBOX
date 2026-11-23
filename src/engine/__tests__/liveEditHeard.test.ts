@@ -170,6 +170,7 @@ export const UNMEASURED: Record<string, string> = {
   musicMaker: 'the song needs its instrument companion file, not in the corpus folder',
   stoneTracker: 'the song needs its sample bank companion file, not in the corpus folder',
   emsv6: 'import runs the UADE scan (parseUADEFile), the node run has no UADE engine instance',
+  dariusZendeh: 'import runs the UADE scan (parseUADEFile), the node run has no UADE engine instance',
   tronic: 'import runs the UADE scan (parseUADEFile), the node run has no UADE engine instance',
   benDaglishSID: 'import runs the UADE scan (parseUADEFile), the node run has no UADE engine instance',
   kt: 'the song has no note cell to edit (a Klystrack instrument-only file)', xrns: 'the song has no note cell to edit',

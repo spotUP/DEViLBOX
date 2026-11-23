@@ -531,7 +531,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   uade_fc_bsi: 'G11-uade-only',
   uade_cust: 'G11-uade-only',
   uade_custom: 'G11-uade-only',
-  uade_dz: 'U27',
   uade_mkiio: 'G11-uade-only',
   uade_mg: 'G11-uade-only',
   uade_hn: 'G11-uade-only',
@@ -596,6 +595,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'monotone', 'ansiMusic', 'kdm', 'organya', 'piyoPiyo', 'jxs', 'tonyWilliams',
   // Ben Daglish SID: nuade's tables (nw_bds_layout) walk to a tick grid (benDaglishSIDGrid.ts), no oracle yet.
   'benDaglishSID',
+  // Darius Zendeh: nuade's tables (nw_dz_layout) and the replayer's row grammar, no oracle yet.
+  'dariusZendeh',
   // SynthDream: the command streams decode to a read-only tick grid (synthDreamGrid.ts), no oracle yet.
   'synthDream',
   // Tim Follin: the command streams decode to a read-only tick grid (timFollinGrid.ts), no oracle yet.

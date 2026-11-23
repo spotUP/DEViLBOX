@@ -48,6 +48,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   lme: 'public/data/songs/leggless-music-editor/the punisher gameover.lme',
   peterVerswyvelenPacker: 'public/data/songs/formats/zarathrusta title.pvp',
   tronic: 'public/data/songs/formats/crystal.dp',
+  dariusZendeh: 'public/data/songs/darius-zendeh/crash and burn.dz',
   silmarils: 'public/data/songs/formats/silmarils_smallest.mok',
   pierreAdane: 'public/data/songs/formats/Ivanhoe_ivanhoe - bonus.pap',
   synthPack: 'public/data/songs/synth-pack/centerbase soft.osp',
