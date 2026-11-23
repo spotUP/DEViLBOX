@@ -65,6 +65,11 @@ export function detectFormatFromContent(filename: string, bytes: Uint8Array): Fo
       if (isGoatTrackerSong(bytes)) return byKey('goatTracker');
       if (ascii(0, 'RJP') && ascii(4, 'SMOD')) return byKey('richardJoseph');
       break;
+    case 'ftm':
+      // FamiTracker / Dn-FamiTracker modules start 'FamiTracker Module' / 'DN-FamiTracker Module';
+      // Face the Music ('FTMN') is the name-only answer for .ftm.
+      if (ascii(0, 'FamiTracker Module') || ascii(0, 'DN-FamiTracker Module')) return byKey('famitracker');
+      break;
     case 'dtm':
       // Digital Tracker (Atari Falcon, libopenmpt) starts 'D.T.'; AdPlug's DTM
       // (DeFy Adlib Tracker) starts 'DeFy DTM '.
