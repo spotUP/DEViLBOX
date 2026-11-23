@@ -1194,11 +1194,11 @@
     },
     "zoundMonitor": {
       "exporter": "ZoundMonitorExporter.exportZoundMonitor",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 1408,
-      "bytes": 6689
+      "cells": 2442,
+      "bytes": 2442
     }
   },
   "missingFixture": [
