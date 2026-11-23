@@ -91,10 +91,15 @@ export function openAuthorHash(hash: string): boolean {
 }
 
 /** Build the link for the song as currently edited. Throws a readable Error when it cannot be shared. */
+const LIVE_SHARE_BASE = 'https://devilbox.uprough.net/';
+
 export async function buildShareLink(): Promise<{ link: string; warnings: string[] }> {
   const { song, warnings } = await currentSong();
   const container = packShare(song);
-  const base = `${window.location.origin}${window.location.pathname}`;
+  // A link made on a dev machine must open for the person who gets it: name the live site, not localhost.
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+  const base = local ? LIVE_SHARE_BASE : `${window.location.origin}${window.location.pathname}`;
+  if (local) warnings.push('This link points at the live site. A song stored on this local server is not there until it is deployed; only small songs that carry their data in the link open.');
   const inline = inlineFragment(container);
   if (inline) {
     // Small songs are uploaded too, so the link also names a server copy; the inline data opens first.
