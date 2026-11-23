@@ -901,6 +901,48 @@
         "dm2"
       ]
     },
+    "Desire": {
+      "adf": "Desire.adf",
+      "adfSha256": "51f88f0e4fa7063872341a701541e111393cce2803cbeeddc2e1cdcfcbf00a14",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 40156,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 40152,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 270018,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 357636,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x42200",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5A200",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x57504",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "batmanreturns.dsr",
+        "bytes": 87852
+      },
+      "sources": {
+        "tool": "44227841b0ac89bb759ec1deb8680d6231cabe76465cf5edb49886ea44745c2c",
+        "player": "30afeb818559561504a9c5a765e45d6d477287ea4f2a0ff26e1b9f4c06729d93"
+      },
+      "prefixes": [
+        "dsr"
+      ]
+    },
     "DigitalSoundStudio": {
       "adf": "DigitalSoundStudio.adf",
       "adfSha256": "65957640764e7ce3db1d6fbe919b876a505a9002ce97fa851602493699c56446",
@@ -3188,7 +3230,7 @@
     },
     "PierreAdane": {
       "adf": "PierreAdane.adf",
-      "adfSha256": "a8dd7626122d3b062f15d6e11e8bb1d4495cb513bb15db59794ddc7c0222a275",
+      "adfSha256": "741188a6bc87fd9f26f23218cc67ad11194158d120c656a62a0ce0f9c424ea7b",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
@@ -3200,30 +3242,42 @@
         "bytes": 4,
         "endian": "big"
       },
+      "companionSlot": {
+        "diskOffset": 270916,
+        "maxBytes": 32768
+      },
+      "companionLengthWord": {
+        "diskOffset": 303692,
+        "bytes": 4,
+        "endian": "big"
+      },
       "titleSlot": {
-        "diskOffset": 271414,
+        "diskOffset": 304198,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
-      "chipArenaBytes": 359684,
+      "chipArenaBytes": 392452,
       "memory": {
         "IMG_BASE": "0xC18000",
-        "IMG_LEN": "0x42600",
+        "IMG_LEN": "0x4A600",
         "IMG_DISK": "0x400",
-        "BSS_BASE": "0xC5A600",
+        "BSS_BASE": "0xC62600",
         "BSS_LEN": "0x14808",
         "CHIP_BASE": "0x1C000",
-        "CHIP_LEN": "0x57D04",
+        "CHIP_LEN": "0x5FD04",
         "ENTRY": "0xC18000"
       },
       "provenWith": {
-        "name": "Ivanhoe_ivanhoe - hiscore.pap",
+        "name": "ivanhoe - hiscore.pap",
         "bytes": 2014
       },
       "sources": {
-        "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
+        "tool": "44227841b0ac89bb759ec1deb8680d6231cabe76465cf5edb49886ea44745c2c",
         "player": "803f830e56676b0abd8b25075860764db266e35dbea9258163e99814db2705bc"
-      }
+      },
+      "prefixes": [
+        "pap"
+      ]
     },
     "PreTracker": {
       "adf": "PreTracker.adf",
