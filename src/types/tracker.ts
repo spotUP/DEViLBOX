@@ -434,6 +434,8 @@ export interface ImportMetadata {
     songLength: number; // Number of patterns in order list
     restartPosition: number; // Pattern to restart at on loop
     patternOrderTable: number[]; // Pattern playback order (0-255 entries)
+    /** Header volume of slots with no sample data (slot id -> 0-64); the MOD exporter writes it back. */
+    emptySlotVolumes?: Record<number, number>;
   };
 
   // Preserve original samples

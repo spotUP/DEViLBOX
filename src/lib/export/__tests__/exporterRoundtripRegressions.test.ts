@@ -237,7 +237,7 @@ describe('exporter round-trip regressions', () => {
     const raw = fixture('public/data/songs/audio-sculpture/m.mod');
     const song = await parseMODFile(raw, 'm.mod');
     const out = await toU8(await exportSongToMOD(song, { bakeSynths: true })); // was: throw "not yet implemented"
-    expect(String.fromCharCode(...out.slice(1080, 1084))).toBe('M.K.');
+    expect(String.fromCharCode(...out.slice(1080, 1084))).toBe('FLT4'); // the source's own tag
     const re = await parseMODFile(out.buffer.slice(0) as ArrayBuffer, 'm.mod');
     const { cells, matched } = cellMatch(song, re);
     expect(cells).toBeGreaterThan(0);

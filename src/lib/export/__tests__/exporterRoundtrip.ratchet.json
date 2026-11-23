@@ -618,10 +618,10 @@
     },
     "mod": {
       "exporter": "MOD bake (modExport)",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 7168,
+      "cells": 108458,
       "bytes": 108458
     },
     "monotone": {

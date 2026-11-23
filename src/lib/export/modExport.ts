@@ -127,7 +127,8 @@ export async function exportSongToMOD(
       name: (inst?.name ?? '').slice(0, 22),
       pcm: evenPcm,
       finetune: inst?.metadata?.modPlayback?.finetune ?? 0,
-      volume: evenPcm.length > 0 ? vol : 0,
+      // An empty slot keeps the volume the file gave it (a sample-less slot with volume 64 is real).
+      volume: evenPcm.length > 0 ? vol : (importMetadata?.modData?.emptySlotVolumes?.[i + 1] ?? 0),
       loopStart: loopStartBytes,
       loopLen: loopLenBytes,
     });
@@ -164,9 +165,12 @@ export async function exportSongToMOD(
     writeU16BE(output, base + 28, s.loopLen > 0 ? Math.floor(s.loopLen / 2) : 1); // 1 = no loop
   }
   output[950] = songLength & 0xFF;
-  output[951] = 127; // restart position (standard)
+  // Restart position and tag as the MOD import read them (FLT4, a restart of 13, ...); 127 / M.K. otherwise.
+  const modData = importMetadata?.sourceFormat === 'MOD' ? importMetadata.modData : undefined;
+  output[951] = modData ? modData.restartPosition & 0xFF : 127;
   for (let i = 0; i < 128; i++) output[952 + i] = i < order.length ? order[i] : 0;
-  writeStr(output, 1080, FORMAT_TAGS[NUM_CHANNELS as 4 | 6 | 8], 4);
+  const keepTag = modData?.moduleType?.length === 4 && song.numChannels === NUM_CHANNELS;
+  writeStr(output, 1080, keepTag ? modData!.moduleType : FORMAT_TAGS[NUM_CHANNELS as 4 | 6 | 8], 4);
 
   // ── Patterns: 4-byte ProTracker cells (sample split across byte0/byte2) ──────
   let pos = HEADER;

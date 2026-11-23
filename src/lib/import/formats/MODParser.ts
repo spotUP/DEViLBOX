@@ -111,6 +111,7 @@ export async function parseMOD(buffer: ArrayBuffer, filename: string): Promise<{
 
   // Read sample data
   const instruments: ParsedInstrument[] = [];
+  const emptySlotVolumes = new Map<number, number>();
   for (let i = 0; i < 31; i++) {
     const sampleHeader = header.samples[i];
 
@@ -125,6 +126,8 @@ export async function parseMOD(buffer: ArrayBuffer, filename: string): Promise<{
         volumeType: 'none',
         panningType: 'none',
       });
+      // Kept in the metadata only (no playable sample): the exporter writes the slot's header volume back.
+      emptySlotVolumes.set(i + 1, sampleHeader.volume);
       continue;
     }
 
@@ -193,6 +196,7 @@ export async function parseMOD(buffer: ArrayBuffer, filename: string): Promise<{
       metadata.originalSamples![sample.id] = sample;
     });
   });
+  metadata.modData!.emptySlotVolumes = Object.fromEntries(emptySlotVolumes);
 
   return { header, patterns, instruments, metadata };
 }
