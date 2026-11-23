@@ -179,6 +179,12 @@ def source_hashes(player):
     return {'tool': h.hexdigest(), 'player': ply}
 
 
+def eagle_prefixes(player):
+    """Every eagleplayer.conf prefix of PLAYER, lower case (the names UADE picks the player by)."""
+    entries, _ = uade_lookup.parse_conf(os.path.join(UADE_ROOT, 'eagleplayer.conf'))
+    return sorted({p.lower() for e in entries if e['player'] == player for p in e['prefixes']})
+
+
 def publish(adf_path, layout, pub_dir, name=None):
     """Copy the ADF to <pub_dir>/<name or player>.adf and upsert its manifest.json entry.
     A second build of one player (another target) needs a name; the entry then records its `player`."""
@@ -203,6 +209,9 @@ def publish(adf_path, layout, pub_dir, name=None):
         'memory': mem,
         'provenWith': layout['stagedModule'],
         'sources': source_hashes(layout['player']),
+        # The browser routes a module with no magic test of its own by these eagleplayer.conf names
+        # (adfTemplateFor). A variant template (MED-A1200) is reached by its magic only.
+        **({'prefixes': eagle_prefixes(key)} if key == layout['player'] else {}),
     }
     man['templates'] = dict(sorted(man['templates'].items()))
     with open(man_path, 'w') as fh:

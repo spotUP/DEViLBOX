@@ -33,6 +33,8 @@ export interface AdfTemplateEntry {
   /** Chip RAM the player needs from CHIP_BASE up, with the slot at its maximum size. */
   chipArenaBytes: number;
   memory: { CHIP_BASE: string };
+  /** eagleplayer.conf prefixes of the player (build_adf.py publish), lower case; absent on variant templates and on templates that fail the boot check. */
+  prefixes?: string[];
 }
 export interface AdfManifest { templates: Record<string, AdfTemplateEntry> }
 
@@ -45,7 +47,7 @@ const ascii = (b: Uint8Array, at: number, s: string): boolean =>
 const be32 = (b: Uint8Array, at: number): number => ((b[at] << 24) | (b[at + 1] << 16) | (b[at + 2] << 8) | b[at + 3]) >>> 0;
 
 /** The template name for a module, from the same magic tests the on-disk screen code uses; null when no player is on a disk. */
-export function adfTemplateFor(m: Uint8Array, filename?: string): string | null {
+export function adfTemplateFor(m: Uint8Array, filename?: string, manifest?: AdfManifest): string | null {
   // Checked first: an .aam module can start with bytes another player's magic test accepts (agony-level1.aam reads as SUN-Tronic).
   // ArtAndMagic has no magic and no detect function: the importer routes by .aam / aam.* name (AmigaFormatParsers).
   const base = (filename?.split('/').pop() ?? '').toLowerCase();
@@ -108,6 +110,14 @@ export function adfTemplateFor(m: Uint8Array, filename?: string): string | null 
   if (/\.dat$/.test(base)) return 'PaulRobotham';
   // Last: the hunk scan for the RIFFRAFF magic is the loosest of the detect functions.
   if (isRiffRaffFormat(m)) return 'RiffRaff';
+  // No magic matched: the player UADE itself picks by name. Same candidate order as build_adf.py's
+  // uade_lookup.candidates: the prefix (puma.liquid kids), then the extension (liquid kids.puma).
+  if (manifest && base.includes('.')) {
+    for (const c of [base.slice(0, base.indexOf('.')), base.slice(base.lastIndexOf('.') + 1)]) {
+      const hit = Object.entries(manifest.templates).find(([, t]) => t.prefixes?.includes(c));
+      if (hit) return hit[0];
+    }
+  }
   return null;
 }
 
@@ -164,7 +174,7 @@ export interface AdfResult { data: Uint8Array; filename: string; warnings: strin
 export async function buildAdf(
   module: Uint8Array, baseName: string, manifest: AdfManifest, loadTemplate: (file: string) => Promise<Uint8Array>, companion?: Uint8Array,
 ): Promise<AdfResult> {
-  const name = adfTemplateFor(module, baseName);
+  const name = adfTemplateFor(module, baseName, manifest);
   const entry = name ? manifest.templates[name] : undefined;
   if (!name || !entry) throw new AdfExportError('No Amiga disk player exists for this format yet.');
   const data = patchAdfSlot(await loadTemplate(entry.adf), entry, module, companion);

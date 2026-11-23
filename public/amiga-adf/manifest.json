@@ -37,7 +37,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "81fd19d25d2e5813f314fe54f2f88606926204825e364b3467e56f74c3c34f0b"
-      }
+      },
+      "prefixes": [
+        "amc"
+      ]
     },
     "AProSys": {
       "adf": "AProSys.adf",
@@ -76,7 +79,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "9385d3bae2d6908ef2ee43dc284db6f81d28e1e9f0d8488cb520788890eb8e65"
-      }
+      },
+      "prefixes": [
+        "aps"
+      ]
     },
     "AbyssHighestExperience": {
       "adf": "AbyssHighestExperience.adf",
@@ -115,7 +121,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "ce55646788639b86811063178613a5b31f783a325dbc60919cfc9596143d3db0"
-      }
+      },
+      "prefixes": [
+        "ahx",
+        "thx"
+      ]
     },
     "Anders_0land": {
       "adf": "Anders_0land.adf",
@@ -154,7 +164,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "3e58a705b80e61ceb42c2e17e7c4a1f95ae829125267b041fcd434877b416b0a"
-      }
+      },
+      "prefixes": [
+        "hot"
+      ]
     },
     "ArtAndMagic": {
       "adf": "ArtAndMagic.adf",
@@ -193,7 +206,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "c89661bc4b22bb5c05ae8f69321da6bdb54d59d21ae87453689ca3f056ed36ae"
-      }
+      },
+      "prefixes": [
+        "aam"
+      ]
     },
     "Ashley_Hogg": {
       "adf": "Ashley_Hogg.adf",
@@ -232,7 +248,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "80949d8cbfea483bf1b7e37d9fcc0d01189cd7e16e17cf09bf2173bd5c869443"
-      }
+      },
+      "prefixes": [
+        "ash"
+      ]
     },
     "AudioSculpture": {
       "adf": "AudioSculpture.adf",
@@ -280,7 +299,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "2eb9551384c6eaaaacb87e1ac2ee726ccb096653f9c76bd55f9e6e0919b88d95"
-      }
+      },
+      "prefixes": [
+        "adsc",
+        "mod_adsc4"
+      ]
     },
     "BeathovenSynthesizer": {
       "adf": "BeathovenSynthesizer.adf",
@@ -319,7 +342,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "8f2ea3e1681e89dde07583ca2835670722c86e420fc61ee8544aee5f581e1461"
-      }
+      },
+      "prefixes": [
+        "bss"
+      ]
     },
     "BenDaglish-SID": {
       "adf": "BenDaglish-SID.adf",
@@ -358,7 +384,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "c8f58610d481c28f85579f8b01af941ab5136af2160980fa63051e95a0c619a9"
-      }
+      },
+      "prefixes": [
+        "bds"
+      ]
     },
     "ChipTracker": {
       "adf": "ChipTracker.adf",
@@ -397,7 +426,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "a2f2aa49e74ff36956548abeaf36753acced51be9d42df6efd6dca48c7eaf7cc"
-      }
+      },
+      "prefixes": [
+        "kris"
+      ]
     },
     "CoreDesign": {
       "adf": "CoreDesign.adf",
@@ -436,7 +468,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "bcb2294a92023d97bb322e2bf8ec0700ae94a17cf059f34ec9af5e7958795fd6"
-      }
+      },
+      "prefixes": [
+        "core"
+      ]
     },
     "CustomMade": {
       "adf": "CustomMade.adf",
@@ -475,7 +510,12 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "170b379f48461877ddcee732338668f3a6c900eadfe08bee119f8fd2af161e49"
-      }
+      },
+      "prefixes": [
+        "cm",
+        "rk",
+        "rkb"
+      ]
     },
     "DIGI-Booster": {
       "adf": "DIGI-Booster.adf",
@@ -514,7 +554,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "485b77266dba0b59f5f71de1beabde89c6396dc0e203f50ee38e068b9683f133"
-      }
+      },
+      "prefixes": [
+        "db",
+        "digi"
+      ]
     },
     "DeltaMusic2.0": {
       "adf": "DeltaMusic2.0.adf",
@@ -553,7 +597,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "90b92efe40439d66458d438a233935aeec118dce54cd5b52325c4f55fa1124f5"
-      }
+      },
+      "prefixes": [
+        "dlm2",
+        "dm2"
+      ]
     },
     "DigitalSoundStudio": {
       "adf": "DigitalSoundStudio.adf",
@@ -592,7 +640,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "57e1efe89779580e38384b1ec5f2d392bebd7657c90932961777d0319176b07c"
-      }
+      },
+      "prefixes": [
+        "dss"
+      ]
     },
     "DynamicSynthesizer": {
       "adf": "DynamicSynthesizer.adf",
@@ -670,7 +721,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "7803230a31cb7eca7525f741aba05ebd413166ab9f4398106eceaefe7c017472"
-      }
+      },
+      "prefixes": [
+        "ems"
+      ]
     },
     "EMS-6": {
       "adf": "EMS-6.adf",
@@ -709,7 +763,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "40b48f7d514976d9e84585fd9a47b5075384caa0e27fe56ef537c4ee55710658"
-      }
+      },
+      "prefixes": [
+        "emsv6"
+      ]
     },
     "FutureComposer1.3": {
       "adf": "FutureComposer1.3.adf",
@@ -748,7 +805,12 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "1899c2bb0bc1cc8c7cebd0c8b2213ac0c4bcec9ad78386524b05d44a006a52bb"
-      }
+      },
+      "prefixes": [
+        "fc13",
+        "fc3",
+        "smod"
+      ]
     },
     "FutureComposer1.4": {
       "adf": "FutureComposer1.4.adf",
@@ -787,7 +849,12 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "507e430c3cf08c3e324820111ba49ef25125ce80fd5bd7d787ebb3d83a9552e3"
-      }
+      },
+      "prefixes": [
+        "fc",
+        "fc14",
+        "fc4"
+      ]
     },
     "FuturePlayer": {
       "adf": "FuturePlayer.adf",
@@ -826,7 +893,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "4d00b5fbd586cd0638303939fa490a5ff29f1da9ccd54042f6910c42b2e75227"
-      }
+      },
+      "prefixes": [
+        "fp"
+      ]
     },
     "GMC": {
       "adf": "GMC.adf",
@@ -865,7 +935,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "4f3d0faa4bd9392de9d07ffa694866c12e978821292491d5c725e769fce9d858"
-      }
+      },
+      "prefixes": [
+        "gmc"
+      ]
     },
     "HowieDavies": {
       "adf": "HowieDavies.adf",
@@ -904,7 +977,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "d4d5651d0ff363f5f5714e6eb0526e7e857843021d2e6aa57c5e057f8efbd18a"
-      }
+      },
+      "prefixes": [
+        "hd"
+      ]
     },
     "InStereo": {
       "adf": "InStereo.adf",
@@ -943,7 +1019,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "13ba07791cfb2100088cecd16fe0c698894eecdebc02ef5538a4cf71509705dc"
-      }
+      },
+      "prefixes": [
+        "is"
+      ]
     },
     "Infogrames": {
       "adf": "Infogrames.adf",
@@ -991,7 +1070,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "f0a852d1f48db10853081f639bb7fdfae7d9296cec2ec4e8451bee15082bf342"
-      }
+      },
+      "prefixes": [
+        "dum"
+      ]
     },
     "JamCracker": {
       "adf": "JamCracker.adf",
@@ -1030,7 +1112,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "1686b55a62f7469096b84dc7769c4d71b73530d8e15b5b032a1d1a08795d4f5d"
-      }
+      },
+      "prefixes": [
+        "jam",
+        "jc"
+      ]
     },
     "JasonPage": {
       "adf": "JasonPage.adf",
@@ -1078,7 +1164,12 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "f5ace202a2c88bd999463a7a64c055b7fe50806d09fc4424bd190f18472f0128"
-      }
+      },
+      "prefixes": [
+        "jp",
+        "jpn",
+        "jpnd"
+      ]
     },
     "JeroenTel": {
       "adf": "JeroenTel.adf",
@@ -1117,7 +1208,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "0dee2968cc7fdaa4d7756b741e01dc52d67073e0324bd41a310baf1bafbc4605"
-      }
+      },
+      "prefixes": [
+        "jt",
+        "mon_old"
+      ]
     },
     "JochenHippel-7V": {
       "adf": "JochenHippel-7V.adf",
@@ -1156,7 +1251,11 @@
       "sources": {
         "tool": "2066d3eb6fc72b3b8d47a44bcb598d90d3145d2f9cb221975cb6864e886366e2",
         "player": "91f90a57be47174a401fe51ff20fdbe55d5f10dc8bd2f12b4bbfb182f8789b41"
-      }
+      },
+      "prefixes": [
+        "hip7",
+        "s7g"
+      ]
     },
     "JochenHippel-CoSo": {
       "adf": "JochenHippel-CoSo.adf",
@@ -1195,7 +1294,11 @@
       "sources": {
         "tool": "2066d3eb6fc72b3b8d47a44bcb598d90d3145d2f9cb221975cb6864e886366e2",
         "player": "d008b7a6bd2bbb7f1e281a64ff29a8e37db1d564ea130294317f4b5e86dc418f"
-      }
+      },
+      "prefixes": [
+        "hipc",
+        "soc"
+      ]
     },
     "KrisHatlelid": {
       "adf": "KrisHatlelid.adf",
@@ -1243,7 +1346,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "4cb3011691d4694a037f88ea6733431641b866e6e874b89a1da33a4ea6c9ebee"
-      }
+      },
+      "prefixes": [
+        "kh"
+      ]
     },
     "MCMD": {
       "adf": "MCMD.adf",
@@ -1282,7 +1388,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "beaeecfa1a6948fc343051f6deb65469b23b36645dd6a2ef01c05e0eef98a741"
-      }
+      },
+      "prefixes": [
+        "mcmd_org"
+      ]
     },
     "MED": {
       "adf": "MED.adf",
@@ -1321,7 +1430,13 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "fcaa3c81076b4814e90548fa474d11c36031a270560818c9b7ddfa3985a65199"
-      }
+      },
+      "prefixes": [
+        "med",
+        "mmd0",
+        "mmd1",
+        "mmd2"
+      ]
     },
     "MED-A1200": {
       "player": "MED",
@@ -1400,7 +1515,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "a35544d53e1fcab7f97580e476ddd342ef95e8d5ccce4738bbf280381231b6e6"
-      }
+      },
+      "prefixes": [
+        "mmdc"
+      ]
     },
     "Mark_Cooksey": {
       "adf": "Mark_Cooksey.adf",
@@ -1439,7 +1557,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "e925ee79c5db0c8306ee195a00c089b77eba7631af7990d7dce78181a30f5b8c"
-      }
+      },
+      "prefixes": [
+        "mc",
+        "mcr"
+      ]
     },
     "Maximum_Effect": {
       "adf": "Maximum_Effect.adf",
@@ -1487,7 +1609,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "72ec3766fe73156e6ac352e8de4d1470a3a8b9bd092c633f5de897c6b457382c"
-      }
+      },
+      "prefixes": [
+        "max"
+      ]
     },
     "Medley": {
       "adf": "Medley.adf",
@@ -1526,7 +1651,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "848ece09e39e00cccc8c7495e8666b8080621dfe69cacb1e09971c91f9354beb"
-      }
+      },
+      "prefixes": [
+        "mso"
+      ]
     },
     "Mugician": {
       "adf": "Mugician.adf",
@@ -1565,7 +1693,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "0f0da6015c69602f0b2eef3dc9e155c7a021b26194455bc0195c6e6c80ee1a04"
-      }
+      },
+      "prefixes": [
+        "dmu",
+        "mug"
+      ]
     },
     "MultiMedia_Sound": {
       "adf": "MultiMedia_Sound.adf",
@@ -1604,7 +1736,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "cf73a1c31c1da1b8a85d714b98a87dd67fad0c69bd396027f6ec1e1f0ebeb513"
-      }
+      },
+      "prefixes": [
+        "mms",
+        "sfx20"
+      ]
     },
     "MusicAssembler": {
       "adf": "MusicAssembler.adf",
@@ -1643,7 +1779,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "2f9c5e3c849f342a342f7300a05301750571ece7d3c1cc4642194bbb4e5ff56a"
-      }
+      },
+      "prefixes": [
+        "ma"
+      ]
     },
     "Oktalyzer": {
       "adf": "Oktalyzer.adf",
@@ -1682,7 +1821,11 @@
       "sources": {
         "tool": "2066d3eb6fc72b3b8d47a44bcb598d90d3145d2f9cb221975cb6864e886366e2",
         "player": "c0abc75d756f56eec22b3e191c56f272ff74a28001a53f56153e3cfea4fdd636"
-      }
+      },
+      "prefixes": [
+        "okt",
+        "okta"
+      ]
     },
     "PTK-Prowiz": {
       "adf": "PTK-Prowiz.adf",
@@ -1721,7 +1864,129 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "cea8f553a382654d56d8d7e27ec26cf9374db54e3e9dcab5be9b4f092e57e9ca"
-      }
+      },
+      "prefixes": [
+        "!pm!",
+        "40a",
+        "40b",
+        "41a",
+        "50a",
+        "60a",
+        "61a",
+        "ac1",
+        "ac1d",
+        "aval",
+        "chan",
+        "cp",
+        "cplx",
+        "crb",
+        "di",
+        "eu",
+        "fc-m",
+        "fcm",
+        "ft",
+        "fuz",
+        "fuzz",
+        "gv",
+        "hmc",
+        "hrt",
+        "hrt!",
+        "ice",
+        "it1",
+        "kef",
+        "kef7",
+        "krs",
+        "ksm",
+        "lax",
+        "mexxmp",
+        "mod",
+        "mod15",
+        "mod15_mst",
+        "mod_comp",
+        "mod_doc",
+        "mod_flt4",
+        "mod_ntk",
+        "mod_ntk1",
+        "mod_ntk2",
+        "mod_ntkamp",
+        "mpro",
+        "noisepacker2",
+        "noisepacker3",
+        "np",
+        "np1",
+        "np2",
+        "np3",
+        "nr",
+        "nru",
+        "ntpk",
+        "p10",
+        "p21",
+        "p30",
+        "p40a",
+        "p40b",
+        "p41a",
+        "p4x",
+        "p50a",
+        "p5a",
+        "p5x",
+        "p60",
+        "p60a",
+        "p61",
+        "p61a",
+        "p6x",
+        "pha",
+        "pin",
+        "pm",
+        "pm0",
+        "pm01",
+        "pm1",
+        "pm10c",
+        "pm18a",
+        "pm2",
+        "pm20",
+        "pm4",
+        "pm40",
+        "pmz",
+        "polk",
+        "pp10",
+        "pp20",
+        "pp21",
+        "pp30",
+        "ppk",
+        "pr1",
+        "pr2",
+        "prom",
+        "pru",
+        "pru1",
+        "pru2",
+        "prun",
+        "prun1",
+        "prun2",
+        "pwr",
+        "pyg",
+        "pygm",
+        "pygmy",
+        "skt",
+        "skyt",
+        "snt",
+        "snt!",
+        "st2",
+        "st26",
+        "st30",
+        "star",
+        "stpk",
+        "tp",
+        "tp1",
+        "tp2",
+        "tp3",
+        "un2",
+        "unic",
+        "unic2",
+        "wn",
+        "xan",
+        "xann",
+        "zen"
+      ]
     },
     "PaulRobotham": {
       "adf": "PaulRobotham.adf",
@@ -1769,7 +2034,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "26b8c25f908f2635ee5796543a963662107123b389ff5896093565853543bd1a"
-      }
+      },
+      "prefixes": [
+        "dat"
+      ]
     },
     "PeterVerswyvelen": {
       "adf": "PeterVerswyvelen.adf",
@@ -1808,7 +2076,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "908e7582da066a05f8ae9500c63629f1d022554503c145cd478edf5bc9147807"
-      }
+      },
+      "prefixes": [
+        "pvp"
+      ]
     },
     "PierreAdane": {
       "adf": "PierreAdane.adf",
@@ -1886,7 +2157,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "383851f0c1ee26252d08baa7798d99a6b73029a4cf386bc541e078b97708c9c3"
-      }
+      },
+      "prefixes": [
+        "puma"
+      ]
     },
     "QuadraComposer": {
       "adf": "QuadraComposer.adf",
@@ -1925,7 +2199,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "5753455cd768b3cd6880442673a659bc7ae95328da00be9cb5e200cc3315c92e"
-      }
+      },
+      "prefixes": [
+        "emod",
+        "qc"
+      ]
     },
     "RiffRaff": {
       "adf": "RiffRaff.adf",
@@ -1964,7 +2242,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "807af51dcaa2424f33deaa783d92f56789a3b044ccf7446b5bf50a8e66d1679d"
-      }
+      },
+      "prefixes": [
+        "riff"
+      ]
     },
     "SIDMon1.0": {
       "adf": "SIDMon1.0.adf",
@@ -2003,7 +2284,12 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "5f3595024cffd7753f5f1854d49aa2bcb09a094d86d4544fa3dbc6e734c8ba4c"
-      }
+      },
+      "prefixes": [
+        "sid",
+        "sid1",
+        "smn"
+      ]
     },
     "SIDMon2.0": {
       "adf": "SIDMon2.0.adf",
@@ -2042,7 +2328,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "0eacdeb971ff72da0fa6fc6c7a3db84bc0764721689c1fb4d1c7865fab95bb29"
-      }
+      },
+      "prefixes": [
+        "sid2"
+      ]
     },
     "SUN-Tronic": {
       "adf": "SUN-Tronic.adf",
@@ -2081,7 +2370,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "2ab53b0fc75461d73518752864a64efce8266ef19b6015497d7b2bc546e3f1bd"
-      }
+      },
+      "prefixes": [
+        "sun"
+      ]
     },
     "SonicArranger": {
       "player": "SonicArranger-pc-all",
@@ -2169,7 +2461,12 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "074e8fbcc7e4d0bd64195580d3ed4fb6724ff39559f3238966e08541297bddf2"
-      }
+      },
+      "prefixes": [
+        "smus",
+        "snx",
+        "tiny"
+      ]
     },
     "Sound-FX": {
       "adf": "Sound-FX.adf",
@@ -2208,7 +2505,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "5317864b73d15d4c50dcbd613c4319ec3b62ab48f58935b00e33aec676cf632e"
-      }
+      },
+      "prefixes": [
+        "sfx",
+        "sfx13"
+      ]
     },
     "SoundControl": {
       "adf": "SoundControl.adf",
@@ -2247,7 +2548,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "d8a7cb2bac53068bd659026c207fd6656ef5515f9480248b6d241266da4eec7a"
-      }
+      },
+      "prefixes": [
+        "sc",
+        "sct"
+      ]
     },
     "SoundImages": {
       "adf": "SoundImages.adf",
@@ -2286,7 +2591,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "d4f4119e7da53c7cca58430af97854d394865426f4a54bbb80815645a5f1c29c"
-      }
+      },
+      "prefixes": [
+        "tw"
+      ]
     },
     "SoundMaster": {
       "adf": "SoundMaster.adf",
@@ -2325,7 +2633,14 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "5333b44d3e5f26198d81c5acc5a2ab66738f2f1579e8e479ab469a2642b23c0f"
-      }
+      },
+      "prefixes": [
+        "sm",
+        "sm1",
+        "sm2",
+        "sm3",
+        "smpro"
+      ]
     },
     "SoundMon2.0": {
       "adf": "SoundMon2.0.adf",
@@ -2364,7 +2679,11 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "b4ea4f36b8769cb5d394357c16eabe0340487b0d68b5858a6b345bcfaa2c2faa"
-      }
+      },
+      "prefixes": [
+        "bp",
+        "sndmon"
+      ]
     },
     "Special-FX": {
       "adf": "Special-FX.adf",
@@ -2403,7 +2722,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "d331f792b4df75eef8c0a0d8b9541e96b3db642c7a0a965ecb4d388d3d1e121a"
-      }
+      },
+      "prefixes": [
+        "jd"
+      ]
     },
     "SpeedySystem": {
       "adf": "SpeedySystem.adf",
@@ -2442,7 +2764,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "9a557c331989c1ff462f6f706d67aaa6089d7c6f7043164b7f1bf989440d26db"
-      }
+      },
+      "prefixes": [
+        "ss"
+      ]
     },
     "TCB_Tracker": {
       "adf": "TCB_Tracker.adf",
@@ -2481,7 +2806,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "62043dab5c4c1c88ee998a2e3d17a7d4b9b04f1e5181d7e04fe90f5b9a9ad4ec"
-      }
+      },
+      "prefixes": [
+        "tcb"
+      ]
     },
     "TFMX-Pro": {
       "player": "TFMX",
@@ -2569,7 +2897,10 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "a89e24b7c81dad6d4dda6a3f8fc6e4746e625ac0710149811753611a7a41c765"
-      }
+      },
+      "prefixes": [
+        "sg"
+      ]
     },
     "Tronic": {
       "adf": "Tronic.adf",
@@ -2608,7 +2939,13 @@
       "sources": {
         "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
         "player": "e757301807ad2e5da81f5dcff3351959e0cfa571a2e793f799ae0c967c5d7135"
-      }
+      },
+      "prefixes": [
+        "dp",
+        "trc",
+        "tro",
+        "tronic"
+      ]
     }
   }
 }

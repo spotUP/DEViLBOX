@@ -193,3 +193,21 @@ describe('single-companion ExtLoad disks route by file name', () => {
     expect([...out.slice(e.companionSlot!.diskOffset, e.companionSlot!.diskOffset + 3)]).toEqual([9, 8, 7]);
   });
 });
+
+describe('modules with no magic test route by eagleplayer.conf names', () => {
+  it.each([
+    ['pumatracker/liquid kids - lv1a.puma', 'PumaTracker'],
+    ['music-assembler/thanatos.ma', 'MusicAssembler'],
+  ])('%s -> %s, by extension and by prefix', (p, name) => {
+    const bytes = song(p);
+    const file = p.split('/').pop()!;
+    const ext = file.slice(file.lastIndexOf('.') + 1);
+    expect(adfTemplateFor(bytes, file, manifest)).toBe(name);
+    expect(adfTemplateFor(bytes, `${ext}.${file.slice(0, file.lastIndexOf('.'))}`, manifest)).toBe(name);
+    expect(adfTemplateFor(bytes, file)).toBeNull();
+  });
+
+  it('a template that fails the boot check carries no names (Pierre Adane stays unrouted)', () => {
+    expect(adfTemplateFor(song('formats/Ivanhoe_ivanhoe - bonus.pap'), 'Ivanhoe_ivanhoe - bonus.pap', manifest)).toBeNull();
+  });
+});
