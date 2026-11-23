@@ -602,20 +602,20 @@
     },
     "CustomMade": {
       "adf": "CustomMade.adf",
-      "adfSha256": "0f261e060b7409d45be08ee58dde1bd3e6dad606d86eb45b6c2039c40f00ad0d",
+      "adfSha256": "d60e6a3b9cbde0ae6ef9655871c65bde4e0a816602c08c9c6571ea8ee4c17052",
       "target": "a500",
       "cpu": "68000",
       "moduleSlot": {
-        "diskOffset": 42120,
+        "diskOffset": 42124,
         "maxBytes": 229376
       },
       "moduleLengthWord": {
-        "diskOffset": 42116,
+        "diskOffset": 42120,
         "bytes": 4,
         "endian": "big"
       },
       "titleSlot": {
-        "diskOffset": 271980,
+        "diskOffset": 271984,
         "bytes": 29,
         "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
       },
@@ -635,7 +635,7 @@
         "bytes": 9759
       },
       "sources": {
-        "tool": "8b140873e8dbe5a59a4fa7e3b707badc2723a0b30fa1bba95ff7714cd81312a2",
+        "tool": "44227841b0ac89bb759ec1deb8680d6231cabe76465cf5edb49886ea44745c2c",
         "player": "170b379f48461877ddcee732338668f3a6c900eadfe08bee119f8fd2af161e49"
       },
       "prefixes": [
@@ -1892,6 +1892,48 @@
       "prefixes": [
         "jt",
         "mon_old"
+      ]
+    },
+    "JesperOlsen": {
+      "adf": "JesperOlsen.adf",
+      "adfSha256": "ce7d70ec4459ea3c3c6c582be03b3f5edbb52e8e6d72c02b93a2c2fc9f780e38",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 42220,
+        "maxBytes": 229376
+      },
+      "moduleLengthWord": {
+        "diskOffset": 42216,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 278194,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 365764,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x44200",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC5C200",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x594C4",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "lollypop-subgame 01.jo",
+        "bytes": 8484
+      },
+      "sources": {
+        "tool": "44227841b0ac89bb759ec1deb8680d6231cabe76465cf5edb49886ea44745c2c",
+        "player": "ba37c9fad4fdfc7922db6780e89b69352a761ade9baf8b9a3f41dad48e2e695d"
+      },
+      "prefixes": [
+        "jo"
       ]
     },
     "JochenHippel-7V": {
@@ -4043,6 +4085,57 @@
         "sndmon"
       ]
     },
+    "SoundPlayer": {
+      "adf": "SoundPlayer.adf",
+      "adfSha256": "ef16c7d10c1d9425a307003a01df4fb23c8bd322ee20566902d39211af9da311",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 43008,
+        "maxBytes": 208896
+      },
+      "moduleLengthWord": {
+        "diskOffset": 43004,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "companionSlot": {
+        "diskOffset": 251904,
+        "maxBytes": 65536
+      },
+      "companionLengthWord": {
+        "diskOffset": 317448,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 317948,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 405764,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x4DC00",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC65C00",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x63104",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "sjs.awesome",
+        "bytes": 5991
+      },
+      "sources": {
+        "tool": "44227841b0ac89bb759ec1deb8680d6231cabe76465cf5edb49886ea44745c2c",
+        "player": "33fa804c621384e1348d5b0cbc5ec64255e58f69d8ab81bba27ea6071550ba04"
+      },
+      "prefixes": [
+        "sjs"
+      ]
+    },
     "SoundProgrammingLanguage": {
       "adf": "SoundProgrammingLanguage.adf",
       "adfSha256": "0ae4fae3c088a048e0f23a90716f81257b7c52ce03cec60a2c3a9d675a643a4a",
@@ -4252,6 +4345,57 @@
       "prefixes": [
         "st",
         "synmod"
+      ]
+    },
+    "SynthPack": {
+      "adf": "SynthPack.adf",
+      "adfSha256": "c378cd88c559d0720a6a4e3f58df2075b88a82f45736e4bb1afb1cf4c547b780",
+      "target": "a500",
+      "cpu": "68000",
+      "moduleSlot": {
+        "diskOffset": 48164,
+        "maxBytes": 204800
+      },
+      "moduleLengthWord": {
+        "diskOffset": 48160,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "companionSlot": {
+        "diskOffset": 252964,
+        "maxBytes": 65536
+      },
+      "companionLengthWord": {
+        "diskOffset": 318508,
+        "bytes": 4,
+        "endian": "big"
+      },
+      "titleSlot": {
+        "diskOffset": 319012,
+        "bytes": 29,
+        "note": "ASCII, space padded; shown as the title by players without a title of their own (EMS, EMS-6, FC, SUN-Tronic, CustomMade, Anders 0land, JamCracker)"
+      },
+      "chipArenaBytes": 406788,
+      "memory": {
+        "IMG_BASE": "0xC18000",
+        "IMG_LEN": "0x4E000",
+        "IMG_DISK": "0x400",
+        "BSS_BASE": "0xC66000",
+        "BSS_LEN": "0x14808",
+        "CHIP_BASE": "0x1C000",
+        "CHIP_LEN": "0x63504",
+        "ENTRY": "0xC18000"
+      },
+      "provenWith": {
+        "name": "centerbase soft.osp",
+        "bytes": 1950
+      },
+      "sources": {
+        "tool": "44227841b0ac89bb759ec1deb8680d6231cabe76465cf5edb49886ea44745c2c",
+        "player": "2c69bb3d3ae92c2ec823dc54de66d798cbc04eeffd7894f573882943f5c7d23d"
+      },
+      "prefixes": [
+        "osp"
       ]
     },
     "TCB_Tracker": {

@@ -442,6 +442,7 @@ _uade_init_super:
 ;     TFMX Pro's DTP_Check2 rejects an "(Empty)"-titled mdat whose header word is not in its
 ;     table of known songs (Turrican bonus: score sends CHECKERROR, player never starts); the
 ;     browser's UADE.wasm plays it, so the template forces the player like it does.
+;     build_adf.py also sets it for eagleplayer.conf ignore_player_check players (CustomMade).
         move.l  #1,$118.w                               ; force
         else
         clr.l   $118.w                                  ; force

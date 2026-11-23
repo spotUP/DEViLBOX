@@ -242,8 +242,10 @@ def main():
     # sample), so the single-module song-end re-post's second InitSound corrupts every sample pointer
     # (silent, DMACONR 0380). UADE never re-inits a loaded module; the player loops on its own (uade123 -n).
     asm += ['-DUADE_NO_SONG_END=1'] if player == 'QuadraComposer' and '-DUADE_NO_SONG_END=1' not in asm else []
-    # TFMX Pro's own check rejects some mdat files that the browser's UADE.wasm plays (forced).
-    asm += ['-DUADE_FORCE=1'] if player == 'TFMX-Pro' else []
+    # Force the player (skip its own check) where UADE does: eagleplayer.conf ignore_player_check (CustomMade:
+    # Ron Klaren .rk hunk files fail its check, silent DMACONR 0380), and TFMX Pro, whose check rejects some mdat
+    # files that the browser's UADE.wasm plays.
+    asm += ['-DUADE_FORCE=1'] if player == 'TFMX-Pro' or 'ignore_player_check' in entry.get('flags', []) else []
     # EMS / EMS-6 modules have no magic and no text fields: screen.s must not print the MOD layout.
     asm += ['-DNOTEXT=1'] if player in ('EMS', 'EMS-6') else []
     # EMS-6 (software mixer, A1200) ticks from a real level-3 VBL like the demo; other players stay polled.
