@@ -623,6 +623,11 @@ describe('furnaceToMds', () => {
       const flat = furnaceToMds(m).pcm.length;
       expect(scaled).toBeGreaterThan(flat); // Bass Drum 120/124/127 and Tom 124/127 each have their own copy
     });
+    it('djtBMX (156 Hz, speed 6): runs at 78 Hz with 3-tick rows instead of clamping to 120 Hz', async () => {
+      const r = await convert('djtBMX_zweitrigger_bluesky_badfmmix.fur');
+      expect(r.lossy.some((l) => l.includes('outside the driver'))).toBe(false);
+      expect(r.lossy.some((l) => l.startsWith('tick rate 78.00 Hz'))).toBe(true);
+    });
   });
 });
 

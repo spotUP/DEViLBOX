@@ -487,7 +487,12 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const f0 = Array.from({ length: kinds.length }, (_, ch) => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[0]}`)?.rows[0]?.effects ?? [])
     .flat().filter((e) => e.type === 0xf0).pop();
   const hz = f0 ? Math.max(1, Math.max(0, f0.value) * 2 / 5) : s.hz;
-  const rate = hz * (s.virtualTempo || 1) / (s.virtualTempoD || 1);
+  // The driver tops out at 2 ticks per frame (119.85 Hz). A faster song runs at hz / k with k Furnace ticks per sequence tick and
+  // each row shortened to speed / k ticks, so row timing stays exact (needs speeds divisible by k; else rounded and flagged lossy).
+  const vtRatio = (s.virtualTempo || 1) / (s.virtualTempoD || 1);
+  const maxHz = 2 * NTSC_HZ - 0.15;
+  const rowDiv = Math.max(1, Math.ceil((hz * vtRatio) / maxHz - 1e-9));
+  const rate = (hz * vtRatio) / rowDiv;
   const tempo = Math.max(0, Math.min(255, Math.round(rate * 128 / NTSC_HZ) - 1));
   // Furnace runs per-tick effects and macros at hz; virtual tempo only moves the row counter (playback.cpp tempoAccum), so a sequence
   // tick holds fpt Furnace ticks (1 without virtual tempo; 5/6 at 180/150).
@@ -522,7 +527,11 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (e.type === 0xff) stop = true;
       }
       c.rows.push(r);
-      c.ticks.push(Math.max(1, speeds[speedIdx++ % speeds.length]));
+      {
+        const sp = speeds[speedIdx++ % speeds.length];
+        if (sp % rowDiv) lossy.add(`row speed ${sp} not divisible by ${rowDiv} (tick rate above the driver maximum, row length rounded)`);
+        c.ticks.push(Math.max(1, Math.round(sp / rowDiv)));
+      }
     }
     if (stop) break;
     [o, start] = next ?? [o + 1, 0];
@@ -931,7 +940,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         // EDxx runs the whole row xx ticks late; ECxx keys off xx ticks after the row runs (playback.cpp rowDelay / cut, delayBehavior 2).
         // Both count Furnace engine ticks (hz), so under virtual tempo they land on the nearest sequence tick.
         const fxv = (t: number) => cell?.effects?.find((e) => e.type === t && e.value > 0)?.value ?? 0;
-        const seqAt = (f: number) => Math.round(f / fpt) - tick, edF = fTick(tick) + fxv(0xed);
+        // rowDiv > 1: sequence tick s runs Furnace tick k*s+k-1, so the first one at or after f is floor(f / k) (round would overshoot by a tick).
+        const seqAt = (f: number) => (rowDiv > 1 ? Math.floor(f / fpt + 1e-9) : Math.round(f / fpt)) - tick, edF = fTick(tick) + fxv(0xed);
         let delay = fxv(0xed) ? Math.max(0, seqAt(edF)) : 0, cutAt = fxv(0xec);
         if (delay >= c.ticks[i]) { lossy.add('EDxx delay not shorter than the row (played on the row)'); delay = 0; }
         cutAt = cutAt ? Math.max(delay + 1, seqAt((fxv(0xed) ? edF : fTick(tick)) + cutAt)) : 0;
