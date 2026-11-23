@@ -206,6 +206,5 @@ export interface FormatEnginePreferences {
   sonicArrangerSas: FormatEngineChoice; // .sas/sas.* → SimpleAmigaStubParser vs UADE
   mikeDavies?: FormatEngineChoice;       // .md/md.* → SimpleAmigaStubParser vs UADE
   aProSys?: FormatEngineChoice;          // .aps/aps.* → AProSysParser vs UADE
-  leggless: FormatEngineChoice;         // .lme/lme.* → SimpleAmigaStubParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }

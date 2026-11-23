@@ -1,7 +1,7 @@
 /**
  * SimpleAmigaStubEncoder — Encodes TrackerCell back to simple Amiga stub formats.
  *
- * Covers: Sonic Arranger SAS, Sound Factory PSF (stub variant), Leggless LME,
+ * Covers: Sonic Arranger SAS, Sound Factory PSF (stub variant),
  * Mike Davies MD, Mark II MK2, Art and Magic AAM.
  *
  * All are self-contained 68k binaries. The parsers generate empty placeholder
@@ -44,4 +44,3 @@ export function encodeSimpleAmigaStubCell(cell: TrackerCell): Uint8Array {
 
 // Register encoders for all simple stub formats
 registerPatternEncoder('soundFactoryStub', () => encodeSimpleAmigaStubCell);
-registerPatternEncoder('leggless', () => encodeSimpleAmigaStubCell);

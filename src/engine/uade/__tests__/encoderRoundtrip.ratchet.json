@@ -336,6 +336,14 @@
       "matchPct": 1,
       "cells": 16
     },
+    "lme": {
+      "kind": "fixed",
+      "method": "decode-encode",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 85
+    },
     "majortom": {
       "kind": "fixed",
       "method": "decode-encode",
@@ -824,7 +832,6 @@
     "inStereo1",
     "karlMorton",
     "kris",
-    "leggless",
     "med_mmd0",
     "med_mmd1",
     "mfp",

@@ -39,6 +39,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "aProSys", fixture: "public/data/songs/formats/action.aps", kind: "fixed" },
   { formatId: "artOfNoise", fixture: "public/data/songs/art-of-noise/inside.blipp.aon", kind: "fixed" },
   { formatId: "artAndMagic", fixture: "public/data/songs/formats/agony-level1.aam", kind: "variable" },
+  { formatId: "lme", fixture: "public/data/songs/leggless-music-editor/the punisher gameover.lme", kind: "fixed" },
   { formatId: "ams", fixture: "public/data/songs/velvet-studio/kernel.ams", kind: "variable" },
   { formatId: "ashleyHogg", fixture: "public/data/songs/ashley-hogg/ash.nobby the aardvark", kind: "variable" },
   { formatId: "krisHatlelid", fixture: "public/data/songs/kris-hatlelid/fiendish freddys - songs.kh", kind: "variable" },

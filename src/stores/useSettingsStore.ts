@@ -192,7 +192,6 @@ export const useSettingsStore = create<SettingsStore>()(
         kt: 'native',                // KlysParser — native klystrack engine
         soprol: 'native',            // WantedTeamDaveLoweParser — SOPROL title + UADE classic audio
         sonicArrangerSas: 'native',  // SimpleAmigaStubParser — filename title + UADE classic audio
-        leggless: 'native',          // SimpleAmigaStubParser — filename title + UADE classic audio
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',

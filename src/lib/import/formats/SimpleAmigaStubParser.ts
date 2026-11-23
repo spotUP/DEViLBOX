@@ -81,10 +81,6 @@ export function parseSoundFactoryFile(buffer: ArrayBuffer, filename: string): Tr
   return makeStubSong(buffer, filename, 'PSF', 'soundFactoryStub');
 }
 
-export function parseLegglessFile(buffer: ArrayBuffer, filename: string): TrackerSong {
-  return makeStubSong(buffer, filename, 'LME', 'leggless');
-}
-
 export function parseMikeDaviesFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   return makeStubSong(buffer, filename, 'MD', 'mikeDavies');
 }
