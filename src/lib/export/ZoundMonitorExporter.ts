@@ -26,6 +26,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { parseZoundMonitorFile } from '@/lib/import/formats/ZoundMonitorParser';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -100,11 +101,56 @@ function xmEffectToZM(effTyp: number, eff: number): { control: number; param: nu
   }
 }
 
+// ── Source-preserving export ────────────────────────────────────────────────
+
+/**
+ * Copy the source file and rewrite only the part cells whose grid cell differs from a fresh
+ * parse of that source. The grid shows table-transposed notes/samples/volumes, so an edit is
+ * written back with the table's noteadd/instradd/volume taken off again. Parts are shared
+ * between voices: an edit lands in every voice that plays the part.
+ */
+async function exportFromSource(
+  song: TrackerSong,
+  src: Uint8Array,
+): Promise<{ data: Blob; filename: string; warnings: string[] }> {
+  const out = src.slice();
+  const orig = await parseZoundMonitorFile(src.buffer.slice(src.byteOffset, src.byteOffset + src.byteLength) as ArrayBuffer, 'x.sng');
+  const tableStart = 5 + NUM_SAMPLE_SLOTS * SAMPLE_DESC_SIZE;
+  const partStart = tableStart + (src[0] + 1) * BYTES_PER_TABLE_ENTRY;
+  const maxPart = src[1];
+  for (let t = 0; t < orig.patterns.length && t < song.patterns.length; t++) {
+    for (let ch = 0; ch < 4; ch++) {
+      const tb = tableStart + t * BYTES_PER_TABLE_ENTRY + ch * 4;
+      const part = Math.min(src[tb], maxPart);
+      const volTab = src[tb + 1] < 128 ? src[tb + 1] : src[tb + 1] - 256;
+      for (let row = 0; row < ROWS_PER_PART; row++) {
+        const a = orig.patterns[t].channels[ch].rows[row];
+        const b = song.patterns[t]?.channels[ch]?.rows[row];
+        if (!b || (a.note === b.note && a.instrument === b.instrument && a.volume === b.volume && a.effTyp === b.effTyp && a.eff === b.eff)) continue;
+        const off = partStart + part * BYTES_PER_PART + row * 4;
+        const old = ((src[off] << 24) | (src[off + 1] << 16) | (src[off + 2] << 8) | src[off + 3]) >>> 0;
+        const oldCtl = (old >>> 16) & 0x0F;
+        let zm = xmNoteToZM(b.note);
+        if (zm > 0 && zm !== 63 && (oldCtl & 0x04) === 0) zm = Math.max(1, zm - src[tb + 3]);
+        let smp = b.instrument & 0x0F;
+        if (smp > 0 && (oldCtl & 0x08) === 0) smp = Math.max(1, smp - src[tb + 2]);
+        const { control, param } = xmEffectToZM(b.effTyp, b.eff);
+        const volAdd = b.volume >= 0x10 && b.volume <= 0x50 ? (b.volume - 0x10) - 64 - volTab : 0;
+        writeU32BE(out, off, ((old & 0x80000000) | ((zm & 0x3F) << 24) | (smp << 20)
+          | (((control & 0x03) | (oldCtl & 0x0C)) << 16) | ((volAdd & 0xFF) << 8) | (param & 0xFF)) >>> 0);
+      }
+    }
+  }
+  const base = (song.name || 'untitled').replace(/[^a-zA-Z0-9_.-]/g, '_');
+  return { data: new Blob([out], { type: 'application/octet-stream' }), filename: base.toLowerCase().endsWith('.sng') ? base : `${base}.sng`, warnings: [] };
+}
+
 // ── Main exporter ───────────────────────────────────────────────────────────
 
 export async function exportZoundMonitor(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
+  if (song.zoundMonitorFileData) return exportFromSource(song, song.zoundMonitorFileData);
   const warnings: string[] = [];
   const numChannels = Math.min(song.numChannels ?? 4, 4);
 

@@ -635,5 +635,6 @@ export async function parseZoundMonitorFile(
     initialBPM,
     linearPeriods:   false,
     uadePatternLayout,
+    zoundMonitorFileData: buf.slice(),
   };
 }

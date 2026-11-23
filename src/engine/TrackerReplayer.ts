@@ -470,6 +470,8 @@ export interface TrackerSong {
   digMugFileData?: ArrayBuffer;
   /** Chuck Biscuits: the title stored in the file (song.name falls back to the file name when it is empty). */
   cbaTitle?: string;
+  /** Raw ZoundMonitor binary; the exporter writes it back and patches only edited cells. */
+  zoundMonitorFileData?: Uint8Array;
   /** Raw Digital Symphony binary; the exporter writes it back and patches only edited cells. */
   digitalSymphonyFileData?: Uint8Array;
   /** Raw DigiBooster Pro binary; the exporter writes it back and re-packs only edited patterns. */
