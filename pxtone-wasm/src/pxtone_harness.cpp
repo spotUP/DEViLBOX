@@ -328,3 +328,86 @@ EXPORT int pxtone_set_events(const int32_t *rec, int n) {
     if (!g_pxtn->moo_preparation(&prep)) return -2;
     return added;
 }
+
+/* ---- Tick grid over the event list (stage 3) ----
+ * Grid row = clock * rows_per_beat / beat_clock. A cell is an ON event; its pitch is the KEY in force at
+ * that clock (tracker note = key/256 - 38, so 1 = C-0 and the default key 0x6000 = note 58 = A-4. Derived from the replayer:
+ * pxtnService_moo.cpp sets ofs_freq = Get(BASICKEY - basic_key), tone step = ofs_freq * Get2(key), so with the
+ * default woice basic key 0x4500 (A 440 Hz, MIDI 69) key 0x6000 plays the sample at its own pitch: MIDI = key/256 - 27,
+ * note = MIDI - 11), velocity is
+ * the VELOCITY in force (0x68 default 104). The EVERECORD list stays the byte carrier: the grid is derived. */
+#include <vector>
+struct GridCell { int32_t row, unit, note, vel, dur_rows, clock; };
+static std::vector<GridCell> g_grid;
+
+static int32_t value_at(int unit, int kind, int clock, int32_t dflt) {
+    int32_t v = dflt;
+    for (const EVERECORD *r = g_pxtn->evels->get_Records(); r && r->clock <= clock; r = r->next)
+        if (r->unit_no == unit && r->kind == kind) v = r->value;
+    return v;
+}
+static bool has_event(int unit, int kind, int clock) {
+    for (const EVERECORD *r = g_pxtn->evels->get_Records(); r && r->clock <= clock; r = r->next)
+        if (r->clock == clock && r->unit_no == unit && r->kind == kind) return true;
+    return false;
+}
+static int row_clock(int row, int rpb) { return (int)((int64_t)row * g_pxtn->master->get_beat_clock() / rpb); }
+
+/* Rebuild the grid cache; returns the number of cells (ON events). */
+EXPORT int pxtone_grid_build(int rpb) {
+    g_grid.clear();
+    if (!g_pxtn || rpb < 1) return 0;
+    int bc = g_pxtn->master->get_beat_clock();
+    if (bc < 1) return 0;
+    for (const EVERECORD *r = g_pxtn->evels->get_Records(); r; r = r->next) {
+        if (r->kind != EVENTKIND_ON) continue;
+        GridCell c;
+        c.clock = r->clock; c.unit = r->unit_no;
+        c.row = (int32_t)((int64_t)r->clock * rpb / bc);
+        c.dur_rows = (int32_t)(((int64_t)r->value * rpb + bc - 1) / bc);
+        if (c.dur_rows < 1) c.dur_rows = 1;
+        int32_t key = value_at(r->unit_no, EVENTKIND_KEY, r->clock, 0x6000);
+        c.note = key / 256 - 38;
+        if (c.note < 1) c.note = 1;
+        if (c.note > 96) c.note = 96;
+        c.vel = value_at(r->unit_no, EVENTKIND_VELOCITY, r->clock, 104);
+        g_grid.push_back(c);
+    }
+    return (int)g_grid.size();
+}
+/* out[0..5] = row, unit, note, velocity, duration in rows, clock */
+EXPORT int pxtone_grid_get(int i, int32_t *out) {
+    if (i < 0 || i >= (int)g_grid.size()) return -1;
+    const GridCell &c = g_grid[i];
+    out[0] = c.row; out[1] = c.unit; out[2] = c.note; out[3] = c.vel; out[4] = c.dur_rows; out[5] = c.clock;
+    return 0;
+}
+/* Edit one grid cell into the event list: note 0 removes the ON, 1..96 sets the pitch (adds an ON of one row
+ * when the cell is empty). A KEY added for a note that had none of its own is undone for the next note. */
+EXPORT int pxtone_grid_set_note(int rpb, int unit, int row, int note) {
+    if (!g_pxtn || rpb < 1 || unit < 0 || row < 0) return -1;
+    int clock = row_clock(row, rpb);
+    if (note <= 0) {
+        int n = pxtone_remove_event(clock, unit, EVENTKIND_ON);
+        pxtone_remove_event(clock, unit, EVENTKIND_KEY);
+        return n;
+    }
+    int32_t key = (note + 38) * 256;
+    int32_t prev = value_at(unit, EVENTKIND_KEY, clock, 0x6000);
+    bool own = has_event(clock, unit, EVENTKIND_KEY);
+    if (!has_event(clock, unit, EVENTKIND_ON)) {
+        int dur = row_clock(row + 1, rpb) - clock;
+        if (pxtone_add_event(clock, unit, EVENTKIND_ON, dur < 1 ? 1 : dur) != 0) return -2;
+    }
+    if (own) pxtone_set_event(clock, unit, EVENTKIND_KEY, key);
+    else {
+        if (pxtone_add_event(clock, unit, EVENTKIND_KEY, key) != 0) return -3;
+        /* restore the earlier pitch at the next ON of this unit unless it carries its own KEY */
+        for (const EVERECORD *r = g_pxtn->evels->get_Records(); r; r = r->next)
+            if (r->unit_no == unit && r->kind == EVENTKIND_ON && r->clock > clock) {
+                if (!has_event(r->clock, unit, EVENTKIND_KEY)) pxtone_add_event(r->clock, unit, EVENTKIND_KEY, prev);
+                break;
+            }
+    }
+    return 1;
+}

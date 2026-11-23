@@ -33,6 +33,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { getPxtoneWasm, readPxtoneGrid } from './PxtoneWasmGrid';
 
 // ── Format detection ──────────────────────────────────────────────────────────
 
@@ -241,17 +242,27 @@ export async function parsePxtoneFile(
 
   const meta = extractPxtoneMeta(data);
 
-  const numChannels = Math.max(1, meta.unitCount || 4);
   const numRows = 64;
   const baseName = meta.songName || fileName.replace(/\.[^.]+$/, '');
 
-  const emptyRows = Array.from({ length: numRows }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
+  const grid = readPxtoneGrid(await getPxtoneWasm(), new Uint8Array(data));
+  const numChannels = Math.max(meta.unitCount, grid.units, 1);
+  const lastRow = grid.cells.reduce((m, c) => Math.max(m, c.row + c.durRows), 1);
+  const numPatterns = Math.ceil(lastRow / numRows);
+  const timelines = Array.from({ length: numChannels }, () =>
+    Array.from({ length: numPatterns * numRows }, () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 })));
+  for (const c of grid.cells) {
+    const t = timelines[c.unit];
+    if (!t || c.row >= t.length) continue;
+    t[c.row] = { note: c.note, instrument: c.unit + 1, volume: 0x10 + Math.min(64, c.velocity >> 1), effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    // release marker on the held note's last row (display only; the carrier is the event list)
+    const end = c.row + c.durRows - 1;
+    if (end > c.row && end < t.length && t[end].note === 0) t[end] = { ...t[end], note: 97 };
+  }
 
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
+  const patterns = Array.from({ length: numPatterns }, (_, pi) => ({
+    id: `pattern-${pi}`,
+    name: `Pattern ${pi}`,
     length: numRows,
     channels: Array.from({ length: numChannels }, (_, ch) => ({
       id: `channel-${ch}`,
@@ -263,17 +274,17 @@ export async function parsePxtoneFile(
       pan: ch === 0 || ch === 3 ? -50 : 50,
       instrumentId: null,
       color: null,
-      rows: emptyRows,
+      rows: timelines[ch].slice(pi * numRows, (pi + 1) * numRows),
     })),
     importMetadata: {
       sourceFormat: 'PxTone' as const,
       sourceFile: fileName,
       importedAt: new Date().toISOString(),
       originalChannelCount: numChannels,
-      originalPatternCount: 1,
+      originalPatternCount: numPatterns,
       originalInstrumentCount: meta.instrumentNames.length,
     },
-  };
+  }));
 
   // In x1x format, instruments and units are 1:1 — use unit names as instrument names
   // when assiWOIC names are absent (empty strings from instrument scanning)
@@ -299,15 +310,16 @@ export async function parsePxtoneFile(
   return {
     name: `${baseName} [PxTone]`,
     format: 'PxTone' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions: patterns.map((_, i) => i),
+    songLength: numPatterns,
     restartPosition: 0,
     numChannels,
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
     pxtoneFileData: data.slice(0),
+    pxtoneEvents: grid.events,
   };
 }

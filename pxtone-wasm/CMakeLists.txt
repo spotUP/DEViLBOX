@@ -42,7 +42,7 @@ set_target_properties(Pxtone PROPERTIES
 target_link_options(Pxtone PRIVATE
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createPxtone'"
-    "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_pxtone_init','_pxtone_stop','_pxtone_render','_pxtone_get_sample_rate','_pxtone_set_channel_gain','_pxtone_get_num_units','_pxtone_get_event_count','_pxtone_get_event','_pxtone_add_event','_pxtone_remove_event','_pxtone_set_event','_pxtone_write','_pxtone_write_data','_pxtone_get_beat_clock','_pxtone_get_beat_tempo','_pxtone_get_beat_num','_pxtone_get_now_clock','_pxtone_set_events']"
+    "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_pxtone_init','_pxtone_stop','_pxtone_render','_pxtone_get_sample_rate','_pxtone_set_channel_gain','_pxtone_get_num_units','_pxtone_get_event_count','_pxtone_get_event','_pxtone_add_event','_pxtone_remove_event','_pxtone_set_event','_pxtone_write','_pxtone_write_data','_pxtone_get_beat_clock','_pxtone_get_beat_tempo','_pxtone_get_beat_num','_pxtone_get_now_clock','_pxtone_set_events','_pxtone_grid_build','_pxtone_grid_get','_pxtone_grid_set_note']"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32','HEAPU8','wasmMemory']"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s INITIAL_MEMORY=16777216"
