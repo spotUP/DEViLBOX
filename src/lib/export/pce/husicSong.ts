@@ -22,11 +22,12 @@ const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PITCH 
 const FREQ_TABLE = 0x19; // `_freq` sits right after LL0's two strings in the const bank
 const NOISE_FREQ = [4, 13, 15, 18, 21, 23, 25, 27, 29, 31, 0, 2]; // Furnace pce.cpp noiseFreq (old noise layout)
 // HuSIC track commands (hmckc output / hus.c SEQ_xx)
-const PAN = 0xf0, WAVE = 0xf1, NOISE = 0xf2, WAIT = 0xf4, NOTE_ENV = 0xf7, REST = 0xfc, VOLUME = 0xfd, WAVE_ENV = 0xfe, JUMP = 0xee;
-const HANDLED = new Set([0x00, 0x08, 0x09, 0x0b, 0x0d, 0x0f, 0x10, 0x11, 0xec, 0xed]);
+const SLUR = 0xe9, PORTA = 0xeb, PAN = 0xf0, WAVE = 0xf1, NOISE = 0xf2, WAIT = 0xf4, NOTE_ENV = 0xf7, REST = 0xfc, VOLUME = 0xfd, WAVE_ENV = 0xfe, JUMP = 0xee;
+const HANDLED = new Set([0x00, 0x03, 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0f, 0x10, 0x11, 0xec, 0xed]);
 
 interface Frames { vals: number[]; loop: number }
-interface Ev { frame: number; kind: 'note' | 'off' | 'cont' | 'mark'; cmds: number[]; note?: number; vol?: number }
+// glide: a slurred note (no envelope reset, no key-on volume); with port, the driver then slides by port per frame.
+interface Ev { frame: number; kind: 'note' | 'off' | 'cont' | 'mark'; cmds: number[]; note?: number; vol?: number; glide?: { port?: [number, number] } }
 
 /** Furnace macro (tick rate `hz`) as per-frame values at the driver's 60 Hz, loop index or -1 (hold the last value). */
 function macroFrames(raw: FurnaceMacro, version: number, hz: number, lossy: Lossy, what: string): Frames | undefined {
@@ -85,6 +86,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   const tb1 = (s.timeBase ?? 0) + 1;
   const hz = s.hz > 0 ? s.hz : 60;
   const flag = (k: string) => Number((m.compatFlags as Record<string, unknown> | undefined)?.[k] ?? 0) > 0;
+  const linear = flag('linearPitch'), slideMul = Number((m.compatFlags as Record<string, unknown> | undefined)?.pitchSlideSpeed ?? 4) || 4;
   const newVol = flag('newVolumeScaling'), ceilVol = flag('ceilVolumeScaling'), properNoise = flag('properNoiseLayout');
   const cellAt = (ch: number, o: number, r: number) => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o] ?? 0}`)?.rows[r];
   const fxOf = (ch: number, o: number, r: number) =>
@@ -173,6 +175,19 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     const evs: Ev[] = [{ frame: 0, kind: 'off', cmds: [] }];
     if (loopFrame > 0) evs.push({ frame: loopFrame, kind: 'mark', cmds: [] });
     let ins = -1, chanVol = 31, arpFx = 0, waveFx = 0, noiseFx = false;
+    // Furnace volume slide (0Axy, playback.cpp): volume is kept << 8, volSpeed = x*64 up / -y*64 down per tick.
+    let volFine = 31 << 8, volSpeed = 0;
+    // Tone portamento (03xx): Furnace slides baseFreq by speed per tick (linear pitch: speed*pitchSlideSpeed / 128
+    // semitone; else period units). The driver gets a slurred note with a constant $EB period step, then a slurred
+    // target note on arrival.
+    let porta = 0, curNv = -1, toneOn = false, snap: Ev | undefined, glideFrom = 0, glideTo = 0, glideStart = 0;
+    const period = (nb: number) => freq[((nb & 15) + 3) & 15] >> (nb >> 4);
+    const dropSnap = (frame: number) => {
+      if (!snap || frame >= snap.frame) { snap = undefined; return; }
+      evs.splice(evs.indexOf(snap), 1);
+      curNv = glideFrom + ((glideTo - glideFrom) * (frame - glideStart)) / Math.max(1, snap.frame - glideStart);
+      snap = undefined;
+    };
     for (const row of rows) {
       const cell = cellAt(ch, row.o, row.r);
       let delay = 0, cut = -1;
@@ -183,15 +198,28 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         else if (t === 0x10) { waveFx = v; if (!framesOf(Math.max(0, ins), MACRO_WAVE, 'wave')) cmds.push(WAVE, v); }
         else if (t === 0x11) { if (ch >= 4) noiseFx = v > 0; else lossy.add('noise effect on channels 1-4'); }
         else if (t === 0x00) arpFx = v;
+        else if (t === 0x03) porta = v;
+        else if (t === 0x0a) volSpeed = !v ? 0 : v & 15 ? -(v & 15) * 64 : (v >> 4) * 64;
         else if (t === 0xed) delay = Math.min(v, row.ticks - 1);
         else if (t === 0xec) cut = v;
         else if (!HANDLED.has(t)) lossy.add(`effect ${t.toString(16).toUpperCase().padStart(2, '0')}xx`);
       }
       if (cell && cell.instrument !== -1) ins = cell.instrument;
-      if (cell && cell.volume !== -1) { chanVol = Math.min(31, cell.volume); volChanged = true; }
+      if (cell && cell.volume !== -1) { chanVol = Math.min(31, cell.volume); volFine = chanVol << 8; volChanged = true; }
       const at = frameOf(row.tick + delay);
       const nv = cell ? convertFurnaceNoteValue(cell) : -1;
-      if (nv >= 0 && nv < 253) {
+      if (nv >= 0 && nv < 253) dropSnap(at);
+      if (nv >= 0 && nv < 253 && porta && toneOn && curNv >= 0 && !(ch >= 4 && noiseFx)) {
+        const from = Math.round(curNv), p0 = period(noteByte(from)), p1 = period(noteByte(nv));
+        const ticks = Math.max(1, Math.ceil(linear ? (Math.abs(nv - curNv) * 128) / (porta * slideMul) : Math.abs(p1 - p0) / porta));
+        const fa = frameOf(row.tick + delay + ticks);
+        const d = (p1 - p0) / Math.max(1, fa - at), hi = Math.trunc(d), lo = Math.min(127, Math.round(Math.abs(d - hi) * 128));
+        evs.push({ frame: at, kind: 'note', cmds: [...cmds], note: noteByte(from), glide: { port: [hi & 0xff, lo | (d < 0 ? 0x80 : 0)] } });
+        snap = { frame: fa, kind: 'note', cmds: [], note: noteByte(nv), glide: {} };
+        evs.push(snap);
+        glideFrom = curNv; glideTo = nv; glideStart = at; curNv = nv;
+      } else if (nv >= 0 && nv < 253) {
+        curNv = nv; toneOn = !(ch >= 4 && noiseFx);
         const insIdx = Math.max(0, ins);
         if (framesOf(insIdx, MACRO_PITCH, 'pitch')) lossy.add('pitch macro');
         const wf = framesOf(insIdx, MACRO_WAVE, 'wave');
@@ -203,10 +231,18 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         const note = noise ? (properNoise ? nv & 31 : NOISE_FREQ[((nv % 12) + 12) % 12]) : noteByte(nv);
         evs.push({ frame: at, kind: 'note', cmds: [...cmds, NOISE, noise ? 1 : 0, ...(wave < 0 ? [WAVE_ENV, -1 - wave] : [WAVE, wave]),
           NOTE_ENV, af ? noteEnv.note(af) : 0xff], note, vol: volCode(insIdx, chanVol) });
-      } else if (nv === 253) evs.push({ frame: at, kind: 'off', cmds });
+      } else if (nv === 253) { dropSnap(at); toneOn = false; evs.push({ frame: at, kind: 'off', cmds }); }
       else if (cmds.length || volChanged) evs.push({ frame: at, kind: 'cont', cmds, vol: volChanged ? volCode(Math.max(0, ins), chanVol) : undefined });
       if (nv === 254 || nv === 255) lossy.add('note release (keeps sounding)');
+      if (cut >= 0 && cut < row.ticks) { dropSnap(frameOf(row.tick + cut)); toneOn = false; }
       if (cut >= 0 && cut < row.ticks) evs.push({ frame: frameOf(row.tick + cut), kind: 'off', cmds: [] });
+      if (volSpeed) {
+        if (framesOf(Math.max(0, ins), MACRO_VOL, 'volume')) lossy.add('volume slide over a volume macro');
+        else for (let k = 0; k < row.ticks; k++) {
+          volFine = Math.max(0, Math.min(31 << 8, volFine + volSpeed));
+          if (volFine >> 8 !== chanVol) { chanVol = volFine >> 8; evs.push({ frame: frameOf(row.tick + k), kind: 'cont', cmds: [], vol: 0x80 | chanVol }); }
+        }
+      }
     }
     tracks.push(evs.filter((e) => e.frame < endFrame).sort((a, b) => a.frame - b.frame));
   }
@@ -231,7 +267,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       const p = merged[merged.length - 1];
       if (p && p.frame === e.frame) {
         p.cmds.push(...e.cmds);
-        if (e.kind === 'note' || e.kind === 'off') { p.kind = e.kind; p.note = e.note; p.vol = e.vol; }
+        if (e.kind === 'note' || e.kind === 'off') { p.kind = e.kind; p.note = e.note; p.vol = e.vol; p.glide = e.glide; }
         else if (e.vol !== undefined && p.kind !== 'off') p.vol = e.vol;
         if (e.kind === 'mark') p.cmds.push(-1);
         if (p.kind === 'mark') p.kind = 'cont';
@@ -253,6 +289,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       if (out.length) unit(out);
       if (e.kind === 'note') {
         if (e.vol !== undefined && e.vol !== curVol) { unit([VOLUME, e.vol]); curVol = e.vol; }
+        if (e.glide) unit([...(e.glide.port ? [PORTA, ...e.glide.port] : []), SLUR]);
         chunks([e.note ?? 0], WAIT, len);
         sounding = true;
       } else if (e.kind === 'off' || !sounding) {
