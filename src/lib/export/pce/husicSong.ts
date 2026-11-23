@@ -27,7 +27,8 @@ const HANDLED = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0xe1, 0xe2, 0xe3, 0xe4, 0
 
 interface Frames { vals: number[]; loop: number }
 // glide: a slurred note (no envelope reset, no key-on volume); with port, the driver then slides by port per frame.
-interface Ev { frame: number; kind: 'note' | 'off' | 'cont' | 'mark'; cmds: number[]; note?: number; vol?: number; glide?: { port?: [number, number] } }
+// owner: a mid-note segment (noise mode switched by the duty macro) of this note; dropped when another note or off comes first.
+interface Ev { frame: number; kind: 'note' | 'off' | 'cont' | 'mark'; cmds: number[]; note?: number; vol?: number; glide?: { port?: [number, number] }; owner?: Ev }
 
 /** Furnace macro (tick rate `hz`) as per-frame values at the driver's 60 Hz, loop index or -1 (hold the last value). */
 function macroFrames(raw: FurnaceMacro, version: number, hz: number, lossy: Lossy, what: string): Frames | undefined {
@@ -187,6 +188,14 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   // Furnace's PCE period for a (fractional) note value; calcBaseFreq, tuning at value 45.
   const furPeriod = (nv: number) => PSG_CLOCK / 32 / (tuning * Math.pow(2, (nv - 45) / 12));
   const frameAt = (f: Frames, i: number) => f.vals[i < f.vals.length ? i : f.loop >= 0 ? f.loop + ((i - f.loop) % (f.vals.length - f.loop)) : f.vals.length - 1];
+  /** The macro as seen from frame f0 on (a segment that starts mid-note). */
+  const shiftFrames = (f: Frames, f0: number): Frames => {
+    if (!f0) return f;
+    if (f.loop < 0) return { vals: f0 < f.vals.length ? f.vals.slice(f0) : [f.vals[f.vals.length - 1]], loop: -1 };
+    if (f0 <= f.loop) return { vals: f.vals.slice(f0), loop: f.loop - f0 };
+    const ph = f.loop + ((f0 - f.loop) % (f.vals.length - f.loop));
+    return { vals: [...f.vals.slice(ph), ...f.vals.slice(f.loop, ph)], loop: 0 };
+  };
   // Pitch env as raw signed bytes per frame (the caller picks delta or absolute meaning); the tail is cut to its
   // shortest repeating period, which the driver loops ($FF jumps to the loop pointer).
   const bakePitch = (v: number[]): number => {
@@ -217,7 +226,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     // 01/02 slides and E1/E2 note slides (baseFreq, reset by a new note), 04 vibrato (sine, E4 fine), E5 pitch.
     // Baked per note into a $F8 pitch env after the row pass.
     const rawT: number[] = [];
-    const pend: Array<{ ev: Ev; tick: number; nv: number; af?: Frames; pf?: Frames; rel: boolean; noise: boolean; arpOn: boolean }> = [];
+    const pend: Array<{ ev: Ev; tick: number; f0: number; nv: number; af?: Frames; pf?: Frames; rel: boolean; noise: boolean; arpOn: boolean }> = [];
     let slide = 0, slideTo: number | undefined, e12 = 0, slid = 0, vibDepth = 0, vibRate = 0, vibFine = 15, vibPos = 0, pitchFx = 0, slideNv = 0;
     const pmul = linear ? slideMul : 1;
     const toRaw = (semis: number) => (linear ? semis * 128 : furPeriod(slideNv) - furPeriod(slideNv + semis));
@@ -270,21 +279,33 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         const insIdx = Math.max(0, ins);
         const wf = framesOf(insIdx, MACRO_WAVE, 'wave');
         const wave = wf && new Set(wf.vals).size > 1 ? -1 - waveEnv.level(wf) : wf ? wf.vals[0] : waveFx;
-        const af = arpFrames(insIdx, arpFx);
-        const df = ch >= 4 ? framesOf(insIdx, MACRO_DUTY, 'noise') : undefined;
-        if (df && new Set(df.vals).size > 1) lossy.add('noise mode changing inside a duty macro (first value kept)');
-        const noise = ch >= 4 && (noiseFx || (df ? df.vals[0] > 0 : false));
-        // Arp as note offsets per frame (fixed notes resolved against this note). Noise: the driver's note env does not
-        // reach the noise register, its pitch env does (drv_pitchenv adds to noise_freq), so arp goes there as register deltas.
-        const nvs = af ? af.vals.map((v) => arpNv(nv, v)) : [nv];
-        const arpOn = nvs.some((x) => x !== nv);
-        const note = noise ? noiseReg(nvs[0]) : noteByte(nv);
-        const ne = arpOn && !noise ? envIdx(noteEnv.note({ vals: nvs.map((x) => x - nv), loop: af!.loop }), 'note') : 0xff;
-        const ev: Ev = { frame: at, kind: 'note', cmds: [...cmds, NOISE, noise ? 1 : 0, ...(wave < 0 ? [WAVE_ENV, -1 - wave] : [WAVE, wave]),
-          NOTE_ENV, ne, PITCH_ENV, 0xff], note, vol: volCode(insIdx, chanVol) };
-        evs.push(ev);
-        pend.push({ ev, tick: row.tick + delay, nv, af: arpOn ? af : undefined, pf: framesOf(insIdx, MACRO_PITCH, 'pitch'),
-          rel: !!macroOf(m.instruments[insIdx], MACRO_PITCH)?.mode, noise, arpOn });
+        const af0 = arpFrames(insIdx, arpFx);
+        const df = ch >= 4 && !noiseFx ? framesOf(insIdx, MACRO_DUTY, 'noise') : undefined;
+        const pf = framesOf(insIdx, MACRO_PITCH, 'pitch'), rel = !!macroOf(m.instruments[insIdx], MACRO_PITCH)?.mode;
+        // Noise mode per frame (duty macro on channels 5-6). Each switch is a slurred note (volume envelope runs on) that
+        // sets the mode and restarts the arp / pitch envelopes at that frame of the macro.
+        const noiseAt = (f: number) => ch >= 4 && (noiseFx || (df ? frameAt(df, f) > 0 : false));
+        const segEnd = df && new Set(df.vals).size > 1 ? (df.loop >= 0 ? 64 : df.vals.length) : 1;
+        if (df && df.loop >= 0 && new Set(df.vals.slice(df.loop)).size > 1) lossy.add('looping noise mode switch in a duty macro (stops after 64 frames)');
+        let owner: Ev | undefined;
+        for (let f0 = 0; f0 < segEnd; f0++) {
+          const noise = noiseAt(f0);
+          if (f0 && noise === noiseAt(f0 - 1)) continue;
+          const af = af0 && shiftFrames(af0, f0);
+          // Arp as note offsets per frame (fixed notes resolved against this note). Noise: the driver's note env does not
+          // reach the noise register, its pitch env does (drv_pitchenv adds to noise_freq), so arp goes there as register deltas.
+          const nvs = af ? af.vals.map((v) => arpNv(nv, v)) : [nv];
+          const arpOn = nvs.some((x) => x !== nv);
+          const note = noise ? noiseReg(nvs[0]) : noteByte(nv);
+          const ne = arpOn && !noise ? envIdx(noteEnv.note({ vals: nvs.map((x) => x - nv), loop: af!.loop }), 'note') : 0xff;
+          const envCmds = [NOISE, noise ? 1 : 0, NOTE_ENV, ne, PITCH_ENV, 0xff];
+          const ev: Ev = f0
+            ? { frame: frameOf(row.tick + delay) + f0, kind: 'note', cmds: envCmds, note, glide: {}, owner }
+            : { frame: at, kind: 'note', cmds: [...cmds, ...(wave < 0 ? [WAVE_ENV, -1 - wave] : [WAVE, wave]), ...envCmds], note, vol: volCode(insIdx, chanVol) };
+          owner ??= ev;
+          evs.push(ev);
+          pend.push({ ev, tick: row.tick + delay, f0, nv, af: arpOn ? af0 : undefined, pf, rel, noise, arpOn });
+        }
         noteTick = delay;
       } else if (nv === 253) { dropSnap(at); toneOn = false; evs.push({ frame: at, kind: 'off', cmds }); }
       else if (cmds.length || volChanged) evs.push({ frame: at, kind: 'cont', cmds, vol: volChanged ? volCode(Math.max(0, ins), chanVol) : undefined });
@@ -312,20 +333,23 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         }
       }
     }
-    const sorted = evs.filter((e) => e.frame < endFrame).sort((a, b) => a.frame - b.frame);
+    const sorted = evs.filter((e) => e.frame < endFrame).sort((a, b) => a.frame - b.frame)
+      .filter((e, i, a) => !e.owner || !a.some((x, j) => j < i && !x.owner && x !== e.owner && x.frame > e.owner!.frame && (x.kind === 'note' || x.kind === 'off')));
     for (const p of pend) {
       const next = sorted.find((e) => e.frame > p.ev.frame && (e.kind === 'note' || e.kind === 'off'));
       const n = Math.min(600, Math.max(1, (next ? next.frame : endFrame) - p.ev.frame));
       let p2 = 0;
       const offs: number[] = [];
       let moves = false;
-      for (let f = 0; f < n; f++) {
+      // f counts from the note's key-on; a segment (f0 > 0) bakes only its own frames.
+      for (let f = 0; f < p.f0 + n; f++) {
         if (p.pf) {
           if (!p.rel) p2 = frameAt(p.pf, f);
           else if (f < p.pf.vals.length || p.pf.loop >= 0) p2 += frameAt(p.pf, f) * (hz / FRAME_HZ);
         }
+        if (f < p.f0) continue;
         const a = p.af ? arpNv(p.nv, frameAt(p.af, f)) : p.nv;
-        if (p.noise) { offs.push(noiseReg(a + Math.round(p2)) - p.ev.note!); if (offs[f]) moves = true; continue; }
+        if (p.noise) { offs.push(noiseReg(a + Math.round(p2)) - p.ev.note!); if (offs[offs.length - 1]) moves = true; continue; }
         const r = rawT[Math.min(rawT.length - 1, p.tick + Math.floor((f * hz) / FRAME_HZ))] + p2;
         if (r) moves = true;
         offs.push(Math.round((linear ? furPeriod(a + r / 128) : furPeriod(a) - r) - period(noteByte(a))));

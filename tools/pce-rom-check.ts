@@ -155,7 +155,9 @@ for (const file of walk(SONGS)) {
     execFileSync(FURNACE, ['-console', '-nostatus', '-nocontrols', '-noreport', '-loglevel', 'error', '-loops', '0', '-vgmout', path.join(dir, 'f.vgm'), file], { stdio: 'ignore', timeout: 120000 });
     const want = states(vgmWrites(path.join(dir, 'f.vgm')));
     const wantStarts = starts(want).filter((w) => w.t < TICKS - 60);
-    const hit = wantStarts.filter((w) => romStarts.some((g) => g.ch === w.ch && Math.abs(g.t - w.t) <= 2)).length;
+    const hits = wantStarts.map((w) => romStarts.some((g) => g.ch === w.ch && Math.abs(g.t - w.t) <= 2));
+    const hit = hits.filter(Boolean).length;
+    if (detail) wantStarts.forEach((w, i) => { if (!hits[i]) console.log(`  missed start tick ${w.t} ch${w.ch}${want[w.t][w.ch].noise ? ' (noise)' : ''}`); });
     let tone = 0, inTune = 0, volOk = 0;
     for (let t = 0; t < Math.min(want.length, got.length); t++) for (let ch = 0; ch < CH; ch++) {
       const a = want[t][ch], b = got[t][ch];
