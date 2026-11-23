@@ -31,8 +31,13 @@ function lowerProcessPriority(): void {
 }
 
 /** Worker cap for a vitest config; VITEST_MAX_WORKERS overrides the default. */
-export function testCpuLimits(): { maxWorkers: number } {
+export function testCpuLimits(): { maxWorkers: number; execArgv: string[] } {
   lowerProcessPriority();
   const fromEnv = Number(process.env.VITEST_MAX_WORKERS);
-  return { maxWorkers: fromEnv > 0 ? fromEnv : DEFAULT_MAX_WORKERS };
+  return {
+    maxWorkers: fromEnv > 0 ? fromEnv : DEFAULT_MAX_WORKERS,
+    // Node 25+ ships a global localStorage that is undefined without --localstorage-file and shadows
+    // the happy-dom one, so every store test that clears it failed. Workers start without it.
+    execArgv: ['--no-experimental-webstorage'],
+  };
 }
