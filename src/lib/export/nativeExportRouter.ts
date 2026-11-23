@@ -203,6 +203,21 @@ export async function nativeExportAvailable(song: TrackerSong | null): Promise<b
   return rawOriginalAvailable();
 }
 
+/** Exporters whose output is not an Amiga module: the dialog names them instead of the Amiga text. */
+const NATIVE_FORMAT_LABELS: Record<string, string> = {
+  pxtone: 'PxTone (.ptcop)',
+  organya: 'Organya (.org)',
+  piyoPiyo: 'PiyoPiyo (.pmd)',
+};
+
+/** Human label of the matched non-Amiga exporter for the song (live song when null), or null for the Amiga text. */
+export async function nativeExporterLabel(song: TrackerSong | null): Promise<string | null> {
+  const resolved = await resolveNativeExportSong(song);
+  if (!resolved || resolved === 'cinter') return null;
+  const id = selectNativeExporter(resolved)?.id;
+  return id ? NATIVE_FORMAT_LABELS[id] ?? null : null;
+}
+
 // ── Cinter paths (operate on the live stores, not a replayer song) ─────────────
 
 async function isCinterLoaded(): Promise<boolean> {

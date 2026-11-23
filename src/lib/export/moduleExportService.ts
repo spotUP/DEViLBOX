@@ -58,6 +58,12 @@ export async function nativeExportAvailableForLiveSong(): Promise<boolean> {
   return nativeExportAvailable(null);
 }
 
+/** Label of the live song's non-Amiga native format (for the dialog panel), or null. */
+export async function nativeExporterLabelForLiveSong(): Promise<string | null> {
+  const { nativeExporterLabel } = await import('./nativeExportRouter');
+  return nativeExporterLabel(null);
+}
+
 /** The ProTracker MOD writer with synth voices baked to samples, from the live song. */
 export async function exportBakedMod(options: { channelCount?: 4 | 6 | 8; moduleName?: string } = {}): Promise<ModExportResult> {
   return exportSongToMOD(liveTrackerSong(), { ...options, bakeSynths: true });

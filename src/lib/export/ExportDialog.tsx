@@ -983,21 +983,23 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
               {ex.exportMode === 'native' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-                    Native Amiga Format Export
+                    {ex.nativeLabel ? `Native ${ex.nativeLabel} Export` : 'Native Amiga Format Export'}
                   </h3>
                   <div className="space-y-3">
                     <div className="text-sm font-mono text-text-secondary space-y-1">
-                      <div>Preset: <span className="text-accent-primary">{useUIStore.getState().activeSystemPreset || 'auto-detect'}</span></div>
+                      {!ex.nativeLabel && <div>Preset: <span className="text-accent-primary">{useUIStore.getState().activeSystemPreset || 'auto-detect'}</span></div>}
                       <div>Patterns: <span className="text-accent-primary">{ex.patterns.length}</span></div>
                       <div>Instruments: <span className="text-accent-primary">{ex.instruments.length}</span></div>
                     </div>
                     <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
                       <p className="text-xs font-mono text-text-primary leading-relaxed">
-                        Exports as the original tracker format with all edits preserved.
+                        {ex.nativeLabel
+                          ? `Exports the song as a ${ex.nativeLabel} file with all edits preserved.`
+                          : `Exports as the original tracker format with all edits preserved.
                         Supports 30+ formats including JamCracker, SoundMon, ProTracker, Future Composer,
                         SidMon, PumaTracker, OctaMED, Hively/AHX, DigiBooster, Oktalyzer, Klystrack,
                         InStereo, DeltaMusic, Digital Mugician, Sonic Arranger, TFMX, Fred Editor,
-                        SoundFX, TCB Tracker, and more. Chip RAM readback is available as fallback.
+                        SoundFX, TCB Tracker, and more. Chip RAM readback is available as fallback.`}
                       </p>
                     </div>
                   </div>

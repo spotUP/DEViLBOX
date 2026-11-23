@@ -221,6 +221,17 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     return () => { current = false; };
   }, [isOpen, patterns, editorMode, uadeEditableFileData]);
 
+  const [nativeLabel, setNativeLabel] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    let current = true;
+    import('@lib/export/moduleExportService')
+      .then((m) => m.nativeExporterLabelForLiveSong())
+      .catch(() => null)
+      .then((label) => { if (current) setNativeLabel(label); });
+    return () => { current = false; };
+  }, [isOpen, patterns, editorMode, uadeEditableFileData]);
+
   const [adfAvailable, setAdfAvailable] = useState(false);
   useEffect(() => {
     if (!isOpen) return;
@@ -836,6 +847,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportNative,
     handleExportAdf,
     nativeAvailable,
+    nativeLabel,
     adfAvailable,
     validModes,
     handleImportFile,
