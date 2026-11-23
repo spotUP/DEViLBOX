@@ -4,7 +4,7 @@
 // Songs: every .fur under public/data/songs/furnace whose only chip is one HuC6280 (file id 0x05).
 // Results: test-data/pce-rom-check.json (skips songs whose input hash matches a recorded verdict; --convert-only records nothing).
 // Per tick (state after the tick's writes) and channel: sounding = control bit 7 set and volume > 0. Both sides start at their own first sounding tick.
-// keyOnMatch = share of Furnace note starts (silent -> sounding, or a period change on a sounding channel) with a ROM start on the same channel
+// keyOnMatch = share of Furnace note starts (silent -> sounding, or a period jump >= 80 cents on a sounding tone channel) with a ROM start on the same channel
 // within 2 ticks (~30 ms). pitchMatch = share of ticks where both sound a tone (noise off) within 50 cents. volumeMatch = same ticks, control volume
 // within 1 step. pass = the ROM sounded and keyOnMatch and pitchMatch are both at least 90 %. Needs Mesen2 and the Furnace CLI (FURNACE_CLI overrides).
 import { createHash } from 'node:crypto';
@@ -71,8 +71,6 @@ function mesenWrites(rom: Uint8Array, dir: string, ticks: number): W[] {
   writeFileSync(path.join(dir, 'p.pce'), rom);
   writeFileSync(path.join(dir, 'tap.lua'), `local f=0
 emu.addEventCallback(function() f=f+1 if f>=${ticks + 120} then print("DONE") emu.stop(0) end end, emu.eventType.endFrame)
--- The player ROM boots to SELECT SONG and waits for RUN: hold it on frames 30-40.
-emu.addEventCallback(function() if f>=30 and f<40 then emu.setInput({run=true}, 0) end end, emu.eventType.inputPolled)
 emu.addMemoryCallback(function(a,v) print(string.format("W %d %d %d",f,a&15,v&0xFF)) end, emu.callbackType.write, 0x0800, 0x0809)
 `);
   const set = path.join(homedir(), 'Library/Application Support/Mesen2');
@@ -109,12 +107,14 @@ function states(ws: W[]): St[][] {
   return first < 0 ? [] : all.slice(first, first + TICKS);
 }
 
-/** Note starts: silent -> sounding, or a new period on a sounding tone channel. */
+/** Note starts: silent -> sounding, or a period jump of at least 80 cents in one tick on a sounding tone channel (a new note or an
+ * arpeggio step; vibrato and slides move the period by a few cents per tick and are not starts). */
 function starts(s: St[][]): Array<{ t: number; ch: number }> {
   const out: Array<{ t: number; ch: number }> = [];
   s.forEach((row, t) => row.forEach((c, ch) => {
     const p = s[t - 1]?.[ch];
-    if (c.on && (!p?.on || (!c.noise && p.per !== c.per))) out.push({ t, ch });
+    const jump = p?.per && c.per ? Math.abs(1200 * Math.log2(p.per / c.per)) : 0;
+    if (c.on && (!p?.on || (!c.noise && !p.noise && jump >= 80))) out.push({ t, ch });
   }));
   return out;
 }

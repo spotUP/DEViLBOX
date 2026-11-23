@@ -3888,9 +3888,8 @@ LL185:
 	  call	_set_font_pal
 	  call	_load_default_font
 	  call	_disp_on
-	__pea_s	0
-	  call	_select_song
-	__stbps
+; DEViLBOX: start song 0 at boot (upstream waits on SELECT SONG for RUN).
+	__stbi_s	0,0
 	  call	_display_title
 	__ldb_s	0
 	  call	_drv_init

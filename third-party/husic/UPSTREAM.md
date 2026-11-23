@@ -5,7 +5,7 @@
 - License: LICENSE.txt (from src/husic/LICENSE.txt)
 
 Contents:
-- `hescode/` : HuC-compiled driver (`main.s`) and HuCard startup. MODIFIED: `_vsync_drv` in `main.s` maps DATA_BANK (bank 4) at MPR3 while `_drv_intr` runs, so song tables spilled past the const bank are readable (not mirrored into `src/husic/main.c`).
+- `hescode/` : HuC-compiled driver (`main.s`) and HuCard startup. MODIFIED: `_vsync_drv` in `main.s` maps DATA_BANK (bank 4) at MPR3 while `_drv_intr` runs, so song tables spilled past the const bank are readable; `_main` starts song 0 at boot instead of calling `_select_song` (an exported HuCard plays at power-on). Neither change is mirrored into `src/husic/main.c`.
 - `include/pce/` : HuC/pceas include files, unmodified.
 - `src/husic/` : driver C source that `hescode/main.s` was compiled from, unmodified (reference only).
 - `pceas/` : pceas assembler source (from HuSIC `src/huc/src/mkit/as`), except `main.c` includes the bundled `overlay.h` (from HuC `include/`) by local name; built by
