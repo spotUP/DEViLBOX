@@ -5,6 +5,8 @@
  * Follows the JamCrackerEngine/FCEngine/PreTrackerEngine singleton pattern.
  */
 
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { PXTONE_ROWS_PER_BEAT, PXTONE_PATTERN_ROWS } from '@/lib/import/formats/PxtoneWasmGrid';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
   WASMSingletonBase,
@@ -27,6 +29,7 @@ export class PxtoneEngine extends WASMSingletonBase {
 
   private _eventsWaiter: ((r: PxtoneEvents) => void) | null = null;
   private _setWaiter: ((added: number) => void) | null = null;
+  private _positionCallbacks = new Set<(update: { row: number; songPos: number }) => void>();
 
   private constructor() {
     super();
@@ -78,9 +81,22 @@ export class PxtoneEngine extends WASMSingletonBase {
           break;
 
         case 'moduleLoaded':
+          useOscilloscopeStore.getState().setChipInfo(data.numUnits ?? 0, 0, data.unitNames ?? []);
           this.settleModuleLoad();
           console.log('[PxtoneEngine] Module loaded');
           break;
+
+        case 'oscData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
+          break;
+
+        case 'position': {
+          // Song clock -> global grid row -> pattern + row, the split PxtoneParser uses.
+          const globalRow = Math.floor((data.clock * PXTONE_ROWS_PER_BEAT) / data.beatClock);
+          const update = { row: globalRow % PXTONE_PATTERN_ROWS, songPos: Math.floor(globalRow / PXTONE_PATTERN_ROWS) };
+          for (const cb of this._positionCallbacks) cb(update);
+          break;
+        }
 
         case 'events':
           this._eventsWaiter?.({ events: data.events, beatClock: data.beatClock, beatTempo: data.beatTempo, beatNum: data.beatNum });
@@ -154,7 +170,14 @@ export class PxtoneEngine extends WASMSingletonBase {
     return reply;
   }
 
+  /** Playhead feed for the generic native-engine routing (NativeEngineRouting). */
+  onPositionUpdate(cb: (update: { row: number; songPos: number }) => void): () => void {
+    this._positionCallbacks.add(cb);
+    return () => { this._positionCallbacks.delete(cb); };
+  }
+
   override dispose(): void {
+    this._positionCallbacks.clear();
     super.dispose();
     if (PxtoneEngine.instance === this) {
       PxtoneEngine.instance = null;

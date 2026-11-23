@@ -7,6 +7,8 @@
  * Follows DavidWhittakerWasmExtractor: the bundle is fetched on the main thread and kept for the session.
  */
 export const PXTONE_ROWS_PER_BEAT = 4;
+/** Rows per pattern in the editable grid; the live playhead splits the song clock by it. */
+export const PXTONE_PATTERN_ROWS = 64;
 
 export interface PxtoneWasmModule {
   _malloc(n: number): number;

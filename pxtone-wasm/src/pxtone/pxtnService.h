@@ -233,6 +233,7 @@ public :
 	bool    moo_set_fade( int32_t fade, float sec );
 	bool    moo_set_master_volume( float v );
 
+	int32_t moo_get_time_pan_index () const { return _moo_time_pan_index; }
 	int32_t moo_get_total_sample   () const;
 
 	int32_t moo_get_now_clock      () const;

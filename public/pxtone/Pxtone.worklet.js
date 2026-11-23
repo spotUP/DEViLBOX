@@ -66,7 +66,21 @@ class PxtoneProcessor extends AudioWorkletProcessor {
               return;
             }
 
-            this.port.postMessage({ type: 'moduleLoaded' });
+            const m = this.module;
+            const numUnits = typeof m._pxtone_get_num_units === 'function' ? m._pxtone_get_num_units() : 0;
+            const unitNames = [];
+            if (typeof m._pxtone_get_unit_name === 'function') {
+              for (let u = 0; u < numUnits; u++) {
+                let ptr = m._pxtone_get_unit_name(u);
+                let str = '';
+                for (let c = m.HEAPU8[ptr]; c; c = m.HEAPU8[++ptr]) str += String.fromCharCode(c);
+                unitNames.push(str);
+              }
+            }
+            this.numUnits = numUnits;
+            this._stream = null;
+            this._posBlocks = 0;
+            this.port.postMessage({ type: 'moduleLoaded', numUnits, unitNames });
           } catch (error) {
             this.port.postMessage({ type: 'error', message: error.message });
           }
@@ -79,6 +93,7 @@ class PxtoneProcessor extends AudioWorkletProcessor {
       case 'stop':
         if (this.module && typeof this.module._pxtone_stop === 'function') {
           this.module._pxtone_stop();
+          this._stream = null;
           this.port.postMessage({ type: 'stopped' });
         }
         break;
@@ -251,6 +266,21 @@ class PxtoneProcessor extends AudioWorkletProcessor {
     }
   }
 
+  // Per-unit scope taps (also the VU feed) through the shared channel stream, plus the song clock at ~15 Hz.
+  postScopes(rendered) {
+    const m = this.module;
+    if (!this.numUnits || typeof m._pxtone_get_scope !== 'function' || !globalThis.DevilboxChannelStream) return;
+    this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+    const buf = (m.HEAPF32 || new Float32Array(m.wasmMemory.buffer)).buffer;
+    const views = [];
+    for (let u = 0; u < this.numUnits; u++) views.push(new Float32Array(buf, m._pxtone_get_scope(u), rendered));
+    this._stream.writeFloat32(views, rendered);
+    if (++this._posBlocks >= 25) {
+      this._posBlocks = 0;
+      this.port.postMessage({ type: 'position', clock: m._pxtone_get_now_clock(), beatClock: m._pxtone_get_beat_clock() });
+    }
+  }
+
   cleanup() {
     if (this.module && typeof this.module._pxtone_stop === 'function') {
       try { this.module._pxtone_stop(); } catch (e) {}
@@ -282,6 +312,7 @@ class PxtoneProcessor extends AudioWorkletProcessor {
             outputL[i] = this.interleavedBuf[i * 2];
             outputR[i] = this.interleavedBuf[i * 2 + 1];
           }
+          this.postScopes(rendered);
         }
       }
     }

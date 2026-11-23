@@ -89,6 +89,10 @@ static PxToneMemFile g_outfile;    /* last pxtone_write result */
 #define CONV_BUF_FRAMES 512
 static int16_t g_s16buf[CONV_BUF_FRAMES * PXTONE_CHANNELS];
 
+/* Per-unit scope taps: each unit's own mono mix (L+R)/2 of the last render, -1..1 (before group effects and master volume). */
+#define PXTONE_MAX_UNITS 64
+static float g_scope[PXTONE_MAX_UNITS][CONV_BUF_FRAMES];
+
 /* ---- Per-channel muting ---- */
 
 /*
@@ -100,7 +104,6 @@ static int16_t g_s16buf[CONV_BUF_FRAMES * PXTONE_CHANNELS];
  * gain >  0 → active (set_played(true))
  */
 
-#define PXTONE_MAX_UNITS 64
 static float g_channel_gain[PXTONE_MAX_UNITS];
 static bool  g_gain_initialized = false;
 
@@ -228,8 +231,20 @@ EXPORT int pxtone_render(float *buf, int frames) {
         int chunk = frames - done;
         if (chunk > CONV_BUF_FRAMES) chunk = CONV_BUF_FRAMES;
 
-        int bytes = chunk * PXTONE_CHANNELS * 2; /* S16 stereo */
-        bool ok = g_pxtn->Moo(g_s16buf, bytes);
+        /* One sample per Moo call so each unit's contribution can be read between ticks. */
+        bool ok = true;
+        int units = g_pxtn->Unit_Num();
+        if (units > PXTONE_MAX_UNITS) units = PXTONE_MAX_UNITS;
+        for (int i = 0; i < chunk; i++) {
+            ok = g_pxtn->Moo(g_s16buf + i * PXTONE_CHANNELS, PXTONE_CHANNELS * 2);
+            /* Moo already advanced the pan index: the tick it just rendered is one back. */
+            int32_t idx = (g_pxtn->moo_get_time_pan_index() - 1) & (pxtnBUFSIZE_TIMEPAN - 1);
+            for (int u = 0; u < units && done + i < CONV_BUF_FRAMES; u++) {
+                const pxtnUnit *unit = g_pxtn->Unit_Get(u);
+                g_scope[u][done + i] = unit ? (float)(unit->Tone_Peek(0, idx) + unit->Tone_Peek(PXTONE_CHANNELS - 1, idx)) / 65536.0f : 0.0f;
+            }
+            if (!ok) { chunk = i + 1; break; }
+        }
 
         /* Convert S16 to F32 */
         for (int i = 0; i < chunk * PXTONE_CHANNELS; i++) {
@@ -248,6 +263,16 @@ EXPORT int pxtone_render(float *buf, int frames) {
     }
 
     return done;
+}
+
+/* Scope tap of unit u after the last pxtone_render (frames rendered); null when out of range. */
+EXPORT const float *pxtone_get_scope(int u) { return u >= 0 && u < PXTONE_MAX_UNITS ? g_scope[u] : nullptr; }
+EXPORT const char *pxtone_get_unit_name(int u) {
+    if (!g_pxtn || u < 0 || u >= g_pxtn->Unit_Num()) return "";
+    const pxtnUnit *unit = g_pxtn->Unit_Get(u);
+    int32_t n = 0;
+    const char *name = unit ? unit->get_name_buf(&n) : nullptr;
+    return name ? name : "";
 }
 
 EXPORT int pxtone_get_sample_rate(void) {

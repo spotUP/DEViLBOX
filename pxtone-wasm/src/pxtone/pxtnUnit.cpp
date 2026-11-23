@@ -232,6 +232,11 @@ void pxtnUnit::Tone_Supple( int32_t  *group_smps, int32_t ch, int32_t  time_pan_
 	group_smps[ _v_GROUPNO ] += _pan_time_bufs[ ch ][ idx ];
 }
 
+int32_t pxtnUnit::Tone_Peek( int32_t ch, int32_t time_pan_index ) const
+{
+	return _pan_time_bufs[ ch ][ ( time_pan_index - _pan_times[ ch ] ) & ( pxtnBUFSIZE_TIMEPAN - 1 ) ];
+}
+
 int32_t  pxtnUnit::Tone_Increment_Key()
 {
 	// prtament..

@@ -61,6 +61,7 @@ public :
 
 	void    Tone_Sample    ( bool b_mute_by_unit, int32_t ch_num, int32_t time_pan_index, int32_t smooth_smp );
 	void    Tone_Supple    ( int32_t *group_smps, int32_t ch_num, int32_t time_pan_index ) const;
+	int32_t Tone_Peek      ( int32_t ch, int32_t time_pan_index ) const; // the sample Tone_Supple would add for this tick (scope tap)
 	int32_t Tone_Increment_Key   ();
 	void    Tone_Increment_Sample( float freq );
 

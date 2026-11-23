@@ -33,7 +33,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
-import { getPxtoneWasm, readPxtoneGrid } from './PxtoneWasmGrid';
+import { getPxtoneWasm, readPxtoneGrid, PXTONE_PATTERN_ROWS } from './PxtoneWasmGrid';
 
 // ── Format detection ──────────────────────────────────────────────────────────
 
@@ -242,7 +242,7 @@ export async function parsePxtoneFile(
 
   const meta = extractPxtoneMeta(data);
 
-  const numRows = 64;
+  const numRows = PXTONE_PATTERN_ROWS;
   const baseName = meta.songName || fileName.replace(/\.[^.]+$/, '');
 
   const grid = readPxtoneGrid(await getPxtoneWasm(), new Uint8Array(data));
