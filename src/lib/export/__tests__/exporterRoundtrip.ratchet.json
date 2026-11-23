@@ -18,11 +18,11 @@
     },
     "adPlug": {
       "exporter": "AdPlug (AdPlugExporter)",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 4032,
-      "bytes": 61
+      "cells": 39,
+      "bytes": 39
     },
     "amosMusicBank": {
       "exporter": "AMOSMusicBankExporter.exportAMOSMusicBank",
@@ -1186,11 +1186,11 @@
     },
     "xmf": {
       "exporter": "XMFExporter.exportXMF",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 256,
-      "bytes": 6407
+      "cells": 5959,
+      "bytes": 5959
     },
     "zoundMonitor": {
       "exporter": "ZoundMonitorExporter.exportZoundMonitor",

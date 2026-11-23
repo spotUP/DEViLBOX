@@ -16,6 +16,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { encodeXMFCell } from '@/engine/uade/encoders/XMFEncoder';
+import { parseXMFFile } from '@/lib/import/formats/XMFParser';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -127,11 +128,36 @@ function extractSampleData(inst: TrackerSong['instruments'][0]): XMFSampleData |
   };
 }
 
+// ── Source-preserving export ───────────────────────────────────────────────
+
+/** Copy the source file and re-encode only the cells that differ from a fresh parse of it. */
+function exportFromSource(song: TrackerSong, src: Uint8Array): { data: Blob; filename: string; warnings: string[] } {
+  const out = src.slice();
+  const orig = parseXMFFile(src, 'x.xmf');
+  const numChannels = src[CHANNEL_OFFSET] + 1;
+  const patternStart = CHANNEL_OFFSET + 2 + numChannels;
+  for (let op = 0; orig && op < orig.patterns.length && op < song.patterns.length; op++) {
+    const patIdx = src[ORDERS_OFFSET + op];
+    for (let ch = 0; ch < numChannels; ch++) {
+      for (let row = 0; row < ROWS_PER_PATTERN; row++) {
+        const a = orig.patterns[op].channels[ch].rows[row];
+        const b = song.patterns[op]?.channels[ch]?.rows[row];
+        if (!b || (a.note === b.note && a.instrument === b.instrument && a.effTyp === b.effTyp && a.eff === b.eff
+          && a.effTyp2 === b.effTyp2 && a.eff2 === b.eff2)) continue;
+        out.set(encodeXMFCell(b), patternStart + (patIdx * ROWS_PER_PATTERN * numChannels + row * numChannels + ch) * CELL_SIZE);
+      }
+    }
+  }
+  const songName = song.name ?? 'untitled';
+  return { data: new Blob([out], { type: 'application/octet-stream' }), filename: `${songName.replace(/[^a-zA-Z0-9_\-. ]/g, '_')}.xmf`, warnings: [] };
+}
+
 // ── Main exporter ──────────────────────────────────────────────────────────
 
 export async function exportXMF(
   song: TrackerSong
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
+  if (song.xmfFileData) return exportFromSource(song, song.xmfFileData);
   const warnings: string[] = [];
 
   // ── Determine channel count ────────────────────────────────────────────

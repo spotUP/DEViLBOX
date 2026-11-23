@@ -858,7 +858,7 @@ export function parseAdPlugFile(buffer: ArrayBuffer, filename?: string): Tracker
   const subFormat = detectSubFormat(buf, name);
 
   switch (subFormat) {
-    case 'RAD': return parseRAD(buf, name);
+    case 'RAD': return { ...parseRAD(buf, name), radFileData: buf.slice() };
     case 'HSC': return parseHSC(buf, name);
     case 'DRO': return parseDRO(buf, name);
     case 'IMF': return parseIMF(buf, name);

@@ -16,6 +16,7 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, FurnaceOperatorConfig, FurnaceConfig } from '@/types';
 import { DEFAULT_OPL3, type OPL3Config } from '@/types/instrument';
+import { parseAdPlugFile } from '@/lib/import/formats/AdPlugParser';
 import { levelToTotalLevel } from '@/engine/opl3/oplLevel';
 
 // RAD v1 header magic
@@ -269,7 +270,22 @@ function mapXmEffectToRAD(effTyp: number, eff: number): number | null {
 /**
  * Export a TrackerSong to RAD v1 binary format
  */
+/** What the RAD encoder writes: cells, order list, speed and OPL patches. */
+function radContent(s: TrackerSong): string {
+  return JSON.stringify([
+    s.patterns.map(p => p.channels.map(c => c.rows)), s.songPositions, s.initialSpeed,
+    s.instruments.map(i => [i.opl3, i.furnace]),
+  ]);
+}
+
 export function exportToRAD(song: TrackerSong): ArrayBuffer {
+  // Source bytes are kept while nothing the encoder writes was edited. The variable-length
+  // event stream is not patched in place; an edit falls through to the full encoder.
+  const src = song.radFileData;
+  if (src) {
+    const orig = parseAdPlugFile(src.buffer.slice(src.byteOffset, src.byteOffset + src.byteLength) as ArrayBuffer, 'x.rad');
+    if (radContent(orig) === radContent(song)) return src.slice().buffer as ArrayBuffer;
+  }
   const encoder = new TextEncoder();
 
   // ── Identify OPL instruments and build mapping ────────────────────────

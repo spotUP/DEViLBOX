@@ -582,5 +582,6 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
     initialBPM:      125,
     linearPeriods:   false,
     uadePatternLayout,
+    xmfFileData:     bytes.slice(),
   };
 }
