@@ -625,7 +625,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Native</div>
                     </button>
                   )}
-                  {ex.nativeAvailable && (
+                  {ex.adfAvailable && (
                     <button
                       onClick={() => ex.setExportMode('adf')}
                       className={`

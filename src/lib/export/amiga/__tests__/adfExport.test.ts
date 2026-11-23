@@ -207,7 +207,7 @@ describe('modules with no magic test route by eagleplayer.conf names', () => {
     expect(adfTemplateFor(bytes, file)).toBeNull();
   });
 
-  it('a template that fails the boot check carries no names (Pierre Adane stays unrouted)', () => {
-    expect(adfTemplateFor(song('formats/Ivanhoe_ivanhoe - bonus.pap'), 'Ivanhoe_ivanhoe - bonus.pap', manifest)).toBeNull();
+  it('ivanhoe - bonus.pap -> PierreAdane (template boots with audio DMA since 75e5a534e)', () => {
+    expect(adfTemplateFor(song('formats/Ivanhoe_ivanhoe - bonus.pap'), 'Ivanhoe_ivanhoe - bonus.pap', manifest)).toBe('PierreAdane');
   });
 });

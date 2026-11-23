@@ -203,3 +203,13 @@ export async function exportLiveSongAdf(): Promise<AdfResult | null> {
   const manifest = await (await fetch(`${base}manifest.json`)).json() as AdfManifest;
   return buildAdf(native.data, native.filename, manifest, async (f) => new Uint8Array(await (await fetch(`${base}${f}`)).arrayBuffer()), companion);
 }
+
+/** True when the live song's native export has a player on an Amiga disk (the Export dialog shows the Amiga Disk button only then). */
+export async function adfAvailableForLiveSong(): Promise<boolean> {
+  const { exportNativeFile, nativeExportAvailableForLiveSong } = await import('../moduleExportService');
+  if (!(await nativeExportAvailableForLiveSong())) return false;
+  const native = await exportNativeFile();
+  if (!native) return false;
+  const manifest = await (await fetch(`${import.meta.env.BASE_URL}amiga-adf/manifest.json`)).json() as AdfManifest;
+  return adfTemplateFor(native.data, native.filename, manifest) !== null;
+}

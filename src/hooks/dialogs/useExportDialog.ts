@@ -220,6 +220,18 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     return () => { current = false; };
   }, [isOpen, patterns, editorMode, uadeEditableFileData]);
 
+  const [adfAvailable, setAdfAvailable] = useState(false);
+  useEffect(() => {
+    if (!isOpen) return;
+    let current = true;
+    setAdfAvailable(false);
+    import('@lib/export/amiga/adfExport')
+      .then((m) => m.adfAvailableForLiveSong())
+      .catch(() => false)
+      .then((available) => { if (current) setAdfAvailable(available); });
+    return () => { current = false; };
+  }, [isOpen, patterns, editorMode, uadeEditableFileData]);
+
   // ── Shared handler: export song ─────────────────────────────────────────────
 
   const handleExportSong = useCallback((onClose: () => void) => {
@@ -807,6 +819,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportNative,
     handleExportAdf,
     nativeAvailable,
+    adfAvailable,
     handleImportFile,
   };
 }
