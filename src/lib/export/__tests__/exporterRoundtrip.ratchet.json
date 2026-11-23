@@ -96,6 +96,14 @@
       "cells": 63200,
       "bytes": 63200
     },
+    "benDaglishSID": {
+      "exporter": "BenDaglishSIDExporter.exportBenDaglishSID",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 8352,
+      "bytes": 8352
+    },
     "c67": {
       "exporter": "CDFM67Exporter.exportCDFM67",
       "tier": "byte-exact",

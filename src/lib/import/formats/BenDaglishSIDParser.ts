@@ -24,7 +24,10 @@
  * UADE eagleplayer.conf: BenDaglishSID  prefixes=BDS
  * Voices: 3 (SID-style 3-voice synthesis)
  *
- * UADE handles actual audio playback. This parser extracts metadata only.
+ * The grid: nuade's loader (nw_bds_layout) finds the order lists and the track table; benDaglishSIDGrid.ts decodes
+ * every track into byte-exact carrier rows and lays the three voices on one tick timeline
+ * (docs/FORMAT_COMMAND_STREAM_GRID.md). Each note cell is paired with its note byte (`noteBytes`) for
+ * BenDaglishSIDExporter. Playback is the vendored player, never this grid.
  *
  * Reference:
  *   third-party/uade-3.05/amigasrc/players/wanted_team/BennDaglishSID/Benn Daglish SID_v2.asm
@@ -32,7 +35,11 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, Pattern } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { benDaglishSIDEncoder } from '@/engine/uade/encoders/BenDaglishSIDEncoder';
+import { bdsLayout } from '@/engine/nuade/nuadeBdsLayout';
+import { buildBdsGrid, BDS_ROWS_PER_PATTERN } from './benDaglishSIDGrid';
 // SID synthesis format — no PCM samples to extract
 // createSamplerInstrument not needed for this format
 
@@ -109,9 +116,7 @@ export function isBenDaglishSIDFormat(buffer: ArrayBuffer, filename?: string): b
 /**
  * Parse a Ben Daglish SID module file into a TrackerSong.
  *
- * The format is a compiled 68k Amiga executable. This parser creates a
- * metadata-only TrackerSong with placeholder instruments. Actual audio
- * playback is always delegated to UADE.
+ * The format is a compiled 68k Amiga executable. Subsong 0 becomes a tick grid (one row per player tick).
  *
  * @param buffer   Raw file bytes (ArrayBuffer)
  * @param filename Original filename (used to derive module name)
@@ -148,64 +153,59 @@ export async function parseBenDaglishSIDFile(
 
   const initSongPtr = u32BE(buf, 52);
 
-  // ── 3 SID voice instruments (synthesis, no PCM) ───────────────────────────
+  // ── Grid: nuade's loader finds the tables (nw_bds_layout), benDaglishSIDGrid.ts walks them ─────────────
 
-  const instruments: InstrumentConfig[] = [];
-  for (let i = 0; i < 3; i++) {
-    instruments.push({
-      id: i + 1,
-      name: '',
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
-    } as InstrumentConfig);
-  }
+  const layout = await bdsLayout(buf);
+  const grid = layout && layout.orderLists.length > 0 ? buildBdsGrid(buf, layout, 0) : null;
 
-  // ── Song positions (one entry per subsong) ────────────────────────────────
+  // ── Instruments: the 16 instrument commands (0x80..0x8F) of the tracks ────
 
-  const songPositions = Array.from({ length: Math.max(subsongCount, 1) }, (_, i) => i % 1);
-
-  // ── Empty pattern (placeholder — UADE handles actual audio) ───────────────
-
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
+  const instruments: InstrumentConfig[] = Array.from({ length: 16 }, (_, i) => ({
+    id: i + 1,
+    name: '',
+    type: 'synth' as const,
+    synthType: 'Synth' as const,
+    effects: [],
     volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
+    pan: 0,
+  } as InstrumentConfig));
 
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 3 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `SID Voice ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: ch === 0 ? -50 : ch === 1 ? 0 : 50,
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 3,
-      originalPatternCount: 1,
-      originalInstrumentCount: 3,
-      subsongCount,
-      initSongPtr,
-    },
-  };
+  const blankRow = () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+  const ticks = grid?.ticks ?? BDS_ROWS_PER_PATTERN;
+  const patternCount = Math.max(1, Math.ceil(ticks / BDS_ROWS_PER_PATTERN));
+  const patterns: Pattern[] = Array.from({ length: patternCount }, (_, p) => {
+    const length = Math.min(BDS_ROWS_PER_PATTERN, ticks - p * BDS_ROWS_PER_PATTERN);
+    return {
+      id: `pattern-${p}`,
+      name: `Pattern ${p}`,
+      length,
+      channels: Array.from({ length: 3 }, (_, ch) => ({
+        id: `channel-${ch}`,
+        name: `SID Voice ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: ch === 0 ? -50 : ch === 1 ? 0 : 50,
+        instrumentId: null,
+        color: null,
+        rows: Array.from({ length }, (_, r) => {
+          const cell = grid?.timeline[ch][p * BDS_ROWS_PER_PATTERN + r];
+          return cell ? { ...cell } : blankRow();
+        }),
+      })),
+      importMetadata: {
+        sourceFormat: 'MOD' as const,
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: 3,
+        originalPatternCount: patternCount,
+        originalInstrumentCount: 16,
+        subsongCount,
+        initSongPtr,
+      },
+    };
+  });
 
   // ── Display name ──────────────────────────────────────────────────────────
 
@@ -214,19 +214,50 @@ export async function parseBenDaglishSIDFile(
     displayName += ` (${subsongCount} subsongs)`;
   }
 
-  return {
+  const song: TrackerSong = {
     name: displayName,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions,
-    songLength: songPositions.length,
+    songPositions: patterns.map((_, i) => i),
+    songLength: patterns.length,
     restartPosition: 0,
     numChannels: 3,
-    initialSpeed: 6,
+    initialSpeed: 1,
     initialBPM: 125,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
   };
+  if (!layout || !grid) {
+    song.gridUnmatchedReason = 'nuade does not load this Ben Daglish SID module';
+    return song;
+  }
+
+  const noteBytes: NonNullable<UADEVariablePatternLayout['noteBytes']> = [];
+  for (let ch = 0; ch < 3; ch++) {
+    grid.noteAt[ch].forEach((offset, tick) => {
+      if (offset < 0) return;
+      noteBytes.push({
+        pattern: Math.floor(tick / BDS_ROWS_PER_PATTERN), channel: ch, row: tick % BDS_ROWS_PER_PATTERN,
+        offset, note: grid.timeline[ch][tick].note,
+      });
+    });
+  }
+  song.uadePlayerTickGrid = true;
+  song.uadeVariableLayout = {
+    formatId: 'benDaglishSID',
+    numChannels: 3,
+    numFilePatterns: grid.filePatternAddrs.length,
+    rowsPerPattern: patterns.map((p) => p.length),
+    moduleSize: buf.length,
+    encoder: benDaglishSIDEncoder,
+    filePatternAddrs: grid.filePatternAddrs,
+    filePatternSizes: grid.filePatternSizes,
+    trackMap: patterns.map(() => [-1, -1, -1]),
+    blockRows: grid.blockRows,
+    noteBytes,
+    propagateSharedCells: true,
+  };
+  return song;
 }

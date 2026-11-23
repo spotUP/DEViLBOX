@@ -422,7 +422,6 @@ export const WALK_GRIDS: Record<string, string> = {
 /** Scope view by design: no pattern grid exists or can exist. */
 export const SCOPE_GRIDS: Record<string, string> = {
   cinter4: 'Cinter4Parser: sequence data left to the WASM replayer (Cinter4Parser.ts header); no corpus song',
-  benDaglishSID: 'owner verdict Good, stub pattern opens the scope view (plan D3)',
   c64sid: 'SIDParser runs 6502 and intercepts SID writes (player program, register log) [h: 39p/7488r/5796n]',
   vgm: 'VGMParser rebuilds notes from chip register writes (register log) [h: 1p/768r/298n]',
   ym: 'ZxtuneParser shell; engine plays [h: 17th.ym THROW fileName.replace]',
@@ -595,6 +594,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'mdl', 'amf', 'j2b', 'mo3', 'itp', 'nst', 'wow', 'kt', 'xrns', 'mod', 'xm', 'it', 's3m',
   // MONOTONE stores 4-track patterns; ANSI music stores one PLAY string the parser lays on rows.
   'monotone', 'ansiMusic', 'kdm', 'organya', 'piyoPiyo', 'jxs', 'tonyWilliams',
+  // Ben Daglish SID: nuade's tables (nw_bds_layout) walk to a tick grid (benDaglishSIDGrid.ts), no oracle yet.
+  'benDaglishSID',
   // SynthDream: the command streams decode to a read-only tick grid (synthDreamGrid.ts), no oracle yet.
   'synthDream',
   // Tim Follin: the command streams decode to a read-only tick grid (timFollinGrid.ts), no oracle yet.

@@ -60,6 +60,7 @@ export interface NuadeModule {
   _nw_key_render(stereo: number, frames: number): number;
   _nw_key_close(): void;
   _nw_scr_layout(data: number, len: number, out: number, cap: number): number;
+  _nw_bds_layout(data: number, len: number, out: number, cap: number): number;
 }
 
 

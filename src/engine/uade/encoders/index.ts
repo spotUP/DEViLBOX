@@ -84,6 +84,7 @@ import './SawteethEncoder';
 import './SCUMMEncoder';
 import './SeanConnollyEncoder';
 import './SeanConranEncoder';
+import './BenDaglishSIDEncoder';
 import './SidMon1Encoder';
 import './SidMon2Encoder';
 import './SimpleAmigaStubEncoder';

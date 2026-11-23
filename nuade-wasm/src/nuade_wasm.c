@@ -22,6 +22,7 @@
 #include "nuade/nuade.h"
 #include "nuade/players/medley.h"
 #include "nuade/players/seanconran.h"
+#include "nuade/players/bendaglishsid.h"
 
 #define NW_MAX_VOICES 64
 #define NW_SNAPSHOT_MAX_VOICES 32
@@ -571,5 +572,39 @@ EMSCRIPTEN_KEEPALIVE int nw_scr_layout(const uint8_t *data, int len, int32_t *ou
     }
   }
   scr_destroy(player);
+  return n;
+}
+
+/* Ben Daglish SID: the tables nuade's loader finds in the driver code (bds_module.c), for the editable grid.
+ * out: [0] 1 = late revision, [1] subsong count, [2] track table (hunk offset), [3] file offset of the hunk,
+ * then per subsong the three voices' order list offsets (hunk offsets). Returns the longs written, -1 when the
+ * module does not load. */
+static int32_t nw_be32(const uint8_t *d, uint32_t at) {
+  return (int32_t)(((uint32_t)d[at] << 24) | ((uint32_t)d[at + 1] << 16) | ((uint32_t)d[at + 2] << 8) | d[at + 3]);
+}
+
+EMSCRIPTEN_KEEPALIVE int nw_bds_layout(const uint8_t *data, int len, int32_t *out, int cap) {
+  if (!data || len <= 0 || !out) return -1;
+  BdsCreateResult r = bds_create(data, (size_t)len);
+  if (r.status != BdsStatus_Ok || !r.player) return -1;
+  const BdsModule *m = &r.player->module;
+  const bool late = m->revision == BdsRevision_Late;
+  const int subsongs = late ? (int)m->header.subsongs : 1;
+  const int n = 4 + 3 * subsongs;
+  if (cap < n || (late && m->tables.subsong_orders + 12u * (uint32_t)subsongs > m->memory.size)) {
+    bds_destroy(r.player);
+    return -1;
+  }
+  out[0] = late ? 1 : 0;
+  out[1] = subsongs;
+  out[2] = (int32_t)m->tables.tracks;
+  out[3] = 32; /* HUNK_HEADER_LONGS * 4: the hunk data follows the hunk header and the hunk's type and size */
+  for (int s = 0; s < subsongs; s++) {
+    for (int v = 0; v < 3; v++) {
+      out[4 + 3 * s + v] = late ? nw_be32(m->memory.data, m->tables.subsong_orders + 12 * (uint32_t)s + 4 * (uint32_t)v)
+                                : (int32_t)m->tables.order_lists[v];
+    }
+  }
+  bds_destroy(r.player);
   return n;
 }

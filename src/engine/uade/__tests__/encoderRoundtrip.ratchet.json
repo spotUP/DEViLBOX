@@ -56,6 +56,14 @@
       "matchPct": 1,
       "cells": 47
     },
+    "benDaglishSID": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 20
+    },
     "coreDesign": {
       "kind": "fixed",
       "method": "decode-encode",
