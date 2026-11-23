@@ -272,7 +272,13 @@ void setTableColour(int a, int b, int c, int d, int e) {
 void setTableBackgroundColours(int i) { (void)i; }
 void highlightInstrument(int t, int p) { (void)t; (void)p; }
 int quickSave(void) { return 0; }
-void initRemapArrays(void) {}
+/* The relocator (greloc.c) numbers the exported patterns through these two arrays. GTUltra fills them by playing
+ * every subsong (playUntilEnd2 on the editor object); here the orderlists are walked instead, which gives the same
+ * set of used patterns (in orderlist order rather than play order). Left at their zero initialisers they mapped
+ * every pattern to pattern 0 and exported pattern 0 for all of them. */
+void initRemapArrays(void) {
+    for (int i = 0; i < 256; i++) { patternOrderArray[i] = -1; patternOrderList[i] = -1; }
+}
 int mouseTransportBar(GTOBJECT *gt) { (void)gt; return 0; }
 int checkMouseRange(int x, int y, int w, int h) {
     (void)x; (void)y; (void)w; (void)h; return 0;
@@ -317,7 +323,19 @@ void stopScreenDisplay(void) {}
 void restartScreenDisplay(void) {}
 void ExportAsPCM(int s, int n, GTOBJECT *gt) { (void)s; (void)n; (void)gt; }
 void playUntilEnd(int s) { (void)s; }
-void playUntilEnd2(int s) { (void)s; }
+void playUntilEnd2(int s) {
+    if (!songlen[s][0] || !songlen[s][1] || !songlen[s][2]) return;  /* greloc.c skips such songs too */
+    for (int d = 0; d < MAX_CHN && d < editorInfo.maxSIDChannels; d++) {
+        if (editorInfo.maxSIDChannels == 9 && (s & 1) && d >= 3) break;
+        for (int e = 0; e < songlen[s][d]; e++) {
+            int pat = songorder[s][d][e];
+            if (pat < REPEAT && patternOrderArray[pat] == -1) {
+                patternOrderList[patternRemapOrderIndex] = pat;
+                patternOrderArray[pat] = patternRemapOrderIndex++;
+            }
+        }
+    }
+}
 void displayPatternInfo(GTOBJECT *gt); /* defined in ginfo.c */
 void displayInstrumentInfo(GTOBJECT *gt); /* defined in ginfo.c */
 void displayTableInfo(GTOBJECT *gt); /* defined in ginfo.c */
