@@ -89,6 +89,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   const tb1 = (s.timeBase ?? 0) + 1;
   const hz = s.hz > 0 ? s.hz : 60;
   const flag = (k: string) => Number((m.compatFlags as Record<string, unknown> | undefined)?.[k] ?? 0) > 0;
+  const resetAtTarget = flag('targetResetsSlides');
   const linear = flag('linearPitch'), slideMul = Number((m.compatFlags as Record<string, unknown> | undefined)?.pitchSlideSpeed ?? 4) || 4;
   const newVol = flag('newVolumeScaling'), ceilVol = flag('ceilVolumeScaling'), properNoise = flag('properNoiseLayout');
   const cellAt = (ch: number, o: number, r: number) => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o] ?? 0}`)?.rows[r];
@@ -231,6 +232,8 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     const pmul = linear ? slideMul : 1;
     const toRaw = (semis: number) => (linear ? semis * 128 : furPeriod(slideNv) - furPeriod(slideNv + semis));
     let porta = 0, curNv = -1, toneOn = false, snap: Ev | undefined, glideFrom = 0, glideTo = 0, glideStart = 0;
+    // Furnace (playback.cpp, targetResetsSlides): reaching the 03xx target clears portaSpeed, so later notes key on again.
+    let portaDone = -1;
     const period = (nb: number) => freq[((nb & 15) + 3) & 15] >> (nb >> 4);
     const dropSnap = (frame: number) => {
       if (!snap || frame >= snap.frame) { snap = undefined; return; }
@@ -242,13 +245,13 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       const cell = cellAt(ch, row.o, row.r);
       let delay = 0, cut = -1, noteTick = -1;
       const cmds: number[] = [];
-      let volChanged = false, slideSet = false, e12Semis = 0, e12Speed = 0;
+      let volChanged = false, slideSet = false, e12Semis = 0, e12Speed = 0, portaSet = false;
       for (const { type: t, value: v } of fxOf(ch, row.o, row.r)) {
         if (t === 0x08) cmds.push(PAN, v);
         else if (t === 0x10) { waveFx = v; if (!framesOf(Math.max(0, ins), MACRO_WAVE, 'wave')) cmds.push(WAVE, v); }
         else if (t === 0x11) { if (ch >= 4) noiseFx = v > 0; else lossy.add('noise effect on channels 1-4'); }
         else if (t === 0x00) arpFx = v;
-        else if (t === 0x03) porta = v;
+        else if (t === 0x03) { porta = v; portaSet = true; portaDone = -1; }
         else if (t === 0x01 || t === 0x02) { slide = (t === 0x01 ? 1 : -1) * v * pmul; slideTo = undefined; slideSet = true; }
         else if (t === 0x04) { vibDepth = v & 15; vibRate = v >> 4; }
         else if (t === 0xe3) { if (v) lossy.add('vibrato shape other than sine'); }
@@ -265,6 +268,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       const at = frameOf(row.tick + delay);
       const nv = cell ? convertFurnaceNoteValue(cell) : -1;
       if (nv >= 0 && nv < 253) dropSnap(at);
+      if (!portaSet && portaDone >= 0 && at >= portaDone) { porta = 0; portaDone = -1; }
       if (nv >= 0 && nv < 253 && porta && toneOn && curNv >= 0 && !(ch >= 4 && noiseFx)) {
         const from = Math.round(curNv), p0 = period(noteByte(from)), p1 = period(noteByte(nv));
         const ticks = Math.max(1, Math.ceil(linear ? (Math.abs(nv - curNv) * 128) / (porta * slideMul) : Math.abs(p1 - p0) / porta));
@@ -274,6 +278,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         snap = { frame: fa, kind: 'note', cmds: [], note: noteByte(nv), glide: {} };
         evs.push(snap);
         glideFrom = curNv; glideTo = nv; glideStart = at; curNv = nv;
+        if (resetAtTarget) portaDone = fa;
       } else if (nv >= 0 && nv < 253) {
         curNv = nv; toneOn = !(ch >= 4 && noiseFx);
         const insIdx = Math.max(0, ins);
