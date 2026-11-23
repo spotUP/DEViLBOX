@@ -10,6 +10,7 @@
  * and other metadata exactly as loaded while applying any edits.
  */
 
+import type { Pattern } from '@/types';
 import { PreTrackerEngine } from '@/engine/pretracker/PreTrackerEngine';
 
 export interface PreTrackerExportResult {
@@ -18,8 +19,48 @@ export interface PreTrackerExportResult {
   warnings: string[];
 }
 
+/** Encode one grid cell as the 3 bytes of a .prt single-channel pattern row (also the live-edit message). */
+export function encodePreTrackerCell(
+  cell: { note: number; instrument: number; effTyp: number; eff: number },
+  transpose: number,
+): [pitchCtrl: number, instEffect: number, effectData: number] {
+  const prtNote = cell.note > 0 ? Math.min(60, Math.max(0, cell.note - 12 - transpose)) : 0;
+  const inst = cell.instrument & 0x1F;
+  const arpFlag = cell.effTyp === 0 && cell.eff !== 0 ? 0x40 : 0;
+  return [
+    (prtNote & 0x3F) | arpFlag | ((inst & 0x10) ? 0x80 : 0),
+    ((inst & 0x0F) << 4) | (cell.effTyp & 0x0F),
+    cell.eff & 0xFF,
+  ];
+}
+
+/**
+ * Write grid cell edits into the file's single-channel tracks. Only cells that differ from the grid parsed out of the
+ * same bytes are written, so an unedited song is byte-exact. A track shared by several positions takes the last edit.
+ */
+export async function patchPreTrackerCells(buf: Uint8Array, patterns: Pattern[], warnings: string[]): Promise<void> {
+  const { parsePreTrackerFile } = await import('@lib/import/formats/PreTrackerParser');
+  const original = (await parsePreTrackerFile(buf.slice().buffer as ArrayBuffer, 'x.prt')).patterns;
+  const dataOffset = new DataView(buf.buffer, buf.byteOffset).getUint32(8, false);
+  patterns.forEach((pat, p) => {
+    const meta = original[p]?.importMetadata;
+    if (!meta) return;
+    const tracks = meta.prtTrackMap ?? [];
+    const transposes = meta.prtTransposeMap ?? [];
+    pat.channels.forEach((ch, c) => ch.rows.forEach((cell, row) => {
+      const was = original[p].channels[c]?.rows[row];
+      if (!was || (was.note === cell.note && was.instrument === cell.instrument && was.effTyp === cell.effTyp && was.eff === cell.eff)) return;
+      if (!tracks[c]) { warnings.push(`Position ${p} channel ${c}: track 0 is empty, edit at row ${row} not saved`); return; }
+      const at = dataOffset + ((tracks[c] - 1) * pat.length + row) * 3;
+      if (at + 3 > buf.length) { warnings.push(`Position ${p} channel ${c} row ${row}: out of bounds`); return; }
+      buf.set(encodePreTrackerCell(cell, transposes[c] ?? 0), at);
+    }));
+  });
+}
+
 export async function exportAsPreTracker(
   originalFilename?: string,
+  patterns?: Pattern[],
 ): Promise<PreTrackerExportResult> {
   if (!PreTrackerEngine.hasInstance()) {
     throw new Error('PreTracker engine not loaded');
@@ -153,6 +194,8 @@ export async function exportAsPreTracker(
       buf[base + j] = raw[j];
     }
   }
+
+  if (patterns) await patchPreTrackerCells(buf, patterns, warnings);
 
   const baseName = originalFilename?.replace(/\.[^.]+$/, '') ?? meta.title ?? 'pretracker';
   const filename = `${baseName}.prt`;

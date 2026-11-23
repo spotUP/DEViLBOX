@@ -917,7 +917,7 @@ export const useTrackerStore = create<TrackerStore>()(
           const pattern = get().patterns[patternIndex];
           const fullCell = pattern?.channels[channelIndex]?.rows[rowIndex];
           if (fullCell && pattern) {
-            import('@engine/pretracker/PreTrackerEngine').then(({ PreTrackerEngine }) => {
+            import('@engine/pretracker/PreTrackerEngine').then(async ({ PreTrackerEngine }) => {
               if (!PreTrackerEngine.hasInstance()) return;
               // Resolve the actual track number from the position→track map
               const meta = pattern.importMetadata as Record<string, unknown> | undefined;
@@ -925,21 +925,9 @@ export const useTrackerStore = create<TrackerStore>()(
               const transposeMap = meta?.prtTransposeMap as number[] | undefined;
               const trackNum = trackMap?.[channelIndex] ?? (patternIndex + 1);
               if (trackNum === 0) return; // track 0 = empty/muted
-              // Reverse XM note → PreTracker note (undo transpose)
               const transpose = transposeMap?.[channelIndex] ?? 0;
-              let prtNote = fullCell.note > 0 ? Math.max(0, fullCell.note - 12 - transpose) : 0;
-              if (prtNote < 0) prtNote = 0;
-              if (prtNote > 60) prtNote = 60;
-              // Encode 3-byte cell:
-              // b0: bits 5-0=note, bit 6=arpeggio flag, bit 7=inst high bit
-              const inst = fullCell.instrument & 0x1F; // 0-31
-              const instHi = (inst & 0x10) ? 0x80 : 0;
-              const hasArp = fullCell.effTyp === 0 && fullCell.eff !== 0;
-              const arpFlag = hasArp ? 0x40 : 0;
-              const pitchCtrl = (prtNote & 0x3F) | arpFlag | instHi;
-              // b1: bits 7-4=inst low nibble, bits 3-0=effect cmd
-              const instEffect = ((inst & 0x0F) << 4) | (fullCell.effTyp & 0x0F);
-              const effectData = fullCell.eff & 0xFF;
+              const { encodePreTrackerCell } = await import('@lib/export/PreTrackerExporter');
+              const [pitchCtrl, instEffect, effectData] = encodePreTrackerCell(fullCell, transpose);
               PreTrackerEngine.getInstance().setTrackCell(trackNum, rowIndex, pitchCtrl, instEffect, effectData);
             });
           }

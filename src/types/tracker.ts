@@ -422,6 +422,9 @@ export interface ImportMetadata {
   originalChannelCount: number;
   originalPatternCount: number;
   originalInstrumentCount: number;
+  /** PreTracker: single-channel track number (1-based, 0 = empty) and order transpose per channel of this position. */
+  prtTrackMap?: number[];
+  prtTransposeMap?: number[];
 
   // MOD/XM specific metadata
   modData?: {
