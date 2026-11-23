@@ -211,6 +211,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   EXPORT MODE
                 </label>
                 <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]">
+                  {ex.validModes.has('song') && (
                   <button
                     onClick={() => ex.setExportMode('song')}
                     className={`
@@ -224,6 +225,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <FileMusic size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold break-words leading-tight">Song</div>
                   </button>
+                  )}
+                  {ex.validModes.has('sfx') && (
                   <button
                     onClick={() => ex.setExportMode('sfx')}
                     className={`
@@ -237,6 +240,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <Zap size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold break-words leading-tight">SFX</div>
                   </button>
+                  )}
+                  {ex.validModes.has('instrument') && (
                   <button
                     onClick={() => ex.setExportMode('instrument')}
                     className={`
@@ -250,6 +255,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <Settings size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold break-words leading-tight">Instrument</div>
                   </button>
+                  )}
+                  {ex.validModes.has('audio') && (
                   <button
                     onClick={() => ex.setExportMode('audio')}
                     className={`
@@ -263,6 +270,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <Volume2 size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold break-words leading-tight">Audio</div>
                   </button>
+                  )}
+                  {ex.validModes.has('midi') && (
                   <button
                     onClick={() => ex.setExportMode('midi')}
                     className={`
@@ -276,6 +285,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <Music2 size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold break-words leading-tight">MIDI</div>
                   </button>
+                  )}
+                  {ex.validModes.has('xm') && (
                   <button
                     onClick={() => ex.setExportMode('xm')}
                     className={`
@@ -289,6 +300,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <FileMusic size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold break-words leading-tight">XM</div>
                   </button>
+                  )}
+                  {ex.validModes.has('mod') && (
                   <button
                     onClick={() => ex.setExportMode('mod')}
                     className={`
@@ -302,6 +315,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <FileMusic size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold break-words leading-tight">MOD</div>
                   </button>
+                  )}
+                  {ex.validModes.has('it') && (
                   <button
                     onClick={() => ex.setExportMode('it')}
                     className={`
@@ -315,6 +330,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <FileMusic size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold break-words leading-tight">IT</div>
                   </button>
+                  )}
+                  {ex.validModes.has('s3m') && (
                   <button
                     onClick={() => ex.setExportMode('s3m')}
                     className={`
@@ -328,6 +345,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <FileMusic size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold break-words leading-tight">S3M</div>
                   </button>
+                  )}
+                  {ex.validModes.has('chip') && (
                   <button
                     onClick={() => ex.setExportMode('chip')}
                     className={`
@@ -341,6 +360,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <Cpu size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold break-words leading-tight">Chip</div>
                   </button>
+                  )}
+                  {ex.validModes.has('nano') && (
                   <button
                     onClick={() => ex.setExportMode('nano')}
                     className={`
@@ -354,7 +375,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <Zap size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold break-words leading-tight">Nano</div>
                   </button>
-                  {(ex.editorMode === 'furnace' || ex.furnaceModuleAvailable) && (
+                  )}
+                  {ex.validModes.has('fur') && (
                     <button
                       onClick={() => ex.setExportMode('fur')}
                       className={`
@@ -369,7 +391,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Export Furnace Module</div>
                     </button>
                   )}
-                  {(ex.editorMode === 'furnace' || ex.furnaceModuleAvailable) && (
+                  {ex.validModes.has('furText') && (
                     <button
                       onClick={() => ex.setExportMode('furText')}
                       className={`
@@ -400,7 +422,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">{AY_SCRAMBLE_TARGETS[k].label}</div>
                     </button>
                   ))}
-                  {ex.furnaceAyAvailable.zx128 && (
+                  {ex.validModes.has('zxTap') && (
                     <button
                       onClick={() => ex.setExportMode('zxTap')}
                       className={`
@@ -415,7 +437,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">ZX Spectrum 128 (.tap)</div>
                     </button>
                   )}
-                  {ex.furnaceAyAvailable.vectrex && (
+                  {ex.validModes.has('vectrexCart') && (
                     <button
                       onClick={() => ex.setExportMode('vectrexCart')}
                       className={`
@@ -430,7 +452,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Vectrex Cartridge (AY-3-8910)</div>
                     </button>
                   )}
-                  {ex.gbRomAvailable && (
+                  {ex.validModes.has('gbRom') && (
                     <button
                       onClick={() => ex.setExportMode('gbRom')}
                       className={`
@@ -445,7 +467,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Game Boy Cartridge (.gb)</div>
                     </button>
                   )}
-                  {ex.mdRomAvailable && (
+                  {ex.validModes.has('mdRom') && (
                     <button
                       onClick={() => ex.setExportMode('mdRom')}
                       className={`
@@ -460,7 +482,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Mega Drive Cartridge (.bin)</div>
                     </button>
                   )}
-                  {ex.pceRomAvailable && (
+                  {ex.validModes.has('pceRom') && (
                     <button
                       onClick={() => ex.setExportMode('pceRom')}
                       className={`
@@ -475,7 +497,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">PC Engine HuCard (.pce)</div>
                     </button>
                   )}
-                  {ex.c64PrgAvailable && (
+                  {ex.validModes.has('c64Prg') && (
                     <button
                       onClick={() => ex.setExportMode('c64Prg')}
                       className={`
@@ -490,7 +512,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Commodore 64 Program (.prg)</div>
                     </button>
                   )}
-                  {ex.smsRomAvailable && (
+                  {ex.validModes.has('smsRom') && (
                     <button
                       onClick={() => ex.setExportMode('smsRom')}
                       className={`
@@ -505,7 +527,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Master System Cartridge (.sms)</div>
                     </button>
                   )}
-                  {ex.smsRomAvailable && (
+                  {ex.validModes.has('ggRom') && (
                     <button
                       onClick={() => ex.setExportMode('ggRom')}
                       className={`
@@ -520,7 +542,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Game Gear Cartridge (.gg)</div>
                     </button>
                   )}
-                  {ex.nesRomAvailable && (
+                  {ex.validModes.has('nesRom') && (
                     <button
                       onClick={() => ex.setExportMode('nesRom')}
                       className={`
@@ -535,7 +557,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">NES Cartridge (.nes)</div>
                     </button>
                   )}
-                  {ex.nesRomAvailable && (
+                  {ex.validModes.has('nsfe') && (
                     <button
                       onClick={() => ex.setExportMode('nsfe')}
                       className={`
@@ -550,7 +572,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">NES NSF Extended (.nsfe)</div>
                     </button>
                   )}
-                  {ex.furnaceAyAvailable.zxbeeper && (
+                  {ex.validModes.has('zxBeeperTap') && (
                     <button
                       onClick={() => ex.setExportMode('zxBeeperTap')}
                       className={`
@@ -565,7 +587,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">ZX Spectrum Beeper (.tap)</div>
                     </button>
                   )}
-                  {ex.quadToneAvailable && (
+                  {ex.validModes.has('zxQuadToneTap') && (
                     <button
                       onClick={() => ex.setExportMode('zxQuadToneTap')}
                       className={`
@@ -580,7 +602,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">ZX Spectrum QuadTone (.tap)</div>
                     </button>
                   )}
-                  {ex.tadAvailable && (
+                  {ex.validModes.has('snesRom') && (
                     <button
                       onClick={() => ex.setExportMode('snesRom')}
                       className={`
@@ -595,7 +617,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">SNES Cartridge (.sfc)</div>
                     </button>
                   )}
-                  {ex.tadAvailable && (
+                  {ex.validModes.has('tad') && (
                     <button
                       onClick={() => ex.setExportMode('tad')}
                       className={`
@@ -610,7 +632,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">SNES (Terrific Audio Driver)</div>
                     </button>
                   )}
-                  {ex.nativeAvailable && (
+                  {ex.validModes.has('native') && (
                     <button
                       onClick={() => ex.setExportMode('native')}
                       className={`
@@ -625,7 +647,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Native</div>
                     </button>
                   )}
-                  {ex.adfAvailable && (
+                  {ex.validModes.has('adf') && (
                     <button
                       onClick={() => ex.setExportMode('adf')}
                       className={`

@@ -8,6 +8,7 @@
 
 import { furnaceModuleExportAvailable } from '@/lib/export/FurnaceModuleExporter';
 import { furnaceAyScrambleExportAvailable, ayScrambleTempoWarning, type AyScrambleTarget } from '@/lib/export/FurnaceExporter';
+import { validExportOptions } from '@/lib/export/validExportOptions';
 import { gbRomExportAvailable } from '@/lib/export/gb/gbExport';
 import { mdRomExportAvailable } from '@/lib/export/md/mdExport';
 import { smsRomExportAvailable } from '@/lib/export/sms/smsExport';
@@ -569,6 +570,22 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   }, [metadata]);
 
   const tadAvailable = (furnaceNative?.chipIds ?? []).includes(FURNACE_SNES_CHIP_ID);
+
+  // The one valid-option set for the loaded song (validExportOptions.ts): the dialog shows only these.
+  const validModes = validExportOptions({
+    maxChannels: Math.max(0, ...patterns.map((p) => p.channels.length)),
+    instrumentCount: instruments.length,
+    synthTypes: instruments.map((i) => i.synthType),
+    nativeAvailable, adfAvailable,
+    isFurnaceEditor: editorMode === 'furnace',
+    furnaceModuleAvailable, furnaceAyAvailable,
+    gbRom: gbRomAvailable, mdRom: mdRomAvailable, pceRom: pceRomAvailable, c64Prg: c64PrgAvailable,
+    smsRom: smsRomAvailable, nesRom: nesRomAvailable, quadTone: quadToneAvailable, tad: tadAvailable,
+  });
+  // A song swap can invalidate the selected mode: fall back to the always-valid one.
+  useEffect(() => {
+    if (!validModes.has(exportMode)) setExportMode('song');
+  }, [validModes, exportMode]);
   const [tadReport, setTadReport] = useState<{ warnings: string[]; ram: string; rows: { id: string; label: string; bytes: number }[] } | null>(null);
 
   const handleExportTad = useCallback(async (
@@ -820,6 +837,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportAdf,
     nativeAvailable,
     adfAvailable,
+    validModes,
     handleImportFile,
   };
 }
