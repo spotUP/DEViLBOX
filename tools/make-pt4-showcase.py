@@ -152,17 +152,24 @@ def layers(L):
                 put(12 + (k ^ 1), t, detuned.get(s, s), period, e, p)
 
     # --- pads, gate pad, sequencer: follow the root ---------------------------------------------------------------
+    since = 0
     for t in range(T):
         pos, row = tl[t]
         r, prev = root[t], root[t - 1] if t else None
         if r is None:
             if prev is not None:
-                for ch in (16, 17, 19, 20, 21):
-                    put(ch, t, 0, 0, 12, 0)
+                for ch in (16, 17, 19, 20, 21):     # release: fade out over the next rows, not a hard cut
+                    for dt in range(4):
+                        if t + dt < T and root[t + dt] is None and not any(echo[ch][t + dt] or ()):
+                            put(ch, t + dt, 0, 0, 10, 0x08)
             continue
         strike = r != prev or row % 32 == 0
-        put(16, t, pulse if strike else 0, per(12 + r) if strike else 0, 0, 0x7C)
-        put(17, t, saw if strike else 0, per(19 + r) if strike else 0, *((7, 0x46) if pos % 8 >= 4 else (4, 0x42)))
+        since = 0 if strike else since + 1   # rows since the pad struck
+        # pluck: arpeggio (a per-row effect) for 4 rows, then a volume slide down so the pad decays instead of holding
+        put(16, t, pulse if strike else 0, per(12 + r) if strike else 0, *((0, 0x7C) if since < 4 else (10, 0x02)))
+        # pad B: vibrato / tremolo for 6 rows after the strike, then a slow volume slide so it decays too
+        put(17, t, saw if strike else 0, per(19 + r) if strike else 0,
+            *(((7, 0x46) if pos % 8 >= 4 else (4, 0x42)) if since < 6 else (10, 0x01)))
         if t >= T // 4:
             if strike or t == T // 4:
                 put(19, t, gate, per(24 + r))
