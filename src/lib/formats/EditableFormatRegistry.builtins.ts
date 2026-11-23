@@ -51,7 +51,7 @@ registerEditableFormat({ formatId: "thomasHermann", label: "Thomas Hermann", pat
 registerEditableFormat({ formatId: "amosMusicBank", label: "AMOS Music Bank", newSong: { template: "templates/amosMusicBank.abk" }, patternCodec: { kind: "variable" }, exporter: { module: "AMOSMusicBankExporter", fn: "exportAMOSMusicBank", ext: "abk", byLayout: true } });
 registerEditableFormat({ formatId: "ams", label: "", patternCodec: { kind: "variable" }, exporter: { module: "AMSExporter", fn: "exportAMS", byLayout: true } });
 registerEditableFormat({ formatId: "artOfNoise", label: "Art of Noise", patternCodec: { kind: "fixed" }, exporter: { module: "ArtOfNoiseExporter", fn: "exportArtOfNoise", byLayout: true } });
-registerEditableFormat({ formatId: "aProSys", label: "A-Pro-Sys", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "aProSys", label: "A-Pro-Sys", patternCodec: { kind: "fixed" }, exporter: { module: "AProSysExporter", fn: "exportAProSys", ext: "aps", byLayout: true } });
 registerEditableFormat({ formatId: "artAndMagic", label: "Art and Magic", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "benDaglish", label: "Ben Daglish", newSong: { template: "templates/benDaglish.bd", name: "Ben Daglish" }, patternCodec: { kind: "variable" }, exporter: { module: "BenDaglishExporter", fn: "exportBenDaglish", ext: "bd", byLayout: true } });
 registerEditableFormat({ formatId: "c67", label: "", newSong: { template: "templates/c67.c67", name: "CDFM Composer 670" }, patternCodec: { kind: "variable" }, exporter: { module: "CDFM67Exporter", fn: "exportCDFM67", byLayout: true } });

@@ -8,7 +8,7 @@
 
 import { UADEEngine } from './UADEEngine';
 import type { UADEPatternLayout } from './UADEPatternEncoder';
-import { getCellFileOffset } from './UADEPatternEncoder';
+import { getCellFileOffset, encodeStoredCell } from './UADEPatternEncoder';
 import type { TrackerCell } from '@/types';
 
 export class UADEChipEditor {
@@ -128,8 +128,9 @@ export class UADEChipEditor {
     if (fileOffset < 0) return; // non-editable cell (e.g., wait row in variable-length format)
     const addr = moduleBase + fileOffset;
     const stored = layout.encodeOverStored ? await this.readBytes(addr, layout.bytesPerCell) : undefined;
-    const bytes = layout.encodeCell(cell, stored);
-    await this.writeBytes(addr, bytes);
+    // The same encoder the export uses: a transposing layout (noteOffset / storeNote) stores the grid note minus its offset.
+    const bytes = encodeStoredCell(layout, pattern, row, channel, cell, stored);
+    if (bytes) await this.writeBytes(addr, bytes);
   }
 
   /**

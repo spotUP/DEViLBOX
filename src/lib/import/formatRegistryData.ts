@@ -2587,7 +2587,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     family: 'amiga-native',
     matchMode: 'prefix',
     prefixes: ['aps.'],
-    nativeParser: { module: '@lib/import/formats/SimpleAmigaStubParser', parseFn: 'parseAProSysFile' },
+    nativeParser: { module: '@lib/import/formats/AProSysParser', parseFn: 'parseAProSysFile' },
     uadeFallback: true,
   },
 

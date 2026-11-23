@@ -23,6 +23,7 @@ import './DigiBoosterProEncoder';
 import './DigitalMugicianEncoder';
 import './DigitalSonixChromeEncoder';
 import './PSAEncoder';
+import './AProSysEncoder';
 import './ThomasHermannEncoder';
 import './SpeedySystemEncoder';
 import './DigitalSymphonyEncoder';

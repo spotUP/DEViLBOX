@@ -2630,13 +2630,13 @@ export async function tryRouteFormat(
       },
       'SCUMMParser', { injectUADE: true });
   }
-  // AProSys (APS.* prefix) — ADRVPACK compressed; stub parser for title + UADE classic audio
+  // AProSys (APS.* prefix) - ADRVPACK sections; editable step/track grid, UADE audio
   if (matchesExt(filename, ['aps'])) {
     const apsCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['aps']) };
-    const { parseAProSysFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    const { parseAProSysFile } = await import('@lib/import/formats/AProSysParser');
     return withNativeThenUADE('aProSys', apsCtx,
       (buf: Uint8Array | ArrayBuffer, name: string) => parseAProSysFile(buf as ArrayBuffer, name),
-      'SimpleAmigaStubParser', { injectUADE: true });
+      'AProSysParser', { injectUADE: true });
   }
   // ── Silmarils (.mok / MOK.* prefix) ──────────────────────────────────────
   // Stub parser: filename-based title + 3 placeholder instruments (3-voice MIDI clone).
