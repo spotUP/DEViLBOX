@@ -98,6 +98,11 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   const rows: Array<{ o: number; r: number; tick: number; ticks: number }> = [];
   const seen = new Map<number, number>();
   let o = 0, r = 0, tick = 0, speedIdx = 0, sp1 = s.speed1, sp2 = s.speed2, loopRow = 0;
+  // Virtual tempo (FDxx / FExx): Furnace adds N to an accumulator each engine tick and counts one row tick per D in it, so a row
+  // of L row ticks lasts until the engine tick that brings the count to L. Effects inside a row (EDxx, ECxx, macros) stay on engine ticks.
+  // Engine tick 0 already adds N once: its first row tick starts row 0, the rest count toward row 0.
+  let vtN = s.virtualTempo > 0 ? s.virtualTempo : 150, vtD = s.virtualTempoD > 0 ? s.virtualTempoD : 150, acc = vtN - vtD, credit = 0;
+  while (acc >= vtD) { acc -= vtD; credit++; }
   const groove = s.speedPattern && s.speedPattern.length > 2 ? s.speedPattern : undefined;
   if (s.speedPattern?.length && !groove) { sp1 = s.speedPattern[0]; sp2 = s.speedPattern[1] ?? s.speedPattern[0]; }
   for (;;) {
@@ -109,10 +114,16 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     let jump = -1, brk = -1;
     for (let ch = 0; ch < CHANNELS; ch++) for (const { type: t, value: v } of fxOf(ch, o, r)) {
       if (t === 0x09 && v) sp1 = v; else if (t === 0x0f && v) sp2 = v; else if (t === 0x0b) jump = v; else if (t === 0x0d) brk = v;
+      else if (t === 0xfd && v) vtN = v; else if (t === 0xfe && v) vtD = v;
     }
-    const ticks = Math.max(1, (groove ? groove[speedIdx % groove.length] : speedIdx % 2 ? sp2 : sp1) * tb1);
-    rows.push({ o, r, tick, ticks });
-    tick += ticks; speedIdx++;
+    const rowTicks = Math.max(1, (groove ? groove[speedIdx % groove.length] : speedIdx % 2 ? sp2 : sp1) * tb1);
+    const start = tick;
+    while (credit < rowTicks) { tick++; acc += vtN; while (acc >= vtD) { acc -= vtD; credit++; } }
+    credit -= rowTicks;
+    // shortcut: rows shorter than one engine tick (N > D * speed) keep one tick each; such songs drift.
+    if (tick === start) tick++;
+    rows.push({ o, r, tick: start, ticks: tick - start });
+    speedIdx++;
     if (jump >= 0 || brk >= 0) { o = jump >= 0 ? jump : o + 1; r = brk >= 0 ? brk : 0; }
     else if (++r >= s.patLen) { r = 0; o++; }
     if (o >= s.ordersLen) o = 0;
