@@ -129,10 +129,11 @@ function banjoPeriod(b: number, tune: number): number {
 /** Pitched noise (20xy with x = 1) takes tone 3's period. Furnace computes it with the noise divider (60 on TI chip types,
  *  64 on Sega) and, on linear-pitch songs, its "easy noise" ramp (period 16, 15, ... one per semitone above a threshold);
  *  Banjo runs the note through its tone table. Pick the Banjo note whose period is nearest Furnace's (sms.cpp snCalcFreq). */
-function pitchedNoiseNote(m: FurnaceModule, linear: boolean, tuneSemis: number, tune: number): (nv: number) => number {
+export function pitchedNoiseNote(m: FurnaceModule, linear: boolean, tuneSemis: number, tune: number): (nv: number) => number {
   const flags = m.chipFlags?.[0] ?? '';
   const chipType = Number(/chipType=(\d+)/.exec(flags)?.[1] ?? 0);
-  const noiseDiv = chipType >= 1 && chipType <= 7 ? 60 : 64;
+  // sms.cpp setFlags: 60 on every TI type (SN94624 / SN76494 run clock/8 with divider 7.5, the same ratio), 64 on Sega (0) and Game Gear (3).
+  const noiseDiv = chipType >= 1 && chipType <= 9 && chipType !== 3 ? 60 : 64;
   const easy = !/noEasyNoise=true/.test(flags);
   const tuning = m.tuning || 440;
   const thr = Math.round(128 * 12 * Math.log2(SN_CLOCK / (16 * noiseDiv) / (0.0625 * tuning))) - 384 + 64 + 60 * 128;
