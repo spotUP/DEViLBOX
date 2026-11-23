@@ -439,7 +439,7 @@ export const SCOPE_GRIDS: Record<string, string> = {
   sndh: 'SNDHParser reads tag header only; 68000 player program (psgplay), scope view [h: 1p/192r/0n]',
   qsf: 'QsfParser: Z80 program + ROM; engine only',
   fmp: 'FmplayerParser: raw binary to engine, empty grid',
-  pxtone: 'PxtoneParser: minimal shell, one empty pattern, engine plays (event data exists but is not shown)',
+  pxtone: 'PxtoneParser: unit tick grid from the wasm event list (pxtone_grid_*); edits reach the engine and PxtoneExporter; velocity, volume and pan columns not shown',
   eupmini: 'EupminiParser: minimal shell, one empty pattern',
   ixalance: 'IxalanceParser: minimal shell (format is IT-like with real patterns, not shown)',
   cpsycle: 'CpsycleParser: minimal shell (Psycle has real patterns, not shown)',

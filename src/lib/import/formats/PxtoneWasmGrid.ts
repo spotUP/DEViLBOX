@@ -19,6 +19,7 @@ export interface PxtoneWasmModule {
   _pxtone_grid_build(rowsPerBeat: number): number;
   _pxtone_grid_get(i: number, out: number): number;
   _pxtone_grid_set_note(rowsPerBeat: number, unit: number, row: number, note: number): number;
+  _pxtone_set_events(rec: number, n: number): number;
   _pxtone_write(): number;
   _pxtone_write_data(): number;
   HEAPU8: Uint8Array;
@@ -34,6 +35,8 @@ export interface PxtoneGrid {
   events: Int32Array;
 }
 
+/** The event list the wasm singleton currently holds (it keeps only the LAST song loaded or edited). */
+let boundEvents: Int32Array | null = null;
 let wasmModule: PxtoneWasmModule | null = null;
 let wasmLoading: Promise<PxtoneWasmModule> | null = null;
 
@@ -81,6 +84,7 @@ export function readPxtoneGrid(m: PxtoneWasmModule, data: Uint8Array, heap: () =
     cells.push({ row, unit, note, velocity, durRows, clock });
   }
   m._free(out);
+  boundEvents = events;
   return { units: m._pxtone_get_num_units(), beatClock: m._pxtone_get_beat_clock(), cells, events };
 }
 
@@ -94,5 +98,31 @@ export function editPxtoneCell(m: PxtoneWasmModule, unit: number, row: number, n
     events.set(new Int32Array(heap().buffer, out, 4), i * 4);
   }
   m._free(out);
+  boundEvents = events;
   return events;
+}
+
+/** Make the wasm hold THIS song (file + its current event list); a no-op while it already does. */
+export function bindPxtoneSong(m: PxtoneWasmModule, file: ArrayBuffer, events: Int32Array, heap: () => Uint8Array = () => m.HEAPU8): void {
+  if (boundEvents === events) return;
+  const data = new Uint8Array(file);
+  const p = m._malloc(data.length);
+  heap().set(data, p);
+  const rc = m._pxtone_init(p, data.length);
+  m._free(p);
+  if (rc !== 0) throw new Error(`pxtone: init failed (${rc})`);
+  const e = m._malloc(events.length * 4);
+  new Int32Array(heap().buffer, e, events.length).set(events);
+  const added = m._pxtone_set_events(e, events.length / 4);
+  m._free(e);
+  if (added < 0) throw new Error(`pxtone: set events failed (${added})`);
+  boundEvents = events;
+}
+
+/** The song as .ptcop/.pttune bytes (pxtnService::write: current layout, semantic not byte-verbatim). */
+export function writePxtone(m: PxtoneWasmModule, file: ArrayBuffer, events: Int32Array, heap: () => Uint8Array = () => m.HEAPU8): Uint8Array {
+  bindPxtoneSong(m, file, events, heap);
+  const n = m._pxtone_write();
+  if (n < 0) throw new Error(`pxtone: write failed (${n})`);
+  return heap().slice(m._pxtone_write_data(), m._pxtone_write_data() + n);
 }

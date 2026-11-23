@@ -318,6 +318,9 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
   // Organya: its module (with the grid's edits) is the export.
   { id: 'organya', matches: (s) => songIds(s).format === 'Organya' && !!s.organyaFileData,
     run: async (s) => { const { exportOrganya } = await import('./OrganyaExporter'); return exportOrganya(s); } },
+  // PxTone: the song's event list (with the grid's edits) written by the pxtone library.
+  { id: 'pxtone', matches: (s) => songIds(s).format === 'PxTone' && !!s.pxtoneFileData && !!s.pxtoneEvents,
+    run: async (s) => { const { exportPxtone } = await import('./PxtoneExporter'); return exportPxtone(s); } },
   // PiyoPiyo: its module (with the grid's edits) is the export.
   { id: 'piyoPiyo', matches: (s) => songIds(s).format === 'PiyoPiyo' && !!s.piyoPiyoFileData,
     run: async (s) => { const { exportPiyoPiyo } = await import('./PiyoPiyoExporter'); return exportPiyoPiyo(s); } },

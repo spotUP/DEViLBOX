@@ -9,8 +9,9 @@ import type { LiveCellEdit } from '../replayer/liveCellEdits';
 
 export async function applyPxtoneGridEdits(song: TrackerSong, edits: readonly LiveCellEdit[]): Promise<Int32Array | null> {
   if (!song.pxtoneEvents) return null;
-  const { getPxtoneWasm, editPxtoneCell } = await import('@/lib/import/formats/PxtoneWasmGrid');
+  const { getPxtoneWasm, editPxtoneCell, bindPxtoneSong } = await import('@/lib/import/formats/PxtoneWasmGrid');
   const m = await getPxtoneWasm();
+  bindPxtoneSong(m, song.pxtoneFileData as ArrayBuffer, song.pxtoneEvents);
   let events: Int32Array | null = null;
   for (const { pattern, row, channel, cell } of edits) {
     if (cell.note > 96) continue; // release marker: display only
