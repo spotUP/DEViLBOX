@@ -41,7 +41,8 @@ it.skipIf(!SONG || !OUT)('captures per-frame SID registers from Furnace dispatch
   for (let blk = 0; frames.length < FRAMES; blk++) {
     proc.process([], outs);
     const k = proc.module._furnace_dispatch_reg_writes(handle, out, 8192);
-    if (k > 0) { const a = new Int32Array(proc.getHeapBuffer(), out, k * 2); for (let j = 0; j < k; j++) if ((a[2 * j] & 0x1f) < 25) reg[a[2 * j] & 0x1f] = a[2 * j + 1] & 0xff; }
+    if (k > 0) { const a = new Int32Array(proc.getHeapBuffer(), out, k * 2); // Only SID addresses 0-24: c64.cpp also logs 0xffff0x01/0xffff0x02 (PCM rate, sample reset), which `& 0x1f` folded onto voice 0's freq hi / duty lo.
+    for (let j = 0; j < k; j++) if (a[2 * j] >= 0 && a[2 * j] < 25) reg[a[2 * j]] = a[2 * j + 1] & 0xff; }
     // Frame f ends at sample (f + 1) * RATE / 50; store the registers of the last block inside it.
     while (frames.length < FRAMES && (blk + 1) * BLOCK >= (frames.length + 1) * RATE / 50) frames.push([...reg]);
   }

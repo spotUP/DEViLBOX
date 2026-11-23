@@ -72,7 +72,14 @@ class EnvTable {
   }
 }
 
-function macroOf(ins: FurnaceInstrument | undefined, code: number): FurnaceMacro | undefined {
+/** Furnace calcArp: bit 30 marks a fixed note (set on a positive value, clear on a negative one); else note + arp. */
+export const arpNv = (nv: number, v: number): number =>
+  v >= 0 && v & 0x40000000 ? v & ~0x40000000 : v < 0 && !(v & 0x40000000) ? v | 0x40000000 : nv + v;
+
+/** Furnace calcArp: the arp value is a fixed note (not an offset from the played note). */
+export const arpIsFixed = (v: number): boolean => arpNv(0, v) !== v;
+
+export function macroOf(ins: FurnaceInstrument | undefined, code: number): FurnaceMacro | undefined {
   return ins?.macros?.find((x) => x.code === code && x.length > 0);
 }
 
@@ -181,9 +188,6 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     }
     return framesOf(insIdx, MACRO_ARP, 'arpeggio');
   };
-  // Furnace calcArp: bit 30 marks a fixed note (set on a positive value, clear on a negative one); else note + arp.
-  const arpNv = (nv: number, v: number) =>
-    v >= 0 && v & 0x40000000 ? v & ~0x40000000 : v < 0 && !(v & 0x40000000) ? v | 0x40000000 : nv + v;
   const noiseReg = (n: number) => (properNoise ? n & 31 : NOISE_FREQ[((n % 12) + 12) % 12]);
   const envIdx = (i: number, what: string) => { if (i < 0xff) return i; lossy.add(`more than 255 ${what} envelopes (envelope dropped)`); return 0xff; };
   // Furnace's PCE period for a (fractional) note value; calcBaseFreq, tuning at value 45.
