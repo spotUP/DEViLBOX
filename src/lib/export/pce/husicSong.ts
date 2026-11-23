@@ -532,7 +532,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     rom.fill(0, cb + at, cb + at + max + 1);
     rom.set(t, cb + at);
   };
-  text(m.name, 0, 12); // LL0+0 and LL0+13 are the two strings the player screen prints
-  text(m.author, 13, 11);
+  text(m.name, 0, 12); // LL0+0 and LL0+25 (19 chars + NUL, reserved after the 'SELECT SONG' string) are the two strings the player screen prints
+  text(m.author, 25, 19);
   return { rom, lossy: lossy.list(), frames: endFrame, loopFrame };
 }

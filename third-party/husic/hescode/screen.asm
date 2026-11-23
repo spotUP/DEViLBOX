@@ -193,25 +193,38 @@ s_init:
 	  cla
 	  sta	s_title,y
 .cd:	  cly
-.ca:	  lda	LL0+13,y
+.ca:	  lda	LL0+25,y
 	  sta	s_author,y
 	  beq	.ad
 	  iny
-	  cpy	#11
+	  cpy	#19
 	  bne	.ca
 	  cla
 	  sta	s_author,y
 .ad:	  stz	s_len
 	  stw	#s_title,<_si
 	  jsr	s_app
+	  lda	s_author
+	  beq	.nb
 	  stw	#s_by,<_si
 	  jsr	s_app
 	  stw	#s_author,<_si
 	  jsr	s_app
+.nb:
 	  stw	#s_sep,<_si
 	  jsr	s_app
 	  stz	s_sp
 	  stz	s_sd
+	  stz	scroll_xl
+	  stz	scroll_xh
+	  stz	scroll_yh
+	  lda	#208
+	  sta	scroll_yl
+	  sta	scroll_top
+	  lda	#224
+	  sta	scroll_bottom
+	  lda	#$C1
+	  sta	scroll_cr
 	  stz	s_f
 	  stz	s_sec
 	  stz	s_min
@@ -224,8 +237,11 @@ s_init:
 	  ; static text
 	  stxt	1,1,3,s_logo
 	  stxt	10,1,0,s_title
+	  lda	s_author
+	  beq	.nb2
 	  stxt	10,2,1,s_by2
 	  stxt	13,2,1,s_author
+.nb2:
 	  stxt	1,3,2,s_chip
 	  stxt	22,3,1,s_plat
 	  stxt	23,24,0,s_song
@@ -382,23 +398,27 @@ s_frame:
 	  jsr	s_chr
 	  lda	s_sec
 	  jsr	s_two
-	  inc	s_sd
+	  ; smooth scroll: one pixel per frame through BXR via a raster split at the scroll row (scanline 208);
+	  ; the row is redrawn (33 cells from column 0) only when a whole cell has passed.
 	  lda	s_sd
-	  cmp	#6
-	  bcc	.sk
-	  stz	s_sd
+	  inc	A
+	  and	#7
+	  sta	s_sd
+	  sta	scroll_xl
+	  stz	scroll_xh
+	  bne	.rt
 	  inc	s_sp
 	  lda	s_sp
 	  cmp	s_len
-	  bcc	.sk
+	  bcc	.dr
 	  stz	s_sp
-.sk:	  ldx	#1
+.dr:	  ldx	#0
 	  lda	#26
 	  jsr	s_at
 	  lda	#$10
 	  sta	s_pal
 	  ldy	s_sp
-	  ldx	#30
+	  ldx	#33
 .sc:	  lda	s_msg,y
 	  jsr	s_chr
 	  iny
@@ -407,7 +427,7 @@ s_frame:
 	  cly
 .ok:	  dex
 	  bne	.sc
-	  rts
+.rt:	  rts
 
 s_logo:	.db "DEVILBOX",0
 s_by:	.db " BY ",0
