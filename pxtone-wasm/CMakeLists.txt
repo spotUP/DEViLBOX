@@ -42,12 +42,12 @@ set_target_properties(Pxtone PROPERTIES
 target_link_options(Pxtone PRIVATE
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createPxtone'"
-    "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_pxtone_init','_pxtone_stop','_pxtone_render','_pxtone_get_sample_rate','_pxtone_set_channel_gain','_pxtone_get_num_units']"
+    "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_pxtone_init','_pxtone_stop','_pxtone_render','_pxtone_get_sample_rate','_pxtone_set_channel_gain','_pxtone_get_num_units','_pxtone_get_event_count','_pxtone_get_event','_pxtone_add_event','_pxtone_remove_event','_pxtone_set_event','_pxtone_write','_pxtone_write_data']"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32','HEAPU8','wasmMemory']"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s INITIAL_MEMORY=16777216"
     "SHELL:-s STACK_SIZE=1048576"
-    "SHELL:-s ENVIRONMENT='web,worker'"
+    "SHELL:-s ENVIRONMENT='web,worker,node'"
     "SHELL:-s NO_EXIT_RUNTIME=1"
     "SHELL:-s SINGLE_FILE=0"
 )

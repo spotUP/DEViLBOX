@@ -28,6 +28,7 @@ struct PxToneMemFile {
     const uint8_t *data;
     int32_t size;
     int32_t pos;
+    int32_t cap; /* >0 only for the growable write buffer (data is then malloc'd) */
 };
 
 static bool pxtone_io_read(void *user, void *p_dst, int32_t size, int32_t num) {
@@ -40,8 +41,21 @@ static bool pxtone_io_read(void *user, void *p_dst, int32_t size, int32_t num) {
 }
 
 static bool pxtone_io_write(void *user, const void *p_src, int32_t size, int32_t num) {
-    (void)user; (void)p_src; (void)size; (void)num;
-    return false; /* read-only */
+    auto *mf = (PxToneMemFile *)user;
+    if (mf->cap <= 0) return false; /* the source file is read-only */
+    int32_t total = size * num;
+    if (mf->pos + total > mf->cap) {
+        int32_t ncap = mf->cap * 2;
+        while (ncap < mf->pos + total) ncap *= 2;
+        void *nb = realloc((void *)mf->data, (size_t)ncap);
+        if (!nb) return false;
+        mf->data = (uint8_t *)nb;
+        mf->cap = ncap;
+    }
+    memcpy((uint8_t *)mf->data + mf->pos, p_src, (size_t)total);
+    mf->pos += total;
+    if (mf->pos > mf->size) mf->size = mf->pos;
+    return true;
 }
 
 static bool pxtone_io_seek(void *user, int32_t mode, int32_t val) {
@@ -67,6 +81,9 @@ static pxtnService *g_pxtn = nullptr;
 static PxToneMemFile g_memfile;
 static uint8_t *g_file_data = nullptr;
 static bool g_playing = false;
+static bool g_is_tune = false;     /* source was .pttune (PTTUNE header) */
+static uint16_t g_exe_ver = 0;     /* source's exe version, written back verbatim */
+static PxToneMemFile g_outfile;    /* last pxtone_write result */
 
 /* Temporary buffer for S16 -> F32 conversion */
 #define CONV_BUF_FRAMES 512
@@ -131,6 +148,8 @@ EXPORT int pxtone_init(const uint8_t *data, uint32_t size) {
     if (!g_file_data) return -1;
     memcpy(g_file_data, data, size);
 
+    g_is_tune = size >= 18 && memcmp(data, "PTTUNE", 6) == 0;
+    g_exe_ver = size >= 18 ? (uint16_t)(data[16] | (data[17] << 8)) : 0; /* _VERSIONSIZE = 16 */
     g_memfile.data = g_file_data;
     g_memfile.size = (int32_t)size;
     g_memfile.pos = 0;
@@ -234,3 +253,46 @@ EXPORT int pxtone_render(float *buf, int frames) {
 EXPORT int pxtone_get_sample_rate(void) {
     return PXTONE_SAMPLE_RATE;
 }
+
+/* ---- Event access (EVERECORD: clock, unit, kind, value) ---- */
+
+EXPORT int pxtone_get_event_count(void) {
+    return g_pxtn ? g_pxtn->evels->get_Count() : 0;
+}
+
+/* out[0..3] = clock, unit_no, kind, value of the i-th event in clock order; 0 ok, -1 out of range */
+EXPORT int pxtone_get_event(int i, int32_t *out) {
+    if (!g_pxtn || i < 0) return -1;
+    const EVERECORD *r = g_pxtn->evels->get_Records();
+    for (; r && i > 0; r = r->next) i--;
+    if (!r) return -1;
+    out[0] = r->clock; out[1] = r->unit_no; out[2] = r->kind; out[3] = r->value;
+    return 0;
+}
+
+EXPORT int pxtone_add_event(int clock, int unit, int kind, int value) {
+    return g_pxtn && g_pxtn->evels->Record_Add_i(clock, (uint8_t)unit, (uint8_t)kind, value) ? 0 : -1;
+}
+
+/* Remove every event at this clock with this unit and kind; returns the number removed. */
+EXPORT int pxtone_remove_event(int clock, int unit, int kind) {
+    return g_pxtn ? g_pxtn->evels->Record_Delete(clock, clock + 1, (uint8_t)unit, (uint8_t)kind) : 0;
+}
+
+/* Change the value of the events at this clock/unit/kind; returns the number changed. */
+EXPORT int pxtone_set_event(int clock, int unit, int kind, int value) {
+    return g_pxtn ? g_pxtn->evels->Record_Value_Set(clock, clock + 1, (uint8_t)unit, (uint8_t)kind, value) : 0;
+}
+
+/* ---- Serialize with pxtnService::write (same container kind and exe version as the source) ---- */
+
+EXPORT int pxtone_write(void) {
+    if (!g_pxtn) return -1;
+    free((void *)g_outfile.data);
+    g_outfile.cap = 1 << 16; g_outfile.pos = 0; g_outfile.size = 0;
+    g_outfile.data = (uint8_t *)malloc((size_t)g_outfile.cap);
+    if (!g_outfile.data) return -2;
+    pxtnERR err = g_pxtn->write(&g_outfile, g_is_tune, g_exe_ver);
+    return err == pxtnOK ? g_outfile.size : -3 - (int)err;
+}
+EXPORT const uint8_t *pxtone_write_data(void) { return g_outfile.data; }
