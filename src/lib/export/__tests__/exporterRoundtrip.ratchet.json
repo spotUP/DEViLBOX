@@ -906,11 +906,11 @@
     },
     "sonicArranger": {
       "exporter": "SonicArrangerExporter.exportSonicArranger",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 8320,
-      "bytes": 113990
+      "cells": 93062,
+      "bytes": 93062
     },
     "sonicArrangerSas": {
       "exporter": "SpeedyA1Exporter.exportSpeedyA1",
