@@ -177,9 +177,12 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     }
     return insFrames.get(k);
   };
-  const volCode = (insIdx: number, chanVol: number): number => {
-    const f = framesOf(insIdx, MACRO_VOL, 'volume');
-    if (!f) return 0x80 | chanVol;
+  // elapsed: frames since the note started. A volume column change on a held note rescales the macro where it is
+  // running (Furnace keeps the macro position), it does not restart it.
+  const volCode = (insIdx: number, chanVol: number, elapsed = 0): number => {
+    const f0 = framesOf(insIdx, MACRO_VOL, 'volume');
+    if (!f0) return 0x80 | chanVol;
+    const f = shiftFrames(f0, elapsed);
     const i = volEnv.level({ vals: f.vals.map((v) => scale(chanVol, Math.max(0, Math.min(31, v)))), loop: f.loop });
     if (i >= 0x80) { lossy.add('more than 128 volume envelopes (fixed volume used)'); return 0x80 | chanVol; }
     return i;
@@ -230,7 +233,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   for (let ch = 0; ch < CHANNELS; ch++) {
     const evs: Ev[] = [{ frame: 0, kind: 'off', cmds: [] }];
     if (loopFrame > 0) evs.push({ frame: loopFrame, kind: 'mark', cmds: [] });
-    let ins = -1, chanVol = 31, arpFx = 0, waveFx = 0, noiseFx = false;
+    let ins = -1, chanVol = 31, noteFrame = 0, arpFx = 0, waveFx = 0, noiseFx = false;
     // Furnace volume slide (0Axy, playback.cpp): volume is kept << 8, volSpeed = x*64 up / -y*64 down per tick.
     let volFine = 31 << 8, volSpeed = 0;
     // Tone portamento (03xx): Furnace slides baseFreq by speed per tick (linear pitch: speed*pitchSlideSpeed / 128
@@ -298,7 +301,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         glideFrom = curNv; glideTo = nv; glideStart = at; curNv = nv;
         if (resetAtTarget) portaDone = fa;
       } else if (nv >= 0 && nv < 253) {
-        curNv = nv; toneOn = !(ch >= 4 && noiseFx);
+        curNv = nv; toneOn = !(ch >= 4 && noiseFx); noteFrame = at;
         const insIdx = Math.max(0, ins);
         const wf = framesOf(insIdx, MACRO_WAVE, 'wave');
         const wave = wf && new Set(wf.vals).size > 1 ? -1 - waveEnv.level(wf) : wf ? wf.vals[0] : waveFx;
@@ -331,7 +334,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         }
         noteTick = delay;
       } else if (nv === 253) { dropSnap(at); toneOn = false; evs.push({ frame: at, kind: 'off', cmds }); }
-      else if (cmds.length || volChanged) evs.push({ frame: at, kind: 'cont', cmds, vol: volChanged ? volCode(Math.max(0, ins), chanVol) : undefined });
+      else if (cmds.length || volChanged) evs.push({ frame: at, kind: 'cont', cmds, vol: volChanged ? volCode(Math.max(0, ins), chanVol, Math.max(0, at - noteFrame)) : undefined });
       // Furnace keeps an 01/02 slide (portaSpeed) running into later notes (each restarts from its own pitch); only an
       // E1/E2 note slide, whose target belongs to the old note, ends with a new note here.
       if (noteTick >= 0 && !slideSet && slideTo !== undefined) slide = 0;
