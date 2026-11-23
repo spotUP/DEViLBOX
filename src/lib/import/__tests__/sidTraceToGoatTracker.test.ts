@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { traceSid, type SidTrace } from '../formats/SIDParser';
 import { sidTraceToGoatTracker } from '../formats/sidTraceToGoatTracker';
 import { parseGoatTrackerSng, writeGoatTrackerSng } from '../formats/GoatTrackerSid';
-import type { VoiceFrame } from '../formats/sidTraceDecode';
+import { segmentNotes, type VoiceFrame } from '../formats/sidTraceDecode';
 
 const CLOCK = 985248;
 /** SID freq value for a MIDI note at the PAL clock. */
@@ -98,5 +98,17 @@ describe('sidTraceToGoatTracker', () => {
       const entries = order.filter((_, k) => k < order.length - 2);
       expect(entries.length * patRows).toBeGreaterThanOrEqual(r.rows);
     }
+  });
+});
+
+describe('segmentNotes restrike', () => {
+  it('starts a note at each held pitch under one held gate', () => {
+    const midis = [48, 55, 52, 60];
+    const frames: VoiceFrame[] = [];
+    for (const m of midis) for (let i = 0; i < 400; i++) frames.push(frame({ freq: freqOf(m), control: 0x41, ad: 0x08, sr: 0xf0 }));
+    for (let i = 0; i < 4000; i++) frames.push(frame({ freq: freqOf(60), control: 0x41, ad: 0x08, sr: 0xf0 }));
+    const notes = segmentNotes([frames], CLOCK);
+    expect(notes.map((n) => n.start)).toEqual([0, 400, 800, 1200]);
+    expect(notes.slice(1).every((n) => n.restrike)).toBe(true);
   });
 });

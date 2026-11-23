@@ -42,6 +42,8 @@ export interface DecodedNote {
    * pulse and envelope run on across them (a GoatTracker KEYOFF then KEYON).
    */
   regates: Array<{ off: number; on: number }>;
+  /** Started by a pitch change under a held gate, not a gate rise. */
+  restrike?: boolean;
 }
 
 export interface SoundProgram {
@@ -104,6 +106,13 @@ function programOf(frames: VoiceFrame[], start: number, end: number): SoundProgr
   };
 }
 
+/** Frames a new pitch must hold, gate still on, to start a note without a gate rise. */
+const RESTRIKE_HOLD = 10;
+/** A voice with fewer gate rises than one per this many frames plays by pitch changes under a held gate. */
+const RESTRIKE_MIN_FRAMES_PER_RISE = 300;
+/** Held-gate pitch changes denser than one per this many frames are not split. */
+const RESTRIKE_MAX_FRAMES_PER_NOTE = 400;
+
 /** Frames before a gate rise whose steps bound a continuing modulation. */
 const CONTINUE_WINDOW = 4;
 
@@ -156,8 +165,15 @@ export function segmentNotes(voices: VoiceFrame[][], clock: number): DecodedNote
   const tuning = recoverTuning(voices, clock);
   const notes: DecodedNote[] = [];
   voices.forEach((frames, voice) => {
+    const segment = (restrikes: boolean): DecodedNote[] => {
+    const notes: DecodedNote[] = [];
     let open: DecodedNote | null = null;
     let last: DecodedNote | null = null;
+    let heardNote = 0;
+    let rises = 0;
+    for (let f = 1; f < frames.length; f++) if ((frames[f].control & 1) && !(frames[f - 1].control & 1)) rises++;
+    // Arpeggios hold each pitch a few frames too: only a voice that rarely re-gates is split by pitch.
+    const gateHeldStyle = restrikes && rises * RESTRIKE_MIN_FRAMES_PER_RISE <= frames.length;
     for (let f = 0; f < frames.length; f++) {
       const gate = (frames[f].control & 1) !== 0;
       const prevGate = f > 0 && (frames[f - 1].control & 1) !== 0;
@@ -178,11 +194,37 @@ export function segmentNotes(voices: VoiceFrame[][], clock: number): DecodedNote
         };
         notes.push(open);
         last = open;
+        heardNote = note;
+      } else if (gateHeldStyle && gate && open && f >= open.start + RESTRIKE_HOLD) {
+        // Restrike: a pitch held RESTRIKE_HOLD frames on a different semitone with the gate held is a new
+        // note (MagSID Retriggers/Restrikes idea); vibrato and glides never hold a settled pitch.
+        const fq = frames[f].freq;
+        let held = fq !== 0 && frames[f - RESTRIKE_HOLD].freq !== fq;
+        for (let k = 1; held && k < RESTRIKE_HOLD; k++) held = frames[f - k].freq === fq;
+        const nn = held ? noteFromFreq(fq, clock, tuning) : 0;
+        if (nn > 0 && nn !== heardNote) {
+          const start = f - RESTRIKE_HOLD + 1;
+          open.end = start;
+          open = {
+            voice, start, end: null, note: nn, signature: '', instrument: 0,
+            frame: frames[f], program: programOf(frames, start, frames.length), regates: [], restrike: true,
+          };
+          notes.push(open);
+          last = open;
+          heardNote = nn;
+        }
       } else if (!gate && prevGate && open) {
         open.end = f;
         open = null;
       }
     }
+    return notes;
+    };
+    const plain = segment(true);
+    // Too many pitch changes is a running melody the converter cannot hold legato (a restarted envelope
+    // misses more than the note count gains): keep the gate rises only.
+    const split = plain.filter((n) => n.restrike).length;
+    notes.push(...(split * RESTRIKE_MAX_FRAMES_PER_NOTE > frames.length ? segment(false) : plain));
   });
   // Re-read each program up to its own end, and the filter route of its voice.
   for (const n of notes) {
@@ -248,12 +290,16 @@ function bestPhase(starts: number[], a: number): { phase: number; aligned: numbe
   return { phase: best, aligned: near(best) };
 }
 
+const MIN_RISES_FOR_GRID = 20;
+
 /**
  * Longest row length (up to 16 frames) that puts nine note starts in ten on a
  * row; 1 when none does. Starts are the gate rises of every voice.
  */
 export function fitGrid(notes: DecodedNote[]): RowGrid {
-  const starts = notes.map((n) => n.start).sort((x, y) => x - y);
+  // Restrikes follow the player's own timing, not the row grid: fit on gate rises when there are enough.
+  const rises = notes.filter((n) => !n.restrike);
+  const starts = (rises.length >= MIN_RISES_FOR_GRID ? rises : notes).map((n) => n.start).sort((x, y) => x - y);
   if (starts.length === 0) return { framesPerRow: 6, origin: 0 };
   for (let a = 16; a >= 2; a--) {
     const { phase, aligned } = bestPhase(starts, a);
