@@ -42,7 +42,8 @@ def effect_names(cells):
     return out
 
 
-def main(src_path, out_path):
+def main(src_path, out_path, nch=8, layers=None, title=b' pt4 echo'):
+    """nch > 8 writes a wide module; layers(locals) fills echo[8..nch-1] and returns extra samples (make-pt4-showcase.py)."""
     d = open(src_path, 'rb').read()
     assert d[1080:1084] == b'M.K.', 'source must be a 4-channel M.K. module'
     songlen = d[950]
@@ -79,8 +80,8 @@ def main(src_path, out_path):
     T = len(tl)
 
     # Echo cells [sample, period, effect, param] per echo channel and timeline row.
-    echo = {ch: [None] * T for ch in range(4, 8)}
-    cur = {ch: [0] * T for ch in range(4, 8)}                      # source sample (1-based) sounding on the echo channel
+    echo = {ch: [None] * T for ch in range(4, nch)}
+    cur = {ch: [0] * T for ch in range(4, nch)}                      # source sample (1-based) sounding on the echo channel
     for k in range(4):
         ech, smp, playing = ECHO_CH[k], 0, 0
         for t, (pos, row) in enumerate(tl):
@@ -105,6 +106,11 @@ def main(src_path, out_path):
             cur[ech][u] = playing and playing - 31
         for t in range(1, T):
             cur[ech][t] = cur[ech][t] or cur[ech][t - 1]
+
+    # Extra samples [(30-byte header, data + envelope)]: first into the free slots up to 31, the rest behind the echo copies.
+    free_slots = list(range(used + 1, 32)) + list(range(32 + used, 64))
+    extra = layers(locals()) if layers else []
+    assert len(extra) <= len(free_slots), 'more extra samples than free slots'
 
     # --- effect placement on the echo channels -------------------------------------------------------------
     def cell(ch, t):
@@ -190,22 +196,26 @@ def main(src_path, out_path):
         echo[ch][t][1] = 1712
 
     # --- write ---------------------------------------------------------------------------------------------
-    pats = bytearray(songlen * 2048)
+    rowlen, tag = nch * 4, b'8CHN' if nch == 8 else b'%dCH' % nch
+    pats = bytearray(songlen * 64 * rowlen)
     for pos, pat in enumerate(order):
         for row in range(64):
             for ch in range(4):
-                o = pos * 2048 + row * 32 + ch * 4
+                o = (pos * 64 + row) * rowlen + ch * 4
                 pats[o:o + 4] = src_cell(pat, row, ch)
-    for ch in range(4, 8):
+    for ch in range(4, nch):
         for t, c in enumerate(echo[ch]):
             if c:
                 s, per, e, p = c
-                o = tl[t][0] * 2048 + tl[t][1] * 32 + ch * 4
+                o = (tl[t][0] * 64 + tl[t][1]) * rowlen + ch * 4
                 pats[o:o + 4] = bytes([(s & 0xF0) | per >> 8, per & 255, (s & 15) << 4 | e, p])
 
     out = bytearray(d[:950])
-    out[:20] = (name_of_song(d) + b' pt4 echo').ljust(20, b'\0')[:20]
-    out += bytes([songlen, 0x7F]) + bytes(range(songlen)).ljust(128, b'\0') + b'8CHN' + pats + b''.join(data)
+    out[:20] = (name_of_song(d) + title).ljust(20, b'\0')[:20]
+    for i, (h, body) in enumerate(extra[:31 - used]):
+        out[20 + 30 * (used + i):50 + 30 * (used + i)] = h
+        data[used + i] = body
+    out += bytes([songlen, 0x7F]) + bytes(range(songlen)).ljust(128, b'\0') + tag + pats + b''.join(data)
     xh, xd = b'', b''
     for n in range(used):
         ln, ft, vol, rep, replen = info[n]
@@ -219,13 +229,16 @@ def main(src_path, out_path):
             ft |= 0x80
         xh += (b'echo ' + hdr[n][:22].rstrip(b'\0')).ljust(22, b'\0')[:22] + struct.pack('>HBBHH', ln, ft, (vol + 1) // 2, rep, replen)
         xd += body
-    out += b'PT4X' + struct.pack('>I', used) + xh + xd
+    for h, body in extra[31 - used:]:
+        xh += h
+        xd += body
+    out += b'PT4X' + struct.pack('>I', len(xh) // 30) + xh + xd
     out += b'PT41' + struct.pack('>HH', 0x0412, 7)                 # footer: 8xy sub-effects, PT4X block, DYN envelope
     open(out_path, 'wb').write(out)
 
     # Self-check on the bytes written: every effect is there, and the echo really is the source DELAY rows later.
     w = bytes(out)
-    cells = [w[1084 + i:1088 + i] for i in range(0, songlen * 2048, 4)]
+    cells = [w[1084 + i:1088 + i] for i in range(0, len(pats), 4)]
     census = effect_names(cells)
     missing = [k for k in REQUIRED if k not in census]
     assert not missing, 'effects missing from the written song: %s' % missing
@@ -233,9 +246,10 @@ def main(src_path, out_path):
                  if (src_cell(order[tl[t][0]], tl[t][1], k)[0] & 15) << 8 | src_cell(order[tl[t][0]], tl[t][1], k)[1]
                  and cell(ECHO_CH[k], t + DELAY)[1])
     assert echoed > 100, 'echo channels carry too few of the source notes'
-    print('%s: 8CHN, %d positions, %d rows played, %d echo notes, %d bytes' % (out_path, songlen, T, echoed, len(out)))
+    print('%s: %s, %d positions, %d rows played, %d echo notes, %d bytes' % (out_path, tag.decode(), songlen, T, echoed, len(out)))
     print('samples 1-%d source, 32-%d echo copies at half volume, DYN envelope on %d' % (used, 31 + used, 32 + name.index(DYN_SAMPLE)))
     print('effects: ' + ' '.join('%s=%d' % (k, census[k]) for k in REQUIRED))
+    return w
 
 
 def name_of_song(d):
