@@ -13,9 +13,20 @@ import {
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
 
+/** Flat events: 4 int32 per record (clock, unit, kind, value), clock order. */
+export interface PxtoneEvents {
+  events: Int32Array;
+  beatClock: number;
+  beatTempo: number;
+  beatNum: number;
+}
+
 export class PxtoneEngine extends WASMSingletonBase {
   private static instance: PxtoneEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+
+  private _eventsWaiter: ((r: PxtoneEvents) => void) | null = null;
+  private _setWaiter: ((added: number) => void) | null = null;
 
   private constructor() {
     super();
@@ -71,6 +82,16 @@ export class PxtoneEngine extends WASMSingletonBase {
           console.log('[PxtoneEngine] Module loaded');
           break;
 
+        case 'events':
+          this._eventsWaiter?.({ events: data.events, beatClock: data.beatClock, beatTempo: data.beatTempo, beatNum: data.beatNum });
+          this._eventsWaiter = null;
+          break;
+
+        case 'eventsSet':
+          this._setWaiter?.(data.added);
+          this._setWaiter = null;
+          break;
+
         case 'error':
           console.error('[PxtoneEngine]', data.message);
           this.failModuleLoad(String(data.message ?? 'module load failed'));
@@ -114,6 +135,23 @@ export class PxtoneEngine extends WASMSingletonBase {
   setMuteMask(mask: number): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
+  async getEvents(): Promise<PxtoneEvents> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('PxtoneEngine not initialized');
+    const reply = new Promise<PxtoneEvents>((res) => { this._eventsWaiter = res; });
+    this.workletNode.port.postMessage({ type: 'getEvents' });
+    return reply;
+  }
+
+  /** Live swap: replaces the whole event list and keeps playing from the current clock. Resolves with the number added. */
+  async setEvents(events: Int32Array): Promise<number> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('PxtoneEngine not initialized');
+    const reply = new Promise<number>((res) => { this._setWaiter = res; });
+    this.workletNode.port.postMessage({ type: 'setEvents', events });
+    return reply;
   }
 
   override dispose(): void {

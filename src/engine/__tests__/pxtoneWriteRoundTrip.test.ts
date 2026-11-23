@@ -81,3 +81,32 @@ describe('pxtone write round trip', () => {
     expect(events().length).toBe(base.length);
   });
 });
+
+describe('pxtone stage 2: beat clock and live set_events', () => {
+  it('reads the beat clock and swaps the event list', () => {
+    load(src);
+    const m = b.module as PxModule & {
+      _pxtone_get_beat_clock: () => number; _pxtone_get_beat_num: () => number;
+      _pxtone_set_events: (p: number, n: number) => number;
+    };
+    expect(m._pxtone_get_beat_clock()).toBeGreaterThan(0);
+    expect(m._pxtone_get_beat_num()).toBeGreaterThan(0);
+    const base = events();
+    const edited = base.map((e) => [...e]);
+    const ei = edited.findIndex((e) => e[2] === 6 /* PORTAMENT */) >= 0 ? edited.findIndex((e) => e[2] === 6) : 0;
+    edited[ei][3] += 1;
+    edited.push([1, 0, 6, 4242]);
+    edited.sort((a, c) => a[0] - c[0]);
+    const flat = new Int32Array(edited.flat());
+    const p = m._malloc(flat.byteLength);
+    new Int32Array(b.heap().buffer, p, flat.length).set(flat);
+    expect(m._pxtone_set_events(p, edited.length)).toBe(edited.length);
+    m._free(p);
+    const after = events();
+    expect(after.length).toBe(base.length + 1);
+    expect(after).not.toEqual(base);
+    expect(after.some((e) => e[0] === 1 && e[3] === 4242)).toBe(true);
+    load(written());
+    expect(events().length).toBe(after.length);
+  });
+});

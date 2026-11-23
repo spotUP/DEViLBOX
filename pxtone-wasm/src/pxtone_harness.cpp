@@ -296,3 +296,35 @@ EXPORT int pxtone_write(void) {
     return err == pxtnOK ? g_outfile.size : -3 - (int)err;
 }
 EXPORT const uint8_t *pxtone_write_data(void) { return g_outfile.data; }
+
+/* ---- Beat clock (master) ---- */
+
+EXPORT int pxtone_get_beat_clock(void) { return g_pxtn ? g_pxtn->master->get_beat_clock() : 0; }
+EXPORT float pxtone_get_beat_tempo(void) { return g_pxtn ? g_pxtn->master->get_beat_tempo() : 0.0f; }
+EXPORT int pxtone_get_beat_num(void) { return g_pxtn ? g_pxtn->master->get_beat_num() : 0; }
+EXPORT int pxtone_get_now_clock(void) { return g_pxtn ? g_pxtn->moo_get_now_clock() : 0; }
+
+/*
+ * Live swap: replace the whole event list with n records of 4 int32 (clock, unit, kind, value)
+ * and re-prepare playback at the clock now playing. Returns the number of events added
+ * (less than n if the allocated event capacity ran out).
+ */
+EXPORT int pxtone_set_events(const int32_t *rec, int n) {
+    if (!g_pxtn) return -1;
+    int32_t now = g_pxtn->moo_get_now_clock();
+    g_pxtn->evels->Clear();
+    int added = 0;
+    for (int i = 0; i < n; i++, rec += 4)
+        if (g_pxtn->evels->Record_Add_i(rec[0], (uint8_t)rec[1], (uint8_t)rec[2], rec[3])) added++;
+
+    float tempo = g_pxtn->master->get_beat_tempo();
+    int32_t bclock = g_pxtn->master->get_beat_clock();
+    pxtnVOMITPREPARATION prep;
+    memset(&prep, 0, sizeof(prep));
+    prep.flags = pxtnVOMITPREPFLAG_loop | pxtnVOMITPREPFLAG_unit_mute;
+    if (tempo > 0 && bclock > 0)
+        prep.start_pos_sample = (int32_t)((double)now * 60.0 * PXTONE_SAMPLE_RATE / ((double)tempo * bclock));
+    prep.master_volume = 0.8f;
+    if (!g_pxtn->moo_preparation(&prep)) return -2;
+    return added;
+}

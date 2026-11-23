@@ -102,6 +102,43 @@ class PxtoneProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'getEvents': {
+        // Reply: flat Int32Array of (clock, unit, kind, value) in clock order, plus the beat clock.
+        const m = this.module;
+        if (!m || typeof m._pxtone_get_event_count !== 'function') {
+          this.port.postMessage({ type: 'error', message: 'Pxtone player not initialised' });
+          break;
+        }
+        const n = m._pxtone_get_event_count();
+        const out = m._malloc(16);
+        const flat = new Int32Array(n * 4);
+        for (let i = 0; i < n; i++) {
+          m._pxtone_get_event(i, out);
+          flat.set(new Int32Array(m.HEAPU8.buffer, out, 4), i * 4);
+        }
+        m._free(out);
+        this.port.postMessage({
+          type: 'events', events: flat,
+          beatClock: m._pxtone_get_beat_clock(), beatTempo: m._pxtone_get_beat_tempo(), beatNum: m._pxtone_get_beat_num(),
+        }, [flat.buffer]);
+        break;
+      }
+
+      case 'setEvents': {
+        const m = this.module;
+        if (!m || typeof m._pxtone_set_events !== 'function') {
+          this.port.postMessage({ type: 'error', message: 'Pxtone player not initialised' });
+          break;
+        }
+        const flat = new Int32Array(data.events);
+        const ptr = m._malloc(Math.max(16, flat.byteLength));
+        new Int32Array(m.HEAPU8.buffer, ptr, flat.length).set(flat);
+        const added = m._pxtone_set_events(ptr, flat.length / 4);
+        m._free(ptr);
+        this.port.postMessage({ type: 'eventsSet', added });
+        break;
+      }
+
       case 'dispose':
         this.cleanup();
         break;
