@@ -111,6 +111,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   ashleyHogg: 'public/data/songs/ashley-hogg/ash.nobby the aardvark',
   krisHatlelid: 'public/data/songs/kris-hatlelid/fiendish freddys - songs.kh',
   seanConnolly: 'public/data/songs/sean-connolly/surf ninjas.scn',
+  seanConran: 'public/data/songs/formats/count_duckula.scr',
   jasonBrooke: 'public/data/songs/jason-brooke/ikari warriors.jb',
   mikeDavies: 'public/data/songs/mike-davies/strider.md',
   scumm: 'public/data/songs/formats/zaktitle.scumm',

@@ -576,6 +576,14 @@
       "matchPct": 1,
       "cells": 12
     },
+    "seanConran": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 18
+    },
     "sidmon1": {
       "kind": "fixed",
       "method": "decode-encode",

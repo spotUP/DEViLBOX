@@ -28,7 +28,10 @@
  *     u32BE(pos) != 0x7F7F7F7F  AND  u16BE(pos) != 0xFFFF
  *     Advance pos by 2 each iteration.
  *
- * UADE handles actual audio playback. This parser extracts metadata only.
+ * The grid: nuade's build pick (nw_scr_layout, by the hash of the replayer's 68000 code) names the command
+ * table and track lists; seanConranGrid.ts decodes every command stream into byte-exact carrier rows and lays the
+ * voices on one tick timeline (docs/FORMAT_COMMAND_STREAM_GRID.md). A module whose build nuade does not know gets
+ * metadata only, with gridUnmatchedReason set. Playback is the vendored player, never this grid.
  *
  * References:
  *   third-party/uade-3.05/amigasrc/players/wanted_team/SeanConran/
@@ -36,9 +39,11 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import type { InstrumentConfig, Pattern } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { seanConranEncoder } from '@/engine/uade/encoders/SeanConranEncoder';
+import { scrLayout } from '@/engine/nuade/nuadeScrLayout';
+import { buildScrGrid, SCR_ROWS_PER_PATTERN } from './seanConranGrid';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -117,14 +122,8 @@ export function isSeanConranFormat(buf: Uint8Array): boolean {
 // ── Main parser ────────────────────────────────────────────────────────────
 
 /**
- * Parse a Sean Conran module file into a TrackerSong.
- *
- * Sean Conran modules are compiled 68k Amiga executables combining the player
- * code with music and sample data. There is no public specification of the
- * internal binary layout beyond what the DTP_Check2 detection code reveals.
- *
- * This parser creates a metadata-only TrackerSong with placeholder instruments.
- * Actual audio playback is always delegated to UADE.
+ * Parse a Sean Conran module into a TrackerSong: subsong 0 as a tick grid (one row per player tick), each note
+ * cell paired with the file offset of its pitch byte (`noteBytes`) for SeanConranExporter.
  *
  * @param buffer   Raw file bytes (ArrayBuffer)
  * @param filename Original filename (used to derive the module name)
@@ -134,95 +133,93 @@ export async function parseSeanConranFile(
   filename: string,
 ): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
-
-  if (!isSeanConranFormat(buf)) {
-    throw new Error('Not a Sean Conran module');
-  }
-
-  // ── Module name from filename ─────────────────────────────────────────────
+  if (!isSeanConranFormat(buf)) throw new Error('Not a Sean Conran module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  // Strip "SCR." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^scr\./i, '') || baseName;
+  const moduleName = baseName.replace(/^scr\./i, '').replace(/\.scr$/i, '') || baseName;
+  const layout = await scrLayout(buf);
+  const grid = layout && layout.trackLists.length > 0 ? buildScrGrid(buf, layout, 0) : null;
 
-  // ── Instrument placeholders ──────────────────────────────────────────────
+  const instruments: InstrumentConfig[] = Array.from({ length: grid?.instrumentCount ?? 1 }, (_, i) => ({
+    id: i + 1,
+    name: '',
+    type: 'sample' as const,
+    synthType: 'Sampler' as const,
+    effects: [],
+    volume: -6,
+    pan: 0,
+  } as InstrumentConfig));
 
-  const NUM_PLACEHOLDER_INSTRUMENTS = 8;
-  const instruments: InstrumentConfig[] = [];
+  const blankRow = () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+  const ticks = grid?.ticks ?? SCR_ROWS_PER_PATTERN;
+  const patternCount = Math.max(1, Math.ceil(ticks / SCR_ROWS_PER_PATTERN));
+  const patterns: Pattern[] = Array.from({ length: patternCount }, (_, p) => {
+    const length = Math.min(SCR_ROWS_PER_PATTERN, ticks - p * SCR_ROWS_PER_PATTERN);
+    return {
+      id: `pattern-${p}`,
+      name: `Pattern ${p}`,
+      length,
+      channels: Array.from({ length: 4 }, (_, ch) => ({
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: (ch === 0 || ch === 3) ? -50 : 50,
+        instrumentId: null,
+        color: null,
+        rows: Array.from({ length }, (_, r) => {
+          const cell = grid?.timeline[ch][p * SCR_ROWS_PER_PATTERN + r];
+          return cell ? { ...cell } : blankRow();
+        }),
+      })),
+    };
+  });
 
-  for (let i = 0; i < NUM_PLACEHOLDER_INSTRUMENTS; i++) {
-    instruments.push({
-      id: i + 1,
-      name: '',
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
-    } as InstrumentConfig);
-  }
-
-  // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
-
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
-
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: (ch === 0 || ch === 3) ? -50 : 50,
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: 1,
-      originalInstrumentCount: NUM_PLACEHOLDER_INSTRUMENTS,
-    },
-  };
-
-  return {
+  const song: TrackerSong = {
     name: `${moduleName} [Sean Conran]`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions: patterns.map((_, i) => i),
+    songLength: patterns.length,
     restartPosition: 0,
     numChannels: 4,
-    initialSpeed: 6,
+    initialSpeed: 1,
     initialBPM: 125,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
-    uadePatternLayout: {
-      formatId: 'mod',
-      patternDataFileOffset: 1084,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
-      numPatterns: 1,
-      moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-    } satisfies UADEPatternLayout,
   };
+  if (!layout || !grid) {
+    song.gridUnmatchedReason = layout ? 'the module has no subsong' : 'no known Sean Conran build matches the replayer code';
+    return song;
+  }
+
+  // every tick that plays a stored note names its pitch byte; a stream played again shows the same byte again
+  const noteBytes: NonNullable<UADEVariablePatternLayout['noteBytes']> = [];
+  for (let ch = 0; ch < 4; ch++) {
+    grid.biasAt[ch].forEach((offset, tick) => {
+      const note = grid.timeline[ch][tick].note;
+      if (offset < 0 || note === 0 || note === 97) return;
+      noteBytes.push({ pattern: Math.floor(tick / SCR_ROWS_PER_PATTERN), channel: ch, row: tick % SCR_ROWS_PER_PATTERN, offset, note });
+    });
+  }
+  song.uadePlayerTickGrid = true;
+  song.uadeVariableLayout = {
+    formatId: 'seanConran',
+    numChannels: 4,
+    numFilePatterns: grid.filePatternAddrs.length,
+    rowsPerPattern: patterns.map((p) => p.length),
+    moduleSize: buf.length,
+    encoder: seanConranEncoder,
+    filePatternAddrs: grid.filePatternAddrs,
+    filePatternSizes: grid.filePatternSizes,
+    trackMap: patterns.map(() => [-1, -1, -1, -1]),
+    blockRows: grid.blockRows,
+    noteBytes,
+    propagateSharedCells: true,
+  };
+  return song;
 }
