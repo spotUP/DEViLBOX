@@ -19,7 +19,7 @@ export interface HusicSong { rom: Uint8Array; lossy: string[]; frames: number; l
 export const PCE_SYSTEM_ID = 0x05;
 const CHANNELS = 6, FRAME_HZ = 60, BANK = 0x2000, WINDOW = 0x4000, MAX_ROWS = 20000, PSG_CLOCK = 3579545;
 const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PITCH = 4, NONE = 0xff;
-const FREQ_TABLE = 0x19; // `_freq` sits right after LL0's two strings in the const bank
+const FREQ_TABLE = 0x2d; // `_freq` sits after LL0's strings (25 bytes) and the 20-byte author field in the const bank; asserted below
 const NOISE_FREQ = [4, 13, 15, 18, 21, 23, 25, 27, 29, 31, 0, 2]; // Furnace pce.cpp noiseFreq (old noise layout)
 // HuSIC track commands (hmckc output / hus.c SEQ_xx)
 const SLUR = 0xe9, PORTA = 0xeb, PAN = 0xf0, WAVE = 0xf1, NOISE = 0xf2, WAIT = 0xf4, NOTE_ENV = 0xf7, PITCH_ENV = 0xf8, REST = 0xfc, VOLUME = 0xfd, WAVE_ENV = 0xfe, JUMP = 0xee;
@@ -150,6 +150,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   // Furnace calcBaseFreq: tuning/16 * 2^((nv + 3) / 12), i.e. flat value 45 = A-4 = tuning (nv 0 = byte $00).
   const cb = layout.constBank * BANK + (layout.ll0 - WINDOW);
   const freq = Array.from({ length: 16 }, (_, i) => player[cb + FREQ_TABLE + 2 * i] | (player[cb + FREQ_TABLE + 2 * i + 1] << 8));
+  if (freq[0] !== 4068) throw new Error('HuSIC player: _freq table not at LL0+' + FREQ_TABLE + '; update FREQ_TABLE after changing the LL0 strings');
   const tuning = m.tuning || 440;
   // low: also bytes $0D-$0F, _freq[0..2] >> 0 = A-0..B-0 below byte $00. Only for a plain key-on note: the note env
   // (drv_noteenv) steps note_data as octave << 4 | semitone 0-11 and cannot reach or leave them.
