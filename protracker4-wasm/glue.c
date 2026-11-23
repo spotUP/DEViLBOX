@@ -52,6 +52,9 @@ void player_set_channel_gain(int chan, float gain) {
     if (g_song) pt4_mute(g_song, chan, gain == 0.0f);
 }
 
+int player_voice_peak(int chan) { return g_song ? pt4_voice_peak(g_song, chan) : 0; }
+void player_voice_scope(int chan, int16_t *out256) { if (g_song) pt4_voice_scope(g_song, chan, out256); }
+
 int player_get_channels(void) { return g_song ? pt4_channels(g_song) : 0; }
 
 /* (order << 8) | row, -1 with no song */

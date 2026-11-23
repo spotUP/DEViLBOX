@@ -121,6 +121,10 @@ export function createShareTables(database: Database.Database = db): void {
     );
     CREATE INDEX IF NOT EXISTS idx_share_replies_share ON share_replies(share_id);
   `);
+  // CREATE TABLE IF NOT EXISTS leaves an older share_links without these columns; add them so POST /api/share works.
+  const cols = (database.prepare('PRAGMA table_info(share_links)').all() as { name: string }[]).map(c => c.name);
+  if (!cols.includes('parent_id')) database.exec('ALTER TABLE share_links ADD COLUMN parent_id TEXT');
+  if (!cols.includes('owner_key_sha256')) database.exec("ALTER TABLE share_links ADD COLUMN owner_key_sha256 TEXT NOT NULL DEFAULT ''");
 }
 
 // Create tables

@@ -137,6 +137,9 @@ struct pt4_song {
     int      opt_stereo, opt_interp, opt_dyn_mixer, opt_notes_ext, opt_master, opt_row0, opt_latch, opt_tempo;
     int      loop;
     int      mute[PT4_MAXCH];
+    int16_t  scope[PT4_MAXCH][256]; /* per-voice output ring, as heard (mute applied), for meters and scopes */
+    int      peak[PT4_MAXCH];       /* per-voice peak since the last pt4_voice_peak call */
+    unsigned scope_pos;
     unsigned rate;
     int      dry;            /* no voices (length scan / seek) */
     pt4_state st;

@@ -18,6 +18,9 @@ class ProTracker4Processor extends AudioWorkletProcessor {
     this.playing = false;
     this.framesPlayed = 0;      // frames rendered since the song started: a swapped-in module catches up to here
     this.muteMask = 0xFFFFFFFF; // bit N set = channel N audible
+    this.channels = 0;
+    this.quanta = 0;
+    this.scopePtr = 0;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
 
@@ -33,7 +36,7 @@ class ProTracker4Processor extends AudioWorkletProcessor {
           this.framesPlayed = 0;
           this.loaded = true;
           this.playing = true;
-          this.port.postMessage({ type: 'moduleLoaded', channels: this.module._player_get_channels() });
+          this.port.postMessage({ type: 'moduleLoaded', channels: this.channels });
         }
         break;
       case 'swapModule':
@@ -73,6 +76,7 @@ class ProTracker4Processor extends AudioWorkletProcessor {
     const err = this.module._player_load(ptr, bytes.length);
     this.module._free(ptr);
     if (err !== 0) { this.port.postMessage({ type: 'error', message: 'libpt4 could not open the module (code ' + err + ')' }); return false; }
+    this.channels = this.module._player_get_channels();
     this.applyMuteMask();
     this.updateBufferViews();
     return true;
@@ -152,6 +156,7 @@ class ProTracker4Processor extends AudioWorkletProcessor {
       }
       if (!this.module.wasmMemory && capturedMemory) this.module.wasmMemory = capturedMemory;
 
+      this.scopePtr = this.module._malloc(256 * 2);
       this.interleavedPtr = this.module._malloc(this.bufferSize * 2 * 4);
       if (!this.interleavedPtr) {
         this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' });
@@ -180,11 +185,28 @@ class ProTracker4Processor extends AudioWorkletProcessor {
   cleanup() {
     if (this.module && this.interleavedPtr) this.module._free(this.interleavedPtr);
     this.interleavedPtr = 0;
+    this.scopePtr = 0;
     this.interleavedBuf = null;
     this.module = null;
     this.initialized = false;
     this.loaded = false;
     this.lastHeapBuffer = null;
+  }
+
+  /** Per-voice peak (0..1) and the last 256 samples of each voice, as the mixer output it (a muted voice reads flat). */
+  postMeters() {
+    const m = this.module;
+    const n = this.channels;
+    const levels = new Array(n);
+    const channels = new Array(n);
+    const buf = this.heapU8().buffer;
+    for (let c = 0; c < n; c++) {
+      levels[c] = Math.min(1, m._player_voice_peak(c) / 16384);
+      m._player_voice_scope(c, this.scopePtr);
+      channels[c] = new Int16Array(buf.slice(this.scopePtr, this.scopePtr + 512));
+    }
+    this.port.postMessage({ type: 'vu', levels, audioTime: currentTime });
+    this.port.postMessage({ type: 'oscData', channels, frame: this.framesPlayed, sampleRate }, channels.map((a) => a.buffer));
   }
 
   process(inputs, outputs) {
@@ -198,6 +220,7 @@ class ProTracker4Processor extends AudioWorkletProcessor {
     this.updateBufferViews();
     if (rendered > 0 && this.interleavedBuf) {
       this.framesPlayed += rendered;
+      if ((++this.quanta & 3) === 0) this.postMeters();
       for (let i = 0; i < rendered; i++) {
         outputL[i] = this.interleavedBuf[i * 2];
         outputR[i] = this.interleavedBuf[i * 2 + 1];

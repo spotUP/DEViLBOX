@@ -219,6 +219,22 @@ void pt4_mute(pt4_song *s, int chan, int on)
     if (s && chan >= 0 && chan < PT4_MAXCH) s->mute[chan] = on ? 1 : 0;
 }
 
+int pt4_voice_peak(pt4_song *s, int chan)
+{
+    int p;
+    if (!s || chan < 0 || chan >= PT4_MAXCH) return 0;
+    p = s->peak[chan];
+    s->peak[chan] = 0;
+    return p;
+}
+
+void pt4_voice_scope(const pt4_song *s, int chan, int16_t *out256)
+{
+    unsigned i;
+    if (!s || chan < 0 || chan >= PT4_MAXCH) return;
+    for (i = 0; i < 256; i++) out256[i] = s->scope[chan][(s->scope_pos + i) & 255];
+}
+
 int pt4_set_option(pt4_song *s, int opt, int v)
 {
     if (!s) return PT4_ERR_ARG;

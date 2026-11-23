@@ -10,10 +10,14 @@ import {
   type WASMAssetsCache,
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
+import { ChannelMeterFeed } from '@engine/tone/channelMeterFeed';
+import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
 
 export class ProTracker4Engine extends WASMSingletonBase {
   private static instance: ProTracker4Engine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
+
+  private readonly meterFeed = new ChannelMeterFeed();
 
   private constructor() {
     super();
@@ -51,7 +55,15 @@ export class ProTracker4Engine extends WASMSingletonBase {
           }
           break;
         case 'moduleLoaded':
+          this.meterFeed.clearHeld();
+          useOscilloscopeStore.getState().setChipInfo(data.channels, 0, Array.from({ length: data.channels }, (_, i) => `Channel ${i + 1}`));
           this.settleModuleLoad();
+          break;
+        case 'vu':
+          this.meterFeed.reportFromWorklet(data, this.audioContext);
+          break;
+        case 'oscData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
         case 'error':
           console.error('[ProTracker4Engine]', data.message);
@@ -83,7 +95,7 @@ export class ProTracker4Engine extends WASMSingletonBase {
   }
 
   play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }
-  stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
+  stop(): void { this.meterFeed.clearHeld(); this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'pause' }); }
 
   /** Bit N set = channel N audible. */

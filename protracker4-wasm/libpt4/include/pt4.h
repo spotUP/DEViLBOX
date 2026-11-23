@@ -99,6 +99,8 @@ long pt4_length_ms(const pt4_song *song);           /* -1 unknown (no end within
 void pt4_position(const pt4_song *song, int *order, int *row);
 int  pt4_ended(const pt4_song *song);               /* song end reached (F00 or an order played again) */
 void pt4_set_loop(pt4_song *song, int on);          /* on: keep playing after the end as PT does; default off */
+int  pt4_voice_peak(pt4_song *song, int chan);       /* peak |sample| (int16 scale) since the last call, then reset */
+void pt4_voice_scope(const pt4_song *song, int chan, int16_t *out256); /* last 256 output samples of a voice, oldest first */
 void pt4_mute(pt4_song *song, int chan, int on);    /* chan 0-based; output only, the replayer keeps running */
 
 /* Options, see PT4_OPT_* */

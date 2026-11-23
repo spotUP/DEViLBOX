@@ -252,6 +252,13 @@ static void advance(pt4_song *s, int n, pt4_voice *v)
 }
 
 /* mix n frames at lr[2*off..]: int32 stereo in 16 bit scale; pairs (mixer path) optional */
+static void capture(pt4_song *s, int k, int x)
+{
+    int a = x < 0 ? -x : x;
+    s->scope[k][s->scope_pos & 255] = (int16_t)(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
+    if (a > s->peak[k]) s->peak[k] = a;
+}
+
 void pt4__mix(pt4_song *s, int32_t *lr, int8_t **pairs, uint32_t off, uint32_t n)
 {
     uint32_t i;
@@ -277,6 +284,8 @@ void pt4__mix(pt4_song *s, int32_t *lr, int8_t **pairs, uint32_t off, uint32_t n
                     advance(s, k + 4, b);
                 }
                 r[k] = (int8_t)(uint8_t)(ta + tb);
+                capture(s, k, ta * 128);
+                capture(s, k + 4, tb * 128);
                 if (pairs) pairs[k][off + i] = (int8_t)r[k];
             }
             if (lr) {
@@ -288,6 +297,7 @@ void pt4__mix(pt4_song *s, int32_t *lr, int8_t **pairs, uint32_t off, uint32_t n
                 lr[2 * (off + i)] = L * 128;
                 lr[2 * (off + i) + 1] = R * 128;
             }
+            s->scope_pos++;
         }
         return;
     }
@@ -296,9 +306,10 @@ void pt4__mix(pt4_song *s, int32_t *lr, int8_t **pairs, uint32_t off, uint32_t n
         for (k = 0; k < nv; k++) {
             pt4_voice *v = &s->st.v[k];
             int x;
-            if (!v->active) continue;
+            if (!v->active) { capture(s, k, 0); continue; }
             x = s->mute[k] ? 0 : read_smp(s, v) * (int)v->vol;
             advance(s, k, v);
+            capture(s, k, x * 2);
             if ((k & 3) == 0 || (k & 3) == 3) L += x;
             else R += x;
         }
@@ -314,5 +325,6 @@ void pt4__mix(pt4_song *s, int32_t *lr, int8_t **pairs, uint32_t off, uint32_t n
             lr[2 * (off + i) + 1] = R;
         }
         if (pairs) for (k = 0; k < 4; k++) pairs[k][off + i] = 0;
+        s->scope_pos++;
     }
 }

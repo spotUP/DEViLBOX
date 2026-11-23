@@ -35,10 +35,10 @@ LAYERS = [  # channels (1-based), side, what
     ('5-8', 'R L L R', 'echo 1: 3 rows late, half volume, other side; carries the effect plan and the DYN orch-hit'),
     ('9-12', 'L R R L', 'echo 2: 6 rows late, same volume as echo 1, source side'),
     ('13-16', 'R L L R', 'double: the source on the other side, tonal samples on finetune +1 copies (chorus)'),
-    ('17', 'L', 'pad A: pulse wave on the bass root, arpeggio 07C on every row'),
-    ('18', 'R', 'pad B: saw a fifth above the root, vibrato 4xy / tremolo 7xy by section'),
+    ('17', 'L', 'melody echo: source channel 2, 6 rows late, 60 percent level'),
+    ('18', 'R', 'melody echo: source channel 3, 9 rows late'),
     ('19', 'R', 'bass double: sub wave in unison with longbase'),
-    ('20', 'L', 'gate pad: DYN envelope with dynamic loop (attack, then a 4-chunk pulse that repeats)'),
+    ('20', 'L', 'melody echo: source channel 4, 12 rows late'),
     ('21-22', 'L R', "sequencer ping-pong on 'another drop': Cxx, ECx, 9xx, EDx in turn"),
     ('23-24', 'R L', 'lead doubles one octave up on the saw (extended period range)'),
     ('25', 'L', 'sub-kick: bassdrum one octave down under every kick'),
@@ -158,21 +158,13 @@ def layers(L):
         r, prev = root[t], root[t - 1] if t else None
         if r is None:
             if prev is not None:
-                for ch in (16, 17, 19, 20, 21):     # release: fade out over the next rows, not a hard cut
+                for ch in (20, 21):     # release: fade out over the next rows, not a hard cut
                     for dt in range(4):
                         if t + dt < T and root[t + dt] is None and not any(echo[ch][t + dt] or ()):
                             put(ch, t + dt, 0, 0, 10, 0x08)
             continue
         strike = r != prev or row % 32 == 0
         since = 0 if strike else since + 1   # rows since the pad struck
-        # pluck: arpeggio (a per-row effect) for 4 rows, then a volume slide down so the pad decays instead of holding
-        put(16, t, pulse if strike else 0, per(12 + r) if strike else 0, *((0, 0x7C) if since < 3 else (10, 0x04)))
-        # pad B: vibrato / tremolo for 6 rows after the strike, then a slow volume slide so it decays too
-        put(17, t, saw if strike else 0, per(19 + r) if strike else 0,
-            *(((7, 0x46) if pos % 8 >= 4 else (4, 0x42)) if since < 6 else (10, 0x01)))
-        if t >= T // 4:
-            if strike or t == T // 4:
-                put(19, t, gate, per(24 + r))
         if pos >= 2 and row % 2 == 0:
             i = row // 2 % 8
             fx = [(12, 0x1C), (14, 0xC2), (9, 0x01), (14, 0xD1)][i % 4]
@@ -180,6 +172,17 @@ def layers(L):
                 fx = (12, 0x14)
             put(20 + i % 2, t, num('another drop'), per(12 + r + SEQ_STEPS[i]), *fx)
             put(29 - i % 2, t + 3, num('another drop'), per(12 + r + SEQ_STEPS[i]), 12, 0x12)
+
+    # --- melody echoes (17, 18, 20): sources 2-4 again 6 / 9 / 12 rows late, clearly audible, at 60 percent of the source level ---
+    for k, ch, dly in ((1, 16, 6), (2, 17, 9), (3, 19, 12)):
+        for t in range(T):
+            s, period, e, p = src(t, k)
+            if e in (11, 13, 15) or (e == 14 and p >> 4 in (6, 14)):
+                e = p = 0
+            if period and cs[k][t] != longbase and cs[k][t] != num('bassdrum'):
+                put(ch, t + dly, cs[k][t], period, 12, max(1, info[cs[k][t] - 1][2] * 6 // 10))
+            elif period:
+                put(ch, t + dly, 0, 0, 12, 0)
 
     # --- bass double (19) --------------------------------------------------------------------------------------------
     on = False
@@ -247,7 +250,7 @@ def layers(L):
             if row == 48:
                 put(31, t, pulse, PT[12], 14, 0x31)                # glissando on: the slide moves in semitone steps
             elif row == 49:
-                put(31, t, 0, PT[35], 3, 0x06)
+                put(31, t, 0, PT[24], 3, 0x06)
             else:
                 put(31, t, 0, 0, *((3, 0) if row < 63 else (14, 0x30)))
         if row == 0 and pos % 4 == 0 and t:
@@ -267,6 +270,20 @@ def layers(L):
                 last = None
             if run >= 8:
                 echo[ch][t] = [0, 0, 10, 0x01]
+    # --- slide-up limiter (copies and added layers): a 1xx slide may raise a note by one octave at most (floor 135), then it
+    # stops. Unbounded up-slides ran into the top of the period range and ended as a chip beep. ---
+    for ch in range(4, NCH):
+        cur = floor = None
+        for t in range(T):
+            c = echo[ch][t]
+            if not c:
+                continue
+            if c[1] and c[2] not in (3, 5):
+                cur, floor = c[1], max(c[1] // 2, 135)
+            if c[2] == 1 and cur:
+                step = min(c[3], max(0, (cur - floor) // 5))   # speed 6: five slide ticks per row
+                cur -= step * 5
+                echo[ch][t] = [c[0], c[1], 1, step]
     return extra
 
 
