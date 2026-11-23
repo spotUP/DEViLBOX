@@ -23,7 +23,7 @@ const FREQ_TABLE = 0x19; // `_freq` sits right after LL0's two strings in the co
 const NOISE_FREQ = [4, 13, 15, 18, 21, 23, 25, 27, 29, 31, 0, 2]; // Furnace pce.cpp noiseFreq (old noise layout)
 // HuSIC track commands (hmckc output / hus.c SEQ_xx)
 const SLUR = 0xe9, PORTA = 0xeb, PAN = 0xf0, WAVE = 0xf1, NOISE = 0xf2, WAIT = 0xf4, NOTE_ENV = 0xf7, PITCH_ENV = 0xf8, REST = 0xfc, VOLUME = 0xfd, WAVE_ENV = 0xfe, JUMP = 0xee;
-const HANDLED = new Set([0x00, 0x03, 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0f, 0x10, 0x11, 0xec, 0xed]);
+const HANDLED = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0f, 0x10, 0x11, 0xec, 0xed]);
 
 interface Frames { vals: number[]; loop: number }
 // glide: a slurred note (no envelope reset, no key-on volume); with port, the driver then slides by port per frame.
@@ -173,6 +173,23 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     v >= 0 && v & 0x40000000 ? v & ~0x40000000 : v < 0 && !(v & 0x40000000) ? v | 0x40000000 : nv + v;
   const noiseReg = (n: number) => (properNoise ? n & 31 : NOISE_FREQ[((n % 12) + 12) % 12]);
   const envIdx = (i: number, what: string) => { if (i < 0xff) return i; lossy.add(`more than 255 ${what} envelopes (envelope dropped)`); return 0xff; };
+  // Furnace's PCE period for a (fractional) note value; calcBaseFreq, tuning at value 45.
+  const furPeriod = (nv: number) => PSG_CLOCK / 32 / (tuning * Math.pow(2, (nv - 45) / 12));
+  const frameAt = (f: Frames, i: number) => f.vals[i < f.vals.length ? i : f.loop >= 0 ? f.loop + ((i - f.loop) % (f.vals.length - f.loop)) : f.vals.length - 1];
+  // Pitch env as raw signed bytes per frame (the caller picks delta or absolute meaning); the tail is cut to its
+  // shortest repeating period, which the driver loops ($FF jumps to the loop pointer).
+  const bakePitch = (v: number[]): number => {
+    if (v.some((x) => Math.abs(x) > 126)) lossy.add('pitch move past the driver pitch envelope step (clamped)');
+    const n = v.length;
+    let best = { start: n - 1, p: 1 };
+    for (let p = 1; p <= Math.min(128, n >> 1); p++) {
+      let st = n - p;
+      while (st > 0 && v[st - 1] === v[st - 1 + p]) st--;
+      if (n - st >= 2 * p && st + p < best.start + best.p) best = { start: st, p };
+    }
+    const enc = (x: number) => (x < 0 ? 0x80 | Math.min(126, -x) : Math.min(126, x));
+    return envIdx(pitchEnv.add([...v.slice(0, best.start + best.p).map(enc), 0xff], best.start), 'pitch');
+  };
 
   // 4. Per-channel events on the 60 Hz frame grid.
   const tracks: Ev[][] = [];
@@ -185,6 +202,14 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     // Tone portamento (03xx): Furnace slides baseFreq by speed per tick (linear pitch: speed*pitchSlideSpeed / 128
     // semitone; else period units). The driver gets a slurred note with a constant $EB period step, then a slurred
     // target note on arrival.
+    // Pitch effects in Furnace pitch units (linear: 1/128 semitone; else period units), + = higher, one value per tick:
+    // 01/02 slides and E1/E2 note slides (baseFreq, reset by a new note), 04 vibrato (sine, E4 fine), E5 pitch.
+    // Baked per note into a $F8 pitch env after the row pass.
+    const rawT: number[] = [];
+    const pend: Array<{ ev: Ev; tick: number; nv: number; af?: Frames; pf?: Frames; rel: boolean; noise: boolean; arpOn: boolean }> = [];
+    let slide = 0, slideTo: number | undefined, e12 = 0, slid = 0, vibDepth = 0, vibRate = 0, vibFine = 15, vibPos = 0, pitchFx = 0, slideNv = 0;
+    const pmul = linear ? slideMul : 1;
+    const toRaw = (semis: number) => (linear ? semis * 128 : furPeriod(slideNv) - furPeriod(slideNv + semis));
     let porta = 0, curNv = -1, toneOn = false, snap: Ev | undefined, glideFrom = 0, glideTo = 0, glideStart = 0;
     const period = (nb: number) => freq[((nb & 15) + 3) & 15] >> (nb >> 4);
     const dropSnap = (frame: number) => {
@@ -195,15 +220,21 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     };
     for (const row of rows) {
       const cell = cellAt(ch, row.o, row.r);
-      let delay = 0, cut = -1;
+      let delay = 0, cut = -1, noteTick = -1;
       const cmds: number[] = [];
-      let volChanged = false;
+      let volChanged = false, slideSet = false, e12Semis = 0, e12Speed = 0;
       for (const { type: t, value: v } of fxOf(ch, row.o, row.r)) {
         if (t === 0x08) cmds.push(PAN, v);
         else if (t === 0x10) { waveFx = v; if (!framesOf(Math.max(0, ins), MACRO_WAVE, 'wave')) cmds.push(WAVE, v); }
         else if (t === 0x11) { if (ch >= 4) noiseFx = v > 0; else lossy.add('noise effect on channels 1-4'); }
         else if (t === 0x00) arpFx = v;
         else if (t === 0x03) porta = v;
+        else if (t === 0x01 || t === 0x02) { slide = (t === 0x01 ? 1 : -1) * v * pmul; slideTo = undefined; slideSet = true; }
+        else if (t === 0x04) { vibDepth = v & 15; vibRate = v >> 4; }
+        else if (t === 0xe3) { if (v) lossy.add('vibrato shape other than sine'); }
+        else if (t === 0xe4) vibFine = v;
+        else if (t === 0xe5) pitchFx = v - 0x80;
+        else if ((t === 0xe1 || t === 0xe2) && v & 15) { e12Semis = (t === 0xe1 ? 1 : -1) * (v & 15); e12Speed = (v >> 4) * 4; }
         else if (t === 0x0a) volSpeed = !v ? 0 : v & 15 ? -(v & 15) * 64 : (v >> 4) * 64;
         else if (t === 0xed) delay = Math.min(v, row.ticks - 1);
         else if (t === 0xec) cut = v;
@@ -219,14 +250,13 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         const ticks = Math.max(1, Math.ceil(linear ? (Math.abs(nv - curNv) * 128) / (porta * slideMul) : Math.abs(p1 - p0) / porta));
         const fa = frameOf(row.tick + delay + ticks);
         const d = (p1 - p0) / Math.max(1, fa - at), hi = Math.trunc(d), lo = Math.min(127, Math.round(Math.abs(d - hi) * 128));
-        evs.push({ frame: at, kind: 'note', cmds: [...cmds], note: noteByte(from), glide: { port: [hi & 0xff, lo | (d < 0 ? 0x80 : 0)] } });
+        evs.push({ frame: at, kind: 'note', cmds: [...cmds, PITCH_ENV, 0xff], note: noteByte(from), glide: { port: [hi & 0xff, lo | (d < 0 ? 0x80 : 0)] } });
         snap = { frame: fa, kind: 'note', cmds: [], note: noteByte(nv), glide: {} };
         evs.push(snap);
         glideFrom = curNv; glideTo = nv; glideStart = at; curNv = nv;
       } else if (nv >= 0 && nv < 253) {
         curNv = nv; toneOn = !(ch >= 4 && noiseFx);
         const insIdx = Math.max(0, ins);
-        if (framesOf(insIdx, MACRO_PITCH, 'pitch')) lossy.add('pitch macro');
         const wf = framesOf(insIdx, MACRO_WAVE, 'wave');
         const wave = wf && new Set(wf.vals).size > 1 ? -1 - waveEnv.level(wf) : wf ? wf.vals[0] : waveFx;
         const af = arpFrames(insIdx, arpFx);
@@ -239,11 +269,27 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         const arpOn = nvs.some((x) => x !== nv);
         const note = noise ? noiseReg(nvs[0]) : noteByte(nv);
         const ne = arpOn && !noise ? envIdx(noteEnv.note({ vals: nvs.map((x) => x - nv), loop: af!.loop }), 'note') : 0xff;
-        const pe = arpOn && noise ? envIdx(pitchEnv.note({ vals: nvs.map((x) => noiseReg(x) - note), loop: af!.loop }, 32), 'pitch') : 0xff;
-        evs.push({ frame: at, kind: 'note', cmds: [...cmds, NOISE, noise ? 1 : 0, ...(wave < 0 ? [WAVE_ENV, -1 - wave] : [WAVE, wave]),
-          NOTE_ENV, ne, PITCH_ENV, pe], note, vol: volCode(insIdx, chanVol) });
+        const ev: Ev = { frame: at, kind: 'note', cmds: [...cmds, NOISE, noise ? 1 : 0, ...(wave < 0 ? [WAVE_ENV, -1 - wave] : [WAVE, wave]),
+          NOTE_ENV, ne, PITCH_ENV, 0xff], note, vol: volCode(insIdx, chanVol) };
+        evs.push(ev);
+        pend.push({ ev, tick: row.tick + delay, nv, af: arpOn ? af : undefined, pf: framesOf(insIdx, MACRO_PITCH, 'pitch'),
+          rel: !!macroOf(m.instruments[insIdx], MACRO_PITCH)?.mode, noise, arpOn });
+        noteTick = delay;
       } else if (nv === 253) { dropSnap(at); toneOn = false; evs.push({ frame: at, kind: 'off', cmds }); }
       else if (cmds.length || volChanged) evs.push({ frame: at, kind: 'cont', cmds, vol: volChanged ? volCode(Math.max(0, ins), chanVol) : undefined });
+      if (noteTick >= 0 && !slideSet) slide = 0;
+      for (let k = 0; k < row.ticks; k++) {
+        if (k === noteTick) { slid = 0; e12 = 0; slideNv = nv; slideTo = undefined; if (!flag('continuousVibrato')) vibPos = 0; }
+        if (k === Math.max(0, noteTick) && e12Semis) {
+          e12 += e12Semis;
+          slideTo = toRaw(e12); slide = Math.sign(slideTo - slid) * e12Speed * pmul;
+        }
+        slid += slide;
+        if (slideTo !== undefined && (slide > 0 ? slid >= slideTo : slid <= slideTo)) { slid = slideTo; slide = 0; }
+        if (vibDepth) vibPos = (vibPos + vibRate) & 63;
+        const tab = Math.trunc(127 * Math.sin((vibPos / 64) * 2 * Math.PI));
+        rawT[row.tick + k] = slid + pitchFx + Math.trunc(((vibDepth * tab * vibFine) >> 4) / 15);
+      }
       if (nv === 254 || nv === 255) lossy.add('note release (keeps sounding)');
       if (cut >= 0 && cut < row.ticks) { dropSnap(frameOf(row.tick + cut)); toneOn = false; }
       if (cut >= 0 && cut < row.ticks) evs.push({ frame: frameOf(row.tick + cut), kind: 'off', cmds: [] });
@@ -255,7 +301,32 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         }
       }
     }
-    tracks.push(evs.filter((e) => e.frame < endFrame).sort((a, b) => a.frame - b.frame));
+    const sorted = evs.filter((e) => e.frame < endFrame).sort((a, b) => a.frame - b.frame);
+    for (const p of pend) {
+      const next = sorted.find((e) => e.frame > p.ev.frame && (e.kind === 'note' || e.kind === 'off'));
+      const n = Math.min(600, Math.max(1, (next ? next.frame : endFrame) - p.ev.frame));
+      let p2 = 0;
+      const offs: number[] = [];
+      let moves = false;
+      for (let f = 0; f < n; f++) {
+        if (p.pf) {
+          if (!p.rel) p2 = frameAt(p.pf, f);
+          else if (f < p.pf.vals.length || p.pf.loop >= 0) p2 += frameAt(p.pf, f) * (hz / FRAME_HZ);
+        }
+        const a = p.af ? arpNv(p.nv, frameAt(p.af, f)) : p.nv;
+        if (p.noise) { offs.push(noiseReg(a + Math.round(p2)) - p.ev.note!); if (offs[f]) moves = true; continue; }
+        const r = rawT[Math.min(rawT.length - 1, p.tick + Math.floor((f * hz) / FRAME_HZ))] + p2;
+        if (r) moves = true;
+        offs.push(Math.round((linear ? furPeriod(a + r / 128) : furPeriod(a) - r) - period(noteByte(a))));
+      }
+      if (!moves) continue;
+      // Without a note env seq_freq / noise_freq carry over, so bytes are deltas; with one set_note resets seq_freq
+      // every frame before the pitch env runs, so bytes are absolute offsets.
+      const w = (x: number) => (p.noise ? ((((x % 32) + 47) % 32) - 15) : x);
+      const bytes = p.arpOn && !p.noise ? offs : offs.map((v, i) => w(v - (i ? offs[i - 1] : 0)));
+      p.ev.cmds[p.ev.cmds.length - 1] = bakePitch(bytes);
+    }
+    tracks.push(sorted);
   }
 
   // 5. Track bytes; a command never straddles a bank, each bank ends with a jump to the next.
