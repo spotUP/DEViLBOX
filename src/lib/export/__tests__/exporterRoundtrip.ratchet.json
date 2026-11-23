@@ -114,11 +114,11 @@
     },
     "chuckBiscuits": {
       "exporter": "ChuckBiscuitsExporter.exportChuckBiscuits",
-      "tier": "pattern-data",
-      "status": "missing-fixture",
-      "matchPct": 0,
-      "cells": 0,
-      "bytes": 0
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 1660,
+      "bytes": 1660
     },
     "composer667": {
       "exporter": "Composer667Exporter.exportComposer667",
@@ -135,6 +135,14 @@
       "matchPct": 1,
       "cells": 156532,
       "bytes": 156532
+    },
+    "dariusZendeh": {
+      "exporter": "DariusZendehExporter.exportDariusZendeh",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 147456,
+      "bytes": 147456
     },
     "daveLowe": {
       "exporter": "DaveLoweExporter.exportDaveLowe",
@@ -1191,20 +1199,11 @@
       "matchPct": 1,
       "cells": 1408,
       "bytes": 6689
-    },
-    "dariusZendeh": {
-      "exporter": "DariusZendehExporter.exportDariusZendeh",
-      "tier": "byte-exact",
-      "status": "byte-exact",
-      "matchPct": 1,
-      "cells": 147456,
-      "bytes": 147456
     }
   },
   "missingFixture": [
     "adPlug",
     "amosMusicBank",
-    "chuckBiscuits",
     "dsm_dyn",
     "jasonPage",
     "synthesis",

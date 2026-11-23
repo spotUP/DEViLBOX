@@ -158,8 +158,9 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   timFollin: 'public/data/songs/formats/follin_smallest.tf',
   beathoven: 'public/data/songs/formats/beathoven_smallest.bss',
   howieDavies: 'public/data/songs/formats/blazing_thunder.hd',
+  chuckBiscuits: 'public/templates/chuckBiscuits.cba',
   // No committed fixture found (reported missing-fixture by the harness — Task 1.3):
-  //   amosMusicBank, synthesis, chuckBiscuits, dsm_dyn, xmf
+  //   amosMusicBank, synthesis, dsm_dyn, xmf
 };
 
 export interface NamedExporterTarget {

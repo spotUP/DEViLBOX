@@ -468,6 +468,8 @@ export interface TrackerSong {
   robHubbardFileData?: ArrayBuffer;
   /** Raw Digital Mugician binary for DigMugEngine WASM playback */
   digMugFileData?: ArrayBuffer;
+  /** Chuck Biscuits: the title stored in the file (song.name falls back to the file name when it is empty). */
+  cbaTitle?: string;
   /** Raw Digital Symphony binary; the exporter writes it back and patches only edited cells. */
   digitalSymphonyFileData?: Uint8Array;
   /** Raw DigiBooster Pro binary; the exporter writes it back and re-packs only edited patterns. */

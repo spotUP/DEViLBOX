@@ -439,7 +439,7 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
       const rows: TrackerCell[] = Array.from({ length: ROWS_PER_PATTERN }, (_, row): TrackerCell => {
         if (!cells) {
           const cell: TrackerCell = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
-          if (ch === 0 && row === 0) {
+          if (orderPos === 0 && ch === 0 && row === 0) {
             cell.effTyp = CMD_SET_SPEED;
             cell.eff    = speed;
           }
@@ -450,7 +450,7 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
         const cell: TrackerCell = { ...src };
 
         // Inject initial speed on row 0, channel 0 if no existing effect
-        if (ch === 0 && row === 0 && cell.effTyp === 0 && cell.eff === 0) {
+        if (orderPos === 0 && ch === 0 && row === 0 && cell.effTyp === 0 && cell.eff === 0) {
           cell.effTyp = CMD_SET_SPEED;
           cell.eff    = speed;
         }
@@ -535,6 +535,7 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
 
   return {
     name:            songName,
+    cbaTitle:        title,
     format:          'MOD' as TrackerFormat,
     patterns,
     instruments,

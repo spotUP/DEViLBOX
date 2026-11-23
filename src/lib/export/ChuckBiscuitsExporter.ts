@@ -161,7 +161,7 @@ export async function exportChuckBiscuits(
   const numOrders = Math.min(MAX_ORDERS, song.songPositions.length);
   const speed = Math.max(1, song.initialSpeed ?? 6);
   const tempo = Math.max(32, song.initialBPM ?? 125);
-  const title = (song.name ?? '').slice(0, 32);
+  const title = (song.cbaTitle ?? song.name ?? '').slice(0, 32);
 
   if (numChannels > MAX_CHANNELS) {
     warnings.push(`Channel count clamped from ${song.numChannels} to ${MAX_CHANNELS}`);
@@ -302,7 +302,11 @@ export async function exportChuckBiscuits(
 
     for (let row = 0; row < ROWS_PER_PATTERN; row++) {
       for (let ch = 0; ch < numChannels; ch++) {
-        const cell = pat?.channels[ch]?.rows[row];
+        let cell = pat?.channels[ch]?.rows[row];
+        // The parser shows the header speed as Fxx on order 0 row 0; the file stores it in the header only.
+        if (cell && cbaPatIdx === 0 && row === 0 && ch === 0 && cell.effTyp === 0x0F && cell.eff === speed) {
+          cell = { ...cell, effTyp: 0, eff: 0 };
+        }
         if (cell) {
           const encoded = encodeCBACell(cell);
           output.set(encoded, pos);
