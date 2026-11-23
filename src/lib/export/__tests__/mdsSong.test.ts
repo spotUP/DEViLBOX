@@ -6,6 +6,8 @@ import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
 import { arpTable, frameTempos, furnaceTickOf, furnaceToMds, Lossy, mdsPsgPitch, furnaceDacGain, furnaceDacTable, pcmDacAtt, pcmDacScale, pcmGain, portaEnvelope, psgEnvelope, pitchEnvelope, psgFix, psgOffsets, vibNodeOff, vibOffsets, vibratoEnvelope } from '../md/mdsSong';
 
 const ROOT = join(__dirname, '../../../..');
+// Bytes per command e0..ff, opcode included (mdsdrv.68k @cmd_length_table, as mdsSong.ts farLayout has it).
+const CMD_LEN = [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 2, 2, 2, 7, 1, 3, 3, 1, 2, 2, 1, 2, 2, 3, 2, 1];
 const ARG1 = new Set([0xe1, 0xe2, 0xe4, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xf0, 0xf9, 0xfb]);
 
 async function parse(name: string) {
@@ -24,7 +26,7 @@ async function solarManRow0(fx: Array<{ type: number; value: number }>, vt?: [nu
 }
 
 /** Test-only decoder: walks one pass of every track (subroutines followed, stops at the loop jump). */
-function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1): { ch: number; tick: number; n: number; s?: 1; peg?: number }[] {
+function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1, arg2?: (ch: number, c: number, a: number, b: number) => void): { ch: number; tick: number; n: number; s?: 1; peg?: number }[] {
   const sd = seq.subarray(8);
   const w = (o: number) => (sd[o] << 8) | sd[o + 1];
   const bgm = (w(4) << 16) | w(6);
@@ -33,14 +35,15 @@ function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1): { c
   for (let i = 0; i < sd[bgm + 3]; i++) {
     const ch = sd[bgm + 4 + i * 4];
     if (onlyCh >= 0 && ch !== onlyCh) continue;
-    let tick = 0, trs = 0, slur = false, peg = 0, depth = 0;
+    let tick = 0, trs = 0, slur = false, peg = 0, depth = 0, tb = tbase;
     const walk = (p: number): boolean => {
       for (;;) {
         const c = sd[p++];
         if (c < 0x80) { if (rests) out.push({ ch, tick, n: -1 }); tick += c + 1; }
         else if (c === 0x81) tick += sd[p++] + 1;
         else if (c >= 0x82 && c < 0xe0) { out.push({ ch, tick, n: c - 0x82 + trs, ...(slurs && slur ? { s: 1 as const } : {}), ...(slurs ? { peg } : {}) }); slur = false; tick += sd[p++] + 1; }
-        else if (c === 0xfe) { if (!walk(tbase + ((w(tbase + sd[p++] * 2) << 16) >> 16))) return false; }
+        else if (c === 0xfe) { if (!walk(tb + ((w(tb + sd[p++] * 2) << 16) >> 16))) return false; }
+        else if (c === 0xf3) { tb += (w(p) << 16) | w(p + 2); p = tb + w(p + 4); } // far layout: track base moves by dd.l, stream at pp.w
         else if (c === 0xfb && depth > 1) { depth--; p++; } // inner counted loop (conductor): one pass
         else if (c === 0xfb || c === 0xff) return c === 0xff;
         else if (c === 0xe0) slur = true; // E0: the next note slurs (no key-on)
@@ -48,6 +51,8 @@ function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1): { c
         else if (c === 0xe4) trs = (sd[p++] << 24) >> 24;
         else if (c === 0xe8) peg = sd[p++]; // slurs: the E8 pitch envelope the note plays
         else if (ARG1.has(c)) p++;
+        else if (CMD_LEN[c - 0xe0] === 3) { arg2?.(ch, c, sd[p], sd[p + 1]); p += 2; }
+        else if (c === 0xec) p++;
         else throw new Error(`unknown command ${c?.toString(16)} on track ${i}`);
       }
     };
@@ -628,6 +633,17 @@ describe('furnaceToMds', () => {
       expect(r.lossy.some((l) => l.includes('outside the driver'))).toBe(false);
       expect(r.lossy.some((l) => l.startsWith('tick rate 78.00 Hz'))).toBe(true);
     });
+  });
+  // Kobito: 12xx 1021, 13xx 109, 15xx 7, 16xy 247 uses (thoughts/spot/2026-11-23-kobito-md-audit.md). The driver gets EE (base TL of a
+  // register-order operator) and ED 30+4r (DT/MUL) for them; before, all four fell to the lossy catch-all with no bytes.
+  it('Kobito: operator TL (12xx-15xx) and multiplier (16xy) reach the stream as EE / ED 3x', async () => {
+    const r = await convert('Kobito_of_the_Shining_Needle.fur');
+    let ee = 0, mul = 0;
+    decode(r.seq, false, false, -1, (_ch, c, a) => { if (c === 0xee) ee++; else if (c === 0xed && (a & 0xf0) === 0x30) mul++; });
+    console.log(`Kobito EE ${ee}, ED 3x ${mul}`);
+    expect(r.lossy.filter((l) => /^effect 1[2-6]/.test(l))).toEqual([]);
+    expect(ee).toBeGreaterThan(0);
+    expect(mul).toBeGreaterThan(0);
   });
 });
 

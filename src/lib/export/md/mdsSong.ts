@@ -241,6 +241,8 @@ function ticksOf(m: FurnaceMacro, lossy: Lossy, what: string): { vals: number[];
 /** 30-byte FM voice in register order (+0,+4,+8,+C). Furnace operators are already stored in register order (genesis.cpp writes op[i] at opOffs[i] = 4*i), as MDSDRV reads them (mdsdrv.68k load inst data). */
 /** MDSDRV mds_fm_op_table: operator i (register order) of algorithm a is a carrier when i >= MDS_FIRST_CARRIER[a]. */
 const MDS_FIRST_CARRIER = [3, 3, 3, 3, 2, 1, 1, 0];
+// Furnace operator effect index (12xx..15xx, 16xy x-1) to register-order operator (genesis.cpp orderedOps).
+const FM_ORDER = [0, 2, 1, 3];
 
 function fmVoice(ins: FurnaceInstrument | undefined, lossy: Lossy): number[] {
   const fm = ins?.fm;
@@ -653,6 +655,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const noiseArps = new Map<string, number>();
   const insCache = new Map<string, { ins: number; peg: number; mtab: number }>();
   const envItems = new Map<string, number>();
+  const mulItems = new Map<string, number>(); // FM voices with 16xy multipliers patched in, keyed on content
   const insRef = (kind: Kind, idx: number, phase?: HitPhase) => {
     const key = `${kind === 'fm' ? 'fm' : 'psg'}:${idx}`;
     let v = insCache.get(key);
@@ -700,16 +703,21 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // of mds_fm_op_table[alg] only (same carriers as Furnace isOutput). An operator whose KVS differs gets base TL tl + att*(kvs - carrier)
     // through EE (fmtl), restated after every E1 (which reloads the voice TLs) and every E2. kvsIns is the voice the driver holds.
     let kvsIns = -1;
-    const kvsCmd = (v: number): number[] => {
+    // 12xx-15xx / 16xy operator TL and MUL overrides, register order (-1: the instrument's). Furnace keeps them in chan.state until a
+    // note-on after an instrument change (genesis.cpp commitState), so E1 restates them: EE for TL, a patched voice for MUL.
+    const tlOv = [-1, -1, -1, -1], mulOv = [-1, -1, -1, -1];
+    // all: restate every overridden TL (E1 reloads t_fm_tl from the voice); only: the one operator a 12xx-15xx just set.
+    const kvsCmd = (v: number, all = false, only = -1): number[] => {
       const ops = kind === 'fm' ? m.instruments[kvsIns]?.fm?.operators : undefined;
       if (!ops || ops.length < 4 || (fm6 && m.instruments[ins]?.type === 4)) return [];
       const alg = m.instruments[kvsIns]!.fm!.algorithm & 7, att = 127 - v, out: number[] = [];
       for (let i = 0; i < 4; i++) {
-        const car = i >= MDS_FIRST_CARRIER[alg], k = ops[i].kvs ?? 2, scaled = k === 1 || (k === 2 && car);
-        if (scaled === car) continue;
+        if (only >= 0 && i !== only) continue;
+        const car = i >= MDS_FIRST_CARRIER[alg], k = ops[i].kvs ?? 2, scaled = k === 1 || (k === 2 && car), tl = tlOv[i] >= 0 ? tlOv[i] : ops[i].tl & 127;
+        if (scaled === car) { if ((all || only === i) && tlOv[i] >= 0) out.push(0xee, i, tl); continue; }
         // FM3 special mode scales w_fm3_tl, which EE does not reach.
         if (op) { lossy.add('FM KVS on an extended channel 3 operator'); continue; }
-        const base = (ops[i].tl & 127) + (scaled ? att : -att);
+        const base = tl + (scaled ? att : -att);
         if (base < 0 || base > 127) lossy.add('FM KVS operator TL beyond 0..127 (clamped)');
         out.push(0xee, i, Math.max(0, Math.min(127, base)));
       }
@@ -882,14 +890,21 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         const r = insRef(kind, ins, envPh);
         const peg = (chunkStart ? sounding && (prate || poff) : prate) ? pslideCmd() : chunkStart && tick < slideEnd ? [] : [0xe8, r.peg + 1];
         kvsIns = ins;
+        // E1 loads DT/MUL later in the frame (nf_ins), over any ED, so 16xy overrides travel in the voice itself.
+        let vIns = r.ins;
+        if (kind === 'fm' && mulOv.some((x) => x >= 0)) {
+          const v = items[r.ins].map((b, j) => (j < 4 && mulOv[j] >= 0 ? (b & 0xf0) | mulOv[j] : b)), k = v.join();
+          vIns = mulItems.get(k) ?? (k === items[r.ins].join() ? r.ins : item(v));
+          mulItems.set(k, vIns);
+        }
         // An arp table's `16 tt` steps write t_trs and EB 00 leaves the last one in force (Solar_Man FM5 47.3 s: an octave up after
         // an 0/12 arp instrument), so an instrument without one restates the transpose; a chunk head can follow any table.
         const tr = r.mtab < 0 && (chunkStart || mtabOn) ? [0xe4, (kind === 'noise' ? (Number.isNaN(trs) ? (trs = 0) : trs) : trsOut || 0) & 0xff] : [];
         mtabOn = r.mtab >= 0;
         // EA on a dummy id sets the noise mode: an OP2-OP4 track leaves the LFO to OP1's channel 2 track.
         const lfo = songLfo && kind === 'fm' && op <= 1 ? [0xea, lfoOf(ins)] : [];
-        if (chunkStart && arpHold !== undefined) return [0xe1, r.ins, ...lfo, ...peg, 0xeb, 0, 0xe4, arpHold & 0xff, ...kvsCmd(vol)];
-        return [0xe1, r.ins, ...lfo, ...peg, 0xeb, r.mtab + 1, ...tr, ...kvsCmd(vol)];
+        if (chunkStart && arpHold !== undefined) return [0xe1, vIns, ...lfo, ...peg, 0xeb, 0, 0xe4, arpHold & 0xff, ...kvsCmd(vol, true)];
+        return [0xe1, vIns, ...lfo, ...peg, 0xeb, r.mtab + 1, ...tr, ...kvsCmd(vol, true)];
       };
       // FM6 with a sample instrument plays PCM (genesis.cpp: dacMode from the instrument type at each note-on); E1 would leave PCM mode.
       const isDac = (n: number) => kind === 'fm' && fm6 && m.instruments[n]?.type === 4;
@@ -937,6 +952,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         else if (op > 1 && nv >= 0 && !op1Ins.has(ins)) lossy.add('extended channel 3: OP2-OP4 instrument other than OP1\'s (FM3 plays OP1\'s voice)');
         const cmds: number[] = [];
         let pChanged = false, vChanged = false, dacOff = false;
+        // Furnace commits the instrument's operators at a note-on after an instrument change, before the row's post effects (12xx-16xy).
+        if (kind === 'fm' && nv >= 0 && nv < 253 && ins !== curIns) { tlOv.fill(-1); mulOv.fill(-1); }
         // EDxx runs the whole row xx ticks late; ECxx keys off xx ticks after the row runs (playback.cpp rowDelay / cut, delayBehavior 2).
         // Both count Furnace engine ticks (hz), so under virtual tempo they land on the nearest sequence tick.
         const fxv = (t: number) => cell?.effects?.find((e) => e.type === t && e.value > 0)?.value ?? 0;
@@ -953,6 +970,16 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           if (e.type < 0 || FX_FLOW.has(e.type)) continue;
           // 10xy: LFO enable x, speed y (genesis.cpp DIV_CMD_FM_LFO). 80xx: linear pan, on Genesis only full left (00) and right (FF) mute a side.
           if (e.type === 0x10 && kind === 'fm') { cmds.push(0xf6, 0x22, ((e.value & 7) | ((e.value >> 4) << 3)) & 0xff); continue; }
+          // 12xx-15xx: operator TL xx (DIV_CMD_FM_TL); 16xy: operator x (1..4, else ignored) multiplier y (DIV_CMD_FM_MULT), DT kept.
+          if (e.type >= 0x12 && e.type <= 0x16 && kind === 'fm') {
+            const o = e.type === 0x16 ? (e.value >> 4) - 1 : e.type - 0x12;
+            if (o < 0 || o > 3) continue;
+            if (op) { lossy.add('12xx-16xy on an extended channel 3 operator'); continue; }
+            const r = FM_ORDER[o], live = kvsIns >= 0 && !isDac(ins);
+            if (e.type === 0x16) { mulOv[r] = e.value & 15; if (live) cmds.push(0xed, 0x30 + 4 * r, (items[insRef(kind, kvsIns).ins][r] & 0xf0) | mulOv[r]); }
+            else { tlOv[r] = e.value & 127; if (live) cmds.push(...kvsCmd(vol, false, r)); }
+            continue;
+          }
           if (e.type === 0x80 && kind === 'fm' && op <= 1) { pan = e.value === 0 ? 0x80 : e.value === 0xff ? 0x40 : 0xc0; cmds.push(0xe9, pan); continue; }
           if (e.type === 0x08 && kind === 'fm') { const l = e.value >> 4, rr = e.value & 15; pan = l && rr ? 0xc0 : l ? 0x80 : rr ? 0x40 : 0xc0; cmds.push(0xe9, pan); continue; }
           // E5xx: Furnace linear pitch offset xx-80 in 1/128 semitone (playback.cpp); MDSDRV dtn is 1/256 semitone, signed byte.
