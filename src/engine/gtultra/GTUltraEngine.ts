@@ -43,7 +43,11 @@ export interface GTUltraCallbacks {
   onSngData?: (data: ArrayBuffer | null) => void;
   onPrgData?: (data: ArrayBuffer | null) => void;
   onSidData?: (data: ArrayBuffer | null) => void;
+  onBinData?: (data: ArrayBuffer | null) => void;
 }
+
+/** Load address and zero page for the relocator; omitted = $1000 / $FC. */
+export type GtExportAddresses = { loadAddress?: number; zeroPage?: number };
 
 export class GTUltraEngine {
   private context: AudioContext;
@@ -208,6 +212,9 @@ export class GTUltraEngine {
         break;
       case 'prgData':
         this.callbacks.onPrgData?.(msg.data as ArrayBuffer | null);
+        break;
+      case 'binData':
+        this.callbacks.onBinData?.(msg.data as ArrayBuffer | null);
         break;
       case 'sidData':
         this.callbacks.onSidData?.(msg.data as ArrayBuffer | null);
@@ -384,12 +391,16 @@ export class GTUltraEngine {
     this.post({ type: 'saveSng' });
   }
 
-  exportPrg(): void {
-    this.post({ type: 'exportPrg' });
+  exportPrg(opts?: GtExportAddresses): void {
+    this.post({ type: 'exportPrg', ...opts });
   }
 
-  exportSid(): void {
-    this.post({ type: 'exportSid' });
+  exportSid(opts?: GtExportAddresses): void {
+    this.post({ type: 'exportSid', ...opts });
+  }
+
+  exportBin(opts?: GtExportAddresses): void {
+    this.post({ type: 'exportBin', ...opts });
   }
 
   // --- Instrument editing ---

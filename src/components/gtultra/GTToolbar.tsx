@@ -8,6 +8,8 @@ import { CustomSelect } from '@components/common/CustomSelect';
 import { useGTUltraStore, type GTSidModel, type GTViewMode } from '../../stores/useGTUltraStore';
 import { getGTUltraASIDBridge } from '../../engine/gtultra/GTUltraASIDBridge';
 import { SIDHardwareToggle } from '../common/SIDHardwareToggle';
+import { notify } from '@stores/useNotificationStore';
+import { validateGtExportOptions, GT_DEFAULT_LOAD_ADDRESS, GT_DEFAULT_ZERO_PAGE } from '../../lib/export/c64/gtExportOptions';
 
 const BTN = 'px-2 py-0.5 text-[10px] font-mono border cursor-pointer transition-colors';
 const BTN_DEFAULT = `${BTN} bg-ft2-header text-ft2-textDim border-ft2-border hover:bg-ft2-border hover:text-ft2-text`;
@@ -71,8 +73,16 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
   const patternLength = useGTUltraStore((s) => s.patternLength);
 
   const handleSave = useCallback(() => { engine?.saveSng(); }, [engine]);
-  const handleExportPrg = useCallback(() => { engine?.exportPrg(); }, [engine]);
-  const handleExportSid = useCallback(() => { engine?.exportSid(); }, [engine]);
+  const [loadAddressText, setLoadAddressText] = useState(GT_DEFAULT_LOAD_ADDRESS.toString(16).toUpperCase());
+  const [zeroPageText, setZeroPageText] = useState(GT_DEFAULT_ZERO_PAGE.toString(16).toUpperCase());
+  const exportWith = useCallback((run: (o: { loadAddress: number; zeroPage: number }) => void) => {
+    const o = { loadAddress: parseInt(loadAddressText, 16), zeroPage: parseInt(zeroPageText, 16) };
+    const err = validateGtExportOptions(o);
+    if (err) notify.error(err); else run(o);
+  }, [loadAddressText, zeroPageText]);
+  const handleExportPrg = useCallback(() => exportWith((o) => engine?.exportPrg(o)), [engine, exportWith]);
+  const handleExportSid = useCallback(() => exportWith((o) => engine?.exportSid(o)), [engine, exportWith]);
+  const handleExportBin = useCallback(() => exportWith((o) => engine?.exportBin(o)), [engine, exportWith]);
 
   // Wire save/export callbacks
   useEffect(() => {
@@ -89,10 +99,12 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
     engine.callbacks.onSngData = (d) => download(d, '.sng', 'application/octet-stream');
     engine.callbacks.onPrgData = (d) => download(d, '.prg', 'application/octet-stream');
     engine.callbacks.onSidData = (d) => download(d, '.sid', 'audio/prs.sid');
+    engine.callbacks.onBinData = (d) => download(d, '.bin', 'application/octet-stream');
     return () => {
       engine.callbacks.onSngData = undefined;
       engine.callbacks.onPrgData = undefined;
       engine.callbacks.onSidData = undefined;
+      engine.callbacks.onBinData = undefined;
     };
   }, [engine, songName]);
 
@@ -102,6 +114,15 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
       <button onClick={handleSave} className={BTN_DEFAULT} title="Save .sng">Save</button>
       <button onClick={handleExportPrg} className={BTN_DEFAULT} title="Export C64 .prg">PRG</button>
       <button onClick={handleExportSid} className={BTN_DEFAULT} title="Export .sid">SID</button>
+      <button onClick={handleExportBin} className={BTN_DEFAULT} title="Export raw binary (no load address header)">Raw Binary</button>
+      <label className="text-ft2-textDim" title="Player load address in hex, page aligned, at least 0400, not overlapping D000-DFFF">
+        Load Address $
+        <input value={loadAddressText} onChange={(e) => setLoadAddressText(e.target.value)} maxLength={4} className={`${SEL} w-12 ml-0.5`} />
+      </label>
+      <label className="text-ft2-textDim" title="Zero page address in hex, 02 to FE">
+        Zero Page $
+        <input value={zeroPageText} onChange={(e) => setZeroPageText(e.target.value)} maxLength={2} className={`${SEL} w-8 ml-0.5`} />
+      </label>
 
       <div className="w-px h-5 bg-ft2-border mx-0.5" />
 

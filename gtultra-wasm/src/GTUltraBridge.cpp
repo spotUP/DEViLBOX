@@ -465,18 +465,22 @@ static void relocateForClock(void) {
     memcpy(freqtbllo, lo, 96); memcpy(freqtblhi, hi, 96);
 }
 
+/* format: FORMAT_SID / FORMAT_PRG / FORMAT_BIN. loadAddr is page aligned (the
+ * relocator works in pages); validation of ranges lives in TS (gtExportOptions.ts). */
 EMSCRIPTEN_KEEPALIVE
-int gt_export_prg(unsigned char* outBuf, int maxLen) {
+int gt_export_ex(int format, int loadAddr, int zeroPage, unsigned char* outBuf, int maxLen) {
     if (editorInfo.maxSIDChannels == 0) editorInfo.maxSIDChannels = 3;
     if (editorInfo.adparam == 0) editorInfo.adparam = 0x0f00;
     editorInfo.optimizepulse = 1;
     editorInfo.optimizerealtime = 1;
     editorInfo.finevibrato = 1;
-    fileformat = FORMAT_PRG;
-    playerversion = PLAYER_BUFFERED;
-    zeropageadr = 0xfc;
-    playeradr = 0x1000;
-    strcpy(packedsongname, "/tmp/temp_export.prg");
+    fileformat = format;
+    playerversion = PLAYER_BUFFERED | (format == FORMAT_SID ? PLAYER_AUTHORINFO : 0);
+    zeropageadr = zeroPage & 0xff;
+    playeradr = loadAddr & 0xff00;
+    const char* path = format == FORMAT_SID ? "/tmp/temp_export.sid"
+                     : format == FORMAT_BIN ? "/tmp/temp_export.bin" : "/tmp/temp_export.prg";
+    strcpy(packedsongname, path);
 
     songExported = 0;
     songExportSuccessFlag = 0;
@@ -484,7 +488,7 @@ int gt_export_prg(unsigned char* outBuf, int maxLen) {
 
     if (!songExported) return 0;
 
-    FILE *f = fopen("/tmp/temp_export.prg", "rb");
+    FILE *f = fopen(path, "rb");
     if (!f) return 0;
     fseek(f, 0, SEEK_END);
     int size = ftell(f);
@@ -496,34 +500,13 @@ int gt_export_prg(unsigned char* outBuf, int maxLen) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-int gt_export_sid(unsigned char* outBuf, int maxLen) {
-    if (editorInfo.maxSIDChannels == 0) editorInfo.maxSIDChannels = 3;
-    if (editorInfo.adparam == 0) editorInfo.adparam = 0x0f00;
-    editorInfo.optimizepulse = 1;
-    editorInfo.optimizerealtime = 1;
-    editorInfo.finevibrato = 1;
-    fileformat = FORMAT_SID;
-    playerversion = PLAYER_BUFFERED | PLAYER_AUTHORINFO;
-    zeropageadr = 0xfc;
-    playeradr = 0x1000;
-    strcpy(packedsongname, "/tmp/temp_export.sid");
+int gt_export_prg(unsigned char* outBuf, int maxLen) { return gt_export_ex(FORMAT_PRG, 0x1000, 0xfc, outBuf, maxLen); }
 
-    songExported = 0;
-    songExportSuccessFlag = 0;
-    relocateForClock();
+EMSCRIPTEN_KEEPALIVE
+int gt_export_sid(unsigned char* outBuf, int maxLen) { return gt_export_ex(FORMAT_SID, 0x1000, 0xfc, outBuf, maxLen); }
 
-    if (!songExported) return 0;
-
-    FILE *f = fopen("/tmp/temp_export.sid", "rb");
-    if (!f) return 0;
-    fseek(f, 0, SEEK_END);
-    int size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (size > maxLen) { fclose(f); return 0; }
-    fread(outBuf, 1, size, f);
-    fclose(f);
-    return size;
-}
+EMSCRIPTEN_KEEPALIVE
+int gt_export_bin(unsigned char* outBuf, int maxLen, int loadAddr, int zeroPage) { return gt_export_ex(FORMAT_BIN, loadAddr, zeroPage, outBuf, maxLen); }
 
 EMSCRIPTEN_KEEPALIVE
 void gt_new_song(void) {
