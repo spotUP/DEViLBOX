@@ -25,6 +25,7 @@ int player_load(const uint8_t *data, int len) {
     if (g_song) pt4_close(g_song);
     g_song = s;
     pt4_set_loop(g_song, 1); /* play on after the end, as the tracker does */
+    pt4_set_option(g_song, PT4_OPT_STEREO, 2); /* stereo 50 %: the tracker's own first-start setting (PT41_FORMAT.md 7.4); hard left/right is too wide on headphones */
     apply_mutes();
     return 0;
 }

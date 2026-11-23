@@ -257,6 +257,11 @@ void pt4__mix(pt4_song *s, int32_t *lr, int8_t **pairs, uint32_t off, uint32_t n
     uint32_t i;
     int k, nv = nvoices(s);
     int sw = s->opt_stereo;
+    /* Card path level: a voice is as loud as in the Paula and mixer paths (sample * volume); above 8 channels the
+       sum is scaled by sqrt(8 / channels), because voices add in power. The old 4 / 32 put every wide module 18 dB
+       down whatever its channel count. wg = gain * 256. */
+    int wg = 256, wn = s->wide ? s->nch : 8;
+    if (wn > 8) for (wg = 0; (wg + 1) * (wg + 1) * wn <= 8 * 65536; wg++) ;
     if (s->path == PT4_PATH_MIXER) {
         for (i = 0; i < n; i++) {
             int r[4], L, R, d;
@@ -297,9 +302,9 @@ void pt4__mix(pt4_song *s, int32_t *lr, int8_t **pairs, uint32_t off, uint32_t n
             if ((k & 3) == 0 || (k & 3) == 3) L += x;
             else R += x;
         }
-        if (nv > 4) {
-            L = L * 4 / nv;
-            R = R * 4 / nv;
+        if (wg != 256) {
+            L = L * wg / 256;
+            R = R * wg / 256;
         }
         d = L - R;
         L -= asr3(d * sw);

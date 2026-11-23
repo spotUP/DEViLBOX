@@ -99,12 +99,14 @@ def main(src_path, out_path):
                       bits=16 if typ & 16 else 8, env=d[h + 233] & 1, map=d[h + 33:h + 129])
 
     # --- which instruments play, and over which notes ------------------------------------------------------
-    rng = {}
+    rng, slides = {}, set()
     for p in pats:
         cur = [0] * nch
         for row in p:
-            for ch, (n, i, *_r) in enumerate(row):
+            for ch, (n, i, v, t, pr) in enumerate(row):
                 cur[ch] = i or cur[ch]
+                if t in (5, 6, 10) or (t == 14 and pr >> 4 in (10, 11)) or v >> 4 in (6, 7, 8, 9):
+                    slides.add(cur[ch])                            # a volume slide: its speed must not change
                 if 1 <= n <= 96 and cur[ch] in ins:
                     assert ins[cur[ch]]['map'][n - 1] == 0, 'multi-sample instrument %d' % cur[ch]
                     a, b = rng.get(cur[ch], (n, n))
@@ -127,9 +129,13 @@ def main(src_path, out_path):
             fr = fr[:ls + ll]
         fr = fr[:len(fr) & ~1]
         assert 2 <= len(fr) <= 131070, 'instrument %d does not fit a PT sample' % i
-        body = bytes(max(-128, min(127, round(x))) & 255 for x in fr)
-        head = s['name'][:22].ljust(22, b'\0') + struct.pack('>HBBHH', len(fr) // 2, 0, s['vol'], ls // 2, ll // 2 or 1)
-        smp[i] = dict(k=s['rel'] - k, head=head, body=body)
+        # A quiet sample uses all 8 bits and its volumes drop by the same factor: same loudness, less noise.
+        # shortcut: an instrument with a volume slide keeps its level (a slide cannot be rescaled); a 4 bit
+        # volume envelope per sample would be needed to lift those too.
+        g = 1 if i in slides else max(1, 127 / max(1, max(abs(x) for x in fr)))
+        body = bytes(max(-128, min(127, round(x * g))) & 255 for x in fr)
+        head = s['name'][:22].ljust(22, b'\0') + struct.pack('>HBBHH', len(fr) // 2, 0, round(s['vol'] / g), ls // 2, ll // 2 or 1)
+        smp[i] = dict(k=s['rel'] - k, head=head, body=body, g=g)
 
     # --- "set volume" beside an effect: a copy of the sample with that default volume, most used pairs first ----
     pairs = {}
@@ -145,7 +151,7 @@ def main(src_path, out_path):
 
     def head(i, vol):
         h = smp[i]['head']
-        return h if vol is None else h[:25] + bytes([vol]) + h[26:]
+        return h if vol is None else h[:25] + bytes([round(vol / smp[i]['g'])]) + h[26:]
 
     # --- cells -------------------------------------------------------------------------------------------
     lost = dict(pan=0, volume_column=0, effect_under_set_volume=0, effect_under_key_off=0)
@@ -186,6 +192,8 @@ def main(src_path, out_path):
                         t, pr = vt, vp                             # a wrong level is heard more than a lost slide
                     else:
                         lost['volume_column'] += 1
+                if t == 12 and cur[ch] in smp:
+                    pr = round(pr / smp[cur[ch]]['g'])             # set volume follows the sample's gain
                 fx[r][ch] = (t, pr)
                 buf[(r * nch + ch) * 4:(r * nch + ch) * 4 + 4] = bytes([(s & 0xF0) | per >> 8, per & 255, (s & 15) << 4 | t, pr])
 
