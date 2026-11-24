@@ -1,5 +1,5 @@
 /**
- * Quartet ST (qts.* / modland *.4v): read-only tracker grid decoded from the song's four voice streams,
+ * Quartet ST (qts.* / modland *.4v): tracker grid (note edits write back in place) decoded from the song's four voice streams,
  * plus real sampler instruments from the companion SMP.<song> / SMP.set file.
  *
  * Every byte meaning below is read from the UADE player
@@ -25,7 +25,9 @@
  * word +4 length in bytes, word +6 'WT' once converted. PCM follows, unsigned (the player subtracts 0x80).
  */
 import type { InstrumentConfig, Pattern, TrackerCell } from '@/types';
-import { periodToGridNote } from '@/lib/amiga/periodNotes';
+import { noteToPeriod, periodToGridNote } from '@/lib/amiga/periodNotes';
+import { cellFieldsEqual } from '@/engine/uade/UADEPatternEncoder';
+import { decodeQuartetStream } from './quartetPsgGrid';
 import { createSamplerInstrument } from './AmigaUtils';
 
 export const QUARTET_ST_ROWS_PER_PATTERN = 64;
@@ -53,6 +55,14 @@ export function quartetStFreqToNote(freq: number): number {
   return periodToGridNote(Math.floor(PAULA_CLOCK / div));
 }
 
+/** Stored frequency long for a grid note (low 3 bits zero); re-imports to the same note. */
+export function quartetStNoteToFreq(note: number): number | null {
+  const period = noteToPeriod(note);
+  if (!(period > 0)) return null;
+  const div = Math.round(PAULA_CLOCK / period);
+  return div > 0 && div <= 0xffff ? div * 8 : null;
+}
+
 /** Voice stream spans: voice 0 at +16, each next voice right after the previous 'F'. */
 export function quartetStVoiceSpans(buf: Uint8Array): Array<{ start: number; end: number }> | null {
   const spans: Array<{ start: number; end: number }> = [];
@@ -78,6 +88,12 @@ export interface QuartetStGrid {
   ticks: number;
   /** sample slots (0-based) the song selects with V */
   usedSamples: number[];
+  /** the 'P' / 'S' record each grid note was read from (frequency long at offset + 4), one per placed cell */
+  placements: Array<{ voice: number; row: number; offset: number; note: number }>;
+  /** byte-exact carrier: every voice stream, one cell per two bytes (quartetPsgGrid.decodeQuartetStream) */
+  blockRows: TrackerCell[][];
+  filePatternAddrs: number[];
+  filePatternSizes: number[];
 }
 
 export function buildQuartetStGrid(buf: Uint8Array, sourceFile: string): QuartetStGrid | null {
@@ -90,6 +106,7 @@ export function buildQuartetStGrid(buf: Uint8Array, sourceFile: string): Quartet
   const timelines: TrackerCell[][] = spans.map(() => []);
   const curSample: Array<number | null> = spans.map(() => null);
   const used = new Set<number>();
+  const placements: QuartetStGrid['placements'] = [];
 
   // One pass of a voice stream from tick t0; returns the tick it ends on.
   const runPass = (v: number, t0: number): number => {
@@ -117,9 +134,11 @@ export function buildQuartetStGrid(buf: Uint8Array, sourceFile: string): Quartet
         if (!line[row].note) {
           const slot = curSample[v];
           if (slot !== null) used.add(slot);
+          const note = quartetStFreqToNote(u32(buf, p + 4));
+          if (note > 0 && row < MAX_ROWS) placements.push({ voice: v, row, offset: p, note });
           line[row] = {
             ...emptyCell(),
-            note: quartetStFreqToNote(u32(buf, p + 4)),
+            note,
             instrument: slot === null ? 0 : slot + 1,
             effTyp: cmd === CMD.S ? 3 : 0,
           };
@@ -163,7 +182,52 @@ export function buildQuartetStGrid(buf: Uint8Array, sourceFile: string): Quartet
       originalInstrumentCount: Math.max(1, usedSamples.length),
     },
   }));
-  return { patterns, step, tickHz, rows, ticks, usedSamples };
+  return {
+    patterns, step, tickHz, rows, ticks, usedSamples, placements,
+    blockRows: spans.map(s => decodeQuartetStream(buf, s.start, s.end)),
+    filePatternAddrs: spans.map(s => s.start),
+    filePatternSizes: spans.map(s => s.end - s.start),
+  };
+}
+
+/**
+ * Write the grid's note edits into the song: a changed note becomes the stored frequency long of its 'P' / 'S'
+ * record, four bytes in place, so an unedited song is written back byte-identical. Cells played from the same
+ * record (loops, 'F' repeats) must agree; any other change (instrument, rest, new note) is reported, not written.
+ */
+export function applyQuartetStGridEdits(source: Uint8Array, edited: Pattern[]): { data: Uint8Array; patched: number; warnings: string[] } {
+  const out = new Uint8Array(source);
+  const base = buildQuartetStGrid(source, '');
+  if (!base) return { data: out, patched: 0, warnings: ['the song has no voice streams to write into'] };
+  const R = QUARTET_ST_ROWS_PER_PATTERN;
+  const cellAt = (v: number, row: number): TrackerCell | undefined => edited[Math.floor(row / R)]?.channels[v]?.rows[row % R];
+  const warnings: string[] = [];
+  const wanted = new Map<number, Set<number>>();
+  const placed = new Set<string>();
+  for (const pl of base.placements) {
+    placed.add(`${pl.voice}:${pl.row}`);
+    const cell = cellAt(pl.voice, pl.row);
+    if (!cell || cell.note === pl.note) continue;
+    const f = (cell.note ?? 0) > 0 ? quartetStNoteToFreq(cell.note ?? 0) : null;
+    if (f === null) { warnings.push(`voice ${pl.voice + 1} row ${pl.row}: note ${cell.note} removes the note or has no frequency; not written`); continue; }
+    if (!wanted.has(pl.offset)) wanted.set(pl.offset, new Set());
+    wanted.get(pl.offset)!.add(f);
+  }
+  let patched = 0;
+  for (const [offset, set] of wanted) {
+    if (set.size !== 1) { warnings.push(`record at ${offset}: cells that play it were edited to different notes; not written`); continue; }
+    const f = [...set][0];
+    out[offset + 4] = (f >>> 24) & 0xff; out[offset + 5] = (f >>> 16) & 0xff; out[offset + 6] = (f >>> 8) & 0xff; out[offset + 7] = f & 0xff;
+    patched++;
+  }
+  let stray = 0;
+  edited.forEach((pat, p) => pat.channels.forEach((chn, v) => chn.rows.forEach((cell, r) => {
+    const was = base.patterns[p]?.channels[v]?.rows[r] ?? emptyCell();
+    const cmp = placed.has(`${v}:${p * R + r}`) ? { ...cell, note: was.note } : cell;
+    if (!cellFieldsEqual(cmp, was)) stray++;
+  })));
+  if (stray > 0) warnings.push(`${stray} edited cell(s) change more than a stored note; not written (the stream would change length)`);
+  return { data: out, patched, warnings };
 }
 
 export interface QuartetStSample {

@@ -8,7 +8,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { buildQuartetStGrid, buildQuartetStInstruments, readQuartetStSamples } from '../quartetStGrid';
+import { buildQuartetStGrid, buildQuartetStInstruments, readQuartetStSamples, quartetStNoteToFreq, quartetStFreqToNote, QUARTET_ST_ROWS_PER_PATTERN } from '../quartetStGrid';
+import { parseQuartetFile } from '../QuartetParser';
+import { exportQuartet } from '@/lib/export/QuartetExporter';
+import { encodeVariableBlock } from '@/engine/uade/UADEPatternEncoder';
 
 const DIR = join(process.cwd(), 'public/data/songs/quartet-st');
 const song = new Uint8Array(readFileSync(join(DIR, 'demo5.4v')));
@@ -61,5 +64,62 @@ describe('Quartet ST through the parser (owner report: qts song loads and plays 
     expect(s.uadePlayerTickGrid).toBe(true);
     expect(s.uadeEditableFileData).toBeDefined();
     expect(s.instruments.some(i => /AHHH/i.test(i.name))).toBe(true);
+  });
+});
+
+describe('Quartet ST note edits write back into the song', () => {
+  const FILES = [
+    'public/data/songs/quartet-st/demo5.4v',
+    'public/data/songs/quartet-st/tfc-tune1.4v',
+    'public/data/songs/quartet-st/MIG.4v',
+  ];
+  const load = async (rel: string) => {
+    const b = readFileSync(join(process.cwd(), rel));
+    const ab = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+    return { raw: new Uint8Array(ab), song: await parseQuartetFile(ab, rel.split('/').pop()!) };
+  };
+
+  it.each(FILES)('%s: carrier re-encodes byte-exact and an unedited export is the source', async (rel) => {
+    const { raw, song } = await load(rel);
+    const l = song.uadeVariableLayout!;
+    expect(l.formatId).toBe('quartet');
+    l.filePatternAddrs.forEach((addr, fp) => {
+      expect(Array.from(encodeVariableBlock(l, fp, l.blockRows![fp], fp))).toEqual(Array.from(raw.subarray(addr, addr + l.filePatternSizes[fp])));
+    });
+    const out = await exportQuartet(song);
+    expect(out.warnings).toEqual([]);
+    expect(Array.from(out.data)).toEqual(Array.from(raw));
+  });
+
+  it.each(FILES)('%s: a one-note edit re-imports as the new note on every row its record plays', async (rel) => {
+    const { raw, song } = await load(rel);
+    const g = buildQuartetStGrid(raw, '')!;
+    const pl = g.placements[0];
+    const target = pl.note + 2;
+    const R = QUARTET_ST_ROWS_PER_PATTERN;
+    const sameRecord = g.placements.filter(q => q.offset === pl.offset);
+    for (const q of sameRecord) song.patterns[Math.floor(q.row / R)].channels[q.voice].rows[q.row % R].note = target;
+    const out = await exportQuartet(song);
+    expect(out.warnings).toEqual([]);
+    expect(out.data.length).toBe(raw.length);
+    expect(Array.from(out.data).filter((b, i) => b !== raw[i]).length).toBeLessThanOrEqual(4);
+    const back = buildQuartetStGrid(out.data, '')!;
+    expect(back.patterns[Math.floor(pl.row / R)].channels[pl.voice].rows[pl.row % R].note).toBe(target);
+  });
+
+  it('a note with no frequency (cleared) is reported, not written', async () => {
+    const { raw, song } = await load(FILES[0]);
+    const pl = buildQuartetStGrid(raw, '')!.placements[0];
+    song.patterns[Math.floor(pl.row / QUARTET_ST_ROWS_PER_PATTERN)].channels[pl.voice].rows[pl.row % QUARTET_ST_ROWS_PER_PATTERN].note = 0;
+    const out = await exportQuartet(song);
+    expect(out.warnings.length).toBeGreaterThan(0);
+    expect(Array.from(out.data)).toEqual(Array.from(raw));
+  });
+
+  it('quartetStNoteToFreq round-trips every grid note it can store', () => {
+    for (let n = 1; n <= 60; n++) {
+      const f = quartetStNoteToFreq(n);
+      if (f !== null) expect(quartetStFreqToNote(f)).toBe(n);
+    }
   });
 });

@@ -54,7 +54,7 @@ import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { quartetEncoder } from '@/engine/uade/encoders/QuartetEncoder';
 import { buildQuartetGrid, QUARTET_ROWS_PER_PATTERN } from './quartetPsgGrid';
-import { buildQuartetStGrid, buildQuartetStInstruments, QUARTET_ST_VOICES } from './quartetStGrid';
+import { buildQuartetStGrid, buildQuartetStInstruments, QUARTET_ST_VOICES, QUARTET_ST_ROWS_PER_PATTERN } from './quartetStGrid';
 import {
   buildQuartetPcmGrid, buildQuartetPcmInstruments, QUARTET_PCM_TICK_HZ, QUARTET_PCM_VOICES,
 } from './quartetPcmGrid';
@@ -621,6 +621,19 @@ export async function parseQuartetFile(
       uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
       uadeEditableFileName: filename,
       uadePlayerTickGrid: true,
+      // same carrier and exporter as SQT: note edits rewrite the stored frequency long in place (QuartetExporter)
+      uadeVariableLayout: {
+        formatId: 'quartet',
+        numChannels: QUARTET_ST_VOICES,
+        numFilePatterns: stGrid.blockRows.length,
+        rowsPerPattern: QUARTET_ST_ROWS_PER_PATTERN,
+        moduleSize: buffer.byteLength,
+        encoder: quartetEncoder,
+        filePatternAddrs: stGrid.filePatternAddrs,
+        filePatternSizes: stGrid.filePatternSizes,
+        trackMap: stGrid.patterns.map(() => stGrid.blockRows.map((_, v) => v)),
+        blockRows: stGrid.blockRows,
+      },
     };
   }
 
