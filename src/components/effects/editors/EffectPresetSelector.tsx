@@ -129,7 +129,7 @@ export const EffectPresetSelector: React.FC<Props> = ({ effect, onApply, onUpdat
                     {p.name === activePresetName ? `● ${p.name}` : p.name}
                   </button>
                   <button onClick={() => handleDelete(p.name)}
-                    className="px-2 text-text-muted hover:text-accent-error opacity-0 group-hover:opacity-100 transition-opacity">
+                    className="px-2 text-text-muted hover:text-accent-error">
                     <Trash2 size={10} />
                   </button>
                 </div>

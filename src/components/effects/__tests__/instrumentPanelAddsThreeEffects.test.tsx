@@ -24,7 +24,7 @@ function Harness() {
 
 function addThroughPicker(label: string): void {
   fireEvent.click(screen.getByText(/Add Effect/));
-  const buttons = screen.getAllByText(label).map((el) => el.closest('button')).filter(Boolean) as HTMLButtonElement[];
+  const buttons = screen.getAllByTitle(`Add ${label}`) as HTMLButtonElement[];
   fireEvent.click(buttons[buttons.length - 1]);
 }
 
@@ -43,7 +43,7 @@ describe('Instrument FX modal (the Master Effects editor pointed at the instrume
   it('adding 3 effects through its browser leaves 3 in the instrument chain, with no channel scope', () => {
     render(<InstrumentEffectsModal isOpen onClose={() => {}} />);
     for (const label of ['Compressor', 'Reverb', 'Compressor']) {
-      const buttons = screen.getAllByText(label).map((el) => el.closest('button')).filter(Boolean) as HTMLButtonElement[];
+      const buttons = screen.getAllByTitle(`Add ${label}`) as HTMLButtonElement[];
       fireEvent.click(buttons[buttons.length - 1]);
     }
     const types = useInstrumentStore.getState().instruments[0].effects.map((fx) => fx.type);

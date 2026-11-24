@@ -6,10 +6,11 @@
  */
 import React, { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Cpu, Globe } from 'lucide-react';
+import { X, Search, Cpu, Globe, Plus } from 'lucide-react';
 import { getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
 import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
+import { Button } from '@components/ui/Button';
 
 export interface EffectBrowserProps {
   onSelect: (effect: AvailableEffect) => void;
@@ -78,17 +79,19 @@ export const EffectBrowser: React.FC<EffectBrowserProps> = ({ onSelect }) => {
               <h4 className="text-xs text-text-muted font-medium uppercase tracking-wide mb-1.5">{group}</h4>
               <div className="space-y-1">
                 {groupEffects.map((effect) => (
-                  <button
+                  <div
                     key={effect.label}
-                    onClick={() => onSelect(effect)}
-                    className={`w-full px-3 py-2 text-sm rounded-lg border border-dark-border bg-dark-bgSecondary
-                             hover:bg-accent-primary/80 hover:text-text-primary hover:border-accent-primary
-                             transition-colors text-left flex items-center justify-between gap-2`}
+                    className="w-full px-3 py-1.5 text-sm rounded-lg border border-dark-border bg-dark-bgSecondary
+                             flex items-center justify-between gap-2"
                   >
-                    <span className="truncate">{effect.label}</span>
+                    <span className="truncate flex-1">{effect.label}</span>
                     {effect.category === 'neural' && <Cpu size={12} className="flex-shrink-0 opacity-60" />}
                     {effect.category === 'wam' && <Globe size={12} className="flex-shrink-0 opacity-60" />}
-                  </button>
+                    <Button variant="primary" size="sm" onClick={() => onSelect(effect)} title={`Add ${effect.label}`}>
+                      <Plus size={12} />
+                      Add
+                    </Button>
+                  </div>
                 ))}
               </div>
             </div>

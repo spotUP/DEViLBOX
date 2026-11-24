@@ -261,7 +261,7 @@ export const ChannelInsertEffectsModal: React.FC<ChannelInsertEffectsModalProps>
                     <span className="text-xs font-mono truncate flex-1">{fx.type}</span>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleRemove(i); }}
-                      className="text-text-muted hover:text-accent-error text-xs opacity-0 group-hover:opacity-100"
+                      className="text-text-muted hover:text-accent-error text-xs"
                       title="Remove"
                       style={{ opacity: i === selectedIndex && !showBrowser ? 1 : undefined }}
                     >

@@ -102,8 +102,8 @@ function SortableVisualEffect({ effect, onToggle, onBassLockToggle, onRemove, on
       {/* Remove button */}
       <button
         onClick={onRemove}
-        className="absolute top-2 right-2 z-10 p-1 rounded-lg opacity-0 group-hover:opacity-100
-                 transition-opacity hover:bg-white/10"
+        className="absolute top-2 right-2 z-10 p-1 rounded-lg
+                 hover:bg-white/10"
         style={{ color: '#ff5050' }}
         title="Remove effect"
       >
@@ -113,8 +113,8 @@ function SortableVisualEffect({ effect, onToggle, onBassLockToggle, onRemove, on
       {/* Toggle button */}
       <button
         onClick={onToggle}
-        className="absolute top-2 right-10 z-10 p-1 rounded-lg opacity-0 group-hover:opacity-100
-                 transition-opacity hover:bg-white/10"
+        className="absolute top-2 right-10 z-10 p-1 rounded-lg
+                 hover:bg-white/10"
         style={{ color: effect.enabled ? '#10b981' : 'rgba(255,255,255,0.2)' }}
         title={effect.enabled ? 'Disable' : 'Enable'}
       >
@@ -125,11 +125,11 @@ function SortableVisualEffect({ effect, onToggle, onBassLockToggle, onRemove, on
       </button>
 
       {/* Bass-lock toggle — 150 Hz crossover protects the bassline from
-          being smeared by reverb / delay / phaser. Visible on hover. */}
+          being smeared by reverb / delay / phaser. Always visible. */}
       <button
         onClick={onBassLockToggle}
-        className="absolute top-2 right-[72px] z-10 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold opacity-0 group-hover:opacity-100
-                 transition-opacity hover:bg-white/10"
+        className="absolute top-2 right-[72px] z-10 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold
+                 hover:bg-white/10"
         style={{
           color: effectiveBassLock(effect.type, effect.bassLock) ? '#f59e0b' : 'rgba(255,255,255,0.25)',
           border: '1px solid currentColor',

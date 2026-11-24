@@ -110,7 +110,7 @@ export function MasterPresetMenu<U extends { name: string }>({
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); onDeleteUserPreset(preset.name); }}
-                    className="text-text-muted hover:text-accent-error opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-text-muted hover:text-accent-error"
                     title="Delete preset"
                   >
                     <X size={12} />

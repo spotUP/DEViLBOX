@@ -126,11 +126,11 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
           effects.map((effect) => {
             return (
               <div key={effect.id} className="relative group">
-                {/* Remove button (top-right corner, visible on hover) */}
+                {/* Remove button (top-right corner) */}
                 <button
                   onClick={() => handleRemove(effect.id)}
-                  className="absolute top-2 right-2 z-10 p-1 rounded-lg opacity-0 group-hover:opacity-100
-                           transition-opacity hover:bg-white/10"
+                  className="absolute top-2 right-2 z-10 p-1 rounded-lg
+                           hover:bg-white/10"
                   style={{ color: '#ff5050' }}
                   title="Remove effect"
                 >
@@ -140,8 +140,8 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
                 {/* Toggle button (top-right, next to remove) */}
                 <button
                   onClick={() => handleToggle(effect.id)}
-                  className="absolute top-2 right-10 z-10 p-1 rounded-lg opacity-0 group-hover:opacity-100
-                           transition-opacity hover:bg-white/10"
+                  className="absolute top-2 right-10 z-10 p-1 rounded-lg
+                           hover:bg-white/10"
                   style={{ color: effect.enabled ? '#10b981' : 'rgba(255,255,255,0.2)' }}
                   title={effect.enabled ? 'Disable' : 'Enable'}
                 >

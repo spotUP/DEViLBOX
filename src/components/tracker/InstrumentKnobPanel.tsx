@@ -13,6 +13,7 @@ import { useInstrumentStore, useUIStore, useMIDIStore } from '@stores';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Button } from '@components/ui/Button';
 import { JC303StyledKnobPanel } from '@components/instruments/controls/JC303StyledKnobPanel';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 import { Knob } from '@components/controls/Knob';
@@ -446,33 +447,21 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
 
   // Right-side content for tab bar — action buttons for FX tabs
   const instFxActions = useMemo(() => (
-    <button
-      onClick={() => instFxRef.current?.toggleBrowser()}
-      className="flex items-center gap-1 px-1.5 py-0 text-[9px] font-bold uppercase rounded
-               bg-accent-highlight/10 text-accent-highlight hover:bg-accent-highlight/20 transition-colors"
-    >
+    <Button variant="compact" onClick={() => instFxRef.current?.toggleBrowser()} title="Add effect">
       <Plus size={9} />
       Add
-    </button>
+    </Button>
   ), []);
 
   const masterFxActions = useMemo(() => (
     <div className="flex items-center gap-1">
-      <button
-        onClick={() => masterFxRef.current?.togglePresetMenu()}
-        className="px-1.5 py-0 text-[9px] font-medium rounded bg-dark-bgTertiary text-text-secondary
-                 hover:bg-dark-bgHover transition-colors border border-dark-borderLight"
-      >
+      <Button variant="compact" onClick={() => masterFxRef.current?.togglePresetMenu()} title="Master effect presets">
         Presets
-      </button>
-      <button
-        onClick={() => masterFxRef.current?.toggleAddMenu()}
-        className="flex items-center gap-1 px-1.5 py-0 text-[9px] font-bold uppercase rounded
-                 bg-accent-highlight/10 text-accent-highlight hover:bg-accent-highlight/20 transition-colors"
-      >
+      </Button>
+      <Button variant="compact" onClick={() => masterFxRef.current?.toggleAddMenu()} title="Add master effect">
         <Plus size={9} />
         Add
-      </button>
+      </Button>
     </div>
   ), []);
 

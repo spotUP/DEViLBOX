@@ -82,6 +82,8 @@ interface UIStore {
   activePanel: PanelType;
   modalOpen: ModalId | null;
   modalData: Record<string, unknown> | null;
+  /** The modal a stacked modal was opened over (e.g. the instrument editor under the FX editor); closeModal returns to it. */
+  modalReturn: { id: ModalId; data: Record<string, unknown> | null } | null;
   showPatterns: boolean;
   editorFullscreen: boolean;
   showAutomationLanes: boolean;
@@ -297,6 +299,7 @@ export const useUIStore = create<UIStore>()(
       activePanel: 'tracker',
       modalOpen: null,
       modalData: null,
+      modalReturn: null,
       showPatterns: false,
       editorFullscreen: false,
       showAutomationLanes: false,
@@ -434,14 +437,22 @@ export const useUIStore = create<UIStore>()(
 
       openModal: (modalId, data) =>
         set((state) => {
+          // shortcut: one level deep; a third stacked modal returns to the second only.
+          if (state.modalOpen && state.modalOpen !== modalId) {
+            state.modalReturn = { id: state.modalOpen, data: state.modalData };
+          } else if (!state.modalOpen) {
+            state.modalReturn = null;
+          }
           state.modalOpen = modalId;
           state.modalData = data ?? null;
         }),
 
       closeModal: () =>
         set((state) => {
-          state.modalOpen = null;
-          state.modalData = null;
+          const back = state.modalReturn;
+          state.modalOpen = back?.id ?? null;
+          state.modalData = back?.data ?? null;
+          state.modalReturn = null;
         }),
 
       togglePatterns: () =>
