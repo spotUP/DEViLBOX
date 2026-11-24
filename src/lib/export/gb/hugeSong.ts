@@ -381,6 +381,9 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
   const lastNote = [-1, -1, -1, -1]; // hUGE note per channel, for E1xy / E2xy targets
   let sweep = 0; // Furnace chan[0].sweep (NR10 shadow): 13xx sets time and shift, 14xx the direction bit
   const fine = [0x80, 0x80, 0x80, 0x80]; // E5xx per channel: one that keeps the current pitch is a no-op
+  // Furnace 00xy is channel state (playback.cpp chan.arp) running on every later row until 0000; hUGE 0xy lasts one row,
+  // so a row with a free effect slot repeats it (hUGE's arp phase is the free-running tick counter, so it continues).
+  const arpNow = [0, 0, 0, 0];
   for (let o = 0; o < s.ordersLen; o++) {
     for (let c0 = 0; c0 < orderLen[o]; c0 += ROWS) {
       const rows = Math.min(ROWS, orderLen[o] - c0);
@@ -442,6 +445,7 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
             const fxs = cell.effects.filter((e) => e.type >= 0 && e !== slide);
             let pan = -1;
             for (const e of fxs) {
+              if (e.type === 0x00) arpNow[ch] = e.value & 0xff;
               if (e.type === 0x11 && kind === 'noise') continue; // handled as the noise width above
               if (e.type === 0x12 && kind === 'duty') dutyNow[ch] = e.value & 3;
               if (e.type === 0xe5) { const same = (e.value & 0xff) === fine[ch]; fine[ch] = e.value & 0xff; if (same) continue; }
@@ -456,17 +460,27 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
               else if (effect < 0) effect = h; else lossy.add('second effect in one cell (hUGE has one effect column)');
             }
             if (cell.volume >= 0) {
-              if (effect < 0) effect = 0xc00 | (kind === 'wave' ? waveVol(cell.volume & 15) : cell.volume & 15);
-              else if (baseKey >= 0 && !macro(m.instruments[ci], MACRO_VOL) && (effect & 0xf00) !== 0x300) {
-                // A note's volume rides in a start-volume variant of its instrument, which frees the Cxy slot for the effect.
-                // The reload sets NR11, but Furnace keeps the channel's duty across notes: a macro-less duty instrument's
-                // variant carries that duty, unless the cell's own effect is the 12xx (9xx sets it after the load).
-                const keepDuty = kind === 'duty' && !macro(m.instruments[ci], MACRO_DUTY) && (effect & 0xf00) !== 0x900;
+              const cxy = 0xc00 | (kind === 'wave' ? waveVol(cell.volume & 15) : cell.volume & 15);
+              // A note's volume rides in a start-volume variant of its instrument, which frees the Cxy slot for the effect.
+              // The reload sets NR11, but Furnace keeps the channel's duty across notes: a macro-less duty instrument's
+              // variant carries that duty, unless the cell's own effect is the 12xx (9xx sets it after the load).
+              const keepDuty = baseKey >= 0 && kind === 'duty' && !macro(m.instruments[ci], MACRO_DUTY) && (effect & 0xf00) !== 0x900;
+              const variantKey = baseKey + (keepDuty && dutyNow[ch] >= 0 ? DUTY_STEP * (dutyNow[ch] + 1) : 0) + VOL_STEP * ((cxy & 15) + 1);
+              const variantOk = baseKey >= 0 && !macro(m.instruments[ci], MACRO_VOL) && (effect & 0xf00) !== 0x300;
+              if (effect < 0) effect = cxy;
+              // An arp with no variant slot gives way to the volume: the arp runs on from the next row (arpNow), a dropped
+              // volume would last the whole note.
+              else if (effect < 0x100 && !(variantOk && (insMap[kind].has(variantKey) || variants[kind] < room[kind]))) {
+                effect = cxy;
+                lossy.add('arpeggio beside a volume column (no free instrument slot; arp starts a row late)');
+              } else if (variantOk) {
                 if (keepDuty && plainRepeat && dutyNow[ch] < 0) lossy.add('volume column beside an effect on an instrument repeat (duty reset)');
-                const dutyKey = keepDuty && dutyNow[ch] >= 0 ? DUTY_STEP * (dutyNow[ch] + 1) : 0;
-                instr = insNo(kind, baseKey + dutyKey + VOL_STEP * ((kind === 'wave' ? waveVol(cell.volume & 15) : cell.volume & 15) + 1), baseKey);
+                instr = insNo(kind, variantKey, baseKey);
               } else lossy.add('volume column beside an effect');
             }
+            // A row's own volume (Cxy) wins over the carried arp: the arp misses that one row, a lost volume lasts the note.
+            if (effect < 0 && arpNow[ch]) effect = arpNow[ch];
+            else if (arpNow[ch] && !fxs.some((e) => e.type === 0x00)) lossy.add('running arpeggio beside another effect (paused that row)');
             // A pan in a busy cell moves to a free slot of the row as a channel-pair pan (driver fx_set_pan param bit 7).
             if (pan >= 0) { if (effect < 0) effect = pan; else spill.push({ r, ch, lr: (pan & 0x10 ? 2 : 0) | (pan & 1) }); }
           }
