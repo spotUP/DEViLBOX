@@ -4,7 +4,9 @@
  * A grid note is a stream byte below 0xC0 (octave nibble, semitone nibble) that the replayer transposes by the build's
  * steps plus the instrument record's, then looks up in the period table shifted by the record's octave. An edited note
  * cell is a same-length patch of that one byte, chosen so the grid's own lookup lands on the new note. The instrument
- * is a 0x22-byte record copied inline into the stream, not a per-note byte: an instrument change is refused. A stream
+ * is a 0x22-byte record copied inline into the stream, not a per-note byte: an instrument change overwrites that record
+ * with the bytes of another instrument's record (same length, no relocations inside), and only when every note the record
+ * covers is changed to that instrument and still reads back at the same pitch. A stream
  * run is shared by every place that calls it, so an edit shows wherever the run plays. Edits the stream cannot hold
  * at its length - a note on a row without one splits the held note ahead of it (addNote, using the 0xF4 padding after it), a note removed, length or volume / effect changes - are refused with a
  * warning and nothing is written for them. After patching the grid is decoded again: every edited cell must read back
@@ -20,7 +22,9 @@ const VOICES = 4;
 const PREFIX = 'Sound Programming Language';
 
 export interface SplEditResult { data: Uint8Array; patched: number; warnings: string[] }
-interface Edit { pattern: number; channel: number; row: number; note: number; at: number; byte: number; fx: Array<[number, number]>; fxPatches: Array<[number, number]> }
+interface Edit { pattern: number; channel: number; row: number; note: number; at: number; byte: number; fx: Array<[number, number]>; fxPatches: Array<[number, number]>;
+  /** instrument edit: the 0x22 record in force is overwritten with the record of instrument `inst`; every note it covers must read back as `inst` */
+  record?: number; inst?: number; covered?: Array<{ pattern: number; channel: number; row: number }> }
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
 const cellAt = (g: SplGrid, channel: number, row: number): TrackerCell | undefined =>
@@ -90,6 +94,7 @@ export function applySplGridEdits(original: Uint8Array, patterns: readonly Patte
   }
   const claimed = new Map<number, number>();
   const accepted: Edit[] = [];
+  const instEdits: Array<{ pattern: number; channel: number; row: number; record: number; inst: number }> = [];
   const adds: Array<{ pattern: number; channel: number; row: number; cell: TrackerCell }> = [];
 
   patterns.forEach((pat, pi) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
@@ -102,7 +107,12 @@ export function applySplGridEdits(original: Uint8Array, patterns: readonly Patte
     if (!noteChanged && !instChanged && !otherChanged && !fxChanged) return;
     const at = { pattern: pi, channel: c, row: r };
     if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect columns are not stored per row in this format; that change was not written.`);
-    if (instChanged) warnings.push(`${PREFIX} ${where(at)}: the instrument is a record copied inline into the stream, not a byte per note; the instrument was not written.`);
+    const instSrc = base.rowSources[pi]?.[c]?.[r];
+    const instEdit = instChanged && !noteChanged && was.note >= 1 && was.note < NOTE_OFF && !!instSrc;
+    if (instEdit && instSrc) {
+      if (cell.instrument < 1 || cell.instrument > base.instrumentRecords.length) warnings.push(`${PREFIX} ${where(at)}: instrument ${cell.instrument} is not one the module plays; the instrument was not written.`);
+      else instEdits.push({ ...at, record: instSrc.record, inst: cell.instrument });
+    } else if (instChanged) warnings.push(`${PREFIX} ${where(at)}: the instrument is a record copied inline into the stream, not a byte per note; it can only change on a note, with the note left alone.`);
     let fxPatches: Array<[number, number]> = [];
     if (fxChanged) {
       const fxr = effectEditPatches(cell, was, base.effectSources[c]?.[pi * ROWS_PER_PATTERN + r] ?? []);
@@ -141,21 +151,34 @@ export function applySplGridEdits(original: Uint8Array, patterns: readonly Patte
     accepted.push({ ...at, note: cell.note, at: src.offset, byte: found, fx: cellEffects(cell), fxPatches });
   })));
 
+  // one record covers every note after it up to the next record: they all take the new instrument or none does
+  const byRecord = new Map<number, typeof instEdits>();
+  for (const e of instEdits) byRecord.set(e.record, [...(byRecord.get(e.record) ?? []), e]);
+  for (const [record, list] of byRecord) {
+    const covered: Array<{ pattern: number; channel: number; row: number }> = [];
+    base.rowSources.forEach((pat, pi) => pat.forEach((col, c) => col.forEach((src, r) => { if (src && src.record === record) covered.push({ pattern: pi, channel: c, row: r }); })));
+    const target = list[0].inst;
+    const consistent = list.every((e) => e.inst === target) && covered.every((k) => list.some((e) => e.pattern === k.pattern && e.channel === k.channel && e.row === k.row));
+    if (!consistent) { warnings.push(`${PREFIX} ${where(list[0])}: this instrument record also covers ${covered.length} notes, all of which must change to the same instrument; the instrument was not written.`); continue; }
+    accepted.push({ ...list[0], note: cellAt(base, list[0].channel, list[0].pattern * ROWS_PER_PATTERN + list[0].row)?.note ?? 0, at: -1, byte: -1, fx: [], fxPatches: [], record, inst: target, covered });
+  }
+
   const writeAll = (edits: Edit[]): void => {
     data.set(original);
-    for (const e of edits) { if (e.at >= 0) data[e.at] = e.byte; for (const [off, val] of e.fxPatches) data[off] = val; }
+    for (const e of edits) { if (e.record !== undefined && e.inst !== undefined) data.set(original.subarray(base.instrumentRecords[e.inst - 1], base.instrumentRecords[e.inst - 1] + 0x22), e.record); if (e.at >= 0) data[e.at] = e.byte; for (const [off, val] of e.fxPatches) data[off] = val; }
   };
   const touched = new Set(accepted.flatMap((e) => [e.at, ...e.fxPatches.map(([o]) => o)]));
+  const records = new Set(accepted.flatMap((e) => (e.record === undefined ? [] : [e.record])));
   const shared = new Set<string>();
   base.rowSources.forEach((pat, pi) => pat.forEach((col, c) => col.forEach((s, r) => {
-    if (s && (touched.has(s.offset) || base.effectSources[c][pi * ROWS_PER_PATTERN + r].some((x) => touched.has(x.at)))) shared.add(`${c}:${pi * ROWS_PER_PATTERN + r}`);
+    if (s && (records.has(s.record) || touched.has(s.offset) || base.effectSources[c][pi * ROWS_PER_PATTERN + r].some((x) => touched.has(x.at)))) shared.add(`${c}:${pi * ROWS_PER_PATTERN + r}`);
   })));
 
   const failing = (edits: Edit[]): Edit[] => {
     writeAll(edits);
     const again = buildSplGrid(data);
     if (typeof again === 'string' || again.rows !== base.rows) return edits;
-    const bad = edits.filter((e) => { const got = cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row); return got?.note !== e.note || (e.fxPatches.length > 0 && JSON.stringify(cellEffects(got as TrackerCell)) !== JSON.stringify(e.fx)); });
+    const bad = edits.filter((e) => { const got = cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row); return got?.note !== e.note || (e.inst !== undefined && (e.covered ?? []).some((k) => { const x = cellAt(again, k.channel, k.pattern * ROWS_PER_PATTERN + k.row); return x?.instrument !== e.inst || x?.note !== cellAt(base, k.channel, k.pattern * ROWS_PER_PATTERN + k.row)?.note; })) || (e.fxPatches.length > 0 && JSON.stringify(cellEffects(got as TrackerCell)) !== JSON.stringify(e.fx)); });
     if (bad.length > 0) return bad;
     for (let c = 0; c < 4; c++) {
       for (let row = 0; row < base.rows; row++) {

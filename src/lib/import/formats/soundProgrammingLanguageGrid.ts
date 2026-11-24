@@ -142,9 +142,11 @@ export function isSplModule(buf: Uint8Array): boolean {
 
 export interface SplStream { offset: number; size: number }
 /** Where a note starts: file offset of its first note byte, bytes it spans, and the octave / transposition its period lookup used. */
-export type SplRowSource = { stream: number; offset: number; length: number; octave: number; steps: number; hold: number } | null;
+export type SplRowSource = { stream: number; offset: number; length: number; octave: number; steps: number; hold: number; record: number } | null;
 
 export interface SplGrid {
+  /** file offset of the first 0x22-byte record of each instrument (index = instrument number - 1) */
+  instrumentRecords: number[];
   /** file offset of the first byte of every decoded note */
   noteOffsets: number[];
   patterns: Pattern[];
@@ -165,7 +167,7 @@ export interface SplGrid {
   noteForByte: (byte: number, octave: number, steps: number) => number;
 }
 
-interface Placed { hold: number; tick: number; note: number; instrument: number; run: number; offset: number; length: number; octave: number; steps: number; extras: number[] }
+interface Placed { hold: number; tick: number; note: number; instrument: number; run: number; offset: number; length: number; octave: number; steps: number; record: number; extras: number[] }
 interface Run { start: number; end: number }
 
 /** transpose_note: octave in the high nibble, semitone in the low. */
@@ -195,7 +197,9 @@ function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: n
     if (i === undefined) { i = runs.length; runs.push({ start, end: start }); runIndex.set(start, i); }
     return i;
   };
-  const instruments = new Map<number, number>();
+  // an instrument is a record's content: two records with the same 0x22 bytes are one instrument
+  const instruments = new Map<string, number>();
+  const instrumentRecords: number[] = [];
   const periodOf = (note: number, octave: number): number => {
     const shifted = (note + ((octave << 4) & 0xff)) & 0xff;
     return u16(buf, at(build.periodTable + 2 * (shifted & 0x0f))) >> (shifted >> 4);
@@ -212,6 +216,7 @@ function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: n
     let row = 0;
     let reload = 0;
     let instrument = 0;
+    let record = -1;
     const rec = { flags: 0, octave: 0, transpose: 0 };
     let done = false;
     while (!done && row < MAX_ROWS) {
@@ -240,8 +245,10 @@ function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: n
         rec.octave = u16(buf, at(rp + 0x0c));
         rec.flags = u16(buf, at(rp + 0x0e));
         rec.transpose = u16(buf, at(rp + 0x20));
-        if (!instruments.has(rp)) instruments.set(rp, instruments.size + 1);
-        instrument = instruments.get(rp) ?? 0;
+        const key = Array.from(buf.subarray(at(rp), at(rp) + RECORD_BYTES)).join(',');
+        if (!instruments.has(key)) { instruments.set(key, instruments.size + 1); instrumentRecords.push(at(rp)); }
+        instrument = instruments.get(key) ?? 0;
+        record = at(rp);
         pos = rp + RECORD_BYTES;
         touch(pos);
       } else if (b >= 0xc0 && b <= 0xef) {
@@ -252,7 +259,7 @@ function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: n
         const more = (rec.flags & 1) === 0 ? 0 : (rec.flags & 0x20) !== 0 ? 3 : 1;
         const moved = transposeNote(b, build.transpose + rec.transpose);
         const period = periodOf(moved, rec.octave);
-        placed.push({ hold: Math.max(reload, 1), tick: row, note: period > 0 ? periodToNote(period) : 0, instrument, run, offset: at(pos), length: 1 + more, octave: rec.octave, steps: build.transpose + rec.transpose,
+        placed.push({ hold: Math.max(reload, 1), tick: row, note: period > 0 ? periodToNote(period) : 0, instrument, run, offset: at(pos), length: 1 + more, octave: rec.octave, steps: build.transpose + rec.transpose, record,
           extras: Array.from({ length: more }, (_, i) => at(pos + 1 + i)) });
         pos += 1 + more;
         touch(pos);
@@ -284,7 +291,7 @@ function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: n
         slots.push({ typ, at: off });
       });
       effectSources[v][p.tick] = slots;
-      sources[v][p.tick] = { stream: p.run, offset: p.offset, length: p.length, octave: p.octave, steps: p.steps, hold: p.hold };
+      sources[v][p.tick] = { stream: p.run, offset: p.offset, length: p.length, octave: p.octave, steps: p.steps, hold: p.hold, record: p.record };
       const endTick = Math.min(rows, i + 1 < placed.length ? placed[i + 1].tick : rows);
       for (let t = p.tick; t < endTick; t++) runAtTick[v][t] = p.run;
     }
@@ -321,6 +328,6 @@ function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: n
   const bpm = Math.max(32, Math.min(255, Math.round((2.5 * TIMEBASE_HZ) / timer)));
   // every note byte of a command: the first and the extra ones (all stay below 0xC0 when edited)
   const noteOffsets = voices.flatMap((p) => p.flatMap((n) => [n.offset, ...n.extras]));
-  return { noteOffsets, patterns, songPositions, rows, streams, blockRows, effectSources, rowSources, streamAtStart, ticksPerStep, bpm, buildName: build.name,
+  return { instrumentRecords, noteOffsets, patterns, songPositions, rows, streams, blockRows, effectSources, rowSources, streamAtStart, ticksPerStep, bpm, buildName: build.name,
     noteForByte: (byte, octave, steps) => { const period = periodOf(transposeNote(byte, steps), octave); return period > 0 ? periodToNote(period) : 0; } };
 }
