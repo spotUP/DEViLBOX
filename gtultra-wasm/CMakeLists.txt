@@ -95,6 +95,7 @@ set_target_properties(GTUltra PROPERTIES
         -s ALLOW_MEMORY_GROWTH=1 \
         -s EXPORTED_RUNTIME_METHODS=['cwrap','ccall','HEAPU8','HEAPU16','HEAPU32','UTF8ToString'] \
         -s EXPORTED_FUNCTIONS=['_malloc','_free'] \
+        -s INCOMING_MODULE_JS_API=['wasmBinary','locateFile','print','printErr'] \
         -s FILESYSTEM=1 \
         -s FORCE_FILESYSTEM=1 \
         -s NO_EXIT_RUNTIME=1 \
