@@ -19,10 +19,10 @@
       "detail": ""
     },
     "adPlug": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": null,
-      "detail": "instrument read back 0 want 3"
+      "detail": ""
     },
     "amosMusicBank": {
       "verdict": "pass",
@@ -379,10 +379,10 @@
       "detail": ""
     },
     "klystrack": {
-      "verdict": "fail",
-      "edited": "instrument",
-      "slotClean": true,
-      "detail": "instrument read back -1 want 3 (bytes unchanged)"
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
     },
     "kris": {
       "verdict": "pass",

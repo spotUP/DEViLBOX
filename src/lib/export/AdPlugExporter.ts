@@ -1,16 +1,12 @@
 /**
  * AdPlug RAD (Reality AdLib Tracker) v1 Exporter
- * Converts a TrackerSong to RAD v1 binary format for OPL2
- *
- * RAD v1 layout:
- *   "RAD by REALiTY!!" (16 bytes) + version byte (0x10)
- *   Description string (null-terminated)
- *   Initial speed byte
- *   Instrument definitions
- *   Order list
- *   Pattern data (channel events with row-skip encoding)
- *
- * OPL2 supports 9 melody channels, each with 2 operators (modulator + carrier).
+ * Converts a TrackerSong to RAD v1 binary format for OPL2 (layout per adplug rad2.cpp, file version 0x10):
+ *   "RAD by REALiTY!!" (16) + version 0x10 + flags (bits 0-4 speed, bit 7 description follows)
+ *   description (null-terminated) + instruments (number byte, 11 bytes; 0 ends) + order count + orders
+ *   + 32 absolute LE uint16 pattern offsets (0 = empty) + patterns:
+ *   line byte (bit 7 last line, low 7 row), per channel: chan byte (bit 7 last channel, low 4 channel),
+ *   note byte (bit 7 instrument bit 4, bits 4-6 octave, low 4 note 1=C..12=B, 15=key off),
+ *   instrument byte (high nibble instrument low bits, low nibble effect), parameter byte if effect != 0.
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -25,6 +21,9 @@ const RAD_VERSION = 0x10; // v1.0
 
 // OPL2 has 9 melody channels
 const OPL2_CHANNELS = 9;
+
+// RAD v1 effects: 1 slide up, 2 slide down, 3 tone porta, 5/6 volume slide + porta/vibrato, A volume slide, C volume, D break, F speed
+const RAD_V1_EFFECTS = new Set([0x1, 0x2, 0x3, 0x5, 0x6, 0xA, 0xC, 0xD, 0xF]);
 
 // OPL chip types in FurnaceChipType that map to OPL2-compatible instruments
 const OPL_CHIP_TYPES = new Set([2, 23, 26]); // OPL3, Y8950, OPL4
@@ -150,121 +149,39 @@ function encodeOPL3Instrument(o: OPL3Config): Uint8Array {
   return bytes;
 }
 
-/**
- * Encode pattern rows in RAD's channel-event format
- *
- * Row format within a pattern:
- *   If row has no events → skip (counted by row-skip byte)
- *   Row-skip byte: (skip_count + 1) — number of empty rows before this row
- *     0x00 means "this is the next row", 0x01 means "skip 1 empty row", etc.
- *   Then per-channel events:
- *     First byte: channel_number (0-8) with flags:
- *       bit 7 (0x80): note present
- *       bit 6 (0x40): instrument present
- *       bit 5 (0x20): volume present (RAD v1 doesn't use this, but reserve)
- *       bit 4 (0x10): effect present
- *     Followed by optional bytes depending on flags:
- *       note byte: octave[6:4] | note[3:0] (1=C, 2=C#, ..., 12=B; 15=key-off)
- *       instrument byte: 1-based instrument number
- *       volume byte (unused in v1)
- *       effect byte: effect_type[7:4] | effect_param[3:0]
- *   End of row's channel events: 0x00
- *   End of pattern: row with 0x00 as first byte after row-skip processing
- */
+/** Encode one pattern as RAD v1 line/channel records; empty patterns return [] (offset 0 in the table). */
 function encodePatternData(
   song: TrackerSong,
   patternIndex: number,
   instrumentMap: Map<number, number>,
 ): number[] {
-  const data: number[] = [];
   const pat = song.patterns[patternIndex];
-  if (!pat) return [0x00]; // empty pattern
-
-  const numRows = pat.length || 64;
+  if (!pat) return [];
+  const numRows = Math.min(64, pat.length || 64);
   const numCh = Math.min(pat.channels.length, OPL2_CHANNELS);
-  let emptyRows = 0;
+  const lines: number[][] = [];
 
   for (let row = 0; row < numRows; row++) {
-    // Collect channel events for this row
-    const rowEvents: number[] = [];
-
+    const chans: number[][] = [];
     for (let ch = 0; ch < numCh; ch++) {
       const cell = pat.channels[ch]?.rows[row];
       if (!cell) continue;
-
-      const hasNote = cell.note > 0 && cell.note <= 97;
-      const hasInst = cell.instrument > 0;
-      const radEffect = cell.effTyp > 0 ? mapXmEffectToRAD(cell.effTyp, cell.eff) : null;
-      const hasEffect = radEffect !== null;
-
-      if (!hasNote && !hasInst && !hasEffect) continue;
-
-      // Channel byte with flags
-      let chanByte = ch & 0x0F;
-      if (hasNote) chanByte |= 0x80;
-      if (hasInst) chanByte |= 0x40;
-      if (hasEffect) chanByte |= 0x10;
-      rowEvents.push(chanByte);
-
-      // Note byte: octave[6:4] | noteNum[3:0]
-      if (hasNote) {
-        if (cell.note === 97) {
-          rowEvents.push(0x0F);
-        } else {
-          const semitone = ((cell.note - 1) % 12) + 1;
-          const octave = Math.floor((cell.note - 1) / 12);
-          rowEvents.push(((octave & 0x07) << 4) | (semitone & 0x0F));
-        }
-      }
-
-      // Instrument byte (1-based RAD instrument number)
-      if (hasInst) {
-        const radInst = instrumentMap.get(cell.instrument) ?? cell.instrument;
-        rowEvents.push(radInst & 0xFF);
-      }
-
-      // Effect byte (already mapped to RAD format)
-      if (hasEffect) {
-        rowEvents.push(radEffect!);
-      }
+      const noteVal = cell.note === 97 ? 0x0F : cell.note >= 1 && cell.note <= 96 ? ((cell.note - 1) % 12) + 1 : 0;
+      const octave = cell.note >= 1 && cell.note <= 96 ? Math.floor((cell.note - 1) / 12) : 0;
+      const inst = cell.instrument > 0 ? (instrumentMap.get(cell.instrument) ?? cell.instrument) & 0x1F : 0;
+      const effect = RAD_V1_EFFECTS.has(cell.effTyp) ? cell.effTyp : 0;
+      if (!noteVal && !inst && !effect) continue;
+      const rec = [ch, ((inst & 0x10) << 3) | (octave << 4) | noteVal, ((inst & 0x0F) << 4) | effect];
+      if (effect) rec.push(cell.eff & 0xFF);
+      chans.push(rec);
     }
-
-    if (rowEvents.length === 0) {
-      emptyRows++;
-      continue;
-    }
-
-    // Emit row-skip byte + channel events + row terminator
-    data.push(emptyRows & 0x3F);
-    emptyRows = 0;
-    data.push(...rowEvents);
-    data.push(0x00); // end of row's channel events
+    if (chans.length === 0) continue;
+    chans[chans.length - 1][0] |= 0x80;
+    lines.push([row, ...chans.flat()]);
   }
-
-  // End-of-pattern marker
-  data.push(0x00);
-  return data;
-}
-
-/**
- * Map XM effect type + param to RAD effect byte (type[7:4] | param[3:0]).
- * RAD effects: 1=slide up, 2=slide down, 3=tone porta, 5=volslide+porta,
- * A=volume slide, C=set volume, D=pattern break, F=set speed.
- * Returns null if no valid mapping exists.
- */
-function mapXmEffectToRAD(effTyp: number, eff: number): number | null {
-  const param = eff & 0x0F;
-  switch (effTyp) {
-    case 0x1: return (0x1 << 4) | param;          // Portamento up
-    case 0x2: return (0x2 << 4) | param;          // Portamento down
-    case 0x3: return (0x3 << 4) | param;          // Tone portamento
-    case 0x5: return (0x5 << 4) | param;          // Vol slide + tone porta
-    case 0xA: return (0xA << 4) | param;          // Volume slide
-    case 0xC: return (0xC << 4) | (eff >> 2);     // Set volume (scale 0-63 → 0-15)
-    case 0xD: return (0xD << 4) | param;          // Pattern break
-    case 0xF: return (0xF << 4) | Math.min(15, eff); // Set speed
-    default:  return null;                         // Unsupported effect
-  }
+  if (lines.length === 0) return [];
+  lines[lines.length - 1][0] |= 0x80;
+  return lines.flat();
 }
 
 /**
@@ -294,7 +211,7 @@ export function exportToRAD(song: TrackerSong): ArrayBuffer {
   const oplInstrumentBytes: Array<{ radIndex: number; bytes: Uint8Array }> = [];
   let radIndex = 1;
 
-  for (let i = 0; i < song.instruments.length; i++) {
+  for (let i = 0; i < song.instruments.length && radIndex < 32; i++) {
     const inst = song.instruments[i];
     if (!isOPLInstrument(inst)) continue;
     const xmIndex = inst.id || (i + 1); // 1-based
@@ -313,54 +230,36 @@ export function exportToRAD(song: TrackerSong): ArrayBuffer {
   }
 
   // ── Build binary sections ─────────────────────────────────────────────
-  const sections: number[] = [];
+  const out: number[] = [];
+  out.push(...encoder.encode(RAD_HEADER), RAD_VERSION);
 
-  // 1. Header: "RAD by REALiTY!!" (16 bytes) + version byte
-  const headerBytes = encoder.encode(RAD_HEADER);
-  for (let i = 0; i < 16; i++) {
-    sections.push(i < headerBytes.length ? headerBytes[i] : 0);
+  // Flags: speed in bits 0-4, bit 7 = description follows
+  out.push(0x80 | Math.max(1, Math.min(31, song.initialSpeed || 6)));
+  out.push(...encoder.encode(song.name || 'DEViLBOX Export'), 0x00);
+
+  // Instruments: number + 11 bytes (internal order ends C0 last; file order has C0 before the two waveforms), 0 ends
+  for (const { radIndex: idx, bytes: b } of oplInstrumentBytes) {
+    out.push(idx, ...b.subarray(0, 8), b[10], b[8], b[9]);
   }
-  sections.push(RAD_VERSION);
+  out.push(0x00);
 
-  // 2. Description string (null-terminated)
-  const desc = encoder.encode(song.name || 'DEViLBOX Export');
-  for (let i = 0; i < desc.length; i++) sections.push(desc[i]);
-  sections.push(0x00);
-
-  // 3. Initial speed byte
-  const speed = Math.max(1, Math.min(255, song.initialSpeed || 6));
-  sections.push(speed);
-
-  // 4. Instrument definitions: count + per-instrument data
-  sections.push(oplInstrumentBytes.length & 0xFF);
-  for (const { radIndex: idx, bytes: instBytes } of oplInstrumentBytes) {
-    sections.push(idx & 0xFF); // instrument number (1-based)
-    for (let j = 0; j < instBytes.length; j++) sections.push(instBytes[j]);
-  }
-
-  // 5. Order list: count + pattern numbers
+  // Order list (patterns 0-31)
   const orderLen = Math.min(128, song.songPositions.length);
-  sections.push(orderLen & 0xFF);
-  for (let i = 0; i < orderLen; i++) {
-    sections.push((song.songPositions[i] ?? 0) & 0xFF);
-  }
+  out.push(orderLen);
+  for (let i = 0; i < orderLen; i++) out.push((song.songPositions[i] ?? 0) & 0x1F);
 
-  // 6. Pattern data
-  // Determine which patterns are referenced by the order list
-  const usedPatterns = new Set<number>();
-  for (let i = 0; i < orderLen; i++) {
-    usedPatterns.add(song.songPositions[i] ?? 0);
+  // 32 absolute pattern offsets, then the pattern data
+  const patBytes: number[][] = [];
+  for (let p = 0; p < 32; p++) patBytes.push(encodePatternData(song, p, instrumentMap));
+  let off = out.length + 64;
+  for (const pb of patBytes) {
+    if (pb.length === 0) { out.push(0, 0); continue; }
+    out.push(off & 0xFF, (off >> 8) & 0xFF);
+    off += pb.length;
   }
+  for (const pb of patBytes) out.push(...pb);
 
-  for (const patIdx of Array.from(usedPatterns).sort((a, b) => a - b)) {
-    sections.push(patIdx & 0xFF); // pattern number
-    const patData = encodePatternData(song, patIdx, instrumentMap);
-    sections.push(...patData);
-  }
-
-  // Build final ArrayBuffer
-  const output = new Uint8Array(sections);
-  return output.buffer as ArrayBuffer;
+  return new Uint8Array(out).buffer as ArrayBuffer;
 }
 
 // ── IMF (id Music Format) Exporter ──────────────────────────────────────────

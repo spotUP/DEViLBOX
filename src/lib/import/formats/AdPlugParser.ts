@@ -187,122 +187,87 @@ function parseRAD(buf: Uint8Array, filename: string): TrackerSong {
   return parseRADv1(buf, filename);
 }
 
+/** RAD v1 stores an instrument as 20m 23c 40m 43c 60m 63c 80m 83c C0 E0m E0c; applyOPLRegisters reads C0 last. */
+function radV1InstrumentToRegs(buf: Uint8Array, pos: number): Uint8Array {
+  const r = new Uint8Array(11);
+  r.set(buf.subarray(pos, pos + 8), 0);
+  r[8] = buf[pos + 9]; r[9] = buf[pos + 10]; r[10] = buf[pos + 8];
+  return r;
+}
+
+/** Layout per adplug rad2.cpp (RADCheckPatternOld / GetNote, version 1.0). */
 function parseRADv1(buf: Uint8Array, filename: string): TrackerSong {
   const flags = buf[17];
-  const speed = buf[18] || 6;
-  const hasDescription = (flags & 0x80) !== 0;
-  let pos = 19;
+  const speed = (flags & 0x1F) || 6;
+  let pos = 18;
 
-  // Skip slow-timer description string if present
-  if (hasDescription) {
+  // Bit 7: null-terminated description
+  if (flags & 0x80) {
     while (pos < buf.length && buf[pos] !== 0) pos++;
-    pos++; // skip null terminator
+    pos++;
   }
 
-  // Read instruments (up to 31)
+  // Instruments: number byte (0 ends the list) + 11 register bytes. Cells are remapped to dense 1-based ids.
   const instruments: InstrumentConfig[] = [];
+  const instIndex = new Map<number, number>();
   while (pos < buf.length) {
-    const instNum = buf[pos];
-    if (instNum === 0) { pos++; break; }
-    pos++;
+    const instNum = buf[pos++];
+    if (instNum === 0) break;
     if (pos + 11 > buf.length) break;
-
     const inst = makeOPLInstrument(instruments.length + 1, '');
-    applyOPLRegisters(inst, buf, pos);
+    applyOPLRegisters(inst, radV1InstrumentToRegs(buf, pos), 0);
     pos += 11;
     instruments.push(inst);
+    instIndex.set(instNum, instruments.length);
   }
-
-  // Ensure we have at least one instrument
   if (instruments.length === 0) instruments.push(makeOPLInstrument(1, 'Default'));
 
-  // Read order table
+  // Order list: count byte, then entries; bit 7 marks a jump (not representable in songPositions, dropped).
   const songPositions: number[] = [];
-  while (pos < buf.length) {
-    const orderVal = buf[pos];
-    if (orderVal === 0xFF) { pos++; break; }
-    songPositions.push(orderVal);
-    pos++;
+  const orderLen = buf[pos++] ?? 0;
+  for (let i = 0; i < orderLen && pos < buf.length; i++, pos++) {
+    if (!(buf[pos] & 0x80)) songPositions.push(buf[pos]);
   }
   if (songPositions.length === 0) songPositions.push(0);
 
-  // Read pattern offset table (each entry is a LE uint16 relative to start of offset table)
-  const patternOffsetBase = pos;
-  const maxPat = Math.max(...songPositions) + 1;
-  const patternOffsets: number[] = [];
-  for (let i = 0; i < maxPat && pos + 1 < buf.length; i++) {
-    patternOffsets.push(le16(buf, pos));
-    pos += 2;
-  }
-
-  // Parse patterns
+  // 32 absolute LE uint16 pattern offsets, 0 = empty pattern
   const NUM_CH = 9;
   const ROWS = 64;
   const patterns: Pattern[] = [];
-
-  for (let p = 0; p < patternOffsets.length; p++) {
+  for (let p = 0; p < 32; p++) {
     const pat = emptyPattern(`p${p}`, `Pattern ${p}`, NUM_CH, ROWS);
-    let ppos = patternOffsetBase + patternOffsets[p];
-    if (ppos >= buf.length) { patterns.push(pat); continue; }
-
-    let row = 0;
-    while (row < ROWS && ppos < buf.length) {
-      const rowByte = buf[ppos++];
-      if (rowByte === 0) { row++; continue; }
-
-      const ch = (rowByte & 0x0F);
-      if (ch >= NUM_CH) {
-        // Skip data for this cell
-        if (rowByte & 0x40) ppos += 2; // note + instrument
-        if (rowByte & 0x20) ppos++;     // volume/instrument
-        if (rowByte & 0x10) ppos += 2;  // effect
-        continue;
-      }
-
-      const cell = pat.channels[ch].rows[row];
-
-      if (rowByte & 0x40) {
-        // Note + octave packed
-        if (ppos >= buf.length) break;
-        const noteOct = buf[ppos++];
-        const octave = (noteOct >> 4) & 0x07;
-        const noteVal = noteOct & 0x0F;
-        if (noteVal === 0x0F) {
-          cell.note = 97; // note off
-        } else if (noteVal > 0) {
-          cell.note = Math.max(1, Math.min(96, octave * 12 + noteVal));
-        }
-        if (ppos < buf.length) {
-          cell.instrument = buf[ppos++];
-        }
-      }
-
-      if (rowByte & 0x20) {
-        // Volume
-        if (ppos < buf.length) {
-          cell.volume = Math.min(64, buf[ppos++]);
-        }
-      }
-
-      if (rowByte & 0x10) {
-        // Effect
-        if (ppos + 1 < buf.length) {
-          cell.effTyp = buf[ppos++];
-          cell.eff = buf[ppos++];
-        }
-      }
-
-      // Bit 7 set means more channel data on this row
-      if (!(rowByte & 0x80)) row++;
-    }
-
     patterns.push(pat);
+    const off = pos + p * 2 + 1 < buf.length ? le16(buf, pos + p * 2) : 0;
+    if (off === 0) continue;
+    let ppos = off;
+    let lastRow = false;
+    while (!lastRow && ppos < buf.length) {
+      const lineDef = buf[ppos++];
+      const row = lineDef & 0x7F;
+      lastRow = (lineDef & 0x80) !== 0;
+      let lastCh = false;
+      while (!lastCh && ppos + 1 < buf.length) {
+        const chanDef = buf[ppos++];
+        lastCh = (chanDef & 0x80) !== 0;
+        const noteByte = buf[ppos++];
+        const instByte = buf[ppos++];
+        const effect = instByte & 0x0F;
+        const param = effect ? buf[ppos++] : 0;
+        const ch = chanDef & 0x0F;
+        if (ch >= NUM_CH || row >= ROWS) continue;
+        const cell = pat.channels[ch].rows[row];
+        const noteVal = noteByte & 0x0F;
+        if (noteVal === 0x0F) cell.note = 97;
+        else if (noteVal >= 1 && noteVal <= 12) cell.note = ((noteByte >> 4) & 7) * 12 + noteVal;
+        const instNum = ((noteByte & 0x80) ? 16 : 0) | (instByte >> 4);
+        if (instNum) cell.instrument = instIndex.get(instNum) ?? instNum;
+        if (effect) { cell.effTyp = effect; cell.eff = param; }
+      }
+    }
   }
-
-  // Fill missing patterns
-  while (patterns.length <= Math.max(...songPositions)) {
-    patterns.push(emptyPattern(`p${patterns.length}`, `Pattern ${patterns.length}`, NUM_CH, ROWS));
-  }
+  // Trim trailing unused patterns but keep every referenced one
+  const keep = Math.max(...songPositions) + 1;
+  patterns.length = Math.min(32, Math.max(keep, 1));
 
   const title = filename.replace(/\.rad$/i, '');
   return buildSong(`${title} (RAD v1)`, patterns, instruments, songPositions, NUM_CH, speed, 125);
