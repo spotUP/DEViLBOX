@@ -138,6 +138,8 @@ export interface HowieDaviesGrid {
   noteForByte: (byte: number) => number;
   /** The pattern command byte of this build's Delay command ([command][ticks], the same two bytes as a note and its rest byte), or -1. */
   delayByte: number;
+  /** The pattern command byte of this build's Instrument command ([command][instrument number - 1]), or -1. */
+  instrumentByte: number;
   /** covers[voice][row over the whole grid]: the note sounding on the row (phase B: where a note on a blank row splits one) */
   covers: Array<Array<HowieDaviesCover | null>>;
   /** File offsets of the longs in the pattern address table that hold the image address `address`. */
@@ -375,6 +377,7 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
       for (let at = patternTable, n = 0; n < 128 && m.reloc[at] === 1 && at + 4 <= m.b.length; at += 4, n++) if (u32(m, at) === address) out.push(at + HUNK_BYTES);
       return out;
     },
+    instrumentByte: (() => { for (let c = COMMAND_BASE; c < 256; c++) if (handlerOf(driver.commandTable, c) === 'instrument') return c; return -1; })(),
     delayByte: (() => { for (let c = COMMAND_BASE; c < 256; c++) if (handlerOf(driver.commandTable, c) === 'delay') return c; return -1; })(),
     noteForByte: (byte) => (byte >= 0 && byte < PERIOD_COUNT ? periodToNote(u16(m, periodAt + 2 * byte)) : 0),
   };

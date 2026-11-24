@@ -216,6 +216,16 @@ export function applyHowieDaviesGridEdits(original: Uint8Array, patterns: readon
 const be32 = (d: Uint8Array, o: number): number => ((d[o] << 24) | (d[o + 1] << 16) | (d[o + 2] << 8) | d[o + 3]) >>> 0;
 const put32 = (d: Uint8Array, o: number, v: number): void => { d[o] = v >>> 24; d[o + 1] = (v >>> 16) & 0xff; d[o + 2] = (v >>> 8) & 0xff; d[o + 3] = v & 0xff; };
 
+/** Every cell but the added one (and its copies in a shared pattern) keeps its note and instrument: the restore command put the voice state back. */
+function othersKept(a: HowieDaviesGrid, b: HowieDaviesGrid, channel: number, row: number): boolean {
+  return a.patterns.every((p, pi) => p.channels.every((ch, c) => ch.rows.every((x, r) => {
+    if (c === channel && pi * ROWS_PER_PATTERN + r === row) return true;
+    const y = b.patterns[pi].channels[c].rows[r];
+    // a pattern used at several positions shows the new note at each; every other note keeps its instrument
+    return x.note === 0 && y.note > 0 || x.note === y.note && x.instrument === y.instrument;
+  })));
+}
+
 /**
  * A note on a row no note starts on. The covering note (rest byte r holds r + 1 steps) is cut after d steps: its rest
  * byte becomes d - 1 and a new note byte with rest r - d follows, so the voice keeps its timing. d is the first split
@@ -232,7 +242,11 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
   const cov = g.covers[a.channel]?.[row];
   if (!cov) return refuse('no note sounds on this row');
   if (cov.stream < 0) return refuse("the start pattern lives inside the replayer's data and cannot grow");
-  if (a.instrument !== 0 && a.instrument !== cov.instrument + 1) return refuse('a different instrument would need an Instrument command');
+  // another instrument: [Instrument new] before the note, [Instrument old] after it, so the voice state is as it was
+  const other = a.instrument !== 0 && a.instrument !== cov.instrument + 1;
+  if (other && (g.instrumentByte < 0 || cov.instrument < 0 || a.instrument > 0x100)) return refuse('a different instrument needs an Instrument command and a known instrument to restore');
+  const around = other ? { before: [g.instrumentByte, a.instrument - 1], after: [g.instrumentByte, cov.instrument] } : { before: [], after: [] };
+  const extra = 2 + around.before.length + around.after.length;
   const byte = Array.from({ length: COMMAND_BASE }, (_, b) => b).find((b) => g.noteForByte(b) === a.note) ?? -1;
   if (byte < 0) return refuse(`note ${a.note} is not in the module's period table`);
   const stream = g.streams.find((s) => s.kind === 'pattern' && s.offset - HUNK_BYTES === cov.stream);
@@ -245,11 +259,11 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
   const old = file.subarray(stream.offset, stream.offset + stream.size);
   const hunk = be32(file, 28) * 4;
   for (let d = 1; d <= rest; d++) {
-    const grown = new Uint8Array(stream.size + 2);
+    const grown = new Uint8Array(stream.size + extra);
     grown.set(old.subarray(0, cut + 2));
     grown.set([d - 1], cut + 1);
-    grown.set([byte, rest - d], cut + 2);
-    grown.set(old.subarray(cut + 2), cut + 4);
+    grown.set([...around.before, byte, rest - d, ...around.after], cut + 2);
+    grown.set(old.subarray(cut + 2), cut + extra + 2);
     const added = Math.ceil(grown.length / 4) * 4;
     const moved = new Uint8Array(file.length + added);
     moved.set(file.subarray(0, HUNK_BYTES + hunk));
@@ -260,7 +274,7 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
     for (const at of pointers) put32(moved, at, hunk);
     const again = buildHowieDaviesGrid(moved);
     const got = typeof again === 'string' ? undefined : cellAt(again, a.channel, row);
-    if (typeof again !== 'string' && again.rows === g.rows && got?.note === a.note) return moved;
+    if (typeof again !== 'string' && again.rows === g.rows && got?.note === a.note && (!other || got.instrument === a.instrument && othersKept(g, again, a.channel, row))) return moved;
   }
   return refuse('no split of the held note reads back as the new note on this row');
 }

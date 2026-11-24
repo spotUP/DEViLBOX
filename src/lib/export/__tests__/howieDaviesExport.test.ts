@@ -149,4 +149,39 @@ describe.each(FILES)('Howie Davies native export: $name', (file) => {
     expect(g1.rows).toBe(g0.rows);
     expect(g1.patterns[0].channels[c].rows[r].note).toBe(note);
   }, 240000);
+
+  it('writes a note with another instrument on a blank row through Instrument commands, every older note keeping its own', async () => {
+    const { raw } = await load(file);
+    const g0 = buildHowieDaviesGrid(raw);
+    if (typeof g0 === 'string') throw new Error(g0);
+    let tried = 0;
+    const seen: string[] = [];
+    let done: { data: Uint8Array; c: number; r: number; inst: number } | null = null;
+    for (let c = 0; c < 4 && !done; c++) {
+      for (let r = 1; r < 64 && !done && tried < 12; r++) {
+        const cov = g0.covers[c][r];
+        if (!cov || cov.stream < 0 || g0.patterns[0].channels[c].rows[r].note !== 0 || cov.instrument < 0) continue;
+        tried++;
+        const { song: s } = await load(file);
+        const cell = s.patterns[0].channels[c].rows[r];
+        cell.note = 40;
+        cell.instrument = cov.instrument + 2;
+        const res = await exportOf(s);
+        seen.push(`${c}/${r} inst ${cov.instrument}: ${res.warnings.join('|')} ${res.data.length}`);
+        if (res.warnings.length === 0 && res.data.length > raw.length) done = { data: res.data, c, r, inst: cell.instrument };
+      }
+    }
+    expect(done, seen.join('\n')).not.toBeNull();
+    const g1 = buildHowieDaviesGrid((done as { data: Uint8Array }).data);
+    if (typeof g1 === 'string') throw new Error(g1);
+    const { c, r, inst } = done as { c: number; r: number; inst: number };
+    expect(g1.rows).toBe(g0.rows);
+    expect(g1.patterns[0].channels[c].rows[r].note).toBe(40);
+    expect(g1.patterns[0].channels[c].rows[r].instrument).toBe(inst);
+    g0.patterns.forEach((p, pi) => p.channels.forEach((ch, ci) => ch.rows.forEach((x, ri) => {
+      const y = g1.patterns[pi].channels[ci].rows[ri];
+      if (x.note === 0 && y.note > 0) return; // the new note, and its copies where the pattern is shared
+      if (x.note !== y.note || x.instrument !== y.instrument) throw new Error(`cell ${pi}/${ci}/${ri} moved`);
+    })));
+  }, 240000);
 });
