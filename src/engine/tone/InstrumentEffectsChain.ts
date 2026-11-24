@@ -6,6 +6,7 @@ import { InstrumentFactory } from '../InstrumentFactory';
 import { InstrumentAnalyser } from '../InstrumentAnalyser';
 import { getChannelFilterManager } from '../ChannelFilterManager';
 import { connectAudio } from './connectAudio';
+import { getNativeAudioNode } from '@utils/audio-context';
 import type { VoiceState } from './ChannelRouting';
 import { LIVE_VOICE_BASE_CHANNEL } from '../furnace-dispatch/chipChannel';
 
@@ -127,20 +128,70 @@ export function connectChainOutput(
   if (activeAnalyser) connectAudio(output, activeAnalyser.input);
 }
 
-export async function buildInstrumentEffectChain(
+const rebuildQueues = new WeakMap<object, Map<number, Promise<void>>>();
+
+/** Run builds of one instrument key strictly one after another (two quick adds must not leak a chain). */
+export function buildInstrumentEffectChain(
   ctx: InstrumentEffectsContext,
   key: number,
   effects: EffectConfig[],
   instrument: Tone.ToneAudioNode | DevilboxSynth
 ): Promise<void> {
-  console.log('[ToneEngine] buildInstrumentEffectChain called for key:', key,
-    'effects:', effects.length,
-    'isNative:', isDevilboxSynth(instrument));
+  let queues = rebuildQueues.get(ctx);
+  if (!queues) { queues = new Map(); rebuildQueues.set(ctx, queues); }
+  const run = (queues.get(key) ?? Promise.resolve()).then(() => buildChainNow(ctx, key, effects, instrument));
+  const tail = run.catch(() => undefined);
+  queues.set(key, tail);
+  void tail.then(() => { if (queues.get(key) === tail) queues.delete(key); });
+  return run;
+}
 
-  // Dispose existing effect chain if any
+/** The node the instrument feeds in a chain: bridge, else first effect, else output. */
+function chainInput(chain: { effects: Tone.ToneAudioNode[]; output: Tone.Gain; bridge?: Tone.Gain }): Tone.ToneAudioNode {
+  return chain.bridge ?? chain.effects[0] ?? chain.output;
+}
+
+/** Remove only the instrument -> old chain edge; other consumers of the output (synthBus) stay. */
+function detachFromChain(instrument: Tone.ToneAudioNode | DevilboxSynth, target: Tone.ToneAudioNode): void {
+  try {
+    if (isDevilboxSynth(instrument)) {
+      const dest = getNativeAudioNode(target as never) ?? (target as unknown as { input?: AudioNode }).input;
+      if (dest) instrument.output.disconnect(dest);
+    } else {
+      instrument.disconnect(target);
+    }
+  } catch (e) {
+    console.log('[ToneEngine] detachFromChain: not connected (expected):', e);
+  }
+}
+
+async function buildChainNow(
+  ctx: InstrumentEffectsContext,
+  key: number,
+  effects: EffectConfig[],
+  instrument: Tone.ToneAudioNode | DevilboxSynth
+): Promise<void> {
+  // Filter to only enabled effects
+  const enabledEffects = effects.filter((fx) => fx.enabled);
+
+  // Create ALL new effect nodes before touching the live chain: a failed or slow
+  // create (lazy registry/WASM/neural load) must never leave the instrument silent.
+  let effectNodes: Tone.ToneAudioNode[] = [];
+  if (enabledEffects.length > 0) {
+    try {
+      effectNodes = (await Promise.all(
+        enabledEffects.map((config) => InstrumentFactory.createEffect(config))
+      )) as Tone.ToneAudioNode[];
+    } catch (e) {
+      console.error('[ToneEngine] buildInstrumentEffectChain: effect creation failed, keeping old chain', e);
+      return;
+    }
+  }
+
+  // Swap: detach and release the old chain only now.
   const existing = ctx.instrumentEffectChains.get(key);
   if (existing) {
-    console.log('[ToneEngine] buildInstrumentEffectChain: disposing existing chain with', existing.effects.length, 'effects');
+    detachFromChain(instrument, chainInput(existing));
     releaseEffectChain(ctx, existing);
   }
 
@@ -161,9 +212,6 @@ export async function buildInstrumentEffectChain(
     }
   };
 
-  // Filter to only enabled effects
-  const enabledEffects = effects.filter((fx) => fx.enabled);
-
   if (enabledEffects.length === 0) {
     // No effects - direct connection
     connectInstrumentTo(output);
@@ -173,13 +221,6 @@ export async function buildInstrumentEffectChain(
     ctx.instrumentEffectChains.set(key, { effects: [], output });
     return;
   }
-
-  // Create effect nodes (async for neural effects)
-  console.log('[ToneEngine] buildInstrumentEffectChain: creating', enabledEffects.length, 'effect nodes');
-  const effectNodes = (await Promise.all(
-    enabledEffects.map((config) => InstrumentFactory.createEffect(config))
-  )) as Tone.ToneAudioNode[];
-  console.log('[ToneEngine] buildInstrumentEffectChain: created', effectNodes.length, 'effect nodes');
 
   // Build full chain: instrument → [bridge?] → effect[0] → ... → effect[N-1] → output → destination
   let bridge: Tone.Gain | undefined;
@@ -262,19 +303,6 @@ export async function rebuildInstrumentEffects(
   for (const key of keys) {
     const instrument = ctx.instruments.get(key);
     if (!instrument) continue;
-
-    // Disconnect instrument from current chain
-    try {
-      if (isDevilboxSynth(instrument)) {
-        // Native synth — disconnect the AudioNode output
-        instrument.output.disconnect();
-      } else {
-        instrument.disconnect();
-      }
-    } catch (e) {
-      // May not be connected
-      console.log('[ToneEngine] rebuildInstrumentEffects: disconnect error (expected if not connected):', e);
-    }
 
     // Build new effect chain (await for neural effects)
     await buildInstrumentEffectChain(ctx, key, effects, instrument);
