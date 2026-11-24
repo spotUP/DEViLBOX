@@ -110,7 +110,7 @@ export function applyHowieDaviesGridEdits(original: Uint8Array, patterns: readon
     if (removal) noteByte = base.delayByte;
     else if (noteChanged) {
       if (cell.note < 1 || cell.note >= NOTE_OFF) {
-        warnings.push(`${PREFIX} ${where(at)}: a note off cannot be written: the driver has no release or gate command (its commands are Repeat, Instrument, Speed, Delay, Maximum Volume and the list commands), so the note sounds until the next note starts; the edit was not written.`);
+        warnings.push(`${PREFIX} ${where(at)}: a note off cannot be written: the driver has no release or gate command (its commands are Repeat, Instrument, Speed, Delay, Maximum Volume and the list commands), so the note sounds until the next note starts. Maximum Volume 0 would mute it only on the two builds that apply the voice limit (hd_module.c volume_limit is false on the middle build), it is voice state that stays until restored, and it needs extra stream bytes; the edit was not written.`);
         return;
       }
       let found = -1;
