@@ -35,4 +35,10 @@ describe('hUGEDriver Game Boy export', () => {
     for (let i = 0; i < rom.length; i++) if (i !== 0x14e && i !== 0x14f) sum = (sum + rom[i]) & 0xffff;
     expect((rom[0x14e] << 8) | rom[0x14f]).toBe(sum);
   });
+
+  it('lagtrain.fur: 11xx noise length becomes a per-width noise instrument, not a lossy item', async () => {
+    const fur = readFileSync(join(ROOT, 'public/data/songs/furnace/gameboy/lagtrain.fur'));
+    const song = furnaceToHuge(await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length)));
+    expect(song.lossy.filter((l) => l.startsWith('effect 11'))).toEqual([]);
+  });
 });

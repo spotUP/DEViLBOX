@@ -44,6 +44,7 @@ const BASE = HUGE_SONG_BASE;
 /** hUGE note 0 is C_3 in hUGE naming = 65.4 Hz = Furnace C-2 (flat value 24). */
 const NOTE_OFFSET = 24;
 const VBLANK_HZ = 59.7275;
+const NOISE_SHORT = 1000;
 const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PAN = 12;
 const MACRO_NAMES: Record<number, string> = { 4: 'pitch', 5: 'ex1', 6: 'ex2', 7: 'ex3', 13: 'pan right', 14: 'phase reset' };
 const FX_NAMES: Record<number, string> = { 0x08: 'panning', 0x10: 'wave select', 0x11: 'noise length', 0x13: 'sweep time', 0x14: 'sweep direction', 0xe1: 'note slide up', 0xe2: 'note slide down', 0xe5: 'finetune', 0xff: 'stop song' };
@@ -330,6 +331,9 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   const patKey = new Map<string, number>();
   const orderLists: number[][] = [[], [], [], []];
   const lastIns = [-1, -1, -1, -1];
+  // Noise width (Furnace chan.duty, NR43 bit 3): set by 11xx, kept across notes, set by a duty macro on note start.
+  // hUGE has no such effect, so a noise instrument is exported once per width (key = Furnace index + NOISE_SHORT).
+  const noiseDuty = [0, 0, 0, 0];
   const lastNote = [-1, -1, -1, -1]; // hUGE note per channel, for E1xy / E2xy targets
   const fine = [0x80, 0x80, 0x80, 0x80]; // E5xx per channel: one that keeps the current pitch is a no-op
   for (let o = 0; o < s.ordersLen; o++) {
@@ -365,14 +369,20 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
             // Furnace keeps duty (12xx) and the channel volume when the same instrument plays again; a hUGE instrument
             // reload resets both, so a repeat of a macro-less instrument plays as instrument 0 (no reload).
             const ci = cell.instrument >= 0 || kind !== 'duty' ? cell.instrument : lastIns[ch];
+            if (kind === 'noise') {
+              const dm = ci >= 0 && note !== NO_NOTE ? macro(m.instruments[ci], MACRO_DUTY) : undefined;
+              if (dm) noiseDuty[ch] = dm.data[0];
+              for (const e of cell.effects) if (e.type === 0x11) noiseDuty[ch] = e.value & 0xff;
+            }
             if (ci >= 0 && note !== NO_NOTE) {
               const plain = !m.instruments[ci]?.macros.some((x) => x.length > 0);
-              instr = kind === 'duty' && plain && ci === lastIns[ch] ? 0 : insNo(kind, ci);
+              instr = kind === 'duty' && plain && ci === lastIns[ch] ? 0 : insNo(kind, kind === 'noise' && noiseDuty[ch] ? ci + NOISE_SHORT : ci);
               lastIns[ch] = ci;
             }
             const fxs = cell.effects.filter((e) => e.type >= 0 && e !== slide);
             let pan = -1;
             for (const e of fxs) {
+              if (e.type === 0x11 && kind === 'noise') continue; // handled as the noise width above
               if (e.type === 0xe5) { const same = (e.value & 0xff) === fine[ch]; fine[ch] = e.value & 0xff; if (same) continue; }
               const h = mapEffect(e.type, e.value, kind, (ord) => orderStart[ord] ?? 0, waveNo);
               if (h === undefined) { if (!((e.type === 0 || e.type === 3) && (e.value & 0xff) === 0)) lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}${FX_NAMES[e.type] ? ` (${FX_NAMES[e.type]})` : ''}`); continue; }
@@ -423,7 +433,8 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   const instrBytes: Record<Kind, number[][]> = { duty: [], wave: [], noise: [] };
   const tableRefs: Array<{ kind: Kind; slot: number; table: number }> = [];
   for (const kind of ['duty', 'wave', 'noise'] as Kind[]) {
-    for (const [fi, hi] of insMap[kind]) {
+    for (const [key, hi] of insMap[kind]) {
+      const fi = key % NOISE_SHORT, short = key >= NOISE_SHORT;
       const ins = m.instruments[fi];
       if (!ins) continue;
       const { len, enable } = lengthBits(ins);
@@ -434,7 +445,7 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
       const duty0 = macro(ins, MACRO_DUTY)?.data[0] ?? 2;
       if (kind === 'duty') instrBytes.duty[hi - 1] = [0x00, ((duty0 & 3) << 6) | len, envelope(ins, lossy), 0, 0, high];
       else if (kind === 'wave') instrBytes.wave[hi - 1] = [len, 0x20, synth?.[0] ?? waveNo(macro(ins, MACRO_WAVE)?.data[0] ?? 0), 0, 0, high];
-      else instrBytes.noise[hi - 1] = [envelope(ins, lossy), 0, 0, (duty0 & 1 ? 0x80 : 0) | (enable ? 0x40 : 0) | (len & 0x3f), 0, 0];
+      else instrBytes.noise[hi - 1] = [envelope(ins, lossy), 0, 0, (short ? 0x80 : 0) | (enable ? 0x40 : 0) | (len & 0x3f), 0, 0];
     }
   }
 
