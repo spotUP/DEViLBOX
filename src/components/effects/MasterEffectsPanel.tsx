@@ -32,8 +32,7 @@ import { useClickOutside } from '@hooks/useClickOutside';
 import { MasterPresetMenu } from './MasterPresetMenu';
 import { matchMasterPresetName, masterPresetButtonLabel } from './masterPresetSearch';
 import { AVAILABLE_EFFECTS, type AvailableEffect } from '@constants/unifiedEffects';
-import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
-import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
+import { buildEffectConfigFromAvailable } from '@/lib/effects/buildEffectConfigFromAvailable';
 import { getDefaultEffectWet } from '@engine/factories/EffectFactory';
 import { effectiveBassLock } from '@engine/dj/bassLockDefaults';
 import { VisualEffectEditorWrapper, ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
@@ -404,29 +403,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
   };
 
   const handleAddEffect = (availableEffect: AvailableEffect) => {
-    const type = (availableEffect.type as EffectType) || 'Distortion';
-    const params: Record<string, number | string> = { ...getDefaultEffectParameters(type) };
-
-    if (availableEffect.category === 'neural' && availableEffect.neuralModelIndex !== undefined) {
-      const model = GUITARML_MODEL_REGISTRY[availableEffect.neuralModelIndex];
-      if (model?.parameters) {
-        Object.entries(model.parameters).forEach(([key, param]) => {
-          if (param) params[key] = param.default;
-        });
-      }
-    }
-
-    const defaultWet = getDefaultEffectWet(type);
-
-    addMasterEffectConfig({
-      category: availableEffect.category,
-      type,
-      enabled: true,
-      wet: defaultWet,
-      parameters: params,
-      neuralModelIndex: availableEffect.neuralModelIndex,
-      neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
-    });
+    addMasterEffectConfig(buildEffectConfigFromAvailable(availableEffect, getDefaultEffectWet((availableEffect.type as EffectType) || 'Distortion')));
     setShowAddMenu(false);
   };
 

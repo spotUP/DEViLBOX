@@ -12,8 +12,7 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, Star, Trash2, CloudOff, Cloud, Plus, Search, X } from 'lucide-react';
 import { FX_PRESETS, type FxPreset, type FxTag } from '@/constants/fxPresets';
 import { AVAILABLE_EFFECTS, type AvailableEffect } from '@/constants/unifiedEffects';
-import { GUITARML_MODEL_REGISTRY } from '@/constants/guitarMLRegistry';
-import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
+import { buildEffectConfigFromAvailable } from '@/lib/effects/buildEffectConfigFromAvailable';
 import { useAudioStore } from '@/stores/useAudioStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { pushToCloud } from '@/lib/cloudSync';
@@ -236,29 +235,7 @@ export const DJFxQuickPresets: React.FC = () => {
   // ── Add individual effect from unified registry ───────────────────────
   const handleAddEffect = useCallback(
     (availableEffect: AvailableEffect) => {
-      const type = (availableEffect.type as AudioEffectType) || 'Distortion';
-      const params: Record<string, number | string> = { ...getDefaultEffectParameters(type) };
-
-      if (availableEffect.category === 'neural' && availableEffect.neuralModelIndex !== undefined) {
-        const model = GUITARML_MODEL_REGISTRY[availableEffect.neuralModelIndex];
-        if (model?.parameters) {
-          Object.entries(model.parameters).forEach(([key, param]) => {
-            if (param) params[key] = param.default;
-          });
-        }
-      }
-
-      const defaultWet = DYNAMICS_EFFECTS.has(type) ? 100 : 50;
-
-      addMasterEffectConfig({
-        category: availableEffect.category,
-        type,
-        enabled: true,
-        wet: defaultWet,
-        parameters: params,
-        neuralModelIndex: availableEffect.neuralModelIndex,
-        neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
-      });
+      addMasterEffectConfig(buildEffectConfigFromAvailable(availableEffect, DYNAMICS_EFFECTS.has((availableEffect.type as AudioEffectType) || 'Distortion') ? 100 : 50));
       // activePresetName auto-recomputes from the new masterEffects chain.
       // Don't close — let user add multiple effects
     },

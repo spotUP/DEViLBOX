@@ -8,11 +8,11 @@ import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { X, Settings, Sliders, Cpu, Globe, AlertTriangle, ChevronDown, Search, ExternalLink } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { focusPopout } from '@components/ui/PopOutWindow';
-import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
+import type { EffectConfig } from '@typedefs/instrument';
 import { useInstrumentStore, notify } from '@stores';
 import { EffectParameterEditor } from './EffectParameterEditor';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
-import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
+import { buildEffectConfigFromAvailable } from '@/lib/effects/buildEffectConfigFromAvailable';
 import { INSTRUMENT_FX_PRESETS, type InstrumentFxPreset } from '@constants/fxPresets';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { instrumentDisplayName } from '@/lib/instruments/instrumentDisplayName';
@@ -83,36 +83,7 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
       if (!proceed) return;
     }
 
-    // Build new effect config
-    const newEffect: EffectConfig = {
-      id: `effect-${++idCounterRef.current}`,
-      category: availableEffect.category,
-      type: (availableEffect.type as EffectType) || 'Distortion',
-      enabled: true,
-      wet: 100,
-      parameters: {},
-      neuralModelIndex: availableEffect.neuralModelIndex,
-      neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
-    };
-
-    // Get default parameters from neural model schema + characteristic overrides
-    if (availableEffect.category === 'neural' && availableEffect.neuralModelIndex !== undefined) {
-      const model = GUITARML_MODEL_REGISTRY[availableEffect.neuralModelIndex];
-      if (model?.parameters) {
-        Object.entries(model.parameters).forEach(([key, param]) => {
-          if (param) newEffect.parameters[key] = param.default;
-        });
-        // Override schema defaults with model-characteristic values so each amp
-        // starts with its own drive/tone character rather than a uniform 50
-        const charDefaults = getModelCharacteristicDefaults(
-          model.characteristics.gain,
-          model.characteristics.tone,
-        );
-        Object.assign(newEffect.parameters, charDefaults);
-      }
-    }
-
-    addEffectConfig(currentInstrumentId, newEffect);
+    addEffectConfig(currentInstrumentId, buildEffectConfigFromAvailable(availableEffect));
   }, [currentInstrumentId, neuralEffectCount, addEffectConfig]);
 
   const handleRemoveEffect = useCallback((effectId: string) => {

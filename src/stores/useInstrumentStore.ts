@@ -79,7 +79,6 @@ import {
   buildDrumKitFromSlices,
 } from './instrument/sampleOperations';
 import {
-  createEffect,
   createEffectFromConfig,
   removeEffectFromList,
   reorderEffectsList,
@@ -205,7 +204,6 @@ interface InstrumentStore {
     autoBakeInstruments: () => Promise<void>;
     // Effects
   
-  addEffect: (instrumentId: number, effectType: EffectConfig['type']) => void;
   addEffectConfig: (instrumentId: number, effect: Omit<EffectConfig, 'id'>) => void;  // For unified effects system
   removeEffect: (instrumentId: number, effectId: string) => void;
   updateEffect: (instrumentId: number, effectId: string, updates: Partial<EffectConfig>) => void;
@@ -1639,28 +1637,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     // Effects
-    addEffect: (instrumentId, effectType) => {
-      set((state) => {
-        const instrument = state.instruments.find((inst) => inst.id === instrumentId);
-        if (instrument) {
-          instrument.effects.push(createEffect(effectType));
-        }
-      });
-
-      // Rebuild instrument effect chain in audio engine (async for neural effects)
-      const instrument = get().instruments.find((inst) => inst.id === instrumentId);
-      if (instrument) {
-        (async () => {
-          try {
-            const engine = getToneEngine();
-            await engine.rebuildInstrumentEffects(instrumentId, instrument.effects);
-          } catch (error) {
-            console.warn('[InstrumentStore] Could not rebuild instrument effects:', error);
-          }
-        })();
-      }
-    },
-
     // Add effect with full configuration (for unified effects system)
     addEffectConfig: (instrumentId, effect) => {
       console.log('[InstrumentStore] addEffectConfig called for instrumentId:', instrumentId, 'effect type:', effect.type);

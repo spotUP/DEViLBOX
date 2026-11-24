@@ -6,14 +6,14 @@
  * wet/dry, and inline parameter editing.
  */
 
-import React, { useState, useCallback, useImperativeHandle, forwardRef, useRef, useEffect } from 'react';
-import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
+import { useState, useCallback, useImperativeHandle, forwardRef, useRef, useEffect } from 'react';
+import type { EffectConfig } from '@typedefs/instrument';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
-import { Plus, X, Search } from 'lucide-react';
-import { VisualEffectEditorWrapper, ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
-import { getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
-import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
-import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
+import { Plus, X } from 'lucide-react';
+import { VisualEffectEditorWrapper } from './VisualEffectEditors';
+import type { AvailableEffect } from '@constants/unifiedEffects';
+import { EffectBrowser } from './EffectBrowser';
+import { buildEffectConfigFromAvailable } from '@/lib/effects/buildEffectConfigFromAvailable';
 
 interface InstrumentEffectsPanelProps {
   instrumentId: number;
@@ -33,7 +33,6 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
   hideHeader = false,
 }, ref) => {
   const [showBrowser, setShowBrowser] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Keep effects ref in sync to avoid stale closures in callbacks (critical for smooth knobs)
   const effectsRef = useRef(effects);
@@ -51,34 +50,8 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
   const updateEffect = useInstrumentStore((s) => s.updateEffect);
 
   const handleAddEffect = useCallback((availableEffect: AvailableEffect) => {
-    const type = (availableEffect.type as EffectType) || 'Distortion';
-    const params: Record<string, number | string> = { ...getDefaultEffectParameters(type) };
-
-    if (availableEffect.category === 'neural' && availableEffect.neuralModelIndex !== undefined) {
-      const model = GUITARML_MODEL_REGISTRY[availableEffect.neuralModelIndex];
-      if (model?.parameters) {
-        Object.entries(model.parameters).forEach(([key, param]) => {
-          if (param) params[key] = param.default;
-        });
-        const charDefaults = getModelCharacteristicDefaults(
-          model.characteristics.gain,
-          model.characteristics.tone,
-        );
-        Object.assign(params, charDefaults);
-      }
-    }
-
-    addEffectConfig(instrumentId, {
-      category: availableEffect.category,
-      type,
-      enabled: true,
-      wet: 100,
-      parameters: params,
-      neuralModelIndex: availableEffect.neuralModelIndex,
-      neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
-    });
+    addEffectConfig(instrumentId, buildEffectConfigFromAvailable(availableEffect));
     setShowBrowser(false);
-    setSearchQuery('');
   }, [instrumentId, addEffectConfig]);
 
   const handleToggle = useCallback((effectId: string) => {
@@ -105,19 +78,6 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
     updateEffect(instrumentId, effectId, { wet });
   }, [instrumentId, updateEffect]);
 
-  // Filter effects browser
-  const effectsByGroup = getEffectsByGroup();
-  const filteredEffectsByGroup = React.useMemo(() => {
-    if (!searchQuery.trim()) return effectsByGroup;
-    const q = searchQuery.toLowerCase();
-    const filtered: Record<string, typeof effectsByGroup[string]> = {};
-    for (const [group, groupEffects] of Object.entries(effectsByGroup)) {
-      const matched = groupEffects.filter(e => e.label.toLowerCase().includes(q));
-      if (matched.length > 0) filtered[group] = matched;
-    }
-    return filtered;
-  }, [effectsByGroup, searchQuery]);
-
   return (
     <div className="flex flex-col h-full min-h-0 bg-dark-bg">
       {/* Header */}
@@ -142,53 +102,8 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
 
       {/* Effect Browser (collapsible) */}
       {showBrowser && (
-        <div className="border-b border-dark-border bg-dark-bgTertiary shrink-0 max-h-[300px] overflow-y-auto scrollbar-modern">
-          <div className="p-2">
-            <div className="relative mb-2">
-              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input
-                type="text"
-                placeholder="Search effects..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-7 pr-7 py-1.5 text-xs bg-dark-bg border border-dark-border rounded text-text-primary
-                         placeholder-text-muted focus:outline-none focus:border-accent-primary transition-colors"
-                autoFocus
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-            {Object.entries(filteredEffectsByGroup).map(([group, groupEffects]) => (
-              <div key={group} className="mb-2">
-                <div className="text-[9px] text-text-muted font-bold uppercase tracking-wider mb-1 px-1">{group}</div>
-                <div className="flex flex-wrap gap-1">
-                  {groupEffects.map((effect) => {
-                    const enc = ENCLOSURE_COLORS[effect.type ?? ''] || DEFAULT_ENCLOSURE;
-                    return (
-                      <button
-                        key={effect.label}
-                        onClick={() => handleAddEffect(effect)}
-                        className="px-2 py-1 text-[10px] rounded border transition-colors hover:text-text-primary"
-                        style={{
-                          borderColor: enc.border,
-                          background: enc.bg,
-                          color: enc.accent,
-                        }}
-                      >
-                        {effect.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="border-b border-dark-border bg-dark-bgTertiary shrink-0 h-[300px]">
+          <EffectBrowser compact onSelect={handleAddEffect} />
         </div>
       )}
 

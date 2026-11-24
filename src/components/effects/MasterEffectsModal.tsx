@@ -6,7 +6,7 @@
 import { CustomSelect } from '@components/common/CustomSelect';
 import { EffectRegistry } from '@engine/registry/EffectRegistry';
 import React, { useState, useCallback, useMemo, useEffect, useRef, useLayoutEffect } from 'react';
-import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, Search, ExternalLink } from 'lucide-react';
+import { X, Settings, Volume2, ChevronDown, Save, Sliders, Cpu, Globe, AlertTriangle, ExternalLink } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import {
@@ -25,7 +25,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
+import type { EffectConfig } from '@typedefs/instrument';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -39,9 +39,9 @@ import { sidechainKeyOptions } from './sidechainKeyOptions';
 import { MasterPresetMenu } from './MasterPresetMenu';
 import { matchMasterPresetName, masterPresetButtonLabel } from './masterPresetSearch';
 import { ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
-import { getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
-import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
-import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
+import type { AvailableEffect } from '@constants/unifiedEffects';
+import { EffectBrowser } from './EffectBrowser';
+import { buildEffectConfigFromAvailable } from '@/lib/effects/buildEffectConfigFromAvailable';
 
 // User preset storage key
 const USER_MASTER_FX_PRESETS_KEY = 'master-fx-user-presets';
@@ -65,8 +65,6 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [presetName, setPresetName] = useState('');
   const [editingEffectId, setEditingEffectId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState<string>('all');
 
   const masterEffects = useAudioStore((s) => s.masterEffects);
   const addMasterEffectConfig = useAudioStore((s) => s.addMasterEffectConfig);
@@ -201,34 +199,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
       if (!proceed) return;
     }
 
-    const type = (availableEffect.type as EffectType) || 'Distortion';
-    const params: Record<string, number | string> = { ...getDefaultEffectParameters(type) };
-
-    if (availableEffect.category === 'neural' && availableEffect.neuralModelIndex !== undefined) {
-      const model = GUITARML_MODEL_REGISTRY[availableEffect.neuralModelIndex];
-      if (model?.parameters) {
-        Object.entries(model.parameters).forEach(([key, param]) => {
-          if (param) params[key] = param.default;
-        });
-        // Override schema defaults with model-characteristic values so each amp
-        // starts with its own drive/tone character rather than a uniform 50
-        const charDefaults = getModelCharacteristicDefaults(
-          model.characteristics.gain,
-          model.characteristics.tone,
-        );
-        Object.assign(params, charDefaults);
-      }
-    }
-
-    addMasterEffectConfig({
-      category: availableEffect.category,
-      type,
-      enabled: true,
-      wet: 100,
-      parameters: params,
-      neuralModelIndex: availableEffect.neuralModelIndex,
-      neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
-    });
+    addMasterEffectConfig(buildEffectConfigFromAvailable(availableEffect));
 
     // Store generates its own ID — read it back
     const added = useAudioStore.getState().masterEffects;
@@ -281,28 +252,6 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
     portalSelector: '[data-master-preset-toggle]',
   });
 
-  // Group effects by category for the add menu, filtered by search
-  const effectsByGroup = getEffectsByGroup();
-  const allGroupNames = useMemo(() => Object.keys(effectsByGroup).sort(), [effectsByGroup]);
-  const filteredEffectsByGroup = useMemo(() => {
-    let source = effectsByGroup;
-    // Filter by selected group
-    if (selectedGroup !== 'all') {
-      source = {};
-      if (effectsByGroup[selectedGroup]) {
-        source[selectedGroup] = effectsByGroup[selectedGroup];
-      }
-    }
-    // Filter by search query
-    if (!searchQuery.trim()) return source;
-    const q = searchQuery.toLowerCase();
-    const filtered: Record<string, typeof effectsByGroup[string]> = {};
-    for (const [group, effects] of Object.entries(source)) {
-      const matched = effects.filter(e => e.label.toLowerCase().includes(q));
-      if (matched.length > 0) filtered[group] = matched;
-    }
-    return filtered;
-  }, [effectsByGroup, searchQuery, selectedGroup]);
 
   if (!isOpen) return null;
 
@@ -541,74 +490,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
 
           {/* Right: Effect Browser (20%) */}
           <div className="w-[20%] flex flex-col">
-            <div className="p-4 border-b border-dark-border bg-dark-bgSecondary space-y-2">
-              <div>
-                <h3 className="text-sm font-bold text-text-primary">Effect Browser</h3>
-              </div>
-              <select
-                value={selectedGroup}
-                onChange={(e) => setSelectedGroup(e.target.value)}
-                className="w-full py-1.5 px-2 text-xs bg-dark-bg border border-dark-border rounded-lg text-text-primary
-                         focus:outline-none focus:border-accent-primary transition-colors cursor-pointer"
-              >
-                <option value="all">All Categories</option>
-                {allGroupNames.map(g => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-                <input
-                  type="text"
-                  placeholder="Search effects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 text-sm bg-dark-bg border border-dark-border rounded-lg text-text-primary
-                           placeholder-text-muted focus:outline-none focus:border-accent-primary transition-colors"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto scrollbar-modern p-3">
-              <div className="space-y-3">
-                {Object.keys(filteredEffectsByGroup).length === 0 ? (
-                  <div className="p-6 text-center text-text-muted text-xs">
-                    No effects matching "{searchQuery}"
-                  </div>
-                ) : null}
-                {Object.entries(filteredEffectsByGroup).map(([group, groupEffects]) => (
-                  <div key={group}>
-                    <h4 className="text-xs text-text-muted font-medium uppercase tracking-wide mb-1.5">{group}</h4>
-                    <div className="space-y-1">
-                      {groupEffects.map((effect) => (
-                        <button
-                          key={effect.label}
-                          onClick={() => handleAddEffect(effect)}
-                          className="w-full px-3 py-2 text-sm rounded-lg border border-dark-border bg-dark-bgSecondary
-                                   hover:bg-accent-primary/80 hover:text-text-primary hover:border-accent-primary
-                                   transition-colors text-left flex items-center justify-between gap-2"
-                        >
-                          <span className="truncate">{effect.label}</span>
-                          {effect.category === 'neural' && (
-                            <Cpu size={12} className="flex-shrink-0 opacity-60" />
-                          )}
-                          {effect.category === 'wam' && (
-                            <Globe size={12} className="flex-shrink-0 opacity-60" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <EffectBrowser onSelect={handleAddEffect} />
           </div>
         </div>
       </div>

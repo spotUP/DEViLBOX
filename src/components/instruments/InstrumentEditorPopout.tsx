@@ -9,7 +9,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { getSynthInfo } from '@constants/synthCategories';
 import { UnifiedInstrumentEditor } from './editors';
-import { EffectChain, TestKeyboard } from './shared';
+import { TestKeyboard } from './shared';
+import { InstrumentEffectsPanel } from '@components/effects/InstrumentEffectsPanel';
 import { SavePresetDialog } from './presets';
 import * as LucideIcons from 'lucide-react';
 import { Settings, Sparkles, Save, Keyboard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -175,12 +176,11 @@ export const InstrumentEditorPopout: React.FC = () => {
         )}
 
         {activeTab === 'effects' && (
-          <div className="p-4">
-            <EffectChain
-              instrumentId={currentInstrument.id}
-              effects={currentInstrument.effects || []}
-            />
-          </div>
+          <InstrumentEffectsPanel
+            instrumentId={currentInstrument.id}
+            instrumentName={currentInstrument.name}
+            effects={currentInstrument.effects || []}
+          />
         )}
       </div>
 
