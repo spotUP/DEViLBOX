@@ -24,6 +24,36 @@ export function notifyChannelLayout(): void {
   for (const fn of layoutListeners) fn();
 }
 
+function sameNumbers(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/**
+ * Write a computed layout into `out` and wake the readers, only when the
+ * values changed. Every pattern/order message from an engine (GoatTracker
+ * Ultra sends one per pattern on load) gives the editor new arrays with the
+ * same numbers; a notify for each made the aligned order matrix set state per
+ * message, and React threw "Maximum update depth exceeded". Returns whether
+ * anything was published.
+ */
+export function publishChannelLayout(
+  out: ChannelLayout,
+  offsets: number[],
+  widths: number[],
+  numChannels: number,
+): boolean {
+  if (out.numChannels === numChannels && sameNumbers(out.offsets, offsets) && sameNumbers(out.widths, widths)) {
+    return false;
+  }
+  out.offsets = offsets;
+  out.widths = widths;
+  out.numChannels = numChannels;
+  notifyChannelLayout();
+  return true;
+}
+
 /** An aligned sub-editor (order matrix) scrolled sideways: the main editor adopts this position. */
 export function publishSharedScrollLeft(left: number): void {
   channelLayout.scrollLeft = left;

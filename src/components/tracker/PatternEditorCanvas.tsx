@@ -12,7 +12,7 @@ import { useMixerStore } from '@stores/useMixerStore';
 import { useVoicePreviewStore } from '@stores/useVoicePreviewStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
-import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, channelAreaWidth, ADD_CHANNEL_BUTTON_PX, subscribeChannelLayout, publishSharedScrollLeft, type ChannelLayout } from './channelLayout';
+import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, channelAreaWidth, ADD_CHANNEL_BUTTON_PX, subscribeChannelLayout, publishSharedScrollLeft, publishChannelLayout, type ChannelLayout } from './channelLayout';
 import { resolveWasmPattern } from './wasmPatternHold';
 import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
@@ -600,10 +600,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   useEffect(() => {
     channelOffsetsRef.current = channelOffsets;
     channelWidthsRef.current = channelWidths;
-    layoutOut.offsets = channelOffsets;
-    layoutOut.widths = channelWidths;
-    layoutOut.numChannels = numChannels;
-    notifyChannelLayout();
+    publishChannelLayout(layoutOut, channelOffsets, channelWidths, numChannels);
   }, [channelOffsets, channelWidths, numChannels]);
 
   // Calculate if all channels fit in viewport (for disabling horizontal scroll)
