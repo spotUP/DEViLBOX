@@ -117,6 +117,7 @@ Safe middle path if wanted later: shrink-only edits (delete an event, pad the bl
 Only two .tw files are in public/data/songs/formats: future basketball main (parses, grid 4 voices, export byte-exact) and blinkys scary school-sfx. chuckie egg 2 and warinthegulf are not in the repo; Modland path not found by guess (404), not fetched.
 blinkys scary school-sfx.tw: header `6000 00a0`, both `c0fc 000a`/`c0fc 000c` scans succeed (base 0x932, 5 songs, instrument table found) but the walker returns null: different song-table layout. Record = `0032 0034 0036 0000 0202`: three voice words, the 4th is 0 (unused voice), and each word points at ONE block word (0x38, 0x5b, 0x59) with no 0x0000 terminator and no loop word; the "lists" overlap and run straight into stream data. So the list format differs (sound-effect player variant: a single block per voice, ended by an end opcode); not an offset or signature change. Needs: list parse mode "one block word per voice", zero word = unused voice, verification of 0x80/0x83 end handling. Result: parses NO, grid n/a, export n/a (falls back to UADE, original bytes untouched).
 warinthegulf (`b27a 003c`): not available, different player, not attempted.
+2026-11-24 update (test src/lib/import/formats/__tests__/TonyWilliams.variants.test.ts): chuckie egg 2 (`6000 008c`) parses via parseModuleToSong, notes on all 4 voices, unedited native export byte-exact. warinthegulf is refused: it is the "Sound Images Generation 2 sound drivers (c) 1993" player (string at 0x54), entry = game API dispatch (`cmpw pc@(0x3e),d1`, `jsr pc@(0x40,d1.w)` jump table), three voice records 0x95e/0x9b0/0xa00 stepped on a 137/250 tempo accumulator, no `muluw #10` song table. isTonyWilliamsFormat is false, so it stays on UADE play-only. Editable support needs its own disassembly pass (song start command, voice list layout, opcode table).
 
 ## 2026-11-14 tail pointer hunt (devilbox-5f, static: m68k-elf-objdump + byte scan, no UADE run)
 
@@ -136,3 +137,8 @@ Arp table base = table itself (fb 0x2e4, bl 0x2d2), targets in head, no patch.
 Block/list/loop words are head-relative, stay put.
 Not checked: further routines in fb tail past 0x1404, eagleplayer hard-coded offsets.
 Next: implement relocation with this list (offsets must be found per file by pattern, not hard-coded), verify with headless UADE render of edited fb + bl.
+
+## 2026-11-17 length-changing edits: status check + UADE render test
+Full relocation was already implemented in commit 0e8a2ff09 (tonyWilliamsRelocate.ts, called from tonyWilliamsEdits.ts applyTwGridEdits; exporter path unchanged). TonyWilliams.relocate.test.ts + tonyWilliamsAddNote.test.ts pass (8 tests): pointers match the hunt list per fixture, moved content identical, other cells re-parse unchanged.
+Added TonyWilliams.render.test.ts: fb with a duplicated duration command (+2 bytes, tail moved) rendered through tools/uade-audit/uadeRenderCore (6 s): identical samples to the original (max diff < 1e-4). Only fb covered; blinkys does not walk in UADE-render terms here (relocate test covers its pointers statically).
+Gaps: 0x82 jump targets refused; stale absolute longs in voice structs judged harmless; eagleplayer hard-coded offsets unchecked.
