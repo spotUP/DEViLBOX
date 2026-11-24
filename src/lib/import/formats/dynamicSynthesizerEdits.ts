@@ -7,7 +7,7 @@
  *   - note: the high byte, chosen so the lookup lands on a table entry that reads as the new note;
  *   - instrument: the low nibble (the sample add is subtracted; the result must fit a nibble).
  * A pattern is shared by every position that plays it, so an edit shows wherever the pattern plays. A note on an empty row
- * overwrites that step's zero word in place. Edits the pattern cannot hold - a note removed or turned into a note off, a volume or effect
+ * overwrites that step's zero word in place. A note removed or turned into a note off writes 0 or 0x8000 into that word. Edits the pattern cannot hold - a volume or effect
  * (the format has none) - are refused with a warning and nothing is written for them. After patching, the grid is
  * decoded again and every edited cell must read back as edited, otherwise its patch is taken out again.
  */
@@ -69,8 +69,21 @@ export function applyDnsGridEdits(original: Uint8Array, patterns: readonly Patte
     const src = base.rowSources[pi]?.[c]?.[r];
     // a pattern is fixed size, one word per step: a note on an empty step (word 0) overwrites that word in place, no stream grows
     const empty = was.note === 0 && cell.note >= 1 && cell.note < NOTE_OFF;
+    // a note removed or turned into a note off is the same one-word patch: 0 (nothing) or 0x8000 (note off)
+    const clears = (cell.note === 0 || cell.note === NOTE_OFF) && was.note >= 1 && was.note <= NOTE_OFF && cell.note !== was.note;
+    if (clears && src) {
+      const w = cell.note === 0 ? 0 : NOTE_OFF_WORD;
+      const other = claimed.get(src.wordAt);
+      if (other !== undefined && other !== w) {
+        warnings.push(`Dynamic Synthesizer ${where(at)}: another edited row shares this pattern word with a different value; this edit was not written.`);
+        return;
+      }
+      claimed.set(src.wordAt, w);
+      accepted.push({ ...at, note: cell.note, instrument: 0, offset: src.wordAt, word: w });
+      return;
+    }
     if (!src || (!empty && (was.note < 1 || was.note >= NOTE_OFF))) {
-      warnings.push(`Dynamic Synthesizer ${where(at)}: turning a note into a rest or note off would change what the fixed-size pattern holds; the edit was not written.`);
+      warnings.push(`Dynamic Synthesizer ${where(at)}: this change would alter what the fixed-size pattern holds; the edit was not written.`);
       return;
     }
     let word = getWord(original, src.wordAt);

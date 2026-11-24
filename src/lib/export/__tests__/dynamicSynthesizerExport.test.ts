@@ -68,14 +68,20 @@ describe('Dynamic Synthesizer native export', () => {
     expect(again2.song.patterns[0].channels[0].rows[0].note).toBe(28);
   }, 240000); // the first parseModuleToSong import loads the whole import graph
 
-  it('refuses a note removed, writing nothing for it', async () => {
+  it('writes a note removed and a note off as one word, same length, and reloads them', async () => {
     const { raw, song } = await load();
-    song.patterns[0].channels[0].rows[0].note = 0;
+    const rows = song.patterns[0].channels[0].rows;
+    const notes = rows.map((c, i) => (c.note >= 1 && c.note < 97 ? i : -1)).filter((i) => i >= 0);
+    expect(notes.length).toBeGreaterThan(1);
+    rows[notes[0]].note = 0;
+    rows[notes[1]].note = 97;
     const res = await exportOf(song);
-    expect(res.warnings.length).toBe(1);
-    expect(res.warnings.join('\n')).toMatch(/not written/);
-    expect(Array.from(res.data)).toEqual(Array.from(raw));
-  });
+    expect(res.warnings).toEqual([]);
+    expect(res.data.length).toBe(raw.length);
+    const again = (await load(res.data)).song.patterns[0].channels[0].rows;
+    expect(again[notes[0]].note).toBe(0);
+    expect(again[notes[1]].note).toBe(97);
+  }, 240000);
 
   it('writes a note on an empty row in place and reloads it', async () => {
     const { raw, song } = await load();
