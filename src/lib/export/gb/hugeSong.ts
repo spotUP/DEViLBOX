@@ -335,6 +335,7 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   // hUGE has no such effect, so a noise instrument is exported once per width (key = Furnace index + NOISE_SHORT).
   const noiseDuty = [0, 0, 0, 0];
   const lastNote = [-1, -1, -1, -1]; // hUGE note per channel, for E1xy / E2xy targets
+  let sweep = 0; // Furnace chan[0].sweep (NR10 shadow): 13xx sets time and shift, 14xx the direction bit
   const fine = [0x80, 0x80, 0x80, 0x80]; // E5xx per channel: one that keeps the current pitch is a no-op
   for (let o = 0; o < s.ordersLen; o++) {
     for (let c0 = 0; c0 < orderLen[o]; c0 += ROWS) {
@@ -384,7 +385,12 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
             for (const e of fxs) {
               if (e.type === 0x11 && kind === 'noise') continue; // handled as the noise width above
               if (e.type === 0xe5) { const same = (e.value & 0xff) === fine[ch]; fine[ch] = e.value & 0xff; if (same) continue; }
-              const h = mapEffect(e.type, e.value, kind, (ord) => orderStart[ord] ?? 0, waveNo);
+              // gb.cpp GB_SWEEP_TIME / GB_SWEEP_DIR (channel 1 only) write NR10 at once; hUGE 6xy runs the NR10 routine below with C = xy.
+              let h: number | undefined;
+              if ((e.type === 0x13 || e.type === 0x14) && ch === 0) {
+                sweep = e.type === 0x13 ? (sweep & 8) | (e.value & 0x77) : (sweep & 0xf7) | (e.value & 1 ? 8 : 0);
+                h = 0x600 | sweep;
+              } else h = mapEffect(e.type, e.value, kind, (ord) => orderStart[ord] ?? 0, waveNo);
               if (h === undefined) { if (!((e.type === 0 || e.type === 3) && (e.value & 0xff) === 0)) lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}${FX_NAMES[e.type] ? ` (${FX_NAMES[e.type]})` : ''}`); continue; }
               if ((h & 0xf00) === 0x800) pan = h;
               else if (effect < 0) effect = h; else lossy.add('second effect in one cell (hUGE has one effect column)');
@@ -468,11 +474,12 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
     w16(11 + k * 2, here()); insAt[kind] = out.length;
     for (let i = 0; i < 15; i++) out.push(...(instrBytes[kind][i] ?? [0, 0, 0, 0, 0, 0]));
   });
-  // Routines: never emitted (effect 6); all 16 point at one `ret`.
+  // Routines: effect 6xy picks routine y, but C holds the whole xy byte, so all 16 share one routine that
+  // writes C to NR10 on tick 0 (ret nz; ld a,c; ldh [$10],a; ret). Sweep effects 13/14 use it.
   w16(17, here());
   const retAddr = here() + 32;
   for (let i = 0; i < 16; i++) out.push(retAddr & 0xff, retAddr >> 8);
-  out.push(0xc9);
+  out.push(0xc0, 0x79, 0xe0, 0x10, 0xc9);
   w16(19, here());
   for (let i = 0; i < Math.max(1, waveSlots.length); i++) out.push(...(waveSlots[i] ?? new Array(16).fill(0)));
   for (const t of tableRefs) {

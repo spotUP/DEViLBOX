@@ -41,4 +41,18 @@ describe('hUGEDriver Game Boy export', () => {
     const song = furnaceToHuge(await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length)));
     expect(song.lossy.filter((l) => l.startsWith('effect 11'))).toEqual([]);
   });
+
+  it('lagtrain.fur with 13xx / 14xx on channel 1: sweep maps to hUGE 6xy, which a routine writes to NR10', async () => {
+    const fur = readFileSync(join(ROOT, 'public/data/songs/furnace/gameboy/lagtrain.fur'));
+    const m = await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
+    const rows = m.patterns.get(`0_0_${m.subsongs[0].orders[0][0]}`)!.rows;
+    // 13xx sets time and shift (bit 7 dropped), 14xx sets the direction bit on top: 0x35 then 0x3D
+    for (const [r, type, value] of [[3, 0x13, 0xb5], [5, 0x14, 0x01]] as const) { rows[r].effects = [{ type, value }]; rows[r].volume = -1; }
+    const song = furnaceToHuge(m);
+    expect(song.lossy.filter((l) => /^effect 1[34]/.test(l))).toEqual([]);
+    const b = song.blob;
+    const cell = (v: number) => { for (let i = 0; i + 2 < b.length; i++) if ((b[i + 1] & 15) === 6 && b[i + 2] === v) return true; return false; };
+    expect(cell(0x35) && cell(0x3d)).toBe(true);
+    expect(b.join(',')).toContain('192,121,224,16,201'); // routine: ret nz; ld a,c; ldh [$10],a; ret
+  });
 });
