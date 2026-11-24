@@ -22,10 +22,15 @@ export interface HugePlayerMeta {
   songAddress: number; songOffset: number; songCapacity: number; tickAddress: number; sourceHash: string;
   /** ScreenText block in huge-player.asm: timer TMA byte, title (11), author (17), scroller text (256). */
   rateOffset: number; titleOffset: number; authorOffset: number; scrollOffset: number;
+  /** hUGEDriver note_table: 72 little-endian NRx3/NRx4 periods, C-3 first; patched per song for its A-4 tuning. */
+  noteTableOffset: number;
 }
 
 /** Player screen text and tick rate the exporter patches into the ROM. */
-export interface HugeScreen { title: string; author: string; /** Timer TMA at 4096 Hz for the song tick rate; 0 = one tick per VBlank. */ timerTma: number }
+export interface HugeScreen { title: string; author: string; /** Timer TMA at 4096 Hz for the song tick rate; 0 = one tick per VBlank. */ timerTma: number; /** Song A-4 in Hz (Furnace module tuning) for the note table. */ tuning: number }
+
+/** hUGE note n period at A-4 = tuning Hz: the rounding hUGE_note_table.inc uses (it is this table at 440). */
+export const hugeNotePeriod = (n: number, tuning: number): number => 2048 - Math.round(131072 / (tuning * 2 ** ((n - 33) / 12)));
 
 export interface HugeSong {
   blob: Uint8Array;
@@ -571,7 +576,7 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
     out[bankAt + o * 2] = bank;
   }
   if (bank > 1 && commonEnd > 0x4000) throw new Error(`song tables ${commonEnd - BASE} bytes exceed the 8 KiB bank 0 area a banked song needs`);
-  return { song: { blob: Uint8Array.from(out), lossy: lossy.list(), orders: hOrders, screen: { title: m.name, author: m.author, timerTma } }, used: { duty: insMap.duty.size, wave: insMap.wave.size, noise: insMap.noise.size } };
+  return { song: { blob: Uint8Array.from(out), lossy: lossy.list(), orders: hOrders, screen: { title: m.name, author: m.author, timerTma, tuning: m.tuning } }, used: { duty: insMap.duty.size, wave: insMap.wave.size, noise: insMap.noise.size } };
 }
 
 /** Patch the song into the player ROM (grown to the banks the song needs, MBC5 ROM size byte) and recompute both checksums. */
@@ -587,6 +592,7 @@ export function buildHugeRom(player: Uint8Array, meta: HugePlayerMeta, blob: Uin
   for (let i = 0x134; i <= 0x14c; i++) hsum = (hsum - rom[i] - 1) & 0xff;
   rom[0x14d] = hsum;
   rom[meta.rateOffset] = screen.timerTma;
+  for (let n = 0; n < 72; n++) { const p = hugeNotePeriod(n, screen.tuning); rom[meta.noteTableOffset + 2 * n] = p & 0xff; rom[meta.noteTableOffset + 2 * n + 1] = p >> 8; }
   rom.set(nesScreenText(screen.title, 11), meta.titleOffset);
   rom.set(nesScreenText(screen.author, 17), meta.authorOffset);
   rom.set(nesScrollText(screen.title, { author: screen.author }, 256), meta.scrollOffset);

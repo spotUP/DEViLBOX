@@ -24,7 +24,8 @@ srcs = ['public/gb/huge-player.asm', 'tools/build-gb-player.sh', 'third-party/hu
 h = hashlib.sha1()
 for s in srcs: h.update(open(f'{root}/{s}', 'rb').read())
 assert sym['song'] == (0, 0x2000), sym['song']
-meta = {'songAddress': 0x2000, 'songOffset': 0x2000, 'songCapacity': 0x6000, 'tickAddress': sym['player_tick'][1], 'rateOffset': sym['scr_rate'][1], 'titleOffset': sym['scr_title'][1], 'authorOffset': sym['scr_author'][1], 'scrollOffset': sym['scr_scroll'][1], 'sources': srcs, 'sourceHash': h.hexdigest()}
+assert sym['note_table'][0] == 0, sym['note_table']
+meta = {'songAddress': 0x2000, 'songOffset': 0x2000, 'songCapacity': 0x6000, 'tickAddress': sym['player_tick'][1], 'rateOffset': sym['scr_rate'][1], 'titleOffset': sym['scr_title'][1], 'authorOffset': sym['scr_author'][1], 'scrollOffset': sym['scr_scroll'][1], 'noteTableOffset': sym['note_table'][1], 'sources': srcs, 'sourceHash': h.hexdigest()}
 json.dump(meta, open(f'{root}/public/gb/huge-player.json', 'w'), indent=1)
 open(f'{root}/public/gb/huge-player.json', 'a').write('\n')
 print(meta)

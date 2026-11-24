@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
-import { buildHugeRom, furnaceToHuge, HUGE_SONG_BASE, type HugePlayerMeta } from '../gb/hugeSong';
+import { buildHugeRom, furnaceToHuge, HUGE_SONG_BASE, hugeNotePeriod, type HugePlayerMeta } from '../gb/hugeSong';
 
 const ROOT = join(__dirname, '../../../..');
 const META = JSON.parse(readFileSync(join(ROOT, 'public/gb/huge-player.json'), 'utf8')) as HugePlayerMeta & { sources: string[] };
@@ -34,6 +34,14 @@ describe('hUGEDriver Game Boy export', () => {
     let sum = 0;
     for (let i = 0; i < rom.length; i++) if (i !== 0x14e && i !== 0x14f) sum = (sum + rom[i]) & 0xffff;
     expect((rom[0x14e] << 8) | rom[0x14f]).toBe(sum);
+  });
+
+  it('note table: hugeNotePeriod at 440 Hz is the assembled table; the song tuning (spreadtro A-4 = 436) is patched in', () => {
+    const player = readFileSync(join(ROOT, 'public/gb/huge-player.gb'));
+    const at = (b: Uint8Array, n: number) => b[META.noteTableOffset + 2 * n] | (b[META.noteTableOffset + 2 * n + 1] << 8);
+    for (let n = 0; n < 72; n++) expect(at(player, n)).toBe(hugeNotePeriod(n, 440));
+    const rom = buildHugeRom(player, META, new Uint8Array(16), { title: '', author: '', timerTma: 0, tuning: 436 });
+    expect(at(rom, 29)).toBe(1669); // note 29 (F, 4 semitones under A-4) at 436 Hz: the period Furnace.app writes for spreadtro (1673 at 440)
   });
 
   it('lagtrain.fur: 11xx noise length becomes a per-width noise instrument, not a lossy item', async () => {
