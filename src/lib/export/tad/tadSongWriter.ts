@@ -758,11 +758,17 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           const sound = soundOf(instruments[ins], cl.note, wave);
           wave = constantMacro(instruments[ins], 3) ?? wave;
           const am = arpMacro(instruments[ins]);
-          const tad = am ? arpNote(sound?.note ?? 0, am.hold) - FURNACE_NOTE_OFFSET : (sound?.note ?? 0) - FURNACE_NOTE_OFFSET;
+          let tad = am ? arpNote(sound?.note ?? 0, am.hold) - FURNACE_NOTE_OFFSET : (sound?.note ?? 0) - FURNACE_NOTE_OFFSET;
+          // snes.cpp:219 clamps the pitch register at 0x3fff and still keys the note on: play the nearest playable note.
+          const pr = sound && outside(sound.smp, tad) ? playable(sound.smp) : null;
+          if (pr) {
+            drop(`exact pitch of notes outside the range of sample ${sound!.smp} (instrument ${ins}; they play at the nearest playable note)`, `${at}, note ${NOTE_NAMES[((tad % 12) + 12) % 12]}${Math.floor(tad / 12)}`);
+            tad = Math.max(pr[0], Math.min(pr[1], tad));
+          }
           if (!sound) {
             if (!insWarned.has(ins)) { insWarned.add(ins); warnings.push(`Instrument ${ins} has no sample or wavetable for some notes; those notes are rests.`); }
             flush(); out.push(...cmds); sounding = false; pending = { tok: 'r', ticks: 0 };
-          } else if (tad < 0 || tad > 95 || outside(sound.smp, tad)) {
+          } else if (tad < 0 || tad > 95) {
             drop(`notes outside the pitch range of sample ${sound.smp} (instrument ${ins})`, `${at}, note ${NOTE_NAMES[((tad % 12) + 12) % 12]}${Math.floor(tad / 12)}`);
             flush(); out.push(...cmds); sounding = false; pending = { tok: 'r', ticks: 0 };
           } else {

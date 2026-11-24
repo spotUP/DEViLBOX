@@ -81,7 +81,7 @@ describe.runIf(process.env.SNES_ROM_CHECK === '1')('snes-rom-check', () => {
         const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
         const file = { title: module.name || name, native: buildFurnaceNativeData(module), instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables };
         const r = await buildTadProject([file], create as CreateTadCompiler, (f) => path.join(TAD, f), async (f) => new Uint8Array(readFileSync(path.join(TAD, f))));
-        if (!r.playerRom) throw new Error(`no player ROM: ${r.warnings.slice(0, 3).join(' | ')}`);
+        if (!r.playerRom) throw new Error(`no player ROM: ${(r.warnings.filter((w) => /rejected|failed|not built/.test(w)).join(' | ') || r.warnings.slice(0, 3).join(' | '))}`);
         const got = mesenKeyOns(r.playerRom, dir);
         v = { inputHash, pass: got.length > 0, seconds: SECONDS, warnings: r.warnings, konEvents: got.length };
         if (existsSync(FURNACE)) {

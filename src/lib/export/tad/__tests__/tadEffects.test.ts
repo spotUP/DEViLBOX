@@ -140,9 +140,10 @@ describe('Furnace effects in the TAD writer', () => {
     expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
   }, 60000);
 
-  it('warns when a note is outside the TAD range (note 179)', async () => {
+  it('clamps a note above the sample range to the nearest playable note and warns (note 179)', async () => {
+    // Furnace snes.cpp clamps the pitch register and still keys the note on.
     const { song } = await writeWithEffects([[0x00, 0x00]], 0, undefined, FILE, 179);
-    expect(song.warnings.join('\n')).toMatch(/Dropped notes outside/);
+    expect(song.warnings.join('\n')).toMatch(/exact pitch of notes outside/);
   }, 60000);
 
   it('warns when a pitch slide needs a portamento velocity above 255', async () => {
