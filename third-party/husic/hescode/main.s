@@ -125,25 +125,8 @@ __vs_bx    .ds 2
 	.proc _pcm_play_data
 	__pushw
 	__addmi	-2,__stack
-	__ldwi	LL2
-	__pushw
-	__ldw_s	10
-	  jmp	___case
-LL4:
-
-	__stwi_s	1,0
-	__lbra	LL3
-LL5:
-
-LL6:
-
-	__stwi_s	0,0
-	__lbra	LL3
-	__lbra	LL3
-LL2:
-
-	.dw	4,LL4,5,LL5
-	.dw	LL6,0
+	__ldw_s	8
+	__stw_s	0
 LL3:
 
 	__ldw_s	0
@@ -181,114 +164,84 @@ LL1:
 	  rts
 	.endp
 
+	.macro PCMMASK
+		lda	#1
+		cpx	#0
+		beq	.m2
+.m1:
+		asl	a
+		dex
+		bne	.m1
+.m2:
+	.endm
+
 	.proc _pcm_on
-	__pushw
-	__ldb	_xpcm_play_flags
-	__notw
-	__tstw
-	__lbeq	LL8
-	  call	_ena_irq_tmr
-LL8:
-
-	__ldb_s	0
-	__stw	<__temp
-	__ldwi	5
-	  jsr	eqzp
-	__lbeq	LL9
-	__ldb	_xpcm_play_flags
-	__orwi	1
-	  stx	_xpcm_play_flags
-LL9:
-
-	__ldb_s	0
-	__stw	<__temp
-	__ldwi	4
-	  jsr	eqzp
-	__lbeq	LL10
-	__ldb	_xpcm_play_flags
-	__orwi	2
-	  stx	_xpcm_play_flags
-LL10:
-
-LL7:
-
-	__addmi	2,__stack
-	  rts
+	cpx	#6
+	bcs	.r
+	PCMMASK
+	sta	<__temp
+	lda	_xpcm_play_flags
+	bne	.s
+	smb	#2,<irq_m
+.s:
+	ora	<__temp
+	sta	_xpcm_play_flags
+.r:
+	rts
 	.endp
 
 	.proc _pcm_off
-	__pushw
-	__ldb_s	0
-	__stw	<__temp
-	__ldwi	5
-	  jsr	eqzp
-	__lbeq	LL12
-	__ldb	_xpcm_play_flags
-	__andwi	254
-	  stx	_xpcm_play_flags
-LL12:
-
-	__ldb_s	0
-	__stw	<__temp
-	__ldwi	4
-	  jsr	eqzp
-	__lbeq	LL13
-	__ldb	_xpcm_play_flags
-	__andwi	253
-	  stx	_xpcm_play_flags
-LL13:
-
-	__ldb	_xpcm_play_flags
-	__notw
-	__tstw
-	__lbeq	LL14
-	  call	_dis_irq_tmr
-LL14:
-
-LL11:
-
-	__addmi	2,__stack
-	  rts
+	cpx	#6
+	bcs	.r
+	PCMMASK
+	eor	#$ff
+	and	_xpcm_play_flags
+	sta	_xpcm_play_flags
+	bne	.r
+	rmb	#2,<irq_m
+.r:
+	rts
 	.endp
 
 	.proc _pcm_stop
-	__pushw
-	__ldb_s	0
-	  call	_pcm_off
-LL15:
-
-	__addmi	2,__stack
-	  rts
+	call	_pcm_off
+	rts
 	.endp
 
 	.proc _pcm_check
-	__pushw
-	__ldb_s	0
-	__stw	<__temp
-	__ldwi	5
-	  jsr	eqzp
-	__lbeq	LL17
-	__ldb	_xpcm_flags
-	__andwi	1
-	__lbra	LL16
-LL17:
+	cpx	#6
+	bcs	.n
+	PCMMASK
+	and	_xpcm_flags
+	beq	.n
+	ldx	#1
+	cly
+	rts
+.n:
+	ldx	#0
+	cly
+	rts
+	.endp
 
-	__ldb_s	0
-	__stw	<__temp
-	__ldwi	4
-	  jsr	eqzp
-	__lbeq	LL18
-	__ldb	_xpcm_flags
-	__andwi	2
-	__lbra	LL16
-LL18:
+	.proc _pcm_flag_set
+	cpx	#6
+	bcs	.r
+	PCMMASK
+	ora	_xpcm_flags
+	sta	_xpcm_flags
+.r:
+	rts
+	.endp
 
-	__ldwi	0
-	__lbra	LL16
-LL16:
-
-	__addmi	2,__stack
-	  rts
+	.proc _pcm_flag_clr
+	cpx	#6
+	bcs	.r
+	PCMMASK
+	eor	#$ff
+	and	_xpcm_flags
+	sta	_xpcm_flags
+.r:
+	rts
 	.endp
 
 	.proc _pcm_switch
@@ -309,24 +262,7 @@ LL16:
 	__ldb	_reg_ch
 	  call	_poke.2
 	__ldb_s	2
-	__stw	<__temp
-	__ldwi	5
-	  jsr	eqzp
-	__lbeq	LL21
-	__ldb	_xpcm_flags
-	__orwi	1
-	  stx	_xpcm_flags
-LL21:
-
-	__ldb_s	2
-	__stw	<__temp
-	__ldwi	4
-	  jsr	eqzp
-	__lbeq	LL22
-	__ldb	_xpcm_flags
-	__orwi	2
-	  stx	_xpcm_flags
-LL22:
+	  call	_pcm_flag_set
 
 	__lbra	LL23
 LL20:
@@ -340,24 +276,7 @@ LL20:
 LL24:
 
 	__ldb_s	2
-	__stw	<__temp
-	__ldwi	5
-	  jsr	eqzp
-	__lbeq	LL25
-	__ldb	_xpcm_flags
-	__andwi	254
-	  stx	_xpcm_flags
-LL25:
-
-	__ldb_s	2
-	__stw	<__temp
-	__ldwi	4
-	  jsr	eqzp
-	__lbeq	LL26
-	__ldb	_xpcm_flags
-	__andwi	253
-	  stx	_xpcm_flags
-LL26:
+	  call	_pcm_flag_clr
 
 LL23:
 
@@ -589,36 +508,55 @@ LL19:
 		; 再生フラグチェックで各PCM再生
 		lda		_xpcm_play_flags
 		and		#$01
+		beq		.end_ch0
+		jmp		.ch0_proc
+	.end_ch0:
+		lda		_xpcm_play_flags
+		and		#$02
 		beq		.end_ch1
 		jmp		.ch1_proc
 	.end_ch1:
 		lda		_xpcm_play_flags
-		and		#$02
+		and		#$04
 		beq		.end_ch2
 		jmp		.ch2_proc
 	.end_ch2:
-		; チャンネルを戻して終了
+		lda		_xpcm_play_flags
+		and		#$08
+		beq		.end_ch3
+		jmp		.ch3_proc
+	.end_ch3:
+		lda		_xpcm_play_flags
+		and		#$10
+		beq		.end_ch4
+		jmp		.ch4_proc
+	.end_ch4:
+		lda		_xpcm_play_flags
+		and		#$20
+		beq		.end_ch5
+		jmp		.ch5_proc
+	.end_ch5:
 		lda		_reg_ch
 		_xpokei_b REG_SEL
 		rts
-	; PCM出力
-	.if (USE_5BITPCM)
-	; 5ビット
+	.ch0_proc:
+		_pcm_proc 0, 0
+		jmp		.end_ch0
 	.ch1_proc:
-		_pcm_proc_8bit 5, 0
+		_pcm_proc 1, 1
 		jmp		.end_ch1
 	.ch2_proc:
-		_pcm_proc_8bit 4, 1
+		_pcm_proc 2, 2
 		jmp		.end_ch2
-	.else
-	; 4ビット
-	.ch1_proc:
-		_pcm_proc 5, 0
-		jmp		.end_ch1
-	.ch2_proc:
-		_pcm_proc 4, 1
-		jmp		.end_ch2
-	.endif
+	.ch3_proc:
+		_pcm_proc 3, 3
+		jmp		.end_ch3
+	.ch4_proc:
+		_pcm_proc 4, 4
+		jmp		.end_ch4
+	.ch5_proc:
+		_pcm_proc 5, 5
+		jmp		.end_ch5
 	.endp
 	; 割り込み有効
     .proc _ena_irq_tmr
@@ -658,7 +596,7 @@ LL28:
 
 	__ldw_s	0
 	__stw	<__temp
-	__ldwi	2
+	__ldwi	6
 	  jsr	ltzp
 	__lbne	LL30
 	__lbra	LL31
@@ -3988,12 +3926,12 @@ _song_track_table:		.ds	2
 _song_bank_table:		.ds	2
 _song_loop_table:		.ds	2
 _song_loop_bank:		.ds	2
-_xpcm_addr:		.ds	4
-_xpcm_len:		.ds	4
-_xpcm_shift:		.ds	2
-_xpcm_bank:		.ds	2
-_xpcm_buf:		.ds	2
-_xpcm_nextbuf:		.ds	2
+_xpcm_addr:		.ds	12
+_xpcm_len:		.ds	12
+_xpcm_shift:		.ds	6
+_xpcm_bank:		.ds	6
+_xpcm_buf:		.ds	6
+_xpcm_nextbuf:		.ds	6
 _xpcm_bank_save:		.ds	1
 _xpcm_flags:		.ds	1
 _xpcm_play_flags:		.ds	1

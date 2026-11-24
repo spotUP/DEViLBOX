@@ -17,18 +17,18 @@ export interface HusicLayout { soundDat: number; songEnd: number; ll0: number; c
 export interface HusicSong { rom: Uint8Array; lossy: string[]; frames: number; loopFrame: number }
 
 export const PCE_SYSTEM_ID = 0x05;
-const CHANNELS = 6, FRAME_HZ = 60, BANK = 0x2000, WINDOW = 0x4000, MAX_ROWS = 20000, PSG_CLOCK = 3579545;
+const CHANNELS = 6, FRAME_HZ = 60, BANK = 0x2000, WINDOW = 0x4000, MAX_ROWS = 20000, PSG_CLOCK = 3579545, XPCM_HZ = 6991.29, XPCM_MAX = BANK * 2;
 const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PITCH = 4, NONE = 0xff, INS_AMIGA = 4; // INS_AMIGA = DIV_INS_AMIGA
 const FREQ_TABLE = 0x2d; // `_freq` sits after LL0's strings (25 bytes) and the 20-byte author field in the const bank; asserted below
 const NOISE_FREQ = [4, 13, 15, 18, 21, 23, 25, 27, 29, 31, 0, 2]; // Furnace pce.cpp noiseFreq (old noise layout)
 // HuSIC track commands (hmckc output / hus.c SEQ_xx)
-const SLUR = 0xe9, PORTA = 0xeb, PAN = 0xf0, WAVE = 0xf1, NOISE = 0xf2, WAIT = 0xf4, NOTE_ENV = 0xf7, PITCH_ENV = 0xf8, REST = 0xfc, VOLUME = 0xfd, WAVE_ENV = 0xfe, JUMP = 0xee;
+const XPCM = 0xef, SLUR = 0xe9, PORTA = 0xeb, PAN = 0xf0, WAVE = 0xf1, NOISE = 0xf2, WAIT = 0xf4, NOTE_ENV = 0xf7, PITCH_ENV = 0xf8, REST = 0xfc, VOLUME = 0xfd, WAVE_ENV = 0xfe, JUMP = 0xee;
 const HANDLED = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0f, 0x10, 0x11, 0x80, 0xec, 0xed]);
 
 interface Frames { vals: number[]; loop: number }
 // glide: a slurred note (no envelope reset, no key-on volume); with port, the driver then slides by port per frame.
 // owner: a mid-note segment (noise mode switched by the duty macro) of this note; dropped when another note or off comes first.
-interface Ev { frame: number; kind: 'note' | 'off' | 'cont' | 'mark'; cmds: number[]; note?: number; vol?: number; glide?: { port?: [number, number] }; owner?: Ev }
+interface Ev { frame: number; kind: 'note' | 'off' | 'cont' | 'mark'; cmds: number[]; note?: number; dda?: boolean; vol?: number; glide?: { port?: [number, number] }; owner?: Ev }
 
 /** Furnace macro (tick rate `hz`) as per-frame values at the driver's 60 Hz, loop index or -1 (hold the last value). */
 function macroFrames(raw: FurnaceMacro, version: number, hz: number, lossy: Lossy, what: string): Frames | undefined {
@@ -180,6 +180,37 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   };
   // elapsed: frames since the note started. A volume column change on a held note rescales the macro where it is
   // running (Furnace keeps the macro position), it does not restart it.
+  // XPCM samples (Furnace DDA): the driver's timer IRQ streams 4-bit packed nibbles at 6991 Hz from one 8 KB bank per sample, indexed
+  // by the note byte. One table entry per (sample, playback rate).
+  const xpcm: Uint8Array[] = [], xpcmKeys = new Map<string, number>();
+  const isSampleIns = (fi: FurnaceInstrument | undefined) => !!fi && (fi.type === INS_AMIGA || !!fi.amiga?.useSample);
+  const xpcmIndex = (insIdx: number, nv: number): number => {
+    const fi = m.instruments[insIdx];
+    if (!isSampleIns(fi)) return -1;
+    const a = fi.amiga, abs = Math.max(0, Math.min(119, nv + 60));
+    const nm = a?.useNoteMap ? a.noteMap?.[abs] : undefined;
+    const smp = m.samples[nm ? nm.map : (a?.initSample ?? -1)];
+    if (!smp || smp.length < 2) return -1;
+    const rate = (smp.c4Rate || smp.compatRate || 8363) * 2 ** (((nm ? nm.freq : abs) - 60) / 12);
+    const step = rate / XPCM_HZ, n = Math.max(2, Math.min(XPCM_MAX, Math.round(smp.length / step)) & ~1);
+    const key = `${nm ? nm.map : a?.initSample}:${n}`;
+    const known = xpcmKeys.get(key);
+    if (known !== undefined) return known;
+    if (xpcm.length >= 0xe0) { lossy.add('more than 224 sample/pitch pairs (sample played as a wavetable tone)'); return -1; }
+    if (Math.round(smp.length / step) > XPCM_MAX) lossy.add('sample longer than one 8 KB bank (cut at 2.3 s)');
+    if (smp.loop) lossy.add('looping sample played once');
+    const d = smp.data, scale = d instanceof Int16Array ? 32768 : 128, bias = d instanceof Uint8Array ? 128 : 0;
+    const nib = (i: number) => {
+      const from = Math.floor(i * step), to = Math.max(from + 1, Math.floor((i + 1) * step));
+      let sum = 0;
+      for (let k = from; k < to; k++) sum += ((d[Math.min(k, d.length - 1)] - bias) / scale);
+      return Math.max(0, Math.min(15, Math.round(((sum / (to - from)) + 1) * 7.5)));
+    };
+    const bytes = new Uint8Array(n >> 1);
+    for (let i = 0; i < n; i += 2) bytes[i >> 1] = (nib(i) << 4) | nib(i + 1); // high nibble plays first
+    xpcmKeys.set(key, xpcm.length); xpcm.push(bytes);
+    return xpcm.length - 1;
+  };
   const volCode = (insIdx: number, chanVol: number, elapsed = 0): number => {
     const f0 = framesOf(insIdx, MACRO_VOL, 'volume');
     if (!f0) return 0x80 | chanVol;
@@ -301,12 +332,14 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         evs.push(snap);
         glideFrom = curNv; glideTo = nv; glideStart = at; curNv = nv;
         if (resetAtTarget) portaDone = fa;
+      } else if (nv >= 0 && nv < 253 && xpcmIndex(Math.max(0, ins), nv) >= 0) {
+        // Furnace pce.cpp: an Amiga-type or useSample instrument plays its sample through DDA; the driver streams it as XPCM ($EF 01).
+        curNv = nv; toneOn = false; noteFrame = at; noteTick = delay;
+        evs.push({ frame: at, kind: 'note', cmds, note: xpcmIndex(Math.max(0, ins), nv), dda: true, vol: volCode(Math.max(0, ins), chanVol) });
       } else if (nv >= 0 && nv < 253) {
         curNv = nv; toneOn = !(ch >= 4 && noiseFx); noteFrame = at;
         const insIdx = Math.max(0, ins);
-        // Furnace pce.cpp: an Amiga-type or useSample instrument plays its sample through DDA; the driver has no DDA route here yet
-        const fi = m.instruments[insIdx];
-        if (fi && (fi.type === INS_AMIGA || fi.amiga?.useSample)) lossy.add('sample instrument (DDA) played as a wavetable tone');
+        if (isSampleIns(m.instruments[insIdx])) lossy.add('sample instrument without a usable sample played as a wavetable tone');
         const wf = framesOf(insIdx, MACRO_WAVE, 'wave');
         const wave = wf && new Set(wf.vals).size > 1 ? -1 - waveEnv.level(wf) : wf ? wf.vals[0] : waveFx;
         const af0 = arpFrames(insIdx, arpFx);
@@ -444,7 +477,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       const p = merged[merged.length - 1];
       if (p && p.frame === e.frame) {
         p.cmds.push(...e.cmds);
-        if (e.kind === 'note' || e.kind === 'off') { p.kind = e.kind; p.note = e.note; p.vol = e.vol; p.glide = e.glide; }
+        if (e.kind === 'note' || e.kind === 'off') { p.kind = e.kind; p.note = e.note; p.dda = e.dda; p.vol = e.vol; p.glide = e.glide; }
         else if (e.vol !== undefined && p.kind !== 'off') p.vol = e.vol;
         if (e.kind === 'mark') p.cmds.push(-1);
         if (p.kind === 'mark') p.kind = 'cont';
@@ -452,17 +485,18 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     }
     unit([]);
     starts.push(here());
-    let loopAt = starts[starts.length - 1], sounding = false, curVol = -1;
+    let loopAt = starts[starts.length - 1], sounding = false, curVol = -1, xpcmOn = false;
     const state = new Map<number, number>(); // last value per command, so unchanged setup is not re-sent
     merged.forEach((e, i) => {
       const len = (merged[i + 1]?.frame ?? endFrame) - e.frame;
       const out: number[] = [];
       for (let k = 0; k < e.cmds.length; k++) {
         const c = e.cmds[k];
-        if (c === -1) { if (out.length) unit(out.splice(0)); unit([]); loopAt = here(); state.clear(); curVol = -1; continue; }
+        if (c === -1) { if (out.length) unit(out.splice(0)); unit([]); loopAt = here(); state.clear(); curVol = -1; if (merged.some((x) => x.dda)) unit([XPCM, 0]); xpcmOn = false; continue; }
         const v = e.cmds[++k];
         if (state.get(c) !== v || c === PAN) { out.push(c, v); state.set(c, v); }
       }
+      if (e.kind === 'note' && !!e.dda !== xpcmOn) { unit([XPCM, e.dda ? 1 : 0]); xpcmOn = !!e.dda; }
       if (out.length) unit(out);
       if (e.kind === 'note') {
         if (e.vol !== undefined && e.vol !== curVol) { unit([VOLUME, e.vol]); curVol = e.vol; }
@@ -520,10 +554,12 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     put16(waveTable + 2 * i, alloc(Array.from({ length: 32 }, (_, k) => Math.max(0, Math.min(31, Math.round(((w.data[Math.floor((k * n) / 32)] ?? 0) * 31) / top))))));
   });
   ptrs.forEach((p, i) => put16(header + 2 * i, p));
-  put16(header + 0x20, waveTable); put16(header + 0x22, ptrs[4]);
+  // XPCM table: addr16, len16 (bytes), bank8, padded to 8 bytes. Each sample sits at the start of its own bank after the track banks.
+  const xpcmTable = xpcm.length ? alloc(xpcm.flatMap((b, i) => [...w16(WINDOW + 0x2000), ...w16(b.length), layout.firstFreeBank + banks.length + i, 0, 0, 0])) : ptrs[4];
+  put16(header + 0x20, waveTable); put16(header + 0x22, xpcmTable);
 
   // 7. HuCard: driver, tables, tracks; power-of-two size of at least 128 KB.
-  const used = layout.firstFreeBank + banks.length;
+  const used = layout.firstFreeBank + banks.length + xpcm.length;
   let size = 16 * BANK;
   while (size < used * BANK) size *= 2;
   if (size > 0x100000) throw new Error('HuSIC export: song data does not fit in a 1 MB HuCard');
@@ -531,6 +567,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   rom.set(player.subarray(0, Math.min(player.length, layout.firstFreeBank * BANK)));
   regions.forEach((g) => rom.set(g.bytes, g.rom));
   banks.forEach((b, i) => rom.set(b, (layout.firstFreeBank + i) * BANK));
+  xpcm.forEach((b, i) => rom.set(b, (layout.firstFreeBank + banks.length + i) * BANK));
   const text = (str: string, at: number, max: number) => {
     const t = [...(str || '')].map((c) => (c >= ' ' && c <= '~' ? c.charCodeAt(0) : 0x3f)).slice(0, max);
     rom.fill(0, cb + at, cb + at + max + 1);

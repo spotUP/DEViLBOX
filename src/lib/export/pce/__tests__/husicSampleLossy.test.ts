@@ -16,13 +16,22 @@ const load = async (song: string) => {
   const b = readFileSync(join(root, 'public/data/songs/furnace/pce', song));
   return parseFurnaceSong(b.buffer.slice(b.byteOffset, b.byteOffset + b.length) as ArrayBuffer);
 };
-const SAMPLE = 'sample instrument (DDA) played as a wavetable tone';
+const SAMPLE = 'sample instrument without a usable sample played as a wavetable tone';
+const XPCM_PTR = 0x22; // header slot of the XPCM table (was a dummy pointer)
 
-describe('PCE sample instruments', () => {
-  it('reports a useSample instrument as lossy', async () => {
-    expect(furnaceToHusic(await load('fd_PCB.fur'), 0, player, layout).lossy.some((l) => l.startsWith(SAMPLE))).toBe(true);
+describe('PCE sample instruments (XPCM)', () => {
+  it('plays fd_PCB drums as XPCM: samples in their own banks, a table, no wavetable-tone fallback', async () => {
+    const r = furnaceToHusic(await load('fd_PCB.fur'), 0, player, layout);
+    expect(r.lossy.some((l) => l.startsWith(SAMPLE))).toBe(false);
+    const at = (addr: number) => layout.constBank * 0x2000 + (addr - 0x4000);
+    const tbl = r.rom[at(layout.soundDat) + XPCM_PTR] | (r.rom[at(layout.soundDat) + XPCM_PTR + 1] << 8);
+    const e = at(tbl); // entry 0: addr16, len16, bank8
+    expect(r.rom[e + 1]).toBe(0x60);
+    expect(r.rom[e + 2] | (r.rom[e + 3] << 8)).toBeGreaterThan(0);
+    expect(r.rom[e + 4]).toBeGreaterThanOrEqual(layout.firstFreeBank);
   });
-  it('does not report it on a wavetable-only song', async () => {
-    expect(furnaceToHusic(await load('pcengineasdmo.fur'), 0, player, layout).lossy.some((l) => l.startsWith(SAMPLE))).toBe(false);
+  it('does not add sample banks on a wavetable-only song', async () => {
+    const r = furnaceToHusic(await load('pcengineasdmo.fur'), 0, player, layout);
+    expect(r.lossy.some((l) => l.startsWith(SAMPLE))).toBe(false);
   });
 });
