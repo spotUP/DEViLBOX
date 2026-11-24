@@ -443,8 +443,10 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         const sent = new Map<string, string>();
         const setState = (cmds?: string) => { for (const c of cmds?.split(' ') ?? []) { const k = /^[A-Za-z]+/.exec(c)![0]; if (sent.get(k) !== c) { sent.set(k, c); out.push(c); } } };
         for (const st of pending.pre.steps) {
-          const t = Math.min(st.ticks, pending.ticks - (pending.tok === 'w' && !cont ? 2 : 1));
-          if (t <= 0) break;
+          // A note that ends here keeps 2 ticks for its last piece: a 1-tick piece cannot key off and would be slurred into
+          // the next note, which then gets no key-on (Furnace keys every NOTE_ON, snes.cpp:351-392).
+          const t = Math.min(st.ticks, pending.ticks - (cont ? 1 : 2));
+          if (t <= 0) { v = undefined; break; } // no room left: the note ends before this step, the tail keeps its state
           if (!st.tok && Math.floor(st.p / 12) !== o) { o = Math.floor(st.p / 12); out.push(`o${o}`); }
           setState(st.v);
           out.push(`${st.tok ?? pitchName(st.p)}%${t} &`);

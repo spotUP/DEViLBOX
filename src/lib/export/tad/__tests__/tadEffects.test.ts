@@ -99,6 +99,8 @@ describe('Furnace effects in the TAD writer', () => {
     expect(await run([{ code: 4, data: [8], mode: 1, speed: 4 }])).toMatch(/MD\+\d+/); // relative: sums on every write
     expect(await run([{ code: 12, data: [127, 40], loop: 0, speed: 8 }, { code: 13, data: [20, 127], loop: 0, speed: 8 }])).toMatch(/\bp\d+/);
     expect(await run([{ code: 1, data: [0x40000000 | 60, 0x40000000 | 64, 0], speed: 4 }])).toMatch(/%\d+ &/); // fixed notes
+    // A looping arp macro fills the whole note: its last piece keeps 2 ticks so the note keys off and the next note keys on.
+    expect((await writeWithEffects([], 0, setM([{ code: 1, data: [0, 12, 24], loop: 0, speed: 4 }]))).song.warnings.join('\n')).not.toMatch(/1-tick note slurred/);
     expect(await run([{ code: 2, data: [3, 20, 9], loop: 0, speed: 4 }], [[0x11, 1]])).toMatch(/N3,%\d+ &/);
   }, 120000);
 
