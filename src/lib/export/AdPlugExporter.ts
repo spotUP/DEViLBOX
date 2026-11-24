@@ -190,7 +190,7 @@ function encodePatternData(
 /** What the RAD encoder writes: cells, order list, speed and OPL patches. */
 function radContent(s: TrackerSong): string {
   return JSON.stringify([
-    s.patterns.map(p => p.channels.map(c => c.rows)), s.songPositions, s.initialSpeed,
+    s.patterns.map(p => p.channels.map(c => c.rows)), s.songPositions, s.initialSpeed, s.radOrderJumps ?? [], !!s.radSlowTimer,
     s.instruments.map(i => [i.opl3, i.furnace]),
   ]);
 }
@@ -234,7 +234,7 @@ export function exportToRAD(song: TrackerSong): ArrayBuffer {
   out.push(...encoder.encode(RAD_HEADER), RAD_VERSION);
 
   // Flags: speed in bits 0-4, bit 7 = description follows
-  out.push(0x80 | Math.max(1, Math.min(31, song.initialSpeed || 6)));
+  out.push(0x80 | (song.radSlowTimer ? 0x40 : 0) | Math.max(1, Math.min(31, song.initialSpeed || 6)));
   out.push(...encoder.encode(song.name || 'DEViLBOX Export'), 0x00);
 
   // Instruments: number + 11 bytes (internal order ends C0 last; file order has C0 before the two waveforms), 0 ends
@@ -244,9 +244,14 @@ export function exportToRAD(song: TrackerSong): ArrayBuffer {
   out.push(0x00);
 
   // Order list (patterns 0-31)
-  const orderLen = Math.min(128, song.songPositions.length);
-  out.push(orderLen);
-  for (let i = 0; i < orderLen; i++) out.push((song.songPositions[i] ?? 0) & 0x1F);
+  const jumps = song.radOrderJumps ?? [];
+  const order: number[] = [];
+  for (let i = 0; i <= song.songPositions.length; i++) {
+    for (const j of jumps) if (j.pos === i) order.push(0x80 | (j.target & 0x7F));
+    if (i < song.songPositions.length) order.push(song.songPositions[i] & 0x1F);
+  }
+  const orderLen = Math.min(128, order.length);
+  out.push(orderLen, ...order.slice(0, orderLen));
 
   // 32 absolute pattern offsets, then the pattern data
   const patBytes: number[][] = [];

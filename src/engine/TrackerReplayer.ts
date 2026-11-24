@@ -476,6 +476,10 @@ export interface TrackerSong {
   xmfFileData?: Uint8Array;
   /** Raw AdPlug RAD binary; the exporter writes it back and patches only edited cells. */
   radFileData?: Uint8Array;
+  /** RAD v1 order jump markers (order byte bit 7): `pos` = songPositions entries before the marker, `target` = raw order index (low 7 bits). */
+  radOrderJumps?: Array<{ pos: number; target: number }>;
+  /** RAD v1 header flags bit 6: legacy slow timer (player runs at 18.2 Hz instead of 50 Hz). */
+  radSlowTimer?: boolean;
   /** Raw ZoundMonitor binary; the exporter writes it back and patches only edited cells. */
   zoundMonitorFileData?: Uint8Array;
   /** Raw Digital Symphony binary; the exporter writes it back and patches only edited cells. */

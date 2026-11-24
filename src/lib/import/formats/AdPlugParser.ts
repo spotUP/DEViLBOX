@@ -222,11 +222,13 @@ function parseRADv1(buf: Uint8Array, filename: string): TrackerSong {
   }
   if (instruments.length === 0) instruments.push(makeOPLInstrument(1, 'Default'));
 
-  // Order list: count byte, then entries; bit 7 marks a jump (not representable in songPositions, dropped).
+  // Order list: count byte, then entries; bit 7 marks a jump to order index (low 7 bits), kept in radOrderJumps.
   const songPositions: number[] = [];
+  const radOrderJumps: Array<{ pos: number; target: number }> = [];
   const orderLen = buf[pos++] ?? 0;
   for (let i = 0; i < orderLen && pos < buf.length; i++, pos++) {
-    if (!(buf[pos] & 0x80)) songPositions.push(buf[pos]);
+    if (buf[pos] & 0x80) radOrderJumps.push({ pos: songPositions.length, target: buf[pos] & 0x7F });
+    else songPositions.push(buf[pos]);
   }
   if (songPositions.length === 0) songPositions.push(0);
 
@@ -270,7 +272,7 @@ function parseRADv1(buf: Uint8Array, filename: string): TrackerSong {
   patterns.length = Math.min(32, Math.max(keep, 1));
 
   const title = filename.replace(/\.rad$/i, '');
-  return buildSong(`${title} (RAD v1)`, patterns, instruments, songPositions, NUM_CH, speed, 125);
+  return { ...buildSong(`${title} (RAD v1)`, patterns, instruments, songPositions, NUM_CH, speed, 125), radOrderJumps, radSlowTimer: (flags & 0x40) !== 0 };
 }
 
 function parseRADv2(buf: Uint8Array, filename: string): TrackerSong {
