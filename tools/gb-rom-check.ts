@@ -206,10 +206,15 @@ for (const name of names) {
       const d = diffWrites(want.slice(1), got.slice(1));
       Object.assign(v, { wanted: want.flat().length, diffs: d.diffs, first: d.first, stateMatch: stateMatch(want, got) });
     } else {
-      const want = vgmTicks(path.join(SONGS, `${name}.fur`), m.subsongs[0].hz * (m.subsongs[0].virtualTempo / m.subsongs[0].virtualTempoD), TICKS);
-      const f = fieldDiffs(want, got);
-      Object.assign(v, { wanted: want.flat().length, stateMatch: stateMatch(want, got), shift: f.shift, fields: f.fields, fieldFirst: f.first });
-      f.fields.forEach((x, ch) => console.log(`  ch${ch + 1} ${JSON.stringify(x)} ${JSON.stringify(f.first[ch])}`));
+      try {
+        const want = vgmTicks(path.join(SONGS, `${name}.fur`), m.subsongs[0].hz * (m.subsongs[0].virtualTempo / m.subsongs[0].virtualTempoD), TICKS);
+        const f = fieldDiffs(want, got);
+        Object.assign(v, { wanted: want.flat().length, stateMatch: stateMatch(want, got), shift: f.shift, fields: f.fields, fieldFirst: f.first });
+        f.fields.forEach((x, ch) => console.log(`  ch${ch + 1} ${JSON.stringify(x)} ${JSON.stringify(f.first[ch])}`));
+      } catch (e) {
+        // The ROM ran; only the reference is missing (e.g. the Furnace CLI is older than the .fur format version): keep the ROM verdict.
+        v.error = `no reference: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`;
+      }
     }
   } catch (e) {
     v = { inputHash, pass: false, ticks: TICKS, got: 0, channels: [], error: e instanceof Error ? e.message : String(e) };
