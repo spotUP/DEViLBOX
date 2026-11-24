@@ -89,7 +89,7 @@ export interface QuartetStGrid {
   /** sample slots (0-based) the song selects with V */
   usedSamples: number[];
   /** the 'P' / 'S' record each grid note was read from (frequency long at offset + 4), one per placed cell */
-  placements: Array<{ voice: number; row: number; offset: number; note: number }>;
+  placements: Array<{ voice: number; row: number; offset: number; note: number; vOffset: number | null; instrument: number }>;
   /** byte-exact carrier: every voice stream, one cell per two bytes (quartetPsgGrid.decodeQuartetStream) */
   blockRows: TrackerCell[][];
   filePatternAddrs: number[];
@@ -105,6 +105,8 @@ export function buildQuartetStGrid(buf: Uint8Array, sourceFile: string): Quartet
   const tickHz = speed > 0 ? speed : 200;
   const timelines: TrackerCell[][] = spans.map(() => []);
   const curSample: Array<number | null> = spans.map(() => null);
+  // the 'V' record that set curSample; survives loop passes and the 'F' restart
+  const curV: Array<number | null> = spans.map(() => null);
   const used = new Set<number>();
   const placements: QuartetStGrid['placements'] = [];
 
@@ -125,6 +127,7 @@ export function buildQuartetStGrid(buf: Uint8Array, sourceFile: string): Quartet
       if (cmd === CMD.V) {
         const slot = Math.floor(u32(buf, p + 8) / 4);
         curSample[v] = slot < SAMPLE_SLOTS ? slot : null;
+        curV[v] = p;
         p += REC; continue;
       }
       if (cmd === CMD.P || cmd === CMD.S) {
@@ -135,11 +138,12 @@ export function buildQuartetStGrid(buf: Uint8Array, sourceFile: string): Quartet
           const slot = curSample[v];
           if (slot !== null) used.add(slot);
           const note = quartetStFreqToNote(u32(buf, p + 4));
-          if (note > 0 && row < MAX_ROWS) placements.push({ voice: v, row, offset: p, note });
+          const instrument = slot === null ? 0 : slot + 1;
+          if (note > 0 && row < MAX_ROWS) placements.push({ voice: v, row, offset: p, note, vOffset: curV[v], instrument });
           line[row] = {
             ...emptyCell(),
             note,
-            instrument: slot === null ? 0 : slot + 1,
+            instrument,
             effTyp: cmd === CMD.S ? 3 : 0,
           };
         }
@@ -192,8 +196,9 @@ export function buildQuartetStGrid(buf: Uint8Array, sourceFile: string): Quartet
 
 /**
  * Write the grid's note edits into the song: a changed note becomes the stored frequency long of its 'P' / 'S'
- * record, four bytes in place, so an unedited song is written back byte-identical. Cells played from the same
- * record (loops, 'F' repeats) must agree; any other change (instrument, rest, new note) is reported, not written.
+ * record, a changed instrument becomes the sample-table offset long (slot * 4) of the governing 'V' record; both
+ * in place, so an unedited song is written back byte-identical. Cells played from the same record (loops, 'F'
+ * repeats, every note under one V) must agree; any other change (rest, new note) is reported, not written.
  */
 export function applyQuartetStGridEdits(source: Uint8Array, edited: Pattern[]): { data: Uint8Array; patched: number; warnings: string[] } {
   const out = new Uint8Array(source);
@@ -203,11 +208,25 @@ export function applyQuartetStGridEdits(source: Uint8Array, edited: Pattern[]): 
   const cellAt = (v: number, row: number): TrackerCell | undefined => edited[Math.floor(row / R)]?.channels[v]?.rows[row % R];
   const warnings: string[] = [];
   const wanted = new Map<number, Set<number>>();
+  const wantedV = new Set<number>();
+  // every note under one V record shares its sample; collect what the cells reading it now say
+  const vSlots = new Map<number, Set<number>>();
   const placed = new Set<string>();
   for (const pl of base.placements) {
     placed.add(`${pl.voice}:${pl.row}`);
     const cell = cellAt(pl.voice, pl.row);
-    if (!cell || cell.note === pl.note) continue;
+    if (!cell) continue;
+    const slot = (cell.instrument ?? 0) - 1;
+    if (pl.vOffset !== null) {
+      if (!vSlots.has(pl.vOffset)) vSlots.set(pl.vOffset, new Set());
+      vSlots.get(pl.vOffset)!.add(slot);
+    }
+    if ((cell.instrument ?? 0) !== pl.instrument) {
+      if (pl.vOffset === null) warnings.push(`voice ${pl.voice + 1} row ${pl.row}: no 'V' record before this note, its instrument is read-only; not written`);
+      else if (slot < 0 || slot >= SAMPLE_SLOTS) warnings.push(`voice ${pl.voice + 1} row ${pl.row}: instrument ${cell.instrument} is outside the ${SAMPLE_SLOTS} sample slots; not written`);
+      else wantedV.add(pl.vOffset);
+    }
+    if (cell.note === pl.note) continue;
     const f = (cell.note ?? 0) > 0 ? quartetStNoteToFreq(cell.note ?? 0) : null;
     if (f === null) { warnings.push(`voice ${pl.voice + 1} row ${pl.row}: note ${cell.note} removes the note or has no frequency; not written`); continue; }
     if (!wanted.has(pl.offset)) wanted.set(pl.offset, new Set());
@@ -220,10 +239,17 @@ export function applyQuartetStGridEdits(source: Uint8Array, edited: Pattern[]): 
     out[offset + 4] = (f >>> 24) & 0xff; out[offset + 5] = (f >>> 16) & 0xff; out[offset + 6] = (f >>> 8) & 0xff; out[offset + 7] = f & 0xff;
     patched++;
   }
+  for (const vOffset of wantedV) {
+    const set = vSlots.get(vOffset)!;
+    if (set.size !== 1) { warnings.push(`'V' record at ${vOffset}: the notes under it were given different instruments; not written`); continue; }
+    const v = [...set][0] * 4;
+    out[vOffset + 8] = 0; out[vOffset + 9] = 0; out[vOffset + 10] = (v >>> 8) & 0xff; out[vOffset + 11] = v & 0xff;
+    patched++;
+  }
   let stray = 0;
   edited.forEach((pat, p) => pat.channels.forEach((chn, v) => chn.rows.forEach((cell, r) => {
     const was = base.patterns[p]?.channels[v]?.rows[r] ?? emptyCell();
-    const cmp = placed.has(`${v}:${p * R + r}`) ? { ...cell, note: was.note } : cell;
+    const cmp = placed.has(`${v}:${p * R + r}`) ? { ...cell, note: was.note, instrument: was.instrument } : cell;
     if (!cellFieldsEqual(cmp, was)) stray++;
   })));
   if (stray > 0) warnings.push(`${stray} edited cell(s) change more than a stored note; not written (the stream would change length)`);

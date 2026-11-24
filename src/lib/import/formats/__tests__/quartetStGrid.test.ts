@@ -116,6 +116,35 @@ describe('Quartet ST note edits write back into the song', () => {
     expect(Array.from(out.data)).toEqual(Array.from(raw));
   });
 
+  it.each(FILES)('%s: an instrument edit rewrites only its V record and re-imports as the new sample', async (rel) => {
+    const { raw, song } = await load(rel);
+    const g = buildQuartetStGrid(raw, '')!;
+    const pl = g.placements.find(q => q.vOffset !== null)!;
+    const under = g.placements.filter(q => q.vOffset === pl.vOffset);
+    const target = (pl.instrument % 20) + 1; // another slot (1-based), within the 20-slot table
+    const R = QUARTET_ST_ROWS_PER_PATTERN;
+    for (const q of under) song.patterns[Math.floor(q.row / R)].channels[q.voice].rows[q.row % R].instrument = target;
+    const out = await exportQuartet(song);
+    expect(out.warnings).toEqual([]);
+    expect(out.data.length).toBe(raw.length);
+    const changed = Array.from(out.data).map((b, i) => (b !== raw[i] ? i : -1)).filter(i => i >= 0);
+    expect(changed.length).toBeGreaterThan(0);
+    changed.forEach(i => expect(i >= pl.vOffset! + 8 && i < pl.vOffset! + 12).toBe(true));
+    const back = buildQuartetStGrid(out.data, '')!;
+    for (const q of under) expect(back.patterns[Math.floor(q.row / R)].channels[q.voice].rows[q.row % R].instrument).toBe(target);
+  });
+
+  it('notes under one V record given different instruments are reported, not written', async () => {
+    const { raw, song } = await load(FILES[0]);
+    const g = buildQuartetStGrid(raw, '')!;
+    const pl = g.placements.find(q => q.vOffset !== null && g.placements.filter(o => o.vOffset === q.vOffset).length > 1)!;
+    const R = QUARTET_ST_ROWS_PER_PATTERN;
+    song.patterns[Math.floor(pl.row / R)].channels[pl.voice].rows[pl.row % R].instrument = (pl.instrument % 20) + 1;
+    const out = await exportQuartet(song);
+    expect(out.warnings.length).toBeGreaterThan(0);
+    expect(Array.from(out.data)).toEqual(Array.from(raw));
+  });
+
   it('quartetStNoteToFreq round-trips every grid note it can store', () => {
     for (let n = 1; n <= 60; n++) {
       const f = quartetStNoteToFreq(n);
