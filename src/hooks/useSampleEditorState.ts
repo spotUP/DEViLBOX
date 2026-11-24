@@ -447,11 +447,15 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
       const a = document.createElement('a');
       a.href = url;
       a.download = 'sample.wav';
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      a.remove();
+      // Revoking at once can cancel the download before the browser reads the blob.
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
       notify.success('Sample exported as WAV');
-    } catch {
-      notify.error('Failed to export WAV');
+    } catch (err) {
+      console.error('[SampleEditor] WAV export failed', err);
+      notify.error(`Failed to export WAV: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, [audioBuffer]);
 
