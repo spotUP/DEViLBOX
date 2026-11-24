@@ -58,6 +58,17 @@ describe.each(['pacland.jb', 'world darts.jb', 'feud pal.jb'])('Jason Brooke ver
     const re = parseJasonBrookeFile(out.data.slice().buffer as ArrayBuffer, name);
     expect(re.patterns[x.pattern].channels[x.channel].rows[x.row].note).toBe(x.note + 1);
   });
+
+  it('an instrument edit on a note cell is a named warning and writes nothing', async () => {
+    const song = load();
+    setGridBaseline(baselineOf(song.patterns));
+    const x = song.uadeVariableLayout!.noteBytes![0];
+    const cell = song.patterns[x.pattern].channels[x.channel].rows[x.row];
+    cell.instrument = cell.instrument + 1;
+    const out = await exportJasonBrooke(song);
+    expect(diffAt(out.data, bytes)).toEqual([]);
+    expect(out.warnings.join(' ')).toMatch(/instrument, volume and effect edits are not written/);
+  });
 });
 
 describe('Jason Brooke reachability and the non-driver placeholder', () => {
