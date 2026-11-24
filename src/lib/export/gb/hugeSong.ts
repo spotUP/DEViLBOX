@@ -279,6 +279,14 @@ function mapEffect(type: number, value: number, kind: Kind, jumpTarget: (order: 
 }
 
 export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
+  // Pass 1 without start-volume variants counts the plain instruments; the variants then get only the slots left over,
+  // so they can never push a plain instrument past hUGE's 15 slots (that plays instrument 0, a wrong sound).
+  const base = convert(m, subsong, { duty: 0, wave: 0, noise: 0 });
+  const room: Record<Kind, number> = { duty: 15 - base.used.duty, wave: 15 - base.used.wave, noise: 15 - base.used.noise };
+  return convert(m, subsong, room).song;
+}
+
+function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>): { song: HugeSong; used: Record<Kind, number> } {
   const lossy = new Lossy();
   const s = m.subsongs[subsong];
   if (!s) throw new Error(`subsong ${subsong} missing`);
@@ -306,8 +314,13 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
 
   // Instruments per kind, in order of first use (hUGE numbers 1-15).
   const insMap: Record<Kind, Map<number, number>> = { duty: new Map(), wave: new Map(), noise: new Map() };
-  const insNo = (kind: Kind, i: number): number => {
+  const variants: Record<Kind, number> = { duty: 0, wave: 0, noise: 0 };
+  const insNo = (kind: Kind, i: number, plain = i): number => {
     const map = insMap[kind];
+    if (!map.has(i) && i >= VOL_STEP) {
+      if (variants[kind] >= room[kind]) { lossy.add('volume column beside an effect (no free instrument slot for a start-volume variant)'); return insNo(kind, plain); }
+      variants[kind]++;
+    }
     if (!map.has(i)) { if (map.size >= 15) { lossy.add(`${kind} instruments past 15`); return 0; } map.set(i, map.size + 1); }
     return map.get(i)!;
   };
@@ -405,7 +418,7 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
                 // A note's volume rides in a start-volume variant of its instrument, which frees the Cxy slot for the effect.
                 // A repeat of a macro-less duty instrument kept Furnace's 12xx duty; the reload resets it.
                 if (plainRepeat) lossy.add('volume column beside an effect on an instrument repeat (duty reset)');
-                instr = insNo(kind, baseKey + VOL_STEP * ((kind === 'wave' ? waveVol(cell.volume & 15) : cell.volume & 15) + 1));
+                instr = insNo(kind, baseKey + VOL_STEP * ((kind === 'wave' ? waveVol(cell.volume & 15) : cell.volume & 15) + 1), baseKey);
               } else lossy.add('volume column beside an effect');
             }
             // A pan in a busy cell moves to a free slot of the row as a channel-pair pan (driver fx_set_pan param bit 7).
@@ -517,7 +530,7 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
     out[bankAt + o * 2] = bank;
   }
   if (bank > 1 && commonEnd > 0x4000) throw new Error(`song tables ${commonEnd - BASE} bytes exceed the 8 KiB bank 0 area a banked song needs`);
-  return { blob: Uint8Array.from(out), lossy: lossy.list(), orders: hOrders, screen: { title: m.name, author: m.author, timerTma } };
+  return { song: { blob: Uint8Array.from(out), lossy: lossy.list(), orders: hOrders, screen: { title: m.name, author: m.author, timerTma } }, used: { duty: insMap.duty.size, wave: insMap.wave.size, noise: insMap.noise.size } };
 }
 
 /** Patch the song into the player ROM (grown to the banks the song needs, MBC5 ROM size byte) and recompute both checksums. */

@@ -69,4 +69,13 @@ describe('hUGEDriver Game Boy export', () => {
     expect(song.lossy.filter((l) => l.startsWith('volume column beside an effect'))).toEqual([]);
     expect(song.lossy.filter((l) => l.includes('instrument repeat'))).toEqual([]);
   });
+
+  it('lagtrain.fur: start-volume variants never push a plain instrument past the 15 hUGE slots', async () => {
+    const fur = readFileSync(join(ROOT, 'public/data/songs/furnace/gameboy/lagtrain.fur'));
+    const m = await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
+    const lossy = furnaceToHuge(m).lossy;
+    expect(lossy.filter((l) => l.includes('instruments past 15'))).toEqual([]);
+    // The variants that no longer fit fall back to the plain instrument and report the dropped volume.
+    expect(lossy.some((l) => l.includes('no free instrument slot'))).toBe(true);
+  });
 });
