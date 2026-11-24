@@ -16,7 +16,6 @@ import { applySynthTypeDefaults } from '@stores/instrument/synthTypeDefaults';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
 import { UnifiedInstrumentEditor } from './editors';
 import { TestKeyboard, CategorizedSynthSelector } from './shared';
-import { InstrumentEffectsPanel } from '@components/effects/InstrumentEffectsPanel';
 import { hasBuiltInInput, hasHardwareUI } from './hardware/HardwareUIWrapper';
 import { SavePresetDialog } from './presets';
 import { InstrumentList } from './InstrumentList';
@@ -495,7 +494,8 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                         return (
                           <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
+                            // Effects opens the same full FX editor as Ctrl+Shift+F; closing it returns here (modalReturn).
+                            onClick={() => (tab.id === 'effects' ? useUIStore.getState().openModal('instrumentFx') : setActiveTab(tab.id))}
                             className={`
                               flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all border
                               ${isActive
@@ -565,16 +565,6 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                     />
                   )}
 
-                  {activeTab === 'effects' && (
-                    <div className="p-2">
-                      <InstrumentEffectsPanel
-                        instrumentId={currentInstrument.id}
-                        instrumentName={currentInstrument.name}
-                        effects={currentInstrument.effects || []}
-                        hideHeader
-                      />
-                    </div>
-                  )}
                 </div>
 
                 {/* Synth Browser Modal */}

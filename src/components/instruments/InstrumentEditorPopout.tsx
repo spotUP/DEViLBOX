@@ -10,7 +10,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { getSynthInfo } from '@constants/synthCategories';
 import { UnifiedInstrumentEditor } from './editors';
 import { TestKeyboard } from './shared';
-import { InstrumentEffectsPanel } from '@components/effects/InstrumentEffectsPanel';
+import { InstrumentEffectsModal } from '@components/effects/InstrumentEffectsModal';
 import { SavePresetDialog } from './presets';
 import * as LucideIcons from 'lucide-react';
 import { Settings, Sparkles, Save, Keyboard, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -35,6 +35,8 @@ export const InstrumentEditorPopout: React.FC = () => {
   }, []);
 
   const [activeTab, setActiveTab] = useState<EditorTab>('sound');
+  // Effects opens the same full FX editor as Ctrl+Shift+F, rendered inside this window (portal target).
+  const [showFx, setShowFx] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
 
@@ -147,7 +149,7 @@ export const InstrumentEditorPopout: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => (tab.id === 'effects' ? setShowFx(true) : setActiveTab(tab.id))}
               className={`
                 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border
                 ${isActive
@@ -175,14 +177,8 @@ export const InstrumentEditorPopout: React.FC = () => {
           />
         )}
 
-        {activeTab === 'effects' && (
-          <InstrumentEffectsPanel
-            instrumentId={currentInstrument.id}
-            instrumentName={currentInstrument.name}
-            effects={currentInstrument.effects || []}
-          />
-        )}
       </div>
+      <InstrumentEffectsModal isOpen={showFx} onClose={() => setShowFx(false)} />
 
       {/* Test Keyboard (Collapsible) */}
       <div className="border-t border-dark-border shrink-0">
