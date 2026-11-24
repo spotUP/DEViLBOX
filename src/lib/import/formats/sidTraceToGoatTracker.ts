@@ -19,9 +19,9 @@
  */
 import {
   type GTInstrument, type GTPlaySettings, type GTSongData,
-  emptyGTInstrument, GT_FIRSTNOTE, GT_REST, GT_LOOPSONG,
+  emptyGTInstrument, writeGoatTrackerSng, GT_FIRSTNOTE, GT_REST, GT_LOOPSONG,
 } from './GoatTrackerSid';
-import type { SidTrace } from './SIDParser';
+import { traceSid, type SidTrace } from './SIDParser';
 import {
   segmentNotes, inferInstruments, fitGrid, rowOfFrame, programControl, MAX_INFERRED_INSTRUMENTS,
   type DecodedNote, type RowGrid,
@@ -857,4 +857,13 @@ export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): S
     instrumentCount: built.instruments.filter((i) => i.ad || i.sr || i.ptr.some((p) => p)).length,
     programFrames: built.maxLen, sharedPrograms: built.shared, warnings,
   };
+}
+
+/** A .sid as GoatTracker .sng bytes: trace the tune, convert, write. Null when the tune cannot be traced or has no notes. */
+export function sidToGoatTrackerSng(sid: ArrayBuffer, name = 'Imported SID'): { sng: Uint8Array; result: SidTraceGoatTracker } | null {
+  const trace = traceSid(sid);
+  if (!trace) return null;
+  const result = sidTraceToGoatTracker(trace, name);
+  if (result.noteCount === 0) return null;
+  return { sng: writeGoatTrackerSng(result.song, result.settings), result };
 }

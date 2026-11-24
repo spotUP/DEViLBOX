@@ -112,3 +112,14 @@ describe('segmentNotes restrike', () => {
     expect(notes.slice(1).every((n) => n.restrike)).toBe(true);
   });
 });
+
+describe('sidToGoatTrackerSng (import wiring)', () => {
+  it('turns a real SID into .sng bytes that parse back as the converted song', async () => {
+    const { sidToGoatTrackerSng } = await import('../formats/sidTraceToGoatTracker');
+    const bytes = readFileSync('public/data/songs/sid/eco-fog-goattracker2.sid');
+    const conv = sidToGoatTrackerSng(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
+    expect(conv).not.toBeNull();
+    expect(conv!.result.noteCount).toBeGreaterThan(0);
+    expect(parseGoatTrackerSng(conv!.sng)!.patterns).toEqual(conv!.result.song.patterns);
+  });
+});

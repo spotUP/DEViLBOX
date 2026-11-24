@@ -120,6 +120,18 @@ export function useSIDInfoDialog({ onClose }: UseSIDInfoDialogOptions) {
     [sidMetadata, setSidMetadata]
   );
 
+  /** The loaded SID traced into an editable GoatTracker song, opened through the normal .sng path. */
+  const handleEditAsGoatTracker = useCallback(async () => {
+    const sid = useFormatStore.getState().c64SidFileData;
+    if (!sid || !sidMetadata) { notify.error('No SID loaded'); return; }
+    const { sidToGoatTrackerSng } = await import('@/lib/import/formats/sidTraceToGoatTracker');
+    const conv = sidToGoatTrackerSng(sid.slice().buffer, sidMetadata.title);
+    if (!conv) { notify.error('This SID could not be traced into notes'); return; }
+    const name = `${sidMetadata.title || 'sid'}.sng`;
+    const result = await openSong({ kind: 'bytes', name, bytes: conv.sng.slice().buffer }, { origin: 'dialog' });
+    if (result.ok) { if (!result.notified) notify.success(result.message); onClose(); } else notify.error(result.error);
+  }, [sidMetadata, onClose]);
+
   const handleEngineChange = useCallback(
     (value: string) => {
       const engine = value as SIDEngineType;
@@ -199,6 +211,7 @@ export function useSIDInfoDialog({ onClose }: UseSIDInfoDialogOptions) {
     // Handlers
     handleLoadTune,
     handleSubsongChange,
+    handleEditAsGoatTracker,
     handleEngineChange,
     handleSubsongPrev,
     handleSubsongNext,

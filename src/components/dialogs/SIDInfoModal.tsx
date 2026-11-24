@@ -23,6 +23,7 @@ import { SIDVisualsTab } from './sid/SIDVisualsTab';
 import { SIDSTILTab } from './sid/SIDSTILTab';
 import { SIDPlayerTab } from './sid/SIDPlayerTab';
 import { SIDCSDbTab } from './sid/SIDCSDbTab';
+import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { SIDGB64Tab } from './sid/SIDGB64Tab';
 import { SIDRemixTab } from './sid/SIDRemixTab';
@@ -55,6 +56,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
     setActiveTab,
     handleLoadTune,
     handleSubsongChange,
+    handleEditAsGoatTracker,
   } = useSIDInfoDialog({ onClose });
 
   if (!sidMetadata) return null;
@@ -195,6 +197,8 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                   </div>
                 </div>
               )}
+
+              <Button variant="default" onClick={handleEditAsGoatTracker}>Edit as GoatTracker song</Button>
 
               {/* SID Engine Selector */}
               <div className="bg-dark-bgSecondary/50 border border-dark-border/50 rounded-lg p-3">
