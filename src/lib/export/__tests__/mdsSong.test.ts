@@ -716,3 +716,14 @@ describe('furnaceToMds', () => {
     expect(up.lossy.some((l) => l.startsWith('01xx/02xx past the driver top key'))).toBe(true);
   });
 });
+
+describe('FM phase-reset macro', () => {
+  it('Plok_Beach organ1 (phase-reset macro 1,0,0,0,0,0 on FM1) is reported lossy: MDSDRV cannot re-key mid-note', async () => {
+    const s = await convert('Plok_Beach.fur');
+    expect(s.lossy.some((l) => l.startsWith('FM phase-reset macro'))).toBe(true);
+  });
+  it('Solar_Man has no phase-reset macro and gets no such lossy line', async () => {
+    const s = await convert('Solar_Man.fur');
+    expect(s.lossy.some((l) => l.startsWith('FM phase-reset macro'))).toBe(false);
+  });
+});

@@ -67,7 +67,7 @@ const LAYOUT: Record<number, { ids: number[]; kinds: Kind[]; ops?: number[]; fm:
  */
 const FM_TRANSPOSE = 0x30;
 const MAX_NOTE = 0xdf - 0x82;
-const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_PITCH = 4;
+const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_PITCH = 4, MACRO_PHASE_RESET = 14;
 // Notes below octave 0 convert to negative values (C--1 = -12), so "no note" needs its own value; -1 stays empty (B--1 shares it).
 // MegadriveOverdrive FM5 C--1..C--3 were dropped as empty cells: no key-on at all.
 const NO_NOTE = -1000;
@@ -276,6 +276,9 @@ const FM_ORDER = [0, 2, 1, 3];
 
 function fmVoice(ins: FurnaceInstrument | undefined, lossy: Lossy): number[] {
   const fm = ins?.fm;
+  // A phase-reset macro step of 1 re-keys the playing FM note (genesis.cpp tick: std.phaseReset val 1 + active sets keyOn); MDSDRV has
+  // no mid-note re-key, so each such step is a Furnace key-on the ROM leaves out (Plok_Beach organ1, FM1 every 6 ticks).
+  if (ins?.macros.some((x) => x.code === MACRO_PHASE_RESET && x.data.slice(0, x.length).includes(1))) lossy.add('FM phase-reset macro (no mid-note re-key)');
   if (!fm || fm.operators.length < 4) { lossy.add('FM channel instrument without FM data (default voice)'); return [...Array<number>(24).fill(0), 0x7f, 0x7f, 0x7f, 0, 7, FM_TRANSPOSE]; }
   const DT = [7, 6, 5, 0, 1, 2, 3, 4];
   const ops = fm.operators.slice(0, 4);
