@@ -49,4 +49,27 @@ describe('Tony Williams note on an empty row', () => {
     expect(warnings.some((w) => /not written/.test(w))).toBe(true);
     expect(Buffer.from(data).equals(raw)).toBe(true);
   });
+
+  it('writes a note with another instrument with Instrument commands around it', async () => {
+    let done = false;
+    const probe = await parseTonyWilliamsFile(buf(), NAME);
+    for (let p = 0; p < probe.patterns.length && !done; p++) for (let c = 0; c < 4 && !done; c++) for (let r = 1; r < 64 && !done; r++) {
+      if (probe.patterns[p].channels[c].rows[r].note !== 0 || probe.patterns[p].channels[c].rows[r - 1].note === 0) continue;
+      const song = await parseTonyWilliamsFile(buf(), NAME);
+      const before = song.patterns.map((pt) => pt.channels.map((ch) => ch.rows.map((x) => x.note)));
+      song.patterns[p].channels[c].rows[r].note = 40;
+      song.patterns[p].channels[c].rows[r].instrument = 16;
+      const { data, warnings } = await run(song);
+      if (warnings.length > 0 || data.length === raw.length) continue;
+      done = true;
+      const re = await parseTonyWilliamsFile(data.buffer.slice(0) as ArrayBuffer, 'x.tw');
+      expect(re.patterns[p].channels[c].rows[r].note).toBe(40);
+      expect(re.patterns[p].channels[c].rows[r].instrument).toBe(16);
+      re.patterns.forEach((pt, pi) => pt.channels.forEach((ch, ci) => ch.rows.forEach((row, ri) => {
+        if (pi === p && ci === c && ri === r) return;
+        expect(row.note).toBe(before[pi][ci][ri]);
+      })));
+    }
+    expect(done).toBe(true);
+  });
 });

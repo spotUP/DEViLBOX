@@ -58,19 +58,41 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
     else if ((op < 0x80 || op === 0x85 || op === 0x86) && e.tick < tick && tick < e.tick + dur) cover = { e, dur };
   }
   if (!cover) return refuse('no note or rest is held across this row');
-  if (a.instrument !== 0 && a.instrument !== instrument) return refuse('a different instrument would need an Instrument command');
+  const swap = a.instrument !== 0 && a.instrument !== instrument;
+  if (swap && (a.instrument > 16 || instrument === 0)) return refuse(instrument === 0 ? 'no Instrument command is in force to restore after the note' : `instrument ${a.instrument} is outside 1..16`);
+  // The next note start of the voice plays whatever Instrument command was last seen: restore the old one unless one already sits before it.
+  let restore = swap;
+  if (swap) {
+    let seen = false;
+    for (const e of walk.events) {
+      if (e.channel !== a.channel) continue;
+      if (e === cover.e) { seen = true; continue; }
+      if (!seen) continue;
+      const op = e.cmd.op;
+      if (op >= 0xd0 && op <= 0xdf) { restore = false; break; }
+      if (op < 0x80 || op === 0x85 || op === 0x86) break;
+    }
+  }
   const byte = a.note - TW_NOTE_BASE - cover.e.transpose;
   if (a.note < TW_NOTE_BASE || byte < 0 || byte > 0x3f) return refuse(`note ${a.note} is outside the player's table`);
   const d1 = tick - cover.e.tick;
   const at = cover.e.cmd.offset;
   const r = relocateTonyWilliams(file, [
     { at, remove: 0, insert: Uint8Array.of(0xdf + d1) },
-    { at: at + cover.e.cmd.length, remove: 0, insert: Uint8Array.of(0xdf + cover.dur - d1, byte, 0xdf + cover.dur) },
+    { at: at + cover.e.cmd.length, remove: 0, insert: Uint8Array.from([0xdf + cover.dur - d1, ...(swap ? [0xd0 + a.instrument - 1] : []), byte, ...(restore ? [0xd0 + instrument - 1] : []), 0xdf + cover.dur]) },
   ]);
   if ('error' in r) return refuse(r.error);
   const w2 = walkTonyWilliams(r.data, 0);
-  const got = w2 ? buildTwGrid(w2).patterns[a.pattern]?.channels[a.channel]?.rows[a.row]?.note : undefined;
-  if (!w2 || w2.ticks !== walk.ticks || got !== a.note) return refuse('the song did not read back as the note on this row');
+  const g1 = buildTwGrid(walk).patterns;
+  const g2 = w2 ? buildTwGrid(w2).patterns : [];
+  const got = g2[a.pattern]?.channels[a.channel]?.rows[a.row];
+  const same = g2.length === g1.length && g1.every((pt, p) => pt.channels.every((ch, c) => ch.rows.every((x, r) => {
+    const y = g2[p]?.channels[c]?.rows[r];
+    if (p === a.pattern && c === a.channel && r === a.row) return true;
+    // a restored Instrument command shows on the next note, which showed none before
+    return !!y && y.note === x.note && (y.instrument === x.instrument || (swap && x.instrument === 0));
+  })));
+  if (!w2 || w2.ticks !== walk.ticks || got?.note !== a.note || (swap && got.instrument !== a.instrument) || !same) return refuse('the song did not read back as the note on this row');
   return r.data;
 }
 
