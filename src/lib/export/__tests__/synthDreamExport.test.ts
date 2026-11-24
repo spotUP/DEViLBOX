@@ -111,6 +111,30 @@ describe.each(FILES)('SynthDream native export: %s', (name) => {
   });
 });
 
+describe('SynthDream blank-row note with another instrument', () => {
+  it('writes the note with the typed instrument on a held row (duration, note, instrument command) and reloads it; reverting the instrument branch fails this', async () => {
+    let written = 0;
+    for (const name of FILES) {
+      const { song: base } = await load(name);
+      const { p, r } = firstNote(base);
+      const was = base.patterns[p].channels[0].rows[r].instrument;
+      const empty = base.patterns[p].channels[0].rows.findIndex((c, i) => i > r && c.note === 0);
+      for (const inst of [1, 2, 3, 4, 5, 6]) {
+        if (inst === was) continue;
+        const { song } = await load(name);
+        const cell = song.patterns[p].channels[0].rows[empty];
+        cell.note = 40; cell.instrument = inst;
+        const res = await exportOf(song);
+        if (res.warnings.length) continue;
+        const again = (await load(name, res.data)).song.patterns[p].channels[0].rows[empty];
+        expect([again.note, again.instrument]).toEqual([40, inst]);
+        written++;
+      }
+    }
+    expect(written).toBeGreaterThan(0);
+  });
+});
+
 describe('SynthDream instrument edit', () => {
   it('writes an instrument change into the instrument word, or refuses it when the replayer would sound it differently', async () => {
     const { raw, song } = await load('sdr.monsterbusiness_5');
