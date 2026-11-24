@@ -363,6 +363,22 @@ describe('furnaceToMds', () => {
     const ticks = furnaceToMds(m).keyOns.filter((k) => k.ch === 5).map((k) => k.tick);
     expect(ticks.slice(0, 4)).toEqual([0, 10, 20, 35]); // rows 0, 2, 4 (Snare), 7 at speed 5
   });
+  it('Kobito FM6: after 17 01 a non-sample note (ins -1, then FM instruments) is compat DAC like Furnace 0.6.8.3, never an FM key-on', async () => {
+    // genesis.cpp 0.6.8.3: dacMode from 17xx holds over non-sample notes (only a sample instrument's note sets furnaceDac and can clear it);
+    // such a note plays sample 12*sampleBank+note%12, or nothing when that sample does not exist. Kobito has 3 samples and no 17 00.
+    const s = await convert('Kobito_of_the_Shining_Needle.fur');
+    expect(s.lossy.some((l) => l.startsWith('FM6 compat DAC note'))).toBe(true);
+    const cmds: Array<[number, number]> = [];
+    const notes = decode(s.seq, false, false, 5, (_ch, c, _a, _b, tick) => cmds.push([c, tick])).filter((k) => k.ch === 5);
+    const firstPcm = cmds.findIndex(([c]) => c === 0xf0);
+    expect(firstPcm).toBeGreaterThanOrEqual(0); // PCM header select
+    // The song head's E1 precedes row 0's 17 01; after it no FM voice up to the first 17 00 (tick 5126), also in later chunk heads
+    // (dacMode is channel state, not chunk state). Before the fix every order after the first keyed FM6 (Kobito 84.44 -> 95.75).
+    expect(cmds.slice(firstPcm).filter(([c, t]) => c === 0xe1 && t < 5126)).toEqual([]);
+    expect(cmds.some(([c, t]) => c === 0xe1 && t >= 5126)).toBe(true); // 17 00 hands FM6 back to FM
+    expect(notes.length).toBeGreaterThan(0);
+    expect(notes.filter((k) => k.tick < 5126).every((k) => (k.n + 60) % 12 < 3)).toBe(true); // out-of-range notes became key-offs
+  });
   it('highscorefollin (Furnace version < 224): FM operators parse without the v224 block byte, so the Wurlitzer voice writes TL 1e 1c 10 16 like Furnace', async () => {
     // Raw FM feature: f4 47 00 20 | 52 1e df 07 ... The extra block byte read shifted every operator one byte (TL 5f 5f 19 19, -14 dB on FM1).
     const m = await parse('highscorefollin.fur');

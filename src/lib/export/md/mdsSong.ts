@@ -957,6 +957,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // the wrap with song-end state, so a vibrato E8 there continues Furnace's song-end phase (newer_song_lol FM4 96.17 s).
     const lc = chunks[loopChunk];
     const firstNote = lc ? lc.rows.findIndex((r) => { const cell = cellAt(ch, lc.o, r); const v = noteOf(cell); return v > NO_NOTE && v < 253; }) : -1;
+    // Furnace 0.6.8.3 genesis.cpp: 17xx sets dacMode; a non-sample note keeps it (compat DAC) unless the last DAC note was a sample instrument.
+    // Channel state, not chunk state: a 17 01 in one order still holds in the next.
+    let dacMode = false, furnaceDac = false;
     for (const [ci, c] of (lc ? [...chunks, lc] : chunks).entries()) {
       const wrapPass = ci === chunks.length;
       let faAt = -1;
@@ -992,11 +995,11 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       let curPcm = -1, pcmOn = false;
       baked = arpHold !== undefined; arpT0 = tick; // insCmd(true) restates EB, which restarts the instrument's arp table
       // Chunk head: the channel state a chunk starts from. The loop chunk's head plays once; the wrap restates it from the song-end state.
-      const head = (): number[] => [...(isDac(ins) || pcm2 ? [] : insCmd(true)), ...(vDepth && any ? vibCmd(tick) : []), ...volCmd(outV), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...((sA || rOn || pm) && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
+      const head = (): number[] => [...(isDac(ins) || pcm2 || dacMode ? [] : insCmd(true)), ...(vDepth && any ? vibCmd(tick) : []), ...volCmd(outV), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...((sA || rOn || pm) && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
       const bytes = head(), headLen = bytes.length;
       // One sequence tick's mid-row commands: 0Axy volume step and the per-tick slide.
       const tickPre = (t: number): number[] | null => { const v = [...(volStep() ?? []), ...(macStep(t) ?? []), ...(prStep(t) ?? [])], sl = (sA && (sounding || fTick(t) <= sTail)) || ((rOn || pm) && sounding) ? slideCmd(t) : []; return v.length || sl.length ? [...v, ...sl] : null; };
-      let curIns = ins;
+      let curIns = dacMode && !isDac(ins) ? -1 : ins; // a compat-DAC head sends no E1, so the next FM note must
       type Tok = { cmd: 'note' | 'tie' | 'rest'; n: number; t: number; pre: number[] };
       const tok: Tok[] = [];
       const emit = (t: Tok) => {
@@ -1083,7 +1086,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           if (e.type === 0x0a || e.type === 0xfa) { const u = e.type === 0xfa ? 256 : 64; vspeed = !e.value ? 0 : e.value & 15 ? -(e.value & 15) * u : (e.value >> 4) * u; continue; }
           if (e.type === 0xec || e.type === 0xed) continue;
           // 17xx sets dacMode; the next note-on sets it again from the instrument, so only 1700 over a playing sample is heard (it stops).
-          if (e.type === 0x17 && kind === 'fm') { if (!e.value && pcmOn && sounding) dacOff = true; continue; }
+          if (e.type === 0x17 && kind === 'fm') { if (fm6) dacMode = !!e.value; if (!e.value && pcmOn && sounding) dacOff = true; continue; }
           if (e.type === 0xe3 && !e.value) continue; // E3 00: Furnace's default vibrato direction (up and down), what vibratoEnvelope plays
           if ((e.type === 0x04 || e.type === 0xe4) && (kind === 'psg' || kind === 'fm') && m.compatFlags.linearPitch) {
             vSync(tick + delay);
@@ -1124,9 +1127,22 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         // DAC volume: driver PCM step (pcmDacAtt) times the residual baked per note-on volume (pcmRef) = dacVolTable[vol] >> 7.
         // shortcut: a volume change mid-note moves only the driver step (sample keeps its note-on residual, under 2 dB), and a DAC volume
         // macro is not applied; upgrade with a header per (sample, volume) at each change if a song needs it.
-        const dac = nv > NO_NOTE && nv < 253 && isDac(ins);
+        const noteOn = nv > NO_NOTE && nv < 253;
+        if (noteOn && kind === 'fm' && fm6 && !pcm2) {
+          if (isDac(ins)) dacMode = true;
+          else if (furnaceDac) { dacMode = false; furnaceDac = false; }
+        }
+        // compat DAC (0.6.8.3): sample 12*sampleBank+note%12 at its own rate, nothing when out of range; never an FM key-on.
+        const compatDac = noteOn && kind === 'fm' && fm6 && !pcm2 && dacMode && !isDac(ins);
+        const dac = (noteOn && isDac(ins)) || compatDac;
         let dacHdr = -1;
-        if (dac) {
+        if (compatDac) {
+          // shortcut: sampleBank (EBxx) taken as 0 and the sample plays at note pitch; upgrade if a song banks or relies on native rate.
+          const smp = ((nv + 60) % 12 + 12) % 12;
+          if (smp < m.samples.length && m.samples[smp].length > 0) dacHdr = pcmRef(smp, Math.max(0, Math.min(179, nv + 60)), dacVol(vol));
+          lossy.add('FM6 compat DAC note (17xx, non-sample instrument): sample bank 0, played at note pitch');
+        } else if (dac) {
+          furnaceDac = true;
           const a = m.instruments[ins].amiga, fn = Math.max(0, Math.min(179, nv + 60));
           // No SM feature in the file means the DivInstrumentAmiga defaults (instrument.h: initSample 0, no note map).
           const smp = a?.useNoteMap ? a.noteMap?.[fn]?.map ?? -1 : a?.initSample ?? 0;
@@ -1134,7 +1150,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         }
         const isNote = nv > NO_NOTE && nv < 253 && (!dac || dacHdr >= 0), isOff = (dac && dacHdr < 0) || nv >= 253 || (dacOff && !isNote);
         if (pcmOn && !isNote && cell && cell.volume >= 0 && isDac(ins) && !m.compatFlags.noOPN2Vol) lossy.add('FM6 DAC volume change mid-note (driver 2 dB step only)');
-        if (dac && isNote) { curIns = ins; pcmOn = true; if (dacHdr !== curPcm) { curPcm = dacHdr; cmds.unshift(0xf0, dacHdr); } }
+        if (dac && isNote) { curIns = compatDac ? -1 : ins; pcmOn = true; if (dacHdr !== curPcm) { curPcm = dacHdr; cmds.unshift(0xf0, dacHdr); } }
         else if (isNote) { pcmOn = false; curPcm = -1; }
         if (!isNote && sounding) {
           if (pChanged || (vChanged && rOn !== (vDepth > 0 && (prate !== 0 || poff !== 0)))) setRamp(tick + delay, poff);
@@ -1151,7 +1167,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         // every channel, and a loop back into this chunk replays it on a release tail (FM4 newer_song_lol o2 r2, 10.83 s and 96.0 s).
         if (!isNote && vChanged) { cmds.push(...(vDepth ? vibCmd(tick + delay) : sounding && (prate || poff) ? pslideCmd() : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
         const hitPh = isNote && kind !== 'fm' && fpt === 1 ? phaseOf(tick + delay) : undefined;
-        if (isNote && (ins !== curIns || (hitPh && insRef(kind, ins, hitPh).ins !== insRef(kind, ins, envPh).ins))) { curIns = ins; envPh = hitPh; cmds.unshift(...insCmd()); }
+        if (isNote && !dac && (ins !== curIns || (hitPh && insRef(kind, ins, hitPh).ins !== insRef(kind, ins, envPh).ins))) { curIns = ins; envPh = hitPh; cmds.unshift(...insCmd()); }
         if (isNote || isOff || cmds.length || i === 0) {
           if (tok.length) emit(tok.pop()!);
           if (isNote) {
