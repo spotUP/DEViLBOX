@@ -21,8 +21,8 @@
       "tier": "byte-exact",
       "status": "byte-exact",
       "matchPct": 1,
-      "cells": 39,
-      "bytes": 39
+      "cells": 111,
+      "bytes": 111
     },
     "amosMusicBank": {
       "exporter": "AMOSMusicBankExporter.exportAMOSMusicBank",
