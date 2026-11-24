@@ -79,6 +79,16 @@ export function readBthParams(buf: Uint8Array): BthParams | string {
   return { legacy, tag, trackLists: lists, table: u32(buf, at + 14), origin: 1, bias: u16(buf, at + 8), tempo: buf[mu + 3], scaled: false };
 }
 
+/**
+ * True when the module's replayer is the extended engine (it has the Hold command 0x83): the voice routine starts
+ * `clr.b d2; move.b flags,d0; andi.b #$c,d0` (beathoven_locate.c locate_engine).
+ * shortcut: only the form without an a1 load between the instructions; other extended builds read as not extended
+ * (edits refuse), upgrade by exposing BthEngine from the wasm.
+ */
+export function bthIsExtended(buf: Uint8Array): boolean {
+  return findBytes(buf, [0x42, 0x02, 0x10, 0x28, 0x00, 0x0e, 0x02, 0x00, 0x00, 0x0c]) >= 0;
+}
+
 export interface BthStream { offset: number; size: number; broken: boolean }
 /** The event a row's note was read from: the 16-bit note number sits at `noteOffset`, played under `base`. */
 export type BthRowSource = { stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number } | null;

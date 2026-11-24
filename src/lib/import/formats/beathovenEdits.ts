@@ -5,7 +5,7 @@
  * player looks the number up in its period table at (number + the entry's note base - origin [+ bias]), so an edited note
  * cell is a same-length patch of that one word, chosen so the table entry lands on the new note under the base in force
  * for the row (recorded per row by the grid). A stream played by several voices or track entries is shared by every
- * place that plays it. A note removed in the legacy replayer becomes its Rest command (same four bytes). Edits the stream cannot hold at its length - a note on a row without one, a note removed in the other replayers (their Hold command needs the extended engine, not detected), a note off, the
+ * place that plays it. A note removed becomes the replayer's Rest command (legacy) or Hold command (extended engine, bthIsExtended), same four bytes. Edits the stream cannot hold at its length - a note on a row without one, a note removed in the basic replayer (no Rest or Hold), a note off, the
  * instrument (chosen by an instrument command), volume and effect columns (not stored per row) - are refused with a
  * warning and nothing is written for them. After patching, the grid is decoded again: every edited cell must read back
  * as edited and every cell that does not share an edited word must be unchanged, otherwise the edit is taken out again.
@@ -15,7 +15,7 @@
  * track-list entry naming it is repointed (addNote).
  */
 import type { Pattern, TrackerCell } from '@/types';
-import { buildBthGrid, bthShownNote, readBthParams, type BthGrid, type BthParams } from './beathovenGrid';
+import { buildBthGrid, bthIsExtended, bthShownNote, readBthParams, type BthGrid, type BthParams } from './beathovenGrid';
 import { otherFieldsDiffer } from './timFollinEdits';
 
 const NOTE_OFF = 97;
@@ -25,6 +25,8 @@ const MAX_NOTE_NUMBER = 0x7f;
 const VOICES = 4;
 /** The legacy replayer's Rest command word (beathoven_legacy.c COMMAND_REST). */
 const LEGACY_REST = 0x82;
+/** The extended replayers' Hold command word (beathoven_voice.c BTH_COMMAND_HOLD): [0x83][duration], keeps the voice's note state. */
+const EXTENDED_HOLD = 0x83;
 const PREFIX = 'Beathoven Synthesizer';
 
 export interface BeathovenEditResult {
@@ -145,6 +147,8 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
 
   const legacy = readBthParams(original);
   const isLegacy = typeof legacy !== 'string' && legacy.legacy;
+  // the word that stands for "no note" over a plain note command, same four bytes: Rest (legacy) or Hold (extended engine)
+  const restWord = isLegacy ? LEGACY_REST : bthIsExtended(original) ? EXTENDED_HOLD : 0;
   const claimed = new Map<number, number>();
   const accepted: Edit[] = [];
   const adds: Add[] = [];
@@ -169,15 +173,15 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
       warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one, or changing a rest, would change the length of the stream; the edit was not written.`);
       return;
     }
-    if (cell.note === 0 && isLegacy && src.noteOffset === src.offset) {
+    if (cell.note === 0 && restWord !== 0 && src.noteOffset === src.offset) {
       // legacy Rest command [0x82][duration] is the same four bytes as a note [number][duration] and switches the voice's DMA off
       const other = claimed.get(src.offset);
-      if (other !== undefined && other !== LEGACY_REST) {
+      if (other !== undefined && other !== restWord) {
         warnings.push(`${PREFIX} ${where(at)}: another edited row shares a stream word with this one and wants a different value; this edit was not written.`);
         return;
       }
-      claimed.set(src.offset, LEGACY_REST);
-      accepted.push({ ...at, note: 0, offset: src.offset, value: LEGACY_REST });
+      claimed.set(src.offset, restWord);
+      accepted.push({ ...at, note: 0, offset: src.offset, value: restWord });
       return;
     }
     if (cell.note < 1 || cell.note >= NOTE_OFF) {

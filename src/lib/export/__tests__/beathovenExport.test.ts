@@ -21,10 +21,10 @@ vi.mock('@lib/import/formats/beathovenEdits', async (importOriginal) => {
 
 const FILE = { path: 'public/data/songs/formats/beathoven_smallest.bss', name: 'beathoven_smallest.bss' };
 
-async function load(bytes?: Uint8Array): Promise<{ raw: Uint8Array; song: TrackerSong }> {
+async function load(bytes?: Uint8Array, file = FILE): Promise<{ raw: Uint8Array; song: TrackerSong }> {
   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-  const raw = new Uint8Array(readFileSync(join(process.cwd(), FILE.path)));
-  const song = await parseModuleToSong(new File([new Uint8Array(bytes ?? raw)], FILE.name));
+  const raw = new Uint8Array(readFileSync(join(process.cwd(), file.path)));
+  const song = await parseModuleToSong(new File([new Uint8Array(bytes ?? raw)], file.name));
   return { raw, song };
 }
 
@@ -126,5 +126,29 @@ describe('Beathoven native export: beathoven_smallest.bss', () => {
     const before = notes((await load()).song);
     const again = await load(res.data);
     expect(notes(again.song)).toBeLessThan(before); // a stream is shared by every place that plays it
+  }, 240000);
+
+  it('extended engine (tristar_cracktro.bss): a removed note is written as the Hold command, same four bytes', async () => {
+    const tri = { path: 'public/data/songs/formats/tristar_cracktro.bss', name: 'tristar_cracktro.bss' };
+    const { raw, song } = await load(undefined, tri);
+    const grid = buildBthGrid(raw);
+    if (typeof grid === 'string') throw new Error(grid);
+    let hit: { rows: TrackerSong['patterns'][0]['channels'][0]['rows']; at: number; src: number } | undefined;
+    grid.rowSources.forEach((pat, pi) => pat.forEach((voice, c) => voice.forEach((src, r) => {
+      if (!hit && src && src.noteOffset === src.offset) hit = { rows: song.patterns[pi].channels[c].rows, at: r, src: src.offset };
+    })));
+    if (!hit) throw new Error('no plain note in the file');
+    const before = song.patterns.flatMap((p) => p.channels.flatMap((c) => c.rows)).filter((c) => c.note > 0 && c.note < 97).length;
+    hit.rows[hit.at].note = 0;
+    const res = await exportOf(song);
+    expect(res.warnings.join('\n')).toBe('');
+    expect(res.data.length).toBe(raw.length);
+    const changed = diffAt(raw, res.data);
+    expect(changed.length).toBeGreaterThanOrEqual(1);
+    expect(changed.length).toBeLessThanOrEqual(2);
+    expect((res.data[hit.src] << 8) | res.data[hit.src + 1]).toBe(0x83);
+    const notes = (x: TrackerSong): number => x.patterns.flatMap((p) => p.channels.flatMap((c) => c.rows)).filter((c) => c.note > 0 && c.note < 97).length;
+    const again = await load(res.data, tri);
+    expect(notes(again.song)).toBeLessThan(before); // the removed note (and every play of its stream) reads empty
   }, 240000);
 });
