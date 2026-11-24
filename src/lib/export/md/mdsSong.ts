@@ -276,9 +276,6 @@ const FM_ORDER = [0, 2, 1, 3];
 
 function fmVoice(ins: FurnaceInstrument | undefined, lossy: Lossy): number[] {
   const fm = ins?.fm;
-  // A phase-reset macro step of 1 re-keys the playing FM note (genesis.cpp tick: std.phaseReset val 1 + active sets keyOn); MDSDRV has
-  // no mid-note re-key, so each such step is a Furnace key-on the ROM leaves out (Plok_Beach organ1, FM1 every 6 ticks).
-  if (ins?.macros.some((x) => x.code === MACRO_PHASE_RESET && x.data.slice(0, x.length).includes(1))) lossy.add('FM phase-reset macro (no mid-note re-key)');
   if (!fm || fm.operators.length < 4) { lossy.add('FM channel instrument without FM data (default voice)'); return [...Array<number>(24).fill(0), 0x7f, 0x7f, 0x7f, 0, 7, FM_TRANSPOSE]; }
   const DT = [7, 6, 5, 0, 1, 2, 3, 4];
   const ops = fm.operators.slice(0, 4);
@@ -776,6 +773,16 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // duty macro (sms.cpp snNoiseMode = val, the 20xy bits). outV: Furnace outVol, what E2 carries; a running volume macro owns it
     // (DIV_CMD_VOLUME only sets it while the macro is not running). macT: Furnace tick of the note-on, macK: last step emitted.
     let outV = vol, mac: FurnaceMacro | undefined, macT = 0, macK = -1, macOn = false;
+    // A phase-reset macro step of 1 re-keys the playing FM note (genesis.cpp tick: std.phaseReset val 1 + active sets keyOn): F4 (DEViLBOX
+    // MDSDRV re-key) keys off and on without restarting the arp table or pitch envelope. Step 0 is the note-on itself. prM: macro, prK: last step.
+    let prM: FurnaceMacro | undefined, prK = -1;
+    const prStep = (t: number): number[] | null => {
+      if (!prM || !sounding) return null;
+      const s = macroStep(prM, fTick(t) - macT);
+      if (s.k === prK) return null;
+      prK = s.k;
+      return s.k > 0 && s.v === 1 && (s.on || s.k < prM.length) ? [0xf4] : null;
+    };
     const vScale = (v: number, x: number) => m.compatFlags.newVolumeScaling ? Math.max(0, Math.min(127, v + x - 127)) : Math.floor((v * x + (m.compatFlags.ceilVolumeScaling ? 126 : 0)) / 127);
     const macStep = (t: number): number[] | null => {
       if (!mac || !macOn) return null;
@@ -988,7 +995,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       const head = (): number[] => [...(isDac(ins) || pcm2 ? [] : insCmd(true)), ...(vDepth && any ? vibCmd(tick) : []), ...volCmd(outV), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...((sA || rOn || pm) && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
       const bytes = head(), headLen = bytes.length;
       // One sequence tick's mid-row commands: 0Axy volume step and the per-tick slide.
-      const tickPre = (t: number): number[] | null => { const v = [...(volStep() ?? []), ...(macStep(t) ?? [])], sl = (sA && (sounding || fTick(t) <= sTail)) || ((rOn || pm) && sounding) ? slideCmd(t) : []; return v.length || sl.length ? [...v, ...sl] : null; };
+      const tickPre = (t: number): number[] | null => { const v = [...(volStep() ?? []), ...(macStep(t) ?? []), ...(prStep(t) ?? [])], sl = (sA && (sounding || fTick(t) <= sTail)) || ((rOn || pm) && sounding) ? slideCmd(t) : []; return v.length || sl.length ? [...v, ...sl] : null; };
       let curIns = ins;
       type Tok = { cmd: 'note' | 'tie' | 'rest'; n: number; t: number; pre: number[] };
       const tok: Tok[] = [];
@@ -1103,6 +1110,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (vs) cmds.push(...vs);
         const ms = macStep(tick + delay);
         if (ms) cmds.push(...ms);
+        const ps = prStep(tick + delay);
+        if (ps) cmds.push(...ps);
         // With a note, Furnace keys the note on (shorthandPorta skips the porta commit) and slides from it to note +-y; without one
         // it slides from the pitch playing to the current note +-y, as a 03xx slur. Both become a slide onto the target note.
         // shortcut: a note-less E1/E2 on a keyed-off channel (Furnace slides the release tail) is dropped.
@@ -1161,6 +1170,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
               // Note-on: macroInit restarts the volume / noise macro; without one Furnace sets outVol = vol (genesis.cpp NOTE_ON).
               mac = kind === 'fm' ? (fm6 && m.instruments[ins]?.type === 4 ? undefined : macro(m.instruments[ins], MACRO_VOL, m.version)) : kind === 'noise' ? macro(m.instruments[ins], MACRO_DUTY, m.version) : undefined;
               macT = fTick(tick + delay); macK = -1; macOn = !!mac;
+              const pr = kind === 'fm' && !isDac(ins) ? macro(m.instruments[ins], MACRO_PHASE_RESET, m.version) : undefined;
+              prM = pr && !op ? pr : undefined; prK = -1;
+              if (pr && op && pr.data.slice(0, pr.length).includes(1)) lossy.add('FM phase-reset macro on an extended channel 3 operator (no re-key)');
               if (mac && mac.release >= 0 && mac.release < mac.length) lossy.add(`${kind === 'fm' ? 'FM volume' : 'noise duty'} macro release point (ignored)`);
               if (!mac && kind === 'fm' && outV !== vol) cmds.push(...volCmd(outV = vol));
               const ms0 = macStep(tick + delay);

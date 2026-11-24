@@ -97,7 +97,7 @@ cf_suspend		rs.b	1			; track is paused and can be
 									;   restarted
 cf_background	rs.b	1			; track is deprioritized and
 									;   plays in the background
-				rs.b	1			; (unused bit)
+cf_rekey		rs.b	1			; DEViLBOX: F4 re-key pending (FM key-off + key-on, envelopes keep position)
 cf_key_on		rs.b	1			; channel is currently playing
 
 ;======================================================================

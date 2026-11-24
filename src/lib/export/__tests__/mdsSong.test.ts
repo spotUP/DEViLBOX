@@ -718,9 +718,13 @@ describe('furnaceToMds', () => {
 });
 
 describe('FM phase-reset macro', () => {
-  it('Plok_Beach organ1 (phase-reset macro 1,0,0,0,0,0 on FM1) is reported lossy: MDSDRV cannot re-key mid-note', async () => {
+  it('Plok_Beach organ1 (phase-reset macro 1,0,0,0,0,0 on FM1) re-keys mid-note with F4 + tie, and is not lossy', async () => {
     const s = await convert('Plok_Beach.fur');
-    expect(s.lossy.some((l) => l.startsWith('FM phase-reset macro'))).toBe(true);
+    expect(s.lossy.some((l) => l.startsWith('FM phase-reset macro'))).toBe(false);
+    // F4 (DEViLBOX MDSDRV re-key) then 81 nn: the note goes on as a tie, so arp table and pitch envelope keep their position.
+    let rekeys = 0;
+    for (let i = 0; i + 1 < s.seq.length; i++) if (s.seq[i] === 0xf4 && s.seq[i + 1] === 0x81) rekeys++;
+    expect(rekeys).toBeGreaterThan(10);
   });
   it('Solar_Man has no phase-reset macro and gets no such lossy line', async () => {
     const s = await convert('Solar_Man.fur');
