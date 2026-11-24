@@ -18,11 +18,11 @@ export interface HusicSong { rom: Uint8Array; lossy: string[]; frames: number; l
 
 export const PCE_SYSTEM_ID = 0x05;
 const CHANNELS = 6, FRAME_HZ = 60, BANK = 0x2000, WINDOW = 0x4000, MAX_ROWS = 20000, PSG_CLOCK = 3579545, XPCM_HZ = 6991.29, XPCM_MAX = BANK * 2;
-const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PITCH = 4, NONE = 0xff, INS_AMIGA = 4; // INS_AMIGA = DIV_INS_AMIGA
+const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PITCH = 4, MACRO_PANL = 12, MACRO_PANR = 13, NONE = 0xff, INS_AMIGA = 4; // INS_AMIGA = DIV_INS_AMIGA
 const FREQ_TABLE = 0x2d; // `_freq` sits after LL0's strings (25 bytes) and the 20-byte author field in the const bank; asserted below
 const NOISE_FREQ = [4, 13, 15, 18, 21, 23, 25, 27, 29, 31, 0, 2]; // Furnace pce.cpp noiseFreq (old noise layout)
 // HuSIC track commands (hmckc output / hus.c SEQ_xx)
-const XPCM = 0xef, SLUR = 0xe9, PORTA = 0xeb, PAN = 0xf0, WAVE = 0xf1, NOISE = 0xf2, WAIT = 0xf4, NOTE_ENV = 0xf7, PITCH_ENV = 0xf8, REST = 0xfc, VOLUME = 0xfd, WAVE_ENV = 0xfe, JUMP = 0xee;
+const XPCM = 0xef, SLUR = 0xe9, PORTA = 0xeb, PAN = 0xf0, WAVE = 0xf1, NOISE = 0xf2, WAIT = 0xf4, NOTE_ENV = 0xf7, PITCH_ENV = 0xf8, REST = 0xfc, VOLUME = 0xfd, WAVE_ENV = 0xfe, PAN_ENV = 0xe6, JUMP = 0xee;
 const HANDLED = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0f, 0x10, 0x11, 0x80, 0xec, 0xed]);
 
 interface Frames { vals: number[]; loop: number }
@@ -167,7 +167,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   };
 
   // 3. Envelopes and instrument setup.
-  const volEnv = new EnvTable(), noteEnv = new EnvTable(), waveEnv = new EnvTable(), pitchEnv = new EnvTable();
+  const volEnv = new EnvTable(), noteEnv = new EnvTable(), waveEnv = new EnvTable(), pitchEnv = new EnvTable(), panEnv = new EnvTable();
   const scale = (x: number, y: number) => (newVol ? Math.max(0, Math.min(31, x + y - 31)) : ceilVol ? Math.ceil((x * y) / 31) : Math.floor((x * y) / 31));
   const insFrames = new Map<string, Frames | undefined>();
   const framesOf = (insIdx: number, code: number, what: string) => {
@@ -210,6 +210,20 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     for (let i = 0; i < n; i += 2) bytes[i >> 1] = (nib(i) << 4) | nib(i + 1); // high nibble plays first
     xpcmKeys.set(key, xpcm.length); xpcm.push(bytes);
     return xpcm.length - 1;
+  };
+  // Pan macros (Furnace pce.cpp: panL = high nibble, panR = low nibble of the pan register, a missing side stays full).
+  // Driver multi-envelope item: count, loop count, then one raw pan byte per frame; count 0 after the loop = hold the last byte.
+  const anyPan = m.instruments.some((i) => macroOf(i, MACRO_PANL) || macroOf(i, MACRO_PANR));
+  const panEnvOf = (insIdx: number): number => {
+    const l = framesOf(insIdx, MACRO_PANL, 'pan'), r = framesOf(insIdx, MACRO_PANR, 'pan');
+    if (!l && !r) return 0xff;
+    const n = Math.max(l?.vals.length ?? 0, r?.vals.length ?? 0);
+    const loops = [l, r].filter((x): x is Frames => !!x).map((x) => x.loop);
+    const lp = loops.every((x) => x >= 0) ? Math.min(...loops) : -1;
+    if (l && r && l.vals.length !== r.vals.length && lp >= 0) lossy.add('pan left and right macros of different lengths looping (loop kept at the earlier point)');
+    const lc = lp >= 0 ? n - lp : 0;
+    const vals = Array.from({ length: n }, (_, i) => (((l ? frameAt(l, i) : 15) & 15) << 4) | ((r ? frameAt(r, i) : 15) & 15));
+    return envIdx(panEnv.add([n & 0xff, n >> 8, lc & 0xff, lc >> 8, ...vals], 4 + (lp >= 0 ? lp : n)), 'pan');
   };
   const volCode = (insIdx: number, chanVol: number, elapsed = 0): number => {
     const f0 = framesOf(insIdx, MACRO_VOL, 'volume');
@@ -361,10 +375,11 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
           const arpOn = nvs.some((x) => x !== nv);
           const note = noise ? noiseReg(nvs[0]) : noteByte(nv, !arpOn);
           const ne = arpOn && !noise ? envIdx(noteEnv.note({ vals: nvs.map((x) => x - nv), loop: af!.loop }), 'note') : 0xff;
+          // envCmds must stay last: the pending-note code patches NOTE_ENV / PITCH_ENV values by position from the end
           const envCmds = [NOISE, noise ? 1 : 0, NOTE_ENV, ne, PITCH_ENV, 0xff];
           const ev: Ev = f0
             ? { frame: frameOf(row.tick + delay) + f0, kind: 'note', cmds: envCmds, note, glide: {}, owner }
-            : { frame: at, kind: 'note', cmds: [...cmds, ...(wave < 0 ? [WAVE_ENV, -1 - wave] : [WAVE, wave]), ...envCmds], note, vol: volCode(insIdx, chanVol) };
+            : { frame: at, kind: 'note', cmds: [...cmds, ...(wave < 0 ? [WAVE_ENV, -1 - wave] : [WAVE, wave]), ...(anyPan && panEnvOf(insIdx) !== 0xff ? [PAN_ENV, panEnvOf(insIdx)] : []), ...envCmds], note, vol: volCode(insIdx, chanVol) };
           owner ??= ev;
           evs.push(ev);
           pend.push({ ev, tick: row.tick + delay, f0, nv, af: arpOn ? af0 : undefined, pf, rel, noise, arpOn });
@@ -494,7 +509,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         const c = e.cmds[k];
         if (c === -1) { if (out.length) unit(out.splice(0)); unit([]); loopAt = here(); state.clear(); curVol = -1; if (merged.some((x) => x.dda)) unit([XPCM, 0]); xpcmOn = false; continue; }
         const v = e.cmds[++k];
-        if (state.get(c) !== v || c === PAN) { out.push(c, v); state.set(c, v); }
+        if (state.get(c) !== v || c === PAN || c === PAN_ENV) { out.push(c, v); state.set(c, v); }
       }
       if (e.kind === 'note' && !!e.dda !== xpcmOn) { unit([XPCM, e.dda ? 1 : 0]); xpcmOn = !!e.dda; }
       if (out.length) unit(out);
@@ -544,8 +559,8 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     ptrs[at + 1] = alloc(new Array<number>(t.items.length * 2).fill(0));
     t.items.forEach((it, i) => { const body = alloc(it.bytes); put16(ptrs[at] + 2 * i, body); put16(ptrs[at + 1] + 2 * i, body + it.lp); });
   };
-  table(volEnv, 2); table(noteEnv, 9); table(waveEnv, 11); table(pitchEnv, 4);
-  ptrs[6] = ptrs[13] = ptrs[14] = alloc([0, 0]); // LFO / multi envelopes: unused
+  table(volEnv, 2); table(noteEnv, 9); table(waveEnv, 11); table(pitchEnv, 4); table(panEnv, 13);
+  ptrs[6] = alloc([0, 0]); // LFO: unused
   const waves = m.wavetables.length ? m.wavetables : [{ width: 32, height: 32, data: Array.from({ length: 32 }, (_, i) => (i < 16 ? i * 2 : 62 - i * 2)) }];
   if (!m.wavetables.length) lossy.add('song has no wavetables (triangle used)');
   const waveTable = alloc(new Array<number>(waves.length * 2).fill(0));
