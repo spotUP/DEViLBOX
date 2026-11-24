@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import { decompressProject } from '@/lib/projectCompression';
 import { deriveFurnaceNativeFromSong, type DerivedFurnaceNative } from '../deriveFurnaceNative';
 import type { FurnaceModuleSong } from '../FurnaceModuleExporter';
-import { FUR_SYSTEM_YM2610, FUR_NEO_GEO_CHANNELS } from '../FurnaceModuleExporter';
+import { FUR_SYSTEM_YM2610, FUR_NEO_GEO_CHANNELS, ym2610TimerBHz } from '../FurnaceModuleExporter';
 import { furnaceRowToTrackerCell } from '@/lib/import/furnaceEditorCells';
 import { isIns2 } from '@/engine/furnace-dispatch/ins2Uploads';
 import { EMPTY_CELL } from '@/types/tracker';
@@ -145,7 +145,7 @@ describe('deriveFurnaceNativeFromSong on the composer trial song', () => {
     expect(sub.speed1).toBe(dbx.speed ?? 6);
     // parser: a one-entry speed pattern sets speed2 = speed1 (FurnaceSongParser.ts:2206)
     expect(sub.speed2).toBe(sub.speed1);
-    expect(sub.hz).toBe(60);
+    expect(sub.hz).toBeCloseTo(ym2610TimerBHz(60), 4); // Neo Geo: Timer B rate
     expect(sub.virtualTempoN).toBe(Math.round(dbx.bpm));
     expect(sub.virtualTempoD).toBe(150);
     expect(d.instrumentIds).toEqual(dbx.instruments.map((i) => i.id));

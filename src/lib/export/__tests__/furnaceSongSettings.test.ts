@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exportFurnaceModule } from '../FurnaceModuleExporter';
+import { exportFurnaceModule, ym2610TimerBHz } from '../FurnaceModuleExporter';
 import { furnaceSettingsForExport, parseGrooves, parseSpeedList } from '../furnaceSongSettings';
 import { parseFurnaceSong } from '@/lib/import/formats/FurnaceSongParser';
 import { DEFAULT_FURNACE } from '@/types/instrument/defaults';
@@ -19,6 +19,13 @@ function baseSong() {
 }
 const parse = (b: Uint8Array) => parseFurnaceSong(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer);
 
+describe('ym2610TimerBHz', () => {
+  it('rounds a rate to the YM2610 Timer B step nsstool picks', () => {
+    expect(ym2610TimerBHz(60)).toBeCloseTo(59.866, 3); // tb 198
+    expect(ym2610TimerBHz(ym2610TimerBHz(60))).toBe(ym2610TimerBHz(60));
+  });
+});
+
 describe('Furnace song settings', () => {
   it('writes author, album, system name, tuning, arp speed, speed pattern, virtual tempo, tick rate and grooves into the .fur', async () => {
     const meta = {
@@ -36,7 +43,8 @@ describe('Furnace song settings', () => {
     expect(sub.arpLen).toBe(3);
     expect(sub.speedPattern).toEqual([6, 4, 5]);
     expect([sub.virtualTempo, sub.virtualTempoD]).toEqual([200, 100]);
-    expect(sub.hz).toBe(50);
+    // Neo Geo export writes the rate Timer B can run at (50 Hz -> 50.32 Hz)
+    expect(sub.hz).toBeCloseTo(ym2610TimerBHz(50), 4);
     expect(mod.grooves.map((g) => g.val.slice(0, g.len))).toEqual([[6, 4, 5], [2, 2]]);
   });
 

@@ -60,6 +60,17 @@ const INFO_COMPAT_FLAGS: ReadonlyArray<ReadonlyArray<readonly [string, number]>>
   [['brokenPortaLegato', 0], ['brokenFMOff', 0], ['preNoteNoEffect', 0], ['oldDPCM', 0],
     ['resetArpPhaseOnNewNote', 0], ['ceilVolumeScaling', 0], ['oldAlwaysSetVolume', 0], ['oldSampleOffset', 0]],
 ];
+
+/**
+ * Tick rate the YM2610 Timer B actually runs at for a requested rate: nullsound drives the song from
+ * Timer B, and ngdevkit's nsstool.py (0.5, line 1170) picks `tb = round(256 - 4000000 / (1152 * hz))`.
+ * Writing this rate (60 Hz -> 59.866 Hz) keeps the Furnace reference in step with the ROM.
+ */
+export function ym2610TimerBHz(hz: number): number {
+  const tb = Math.round(256 - 4_000_000 / (1152 * hz));
+  return 4_000_000 / (1152 * (256 - tb));
+}
+
 /** System id of the YM2610 (Neo Geo): FM 1-4, SSG 1-3, ADPCM-A 1-6, ADPCM-B. */
 export const FUR_SYSTEM_YM2610 = 0xa5;
 export const FUR_NEO_GEO_CHANNELS = 14;
@@ -557,7 +568,7 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   }
 
   // Song timing and grooves. INFO stores speeds and groove entries as bytes (fur.cpp v0.6.8.3).
-  const hz = song.hz ?? 60;
+  const hz = song.chip ? (song.hz ?? 60) : ym2610TimerBHz(song.hz ?? 60);
   const vN = song.virtualTempoN ?? Math.max(1, Math.min(65535, Math.round(song.initialBPM)));
   const vD = song.virtualTempoD ?? 150;
   const speeds = song.speedPattern && song.speedPattern.length > 0

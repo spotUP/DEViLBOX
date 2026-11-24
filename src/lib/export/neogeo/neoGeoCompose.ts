@@ -9,7 +9,7 @@
 import { EMPTY_CELL } from '@/types/tracker';
 import type { Pattern, TrackerCell, ChannelData } from '@/types/tracker';
 import type { InstrumentConfig, FurnaceConfig } from '@/types/instrument';
-import type { FurnaceModuleSong } from '../FurnaceModuleExporter';
+import { ym2610TimerBHz, type FurnaceModuleSong } from '../FurnaceModuleExporter';
 import { xmVolToFurnace } from '@/lib/import/furnaceEditorCells';
 
 /** Channel index of each voice in the extended-FM chip (0xa6). */
@@ -151,7 +151,7 @@ export class NeoGeoSongBuilder {
   build(): FurnaceModuleSong {
     return {
       name: this.name, patterns: this.patterns, instruments: this.instruments, songPositions: this.order,
-      initialSpeed: this.speed, initialBPM: 150, hz: 60, extendedFm: true,
+      initialSpeed: this.speed, initialBPM: 150, hz: ym2610TimerBHz(60), extendedFm: true,
     };
   }
 }
