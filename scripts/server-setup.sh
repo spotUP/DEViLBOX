@@ -44,6 +44,7 @@ if [[ ! -x "$WEBHOOK_BIN" ]]; then
   esac
   WEBHOOK_URL="https://github.com/adnanh/webhook/releases/download/${WEBHOOK_VERSION}/webhook-linux-${WEBHOOK_ARCH}.tar.gz"
   TMP_DIR="$(mktemp -d)"
+  trap 'rm -rf "$TMP_DIR"' EXIT
   curl -fsSL "$WEBHOOK_URL" -o "${TMP_DIR}/webhook.tar.gz"
   tar -xzf "${TMP_DIR}/webhook.tar.gz" -C "$TMP_DIR"
   install -m 0755 "${TMP_DIR}/webhook-linux-${WEBHOOK_ARCH}/webhook" "$WEBHOOK_BIN"
@@ -65,6 +66,7 @@ set -euo pipefail
 LOG="/var/log/devilbox-deploy.log"
 DIST_DIR="/var/www/devilbox-dist"
 TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
 TARBALL="${TMP_DIR}/devilbox-dist.tar.gz"
 GH_REPO="spotUP/DEViLBOX"
 RELEASE_TAG="latest"
@@ -108,6 +110,7 @@ IMAGE_URL="https://github.com/${GH_REPO}/releases/download/${RELEASE_TAG}/devilb
 log "    Downloading ${IMAGE_URL}..."
 curl -fsSL "$IMAGE_URL" -o "${TMP_DIR}/devilbox-backend.tar.gz"
 gunzip -c "${TMP_DIR}/devilbox-backend.tar.gz" | docker load | tee -a "$LOG"
+docker image prune -f | tee -a "$LOG"
 (cd "$BACKEND_COMPOSE_DIR" && docker compose up -d --no-build backend) 2>&1 | tee -a "$LOG"
 log "    Backend restarted on devilbox-backend:latest"
 
