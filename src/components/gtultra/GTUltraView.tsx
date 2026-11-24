@@ -103,7 +103,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
       >
         {recordMode
           ? 'Recording: keys write into the pattern. Esc stops recording.'
-          : 'Jam only: keys play notes but do not edit. Esc starts recording.'}
+          : 'Jam only: keys Z to M play notes but do not edit. Esc starts recording.'}
       </div>
       <div style={{ flex: '2 1 0', minHeight: 0, overflow: 'hidden' }}>
         <PatternEditorCanvas

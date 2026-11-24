@@ -35,10 +35,37 @@ const WAVE_LEFT_ANNOTATIONS: Record<number, string> = {
 // Column meaning depends on the table (GoatTracker table format)
 const TABLE_COLUMNS: Record<TableType, [string, string]> = {
   wave: ['Waveform', 'Note'],
-  pulse: ['Pulse Step', 'Duration'],
-  filter: ['Cutoff Step', 'Duration'],
+  pulse: ['Duration', 'Step Size'],
+  filter: ['Duration', 'Step Size'],
   speed: ['Vibrato Speed', 'Depth'],
 };
+
+const TABLE_HELP: Record<TableType, string> = {
+  wave: 'Wave table: waveform and note steps the instrument plays through',
+  pulse: 'Pulse table: pulse width modulation (Duration ticks of Step Size each, or set width)',
+  filter: 'Filter table: cutoff modulation, set cutoff, or set filter type and resonance',
+  speed: 'Speed table: vibrato and portamento speed and depth values',
+};
+
+const hex2 = (v: number) => v.toString(16).toUpperCase().padStart(2, '0');
+const signed = (v: number) => (v > 127 ? v - 256 : v);
+
+// Plain-language reading of one table row (GoatTracker table format); '' when none applies
+function annotateEntry(t: TableType, left: number, right: number): string {
+  if (t === 'wave') return WAVE_LEFT_ANNOTATIONS[left] ?? '';
+  if (t === 'speed' || (t === 'pulse' && left === 0)) return '';
+  if (left === 0xFF) return right === 0 ? 'end of table' : `jump to ${hex2(right)}`;
+  if (t === 'pulse') {
+    if (left >= 0x80) return `set width ${(((left & 0x0F) << 8) | right).toString(16).toUpperCase().padStart(3, '0')}`;
+    return `${left} ticks, ${signed(right)} per tick`;
+  }
+  if (left === 0) return `set cutoff ${hex2(right)}`;
+  if (left >= 0x80) {
+    const types = [left & 0x10 && 'low', left & 0x20 && 'band', left & 0x40 && 'high'].filter(Boolean).join('+');
+    return `${types || 'no'} pass, resonance ${right >> 4}`;
+  }
+  return `${left} ticks, ${signed(right)} per tick`;
+}
 
 const ROW_H = 14;
 
@@ -128,13 +155,11 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
       ctx.fillStyle = right === 0 ? 'var(--color-border-light)' : color;
       ctx.fillText(right.toString(16).toUpperCase().padStart(2, '0'), 128, y + 1);
 
-      // Annotations for wave table left column
-      if (activeTable === 'wave' && left !== 0) {
-        const anno = WAVE_LEFT_ANNOTATIONS[left];
-        if (anno) {
-          ctx.fillStyle = '#555';
-          ctx.fillText(anno, 170, y + 1);
-        }
+      // Plain-language annotation per row
+      const anno = (activeTable !== 'wave' || left !== 0) ? annotateEntry(activeTable, left, right) : '';
+      if (anno) {
+        ctx.fillStyle = '#777';
+        ctx.fillText(anno, 170, y + 1);
       }
 
       // Visual bar for pulse/filter right value
@@ -287,6 +312,7 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
         {TABLE_TYPES.map((t) => (
           <button
             key={t}
+            title={TABLE_HELP[t]}
             onClick={() => { setActiveTable(t); setHexDigit(null); }}
             style={{
               flex: 1,
@@ -355,7 +381,7 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
             whiteSpace: 'nowrap',
           }}>
             [{hoverInfo.idx.toString(16).toUpperCase().padStart(2, '0')}] L:{table.left[hoverInfo.idx].toString(16).toUpperCase().padStart(2, '0')} R:{table.right[hoverInfo.idx].toString(16).toUpperCase().padStart(2, '0')}
-            {activeTable === 'wave' && WAVE_LEFT_ANNOTATIONS[table.left[hoverInfo.idx]] ? ` (${WAVE_LEFT_ANNOTATIONS[table.left[hoverInfo.idx]]})` : ''}
+            {annotateEntry(activeTable, table.left[hoverInfo.idx], table.right[hoverInfo.idx]) ? ` (${annotateEntry(activeTable, table.left[hoverInfo.idx], table.right[hoverInfo.idx])})` : ''}
           </div>
         )}
       </div>
