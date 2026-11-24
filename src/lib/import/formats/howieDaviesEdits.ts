@@ -72,7 +72,7 @@ export function applyHowieDaviesGridEdits(original: Uint8Array, patterns: readon
     if (!noteChanged && !instChanged && !otherChanged && !fxChanged) return;
     const at = { pattern: pi, channel: c, row: r };
     if (otherChanged) {
-      warnings.push(`${PREFIX} ${where(at)}: the volume column is not stored per row in this format; that change was not written.`);
+      warnings.push(`${PREFIX} ${where(at)}: the volume column is not stored per row in this format (volume is the instrument record's, capped only by the per-voice Maximum Volume effect); that change was not written.`);
       if (!noteChanged && !instChanged && !fxChanged) return;
     }
     let fxPatches: Array<[number, number]> = [];
@@ -110,7 +110,7 @@ export function applyHowieDaviesGridEdits(original: Uint8Array, patterns: readon
     if (removal) noteByte = base.delayByte;
     else if (noteChanged) {
       if (cell.note < 1 || cell.note >= NOTE_OFF) {
-        warnings.push(`${PREFIX} ${where(at)}: a note cannot be removed or turned into a note off without changing the stream length; the edit was not written.`);
+        warnings.push(`${PREFIX} ${where(at)}: a note off cannot be written: the driver has no release or gate command (its commands are Repeat, Instrument, Speed, Delay, Maximum Volume and the list commands), so the note sounds until the next note starts; the edit was not written.`);
         return;
       }
       let found = -1;
@@ -125,7 +125,7 @@ export function applyHowieDaviesGridEdits(original: Uint8Array, patterns: readon
     if (instChanged) {
       const index = cell.instrument - 1;
       if (src.instrumentAt < 0) {
-        warnings.push(`${PREFIX} ${where(at)}: this note's instrument is the voice's start state, the stream has no Instrument command to change; the instrument was not written.`);
+        warnings.push(`${PREFIX} ${where(at)}: this note's instrument is the voice's start state (silence), and an Instrument command cannot put that state back after the note, so later start-state notes would change too; the instrument was not written.`);
         return;
       }
       if (index < 0 || index > 0xff) {
