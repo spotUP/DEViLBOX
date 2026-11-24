@@ -637,7 +637,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           }
         }
         for (const e of cell?.effects ?? []) {
-          const k = e.type === 0x02 ? 0x01 : e.type;
+          const k = e.type === 0x02 ? 0x01 : e.type === 0xfa ? 0x0a : e.type;
           if (k === 0x00 || k === 0x01 || k === 0x04 || k === 0x0a) { if (e.value > 0) run.add(k); else run.delete(k); }
           if (e.type === 0x03 || e.type === 0xe1 || e.type === 0xe2) { porta = e.value > 0; run.delete(0x01); }
         }
@@ -1023,7 +1023,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           // EAxx legato: a note keys no new note-on and restarts no macro, only the pitch moves (playback.cpp DIV_CMD_LEGATO), as E0.
           if (e.type === 0xea) { legato = e.value; continue; }
           if (e.type === 0x30 && kind === 'fm') { lossy.add('effect 30 (FM hard reset: MDSDRV has no command for it)'); continue; }
-          if (e.type === 0x0a) { vspeed = !e.value ? 0 : e.value & 15 ? -(e.value & 15) * 64 : (e.value >> 4) * 64; continue; }
+          // 0Axy slides 64/256 of a volume step per tick; FAxy is the same with four times the speed (playback.cpp case 0xfa).
+          if (e.type === 0x0a || e.type === 0xfa) { const u = e.type === 0xfa ? 256 : 64; vspeed = !e.value ? 0 : e.value & 15 ? -(e.value & 15) * u : (e.value >> 4) * u; continue; }
           if (e.type === 0xec || e.type === 0xed) continue;
           // 17xx sets dacMode; the next note-on sets it again from the instrument, so only 1700 over a playing sample is heard (it stops).
           if (e.type === 0x17 && kind === 'fm') { if (!e.value && pcmOn && sounding) dacOff = true; continue; }

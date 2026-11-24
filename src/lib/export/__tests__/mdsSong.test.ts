@@ -459,6 +459,11 @@ describe('furnaceToMds', () => {
     expect(hex).toContain('e20d8100e20e8100e20f8100e2108100'); // ticks 1..4: volume 114..111 = E2 127-v as ties
     expect(s.lossy.some((l) => l.startsWith('effect 0A'))).toBe(false);
   });
+  it('FAxy: fast volume slide, four times 0Axy: FA 01 plays what 0A 04 plays, and is no longer lossy (golden_shit)', async () => {
+    const s = await solarManRow0([{ type: 0xfa, value: 0x01 }]);
+    expect(Buffer.from(s.seq).toString('hex')).toContain('e20d8100e20e8100e20f8100e2108100');
+    expect(s.lossy.some((l) => l.startsWith('effect FA'))).toBe(false);
+  });
   it('ECxx: key-off xx ticks after the row starts (Solar_Man FM1, EC 02)', async () => {
     const s = await solarManRow0([{ type: 0xec, value: 0x02 }]);
     const ch0 = decode(s.seq, true).filter((e) => e.ch === 0);
