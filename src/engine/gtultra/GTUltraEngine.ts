@@ -405,6 +405,10 @@ export class GTUltraEngine {
 
   // --- Instrument editing ---
 
+  setInstrumentName(instrument: number, name: string): void {
+    this.post({ type: 'setInstrumentName', instrument, name });
+  }
+
   setInstrumentAD(instrument: number, value: number): void {
     this.post({ type: 'setInstrumentAD', instrument, value });
   }

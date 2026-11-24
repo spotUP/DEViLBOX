@@ -38,6 +38,12 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
     useGTUltraStore.getState().refreshAllInstruments();
   }, [engine, currentInstrument, instr?.ad, instr?.sr]);
 
+  const setName = useCallback((name: string) => {
+    if (!engine || name === (instr?.name ?? '')) return;
+    engine.setInstrumentName(currentInstrument, name);
+    useGTUltraStore.getState().refreshAllInstruments();
+  }, [engine, currentInstrument, instr?.name]);
+
   // Set table pointer (0=wave, 1=pulse, 2=filter, 3=speed)
   const setTablePtr = useCallback((tableType: number, value: number) => {
     if (!engine) return;
@@ -105,10 +111,21 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
         />
       </div>
 
-      {/* Instrument name (read-only for now — WASM doesn't expose name setter easily) */}
+      {/* Instrument name: up to 15 characters, written to the song through gt_set_instrument_name */}
       <div style={{ display: 'flex', alignItems: 'center', height: 20, marginBottom: 4 }}>
         <span style={labelStyle}>Name</span>
-        <span style={{ color: 'var(--color-text-secondary)', fontSize: 11 }}>{instr?.name || '—'}</span>
+        <input
+          key={currentInstrument}
+          type="text"
+          maxLength={15}
+          defaultValue={instr?.name ?? ''}
+          placeholder="Unnamed"
+          title="Instrument name (15 characters)"
+          aria-label="Instrument name"
+          onBlur={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') e.currentTarget.blur(); }}
+          style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)', padding: '1px 4px', fontSize: 11, fontFamily: 'inherit', width: 140 }}
+        />
       </div>
 
       {/* ADSR visualization */}
