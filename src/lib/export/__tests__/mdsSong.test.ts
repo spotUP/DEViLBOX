@@ -26,7 +26,7 @@ async function solarManRow0(fx: Array<{ type: number; value: number }>, vt?: [nu
 }
 
 /** Test-only decoder: walks one pass of every track (subroutines followed, stops at the loop jump). */
-function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1, arg2?: (ch: number, c: number, a: number, b: number) => void): { ch: number; tick: number; n: number; s?: 1; peg?: number }[] {
+function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1, arg2?: (ch: number, c: number, a: number, b: number, tick: number) => void): { ch: number; tick: number; n: number; s?: 1; peg?: number }[] {
   const sd = seq.subarray(8);
   const w = (o: number) => (sd[o] << 8) | sd[o + 1];
   const bgm = (w(4) << 16) | w(6);
@@ -48,10 +48,10 @@ function decode(seq: Uint8Array, rests = false, slurs = false, onlyCh = -1, arg2
         else if (c === 0xfb || c === 0xff) return c === 0xff;
         else if (c === 0xe0) slur = true; // E0: the next note slurs (no key-on)
         else if (c === 0xfa) depth++;
-        else if (c === 0xe4) trs = (sd[p++] << 24) >> 24;
+        else if (c === 0xe4) { trs = (sd[p++] << 24) >> 24; arg2?.(ch, c, sd[p - 1], -1, tick); }
         else if (c === 0xe8) peg = sd[p++]; // slurs: the E8 pitch envelope the note plays
-        else if (ARG1.has(c)) { const v = sd[p++]; arg2?.(ch, c, v, -1); }
-        else if (CMD_LEN[c - 0xe0] === 3) { arg2?.(ch, c, sd[p], sd[p + 1]); p += 2; }
+        else if (ARG1.has(c)) { const v = sd[p++]; arg2?.(ch, c, v, -1, tick); }
+        else if (CMD_LEN[c - 0xe0] === 3) { arg2?.(ch, c, sd[p], sd[p + 1], tick); p += 2; }
         else if (c === 0xec) p++;
         else throw new Error(`unknown command ${c?.toString(16)} on track ${i}`);
       }
@@ -447,6 +447,26 @@ describe('furnaceToMds', () => {
   it('decode walks every track of newer_song_lol to its end (streams placed before the track table have a negative pos)', async () => {
     const d = decode((await convert('newer_song_lol.fur')).seq);
     expect(new Set(d.map((e) => e.ch)).size).toBeGreaterThanOrEqual(8);
+  });
+  it('04xy with 01xx: E8 stays the vibrato and the ramp rides per tick in E4/E6, xx * pitchSlideSpeed per Furnace tick from the row tick (not lossy)', async () => {
+    // Furnace (playback.cpp 01xx -> DIV_CMD_NOTE_PORTA every tick, genesis.cpp linear: baseFreq += xx * pitchSlideSpeed in 1/128 semitone;
+    // vibrato adds to pitch separately), so the driver pitch (1/256 semitone) after Furnace tick f is 2 * xx * pss * (f + 1) + detune.
+    const m = await parse('Solar_Man.fur');
+    m.compatFlags.linearPitch = 2;
+    const pss = Number(m.compatFlags.pitchSlideSpeed) || 1;
+    m.patterns.get(`0_0_${m.subsongs[0].orders[0][0]}`)!.rows[0]!.effects!.push({ type: 0x04, value: 0x47 }, { type: 0x01, value: 0x03 });
+    const s = furnaceToMds(m);
+    expect(s.lossy.some((l) => l.startsWith('04xy with a pitch slide'))).toBe(false);
+    let trs = 0, dtn = 0;
+    const at = new Map<number, number>();
+    decode(s.seq, false, false, 0, (_ch, c, a, _b, tick) => {
+      if (c === 0xe4) trs = (a << 24) >> 24; else if (c === 0xe6) dtn = (a << 24) >> 24; else return;
+      at.set(tick, trs * 256 + dtn);
+    });
+    const o = [0, 1, 2, 3, 4].map((t) => at.get(t));
+    expect(o.every((v) => v !== undefined)).toBe(true);
+    expect(o).toEqual([0, 1, 2, 3, 4].map((t) => 2 * 3 * pss * (t + 1))); // instrument 11 has no detune
+    expect(decode(s.seq, false, true, 0).find((e) => e.tick === 0)!.peg).toBeGreaterThan(0); // the note plays the vibrato E8
   });
   it('highscorefollin: mid-note 04 66 on FM2 (order 0 row 32) is an E8 extended vibrato envelope from pos 0, not lossy', async () => {
     const s = await convert('highscorefollin.fur');

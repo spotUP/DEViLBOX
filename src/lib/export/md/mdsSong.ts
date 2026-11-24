@@ -790,9 +790,22 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // pXx: the 03xx speed it runs at (0 = no porta in flight). shortcut: non-linear-pitch slides are not retargeted (fresh note-on).
     let fA = 0, fF0 = 0, pXx = 0;
     const flyOff = (f: number) => (fA ? Math.sign(fA) * Math.max(0, Math.abs(fA) - pXx * pss * (f - fF0 + 1)) : 0);
+    // 01xx/02xx and an absolute pitch macro under a running 04xy: the one E8 envelope is the vibrato, and a summed envelope cannot hold
+    // them (a ramp plus a sine never repeats, and t_peg_pos is a byte: 256 nodes, ~4 s), so their offset goes out per sequence tick in
+    // slideCmd too, added to sA (Furnace: pitch = base + pitch (vibrato) + pitch2 (macro), playback.cpp / genesis.cpp calcFreq).
+    // Ramp: offset rB before Furnace tick rF0, rRate per tick from rF0 on (first step on the row tick, as pslideCmd), held at rLim.
+    // pm: the instrument's pitch macro, stepped from the note's Furnace tick pmF0 (macroStep). rEnd: E4/E6 still carry an ended one.
+    let rOn = false, rEnd = false, rB = 0, rRate = 0, rF0 = 0, rLim = 0, pm: FurnaceMacro | undefined, pmF0 = 0;
+    const rampOff = (f: number): number => (!rOn ? 0 : !rRate ? rB : rRate > 0 ? Math.min(rLim, rB + rRate * (f - rF0 + 1)) : Math.max(rLim, rB + rRate * (f - rF0 + 1)));
+    const setRamp = (t: number, base: number) => {
+      const on = vDepth > 0 && (prate !== 0 || base !== 0);
+      rEnd ||= rOn && !on; rOn = on; rB = base; rRate = prate; rF0 = fTick(t); if (prate) rLim = pLimit();
+    };
+    const setPm = () => { const p = vDepth && insRef(kind, ins).peg >= 0 ? macro(m.instruments[ins], MACRO_PITCH, m.version) : undefined; rEnd ||= !!pm && !p; pm = p; };
     const slideCmd = (t: number): number[] => {
-      const off = slideOff(fTick(t)), o = slidePitch(off, t), tr = Math.floor((o + 128) / 256), d = o - 256 * tr, out: number[] = [];
-      if (!off) sA = 0;
+      const f = fTick(t), so = slideOff(f), off = so + rampOff(f) + (pm ? macroStep(pm, f - pmF0).v : 0), o = slidePitch(off, t), tr = Math.floor((o + 128) / 256), d = o - 256 * tr, out: number[] = [];
+      if (!so) sA = 0;
+      rEnd = false;
       if (baked) trsOut = tr;
       else if (tr !== trsOut) out.push(0xe4, (trsOut = tr) & 0xff);
       if (d !== dtnOut) out.push(0xe6, (dtnOut = d) & 0xff);
@@ -938,10 +951,10 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       let curPcm = -1, pcmOn = false;
       baked = arpHold !== undefined; arpT0 = tick; // insCmd(true) restates EB, which restarts the instrument's arp table
       // Chunk head: the channel state a chunk starts from. The loop chunk's head plays once; the wrap restates it from the song-end state.
-      const head = (): number[] => [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && any ? vibCmd(tick) : []), ...volCmd(outV), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...(sA && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
+      const head = (): number[] => [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && any ? vibCmd(tick) : []), ...volCmd(outV), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...((sA || rOn || pm) && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
       const bytes = head(), headLen = bytes.length;
       // One sequence tick's mid-row commands: 0Axy volume step and the per-tick slide.
-      const tickPre = (t: number): number[] | null => { const v = [...(volStep() ?? []), ...(macStep(t) ?? [])], sl = sA && (sounding || fTick(t) <= sTail) ? slideCmd(t) : []; return v.length || sl.length ? [...v, ...sl] : null; };
+      const tickPre = (t: number): number[] | null => { const v = [...(volStep() ?? []), ...(macStep(t) ?? [])], sl = (sA && (sounding || fTick(t) <= sTail)) || ((rOn || pm) && sounding) ? slideCmd(t) : []; return v.length || sl.length ? [...v, ...sl] : null; };
       let curIns = ins;
       type Tok = { cmd: 'note' | 'tie' | 'rest'; n: number; t: number; pre: number[] };
       const tok: Tok[] = [];
@@ -1078,16 +1091,20 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (pcmOn && !isNote && cell && cell.volume >= 0 && isDac(ins) && !m.compatFlags.noOPN2Vol) lossy.add('FM6 DAC volume change mid-note (driver 2 dB step only)');
         if (dac && isNote) { curIns = ins; pcmOn = true; if (dacHdr !== curPcm) { curPcm = dacHdr; cmds.unshift(0xf0, dacHdr); } }
         else if (isNote) { pcmOn = false; curPcm = -1; }
+        if (!isNote && sounding) {
+          if (pChanged || (vChanged && rOn !== (vDepth > 0 && (prate !== 0 || poff !== 0)))) setRamp(tick + delay, poff);
+          if (vChanged) setPm();
+        }
         const rowPoff = poff; // 01xx/02xx offset reached so far: a slide from the playing pitch starts there (baseFreq holds it)
         if (isNote) { poff = 0; curNv = nv; }
         // 03xx without a note slides to the note already playing, so it ends on its first tick and targetResetsSlides drops it
         // (playback.cpp NOTE_PORTA == 2): the next note keys on. shortcut: a 03xx row that retunes a slide still in flight is not kept.
         else if (portaXx && m.compatFlags.targetResetsSlides) portaXx = 0;
-        else if (pChanged && sounding && (prate || poff)) cmds.push(...pslideCmd());
-        if (!isNote && sounding && (sA || trsOut)) cmds.push(...slideCmd(tick + delay));
+        else if (pChanged && sounding && (prate || poff) && !rOn) cmds.push(...pslideCmd());
+        if (!isNote && sounding && (sA || trsOut || rOn || pm || rEnd)) cmds.push(...slideCmd(tick + delay));
         // 04xy without a note retunes the vibrato whatever the key state, also before the first note: Furnace runs vibrato per tick on
         // every channel, and a loop back into this chunk replays it on a release tail (FM4 newer_song_lol o2 r2, 10.83 s and 96.0 s).
-        if (!isNote && vChanged) { cmds.push(...(vDepth ? vibCmd(tick + delay) : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
+        if (!isNote && vChanged) { cmds.push(...(vDepth ? vibCmd(tick + delay) : sounding && (prate || poff) ? pslideCmd() : [0xe8, insRef(kind, ins).peg + 1])); pegDirty = true; }
         const hitPh = isNote && kind !== 'fm' && fpt === 1 ? phaseOf(tick + delay) : undefined;
         if (isNote && (ins !== curIns || (hitPh && insRef(kind, ins, hitPh).ins !== insRef(kind, ins, envPh).ins))) { curIns = ins; envPh = hitPh; cmds.unshift(...insCmd()); }
         if (isNote || isOff || cmds.length || i === 0) {
@@ -1133,6 +1150,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             const fresh = !m.compatFlags.continuousVibrato && !portaSlur;
             if (!m.compatFlags.continuousVibrato && (!portaSlur || retarget)) { vPos = 0; vAt = tick + delay; }
             if (vDepth) { vSync(tick + delay); eT = tick + delay; eP = vPos; } // the note byte restarts E8 (slide steps below score on it)
+            if (!slur) pmF0 = fTick(tick + delay); // a slurred note keeps its macros running (no NOTE_ON)
+            setRamp(tick + delay, 0); setPm();
             sA = 0; fA = 0; pXx = slide && m.compatFlags.linearPitch ? portaXx : 0;
             if (slide && vDepth && m.compatFlags.linearPitch) {
               sA = from - nv * 128; sStep = portaXx * pss; sF0 = fTick(tick + delay);
@@ -1144,13 +1163,13 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
               const env = portaEnvelope(lin ? from / 128 : prevKey, nv, portaXx, kind === 'fm', m.compatFlags.linearPitch ? portaXx * (Number(m.compatFlags.pitchSlideSpeed) || 1) : 0, fpf, kind === 'psg' ? curKey * 256 + dtnOut : undefined);
               cmds.push(0xe8, slideItem(env) + 1); slideEnd = tick + Math.round((env[env.length - 1] + 1) * (tempo + 1) / 128);
             }
-            else if (prate) { if (pChanged || pInit || !pegDirty) cmds.push(...pslideCmd()); }
+            else if (prate) { if (!rOn && (pChanged || pInit || !pegDirty)) cmds.push(...pslideCmd()); }
             else if (pegDirty) cmds.push(0xe8, insRef(kind, ins).peg + 1);
-            if (trsOut || sA || (kind === 'fm' && dtnOut !== effDtn())) cmds.push(...slideCmd(tick + delay));
+            if (trsOut || sA || rOn || pm || rEnd || (kind === 'fm' && dtnOut !== effDtn())) cmds.push(...slideCmd(tick + delay));
             pegDirty = slide || prate !== 0; portaXx = 0;
             if (!slur) { arpT0 = tick + delay; if (baked && insRef(kind, ins).mtab >= 0) cmds.push(0xeb, insRef(kind, ins).mtab + 1); baked = false; }
             if (vDepth) {
-              if ((slide && !sA) || prate || insRef(kind, ins).peg >= 0) lossy.add('04xy with a pitch slide or pitch macro (vibrato replaces it)');
+              if (slide && !m.compatFlags.linearPitch) lossy.add('04xy with a pitch slide or pitch macro (vibrato replaces it)'); // a linear 03xx rides in sA
               cmds.push(...vibCmd(tick + delay, fresh)); pegDirty = true;
             }
             prevKey = kind === 'psg' || kind === 'fm' ? nv : -1;
