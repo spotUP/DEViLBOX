@@ -73,10 +73,7 @@ function mesenWrites(rom: Uint8Array, dir: string, ticks: number): W[] {
   writeFileSync(path.join(dir, 'p.pce'), rom);
   writeFileSync(path.join(dir, 'tap.lua'), `local f=0
 emu.addEventCallback(function() f=f+1 if f>=${ticks + 120} then print("DONE") emu.stop(0) end end, emu.eventType.endFrame)
--- tick = driver interrupt, not the emulator frame: the interrupt starts within a few thousand cycles of the frame boundary,
--- so its first writes (channel 0) would land in the previous frame bucket. Each interrupt selects channels 0..5 in order.
-local g,last=0,0
-emu.addMemoryCallback(function(a,v) v=v&0xFF if (a&15)==0 then if v==0 and last~=0 then g=g+1 end last=v end print(string.format("W %d %d %d %d",g,a&15,v,${process.env.PCE_CYCLES ? 'emu.getState()["cpu.cycleCount"]' : 0})) end, emu.callbackType.write, 0x0800, 0x0809)
+emu.addMemoryCallback(function(a,v) v=v&0xFF print(string.format("W 0 %d %d %d",a&15,v,${process.env.PCE_CYCLES ? 'emu.getState()["cpu.cycleCount"]' : 0})) end, emu.callbackType.write, 0x0800, 0x0809)
 `);
   const set = path.join(homedir(), 'Library/Application Support/Mesen2');
   mkdirSync(set, { recursive: true });
@@ -85,7 +82,16 @@ emu.addMemoryCallback(function(a,v) v=v&0xFF if (a&15)==0 then if v==0 and last~
   const out = execFileSync(MESEN, ['--testRunner', `--timeout=${timeout}`, '--doNotSaveSettings', '--enableStdout', '--PcEngine.Port1.Type=PceController', path.join(dir, 'tap.lua'), path.join(dir, 'p.pce')],
     { encoding: 'utf8', timeout: timeout * 1000 + 30000, maxBuffer: 1 << 28 });
   if (!out.includes('DONE')) throw new Error(`Mesen2 run did not reach DONE: ${out.slice(-300)}`);
-  return out.split('\n').filter((l) => l.startsWith('W ')).map((l) => { const [, t, r, v, cy] = l.trim().split(' ').map(Number); return { tick: t, reg: r, val: v, cy }; });
+  const raw = out.split('\n').filter((l) => l.startsWith('W ')).map((l) => { const [, , r, v, cy] = l.trim().split(' ').map(Number); return { tick: 0, reg: r, val: v, cy }; });
+  // tick = driver interrupt: the channel-select run 0 -> 1 that follows channel 5 (or the start). The XPCM timer interrupt also selects
+  // channels (its own, then the interrupted one back), so a bare "select 0" is not a frame boundary; "5, 0, 1" in the distinct select sequence is.
+  const sels: { i: number; v: number }[] = [];
+  raw.forEach((w, i) => { if (w.reg === 0 && sels[sels.length - 1]?.v !== (w.val & 7)) sels.push({ i, v: w.val & 7 }); });
+  const startAt = new Set<number>();
+  sels.forEach((s, k) => { if (s.v === 0 && sels[k + 1]?.v === 1 && (k === 0 || sels[k - 1].v === 5)) startAt.add(s.i); });
+  let g = 0;
+  raw.forEach((w, i) => { if (startAt.has(i)) g++; w.tick = g; });
+  return raw;
 }
 
 /** Register writes -> per-tick channel state, re-timed from the first sounding tick. */
