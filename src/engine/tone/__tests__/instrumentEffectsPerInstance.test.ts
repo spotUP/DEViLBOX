@@ -14,7 +14,7 @@ vi.mock('tone', async (importOriginal) => {
     disconnect() { return this; }
     dispose() { nodes.disposed++; return this; }
   }
-  return { ...(await importOriginal<typeof import('tone')>()), Gain };
+  return { ...(await importOriginal<typeof import('tone')>()), Gain, getContext: () => ({ rawContext: { createAnalyser: () => ({}) } }) };
 });
 vi.mock('../../InstrumentFactory', () => ({
   InstrumentFactory: {

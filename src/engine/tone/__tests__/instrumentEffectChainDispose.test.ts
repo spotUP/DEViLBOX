@@ -14,7 +14,7 @@ vi.mock('tone', () => {
     disconnect() { return this; }
     dispose() { nodes.disposed++; return this; }
   }
-  return { Gain };
+  return { Gain, getContext: () => ({ rawContext: { createAnalyser: () => ({}) } }) };
 });
 vi.mock('../../InstrumentFactory', () => ({
   InstrumentFactory: {

@@ -14,7 +14,7 @@ vi.mock('tone', () => {
     disconnect() { return this; }
     dispose() { live.chains--; return this; }
   }
-  return { Gain, ToneAudioNode: class {} };
+  return { Gain, ToneAudioNode: class {}, getContext: () => ({ rawContext: { createAnalyser: () => ({}) } }) };
 });
 vi.mock('../../InstrumentFactory', () => ({ InstrumentFactory: { createEffect: vi.fn() } }));
 vi.mock('../../InstrumentAnalyser', () => ({ InstrumentAnalyser: class {} }));

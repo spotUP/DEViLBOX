@@ -28,6 +28,7 @@ import { CollapsedPanelStrip } from '@components/ui/CollapsedPanelStrip';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import { ToneEngine } from '@engine/ToneEngine';
 import { instrumentDisplayName } from '@/lib/instruments/instrumentDisplayName';
+import { InstrumentEffectsModal } from '@components/effects/InstrumentEffectsModal';
 
 // ============================================================================
 // SYNTH TYPE CATEGORIZATION HELPERS
@@ -77,6 +78,8 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
   const [activeTab, setActiveTab] = useState<EditorTab>('sound');
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  // Local, so the FX dialog stacks over this editor instead of replacing it in the global modal slot.
+  const [showFx, setShowFx] = useState(false);
   const [showSynthBrowser, setShowSynthBrowser] = useState(false);
 
   // Left panel collapsed state (persisted)
@@ -495,7 +498,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                           <button
                             key={tab.id}
                             // Effects opens the same full FX editor as Ctrl+Shift+F; closing it returns here (modalReturn).
-                            onClick={() => (tab.id === 'effects' ? useUIStore.getState().openModal('instrumentFx') : setActiveTab(tab.id))}
+                            onClick={() => (tab.id === 'effects' ? setShowFx(true) : setActiveTab(tab.id))}
                             className={`
                               flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all border
                               ${isActive
@@ -657,6 +660,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
             onClose={() => setShowSaveDialog(false)}
           />
         )}
+        <InstrumentEffectsModal isOpen={showFx} onClose={() => setShowFx(false)} />
       </div>
     </div>
   );

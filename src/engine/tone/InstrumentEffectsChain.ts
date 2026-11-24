@@ -274,18 +274,19 @@ async function buildChainNow(
       console.log('[ToneEngine] buildInstrumentEffectChain: connecting native synth to bridge');
       connectInstrumentTo(bridge);
       console.log('[ToneEngine] buildInstrumentEffectChain: connecting bridge to first effect');
-      bridge.connect(effectNodes[0] as Tone.ToneAudioNode);
+      connectAudio(bridge, effectNodes[0]);
     } else {
       console.log('[ToneEngine] buildInstrumentEffectChain: connecting Tone.js instrument to first effect');
-      (instrument as Tone.ToneAudioNode).connect(effectNodes[0] as Tone.ToneAudioNode);
+      connectAudio(instrument, effectNodes[0]);
     }
     // Chain effects together
     for (let i = 0; i < effectNodes.length - 1; i++) {
-      (effectNodes[i] as Tone.ToneAudioNode).connect(effectNodes[i + 1] as Tone.ToneAudioNode);
+      // Effects mix Tone.js and native nodes (Buzzmachine): connectAudio bridges both.
+      connectAudio(effectNodes[i], effectNodes[i + 1]);
     }
     // Connect last effect to output
     console.log('[ToneEngine] buildInstrumentEffectChain: connecting last effect to output');
-    (effectNodes[effectNodes.length - 1] as Tone.ToneAudioNode).connect(output);
+    connectAudio(effectNodes[effectNodes.length - 1], output);
   } else {
     console.log('[ToneEngine] buildInstrumentEffectChain: no enabled effects, connecting directly to output');
     connectInstrumentTo(output);
@@ -436,12 +437,9 @@ function releaseEffectChain(
     }
   }
   chain.effects.forEach((fx) => {
-    try {
-      fx.disconnect();
-      fx.dispose();
-    } catch {
-      // Node may already be disposed
-    }
+    // Native effects (Buzzmachine) have no disconnect(); dispose() disconnects them, so run it regardless.
+    try { fx.disconnect(); } catch { /* native effect or already disposed */ }
+    try { fx.dispose(); } catch { /* already disposed */ }
   });
   if (chain.bridge) {
     try {
