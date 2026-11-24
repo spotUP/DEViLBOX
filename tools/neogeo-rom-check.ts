@@ -25,7 +25,7 @@ const SONGS: { name: string; fur?: string; compose?: string }[] = [
   ...['gumbirds-title', 'gumbirds-arena', 'gumbirds-game-over', 'gumbirds-round-clear'].map((n) => ({ name: n, compose: n })),
 ];
 
-interface Verdict { inputHash: string; pass: boolean; seconds: number; stage?: string; error?: string; commands?: string[]; mameStarts?: number; furnaceStarts?: number; keyOnMatch?: number; pitchMatch?: number; byChannel?: Record<string, string>; lint?: string[] }
+interface Verdict { inputHash: string; pass: boolean; seconds: number; stage?: string; error?: string; commands?: string[]; mameStarts?: number; furnaceStarts?: number; keyOnMatch?: number; keyOnWithin150ms?: number; pitchMatch?: number; byChannel?: Record<string, string>; lint?: string[] }
 type Start = { t: number; ch: string; hz: number };
 type W = { t: number; port: number; reg: number; val: number };
 
@@ -36,7 +36,7 @@ const failedOnly = args.includes('--failed');
 const detail = args.includes('--detail');
 const SECONDS = Number(opt('--seconds') ?? 20);
 
-/** Decode YM2610 register writes (port 0 = A, 1 = B) to key-on starts with the channel's Hz at key-on (freq written within 8 ms after counts). */
+/** Decode YM2610 register writes (port 0 = A, 1 = B) to key-on starts with the channel's Hz at key-on (freq written within 50 ms after counts; the Z80 driver writes it up to ~40 ms after key-on). */
 function starts(w: W[], clk: number): Start[] {
   const fnum: Record<string, number> = {}, hi: Record<string, number> = {}, vol: Record<string, number> = {}, per: Record<string, number> = {};
   const out: (Start & { fix?: () => void })[] = [];
@@ -48,7 +48,7 @@ function starts(w: W[], clk: number): Start[] {
   for (let n = 0; n < 3; n++) hzOf[`S${n + 1}`] = ssg(n + 1);
   hzOf.B = () => (clk / 144) * (dn / 65536);
   const pend: { s: Start; ch: string }[] = [];
-  const settle = (t: number) => { for (let i = pend.length - 1; i >= 0; i--) if (t - pend[i].s.t > 0.008) { pend[i].s.hz = hzOf[pend[i].ch](); pend.splice(i, 1); } };
+  const settle = (t: number) => { for (let i = pend.length - 1; i >= 0; i--) if (t - pend[i].s.t > 0.05) { pend[i].s.hz = hzOf[pend[i].ch](); pend.splice(i, 1); } };
   const on = (t: number, ch: string) => { const s = { t, ch, hz: hzOf[ch]?.() ?? 0 }; out.push(s); if (hzOf[ch]) pend.push({ s, ch }); };
   const latchA: Record<number, number> = {};
   const fmCh = (port: number, reg: number) => (reg & 3) === 0 || (reg & 3) === 3 ? undefined : `F${port * 2 + (reg & 3)}`;
@@ -168,6 +168,15 @@ for (const song of SONGS) {
     const want = starts(vgm.w, vgm.clk).filter((e) => e.t < SECONDS - 2);
     const pairs = want.map((w) => [w, got.find((g) => g.ch === w.ch && Math.abs(g.t - w.t) < 0.03)] as const);
     const hit = pairs.filter(([, g]) => g);
+    // miss analysis: signed delta (MAME - Furnace) to the nearest same-channel MAME key-on; late = driver timing, none = lost row
+    const nearest = (w: Start) => got.filter((g) => g.ch === w.ch).reduce<number | undefined>((b, g) => (b === undefined || Math.abs(g.t - w.t) < Math.abs(b) ? g.t - w.t : b), undefined);
+    const missD = pairs.filter(([, g]) => !g).map(([w]) => ({ w, d: nearest(w) }));
+    const loose = pairs.filter(([w, g]) => g || (nearest(w) !== undefined && Math.abs(nearest(w)!) < 0.15)).length;
+    if (detail) {
+      const bins = [0.03, 0.06, 0.1, 0.15, 0.3, 1, 1e9], h: Record<string, number> = {};
+      for (const { w, d } of missD) { const k = d === undefined ? 'none' : `${d < 0 ? '-' : '+'}${bins.find((x) => Math.abs(d) < x)}`; h[`${w.ch} ${k}`] = (h[`${w.ch} ${k}`] ?? 0) + 1; console.log(`  MISS ${w.t.toFixed(3)} ${w.ch} nearest ${d === undefined ? 'none' : `${(d * 1000).toFixed(0)} ms`}`); }
+      console.log('  miss histogram (channel, sign, |delta| < s):', JSON.stringify(h));
+    }
     const tone = hit.filter(([w]) => w.hz > 0);
     const cents = (a: Start, b: Start) => Math.round(1200 * Math.log2(b.hz / a.hz));
     const ok = (w: Start, g: Start) => g.hz > 0 && Math.abs(cents(w, g)) < 50;
@@ -175,7 +184,7 @@ for (const song of SONGS) {
     const pct = (a: number, b: number) => (b ? Math.round((a / b) * 10000) / 100 : 0);
     const chs = [...new Set(want.map((w) => w.ch))].sort();
     v.byChannel = Object.fromEntries(chs.map((c) => { const p = pairs.filter(([w]) => w.ch === c); const h = p.filter(([, g]) => g); return [c, `${h.length}/${p.length} key-on, ${h.filter(([w, g]) => w.hz > 0 && ok(w, g!)).length}/${h.filter(([w]) => w.hz > 0).length} pitch`]; }));
-    Object.assign(v, { furnaceStarts: want.length, keyOnMatch: pct(hit.length, want.length), pitchMatch: pct(tone.filter(([w, g]) => ok(w, g!)).length, tone.length) });
+    Object.assign(v, { furnaceStarts: want.length, keyOnMatch: pct(hit.length, want.length), keyOnWithin150ms: pct(loose, want.length), pitchMatch: pct(tone.filter(([w, g]) => ok(w, g!)).length, tone.length) });
     v.stage = undefined;
   } catch (e) {
     v.error = e instanceof Error ? e.message : String(e); v.pass = false;
