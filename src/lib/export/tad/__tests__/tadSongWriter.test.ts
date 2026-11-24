@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { parseFurnaceSong, toSequencerSamples, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
 import { openTadSession, type CreateTadCompiler } from '../tadCompilerWasm';
-import { writeTadSong, panSplit, stepCompileState, initialCompileState, noteSemitone, tadRowTicks } from '../tadSongWriter';
+import { writeTadSong, panSplit, stepCompileState, initialCompileState, noteSemitone, tadRowTicks, factorRepeats } from '../tadSongWriter';
 import { tadProjectJson, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 
 const DIR = resolve(__dirname, '../../../../../public/data/songs/furnace/snes');
@@ -342,5 +342,24 @@ describe('tadRowTicks', () => {
     const speed1 = Array.from({ length: 4 }, (_, i) => ({ ticks: 1, rate: 200, row: i }));
     tadRowTicks(speed1, 64, 1, false);
     expect(speed1.every((r) => r.ticks >= 1)).toBe(true); // rows never merge
+  });
+
+  it('loops repeated bars inside a subroutine body (Sadness.fur drum subs)', () => {
+    const bar = ['o4', 'V142', 'Vs-138,18', 'c%18', 'V142', 'Vs-138,18', 'c%18', 'V142', 'Vs-138,18', 'c%18', 'V142', 'Vs-138,18', 'c%18'];
+    const out = [...bar, ...bar.slice(1)];
+    const f = factorRepeats([{ letter: 'A', out, cuts: [bar.length], fine: [] }], 'cuts', 'none');
+    expect(f.subs.map((s) => s.out.join(' '))).toEqual(['o4 [V142 Vs-138,18 c%18 ]4']);
+    expect(f.channels[0].out.filter((t) => t === '!s0')).toHaveLength(2);
+  });
+
+  it('carries the sub-tick remainder across patterns (MM8_Frost_Man: 192-tick patterns lost 0.48 tick each)', () => {
+    const rows = Array.from({ length: 64 * 16 }, (_, i) => ({ ticks: 3, rate: 60, row: i % 64 }));
+    tadRowTicks(rows, 133, 1, false);
+    let end = 0;
+    for (let p = 0; p < 16; p++) {
+      end += rows.slice(p * 64, p * 64 + 64).reduce((s, r) => s + r.ticks, 0);
+      // every pattern start stays within half a TAD tick of absolute time (was 2 ticks = 32 ms late by pattern 4)
+      expect(Math.abs(end - (p + 1) * 192 * (8000 / 60) / 133)).toBeLessThanOrEqual(0.5);
+    }
   });
 });

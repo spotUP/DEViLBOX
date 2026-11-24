@@ -185,13 +185,14 @@ export function tadRowTicks(rows: Array<{ ticks: number; rate: number; timer?: n
   let acc = 0, prev = 0, t = timer;
   rows.forEach((r, i) => {
     if (r.timer) t = r.timer;
-    // Songs round per pattern (no carried error), so identical patterns get identical ticks for subroutine dedup.
-    if (!sfx && r.row === 0) { acc = 0; prev = 0; }
+    // Songs round per pattern, carrying only the sub-tick remainder into the next pattern: dropping it lost up to
+    // 0.5 tick per pattern (192-tick patterns at 60 Hz: 192.48 -> 192, 32 ms early by the 4th pattern).
+    if (!sfx && r.row === 0) { acc -= prev; prev = 0; }
     const f = sfx ? SFX_TICK_HZ / (r.rate * k) : 8000 / (r.rate * k * t);
     const fast = !sfx && 8000 / (r.rate * k) < 63.5; // timer would be under 64
     acc += r.ticks * (sfx || fast || Math.abs(f - 1) <= 0.005 ? f : 1);
     // Songs correct only on the last row of a pattern, so repeated patterns stay identical for subroutine dedup
-    // (the error stays under about one tick per pattern).
+    // (the error stays under about one tick at any pattern start).
     if (!sfx && !fast && rows[i + 1]?.row !== 0 && i < rows.length - 1) { prev += r.ticks; return; }
     const n = sfx ? Math.round(acc) : Math.max(prev + 1, Math.round(acc));
     r.ticks = n - prev; prev = n;
@@ -1281,8 +1282,25 @@ const MAX_SUBROUTINES = 255;
  * in the same state as inline. Runtime state (V, p, @, E, D, G, q, vibrato) is shared by caller and subroutine,
  * so token-identical bodies play the same. Stack: a loop is 3 bytes and a call 2 of 21 (mml-syntax.md:693-697).
  */
-export function factorRepeats(chans: SongChannel[], grid: 'cuts' | 'fine'): { subs: { letter: string; out: string[] }[]; channels: { letter: string; out: string[] }[] } {
-  type Seg = { body: string[]; full: string[]; key: string; shift: number; entry: MmlCompileState; exit: MmlCompileState; ok: boolean };
+export function factorRepeats(chans: SongChannel[], grid: 'cuts' | 'fine', peel: 'none' | 'count' | 'major' | 'both' = 'count'): { subs: { letter: string; out: string[] }[]; channels: { letter: string; out: string[] }[] } {
+  type Body = { body: string[]; full: string[]; key: string; shift: number; entry: MmlCompileState };
+  type Seg = Body & { head: string[]; alt?: Body & { head: string[] }; exit: MmlCompileState; ok: boolean };
+  const mk = (body: string[], entry: MmlCompileState): Body => {
+    const pre = [
+      entry.ins >= 0 && !body[0].startsWith('@') ? `?@${entry.ins}` : '',
+      entry.o >= 0 ? `o${entry.o}` : '',
+      entry.mp !== 'MP0' ? entry.mp : '',
+      entry.md !== 'MD0' ? entry.md : '',
+    ].filter(Boolean);
+    const full = [...pre, ...body];
+    const tr = transposeKey(full, entry);
+    return { body, full, key: tr?.key ?? full.join(' '), shift: tr?.first ?? 0, entry };
+  };
+  // One-pitch portamento needs the previous note (mml-syntax.md:464), which a call boundary hides.
+  const opensWithOnePitchPorta = (body: string[]) => {
+    const first = body.find((t) => /^(\{+)?(o\d\s+)?[a-g]/.test(t) || /^N\d/.test(t));
+    return !!first && /^\{(?!\{)/.test(first) && first.slice(1, first.indexOf('}')).replace(/o\d/g, '').trim().split(/\s+/).length === 1;
+  };
   const perCh: Seg[][] = chans.map(({ out, [grid]: cuts }) => {
     const st = initialCompileState();
     const bounds = [...new Set([0, ...cuts, out.length])].sort((a, b) => a - b);
@@ -1291,30 +1309,45 @@ export function factorRepeats(chans: SongChannel[], grid: 'cuts' | 'fine'): { su
       const body = out.slice(bounds[i], bounds[i + 1]);
       if (!body.length) continue;
       const entry = { ...st };
-      for (const t of body) stepCompileState(st, t);
-      const pre = [
-        entry.ins >= 0 && !body[0].startsWith('@') ? `?@${entry.ins}` : '',
-        entry.o >= 0 ? `o${entry.o}` : '',
-        entry.mp !== 'MP0' ? entry.mp : '',
-        entry.md !== 'MD0' ? entry.md : '',
-      ].filter(Boolean);
-      const full = [...pre, ...body];
-      const tr = transposeKey(full, entry);
-      segs.push({ body, full, key: tr?.key ?? full.join(' '), shift: tr?.first ?? 0, entry, exit: { ...st }, ok: body.length >= 3 && !body.includes('L') });
+      stepCompileState(st, body[0]);
+      // A segment usually opens with the length of the previous pattern's last note (flushed at the next event).
+      // Songs carry the sub-tick remainder into that length, so otherwise identical patterns can differ in it
+      // alone: offer the segment without that one plain token as a second dedup candidate.
+      const alt = body.length >= 4 && /^([a-g][+-]*|r|w)%\d+$/.test(body[0]) ? { ...mk(body.slice(1), { ...st }), head: [body[0]] } : undefined;
+      for (const t of body.slice(1)) stepCompileState(st, t);
+      segs.push({ ...mk(body, entry), head: [], alt: alt && !opensWithOnePitchPorta(alt.body) ? alt : undefined, exit: { ...st }, ok: body.length >= 3 && !body.includes('L') });
     }
-    // One-pitch portamento needs the previous note (mml-syntax.md:464), which a call boundary hides: such a
-    // segment and the one before it stay inline.
+    // A one-pitch portamento segment and the one before it stay inline.
     segs.forEach((g, i) => {
-      const first = g.body.find((t) => /^(\{+)?(o\d\s+)?[a-g]/.test(t) || /^N\d/.test(t));
-      if (first && /^\{(?!\{)/.test(first) && first.slice(1, first.indexOf('}')).replace(/o\d/g, '').trim().split(/\s+/).length === 1) {
+      if (opensWithOnePitchPorta(g.body)) {
         g.ok = false;
         if (i > 0) segs[i - 1].ok = false;
       }
     });
     return segs;
   });
-  const count = new Map<string, { n: number; len: number }>();
-  for (const s of perCh.flat()) if (s.ok) { const c = count.get(s.key); if (c) c.n++; else count.set(s.key, { n: 1, len: s.body.length }); }
+  const tally = (pick: (s: Seg) => Body | undefined) => {
+    const c = new Map<string, { n: number; len: number }>();
+    for (const s of perCh.flat()) { const b = s.ok ? pick(s) : undefined; if (!b) continue; const e = c.get(b.key); if (e) e.n++; else c.set(b.key, { n: 1, len: b.body.length }); }
+    return c;
+  };
+  // Peel modes (the smallest result wins, see smallestFactoring): 'count' moves a segment to its headless body when
+  // that repeats more often; 'major' keeps the group's most common head inside the body, so runs of identical
+  // calls still loop, and peels only the other heads; 'both' needs both conditions.
+  const whole = tally((s) => s), headless = tally((s) => s.alt);
+  const groups = new Map<string, Seg[]>();
+  for (const s of perCh.flat()) if (s.ok && s.alt) { const g = groups.get(s.alt.key); if (g) g.push(s); else groups.set(s.alt.key, [s]); }
+  for (const g of peel === 'none' ? [] : groups.values()) {
+    const heads = new Map<string, number>();
+    for (const s of g) heads.set(s.alt!.head[0], (heads.get(s.alt!.head[0]) ?? 0) + 1);
+    // A head that occurs once gains nothing from staying inside: then every segment calls the headless body.
+    const [major, majorN] = [...heads].sort((a, b) => b[1] - a[1])[0];
+    for (const s of g) {
+      const more = headless.get(s.alt!.key)!.n > whole.get(s.key)!.n, minor = g.length > 1 && (majorN < 2 || s.alt!.head[0] !== major);
+      if (peel === 'count' ? more : peel === 'major' ? minor : more && minor) Object.assign(s, s.alt);
+    }
+  }
+  const count = tally((s) => s);
   // Rough command-count saving: every occurrence becomes a 2-byte call, the body is stored once.
   const chosen = [...count].filter(([, c]) => c.n >= 2).sort((a, b) => (b[1].n - 1) * b[1].len - (a[1].n - 1) * a[1].len).slice(0, MAX_SUBROUTINES);
   const names = new Map(chosen.map(([key], i) => [key, `s${i}`]));
@@ -1322,7 +1355,15 @@ export function factorRepeats(chans: SongChannel[], grid: 'cuts' | 'fine'): { su
   const subBody = new Map<string, string[]>();
   // The first occurrence is the body; the others play it under driver transpose (mml-syntax.md:294-306).
   const base = new Map<string, number>();
-  for (const s of perCh.flat()) { const nm = names.get(s.key); if (nm && !subBody.has(nm)) { subBody.set(nm, s.full); base.set(nm, s.shift); subs.push({ letter: `!${nm}`, out: s.full }); } }
+  const first = new Map<string, Seg>();
+  for (const s of perCh.flat()) { const nm = names.get(s.key); if (nm && !subBody.has(nm)) { subBody.set(nm, s.full); base.set(nm, s.shift); first.set(nm, s); subs.push({ letter: `!${nm}`, out: s.full }); } }
+  // A body that is a head plus another subroutine's body plays the head and calls that one, so the shared body is
+  // stored once ('major' keeps the common head inside, the other heads call the headless body).
+  for (const sub of subs) {
+    const s = first.get(sub.letter.slice(1))!, inner = s.alt && !s.head.length ? names.get(s.alt.key) : undefined;
+    if (!inner || `!${inner}` === sub.letter || s.alt!.shift !== base.get(inner)) continue;
+    sub.out = [...s.full.slice(0, s.full.length - s.body.length), ...s.alt!.head, `!${inner}`];
+  }
   const channels = chans.map(({ letter }, ci) => {
     const out: string[] = [];
     let run: { name: string; semi: number; n: number; restore: string[] } | null = null;
@@ -1337,7 +1378,8 @@ export function factorRepeats(chans: SongChannel[], grid: 'cuts' | 'fine'): { su
     };
     for (const s of perCh[ci]) {
       const name = s.ok ? names.get(s.key) : undefined;
-      if (!name) { endRun(); out.push(...s.body); continue; }
+      if (!name) { endRun(); out.push(...s.head, ...s.body); continue; }
+      if (s.head.length) { endRun(); out.push(...s.head); }
       const semi = s.shift - base.get(name)!;
       if (run && run.name === name && run.semi === semi && run.n < 255) { run.n++; continue; }
       endRun();
@@ -1351,7 +1393,8 @@ export function factorRepeats(chans: SongChannel[], grid: 'cuts' | 'fine'): { su
     endRun();
     return { letter, out: loopCallSequences(out) };
   });
-  return { subs, channels };
+  // Bodies repeat bars inside them too (Sadness.fur drum subs play `V142 Vs-138,18 c%18` 7 times): loop those as well.
+  return { subs: subs.map((sub) => ({ ...sub, out: loopCallSequences(sub.out) })), channels };
 }
 
 /**
@@ -1397,7 +1440,9 @@ export function loopCallSequences(out: string[]): string[] {
  * by bar): factor both ways and keep the one with fewer commands.
  */
 function smallestFactoring(chans: SongChannel[]): ReturnType<typeof factorRepeats> {
-  const size = (f: ReturnType<typeof factorRepeats>) => [...f.subs, ...f.channels].reduce((n, c) => n + c.out.length, 0);
-  const [a, b] = [factorRepeats(chans, 'cuts'), factorRepeats(chans, 'fine')];
-  return size(a) <= size(b) ? a : b;
+  // Octave, slur, loop point and conditional instrument tokens compile to no bytes of their own. A loop token
+  // (`[a b ]3`) holds its commands plus start/end: count each of them.
+  const size = (f: ReturnType<typeof factorRepeats>) => [...f.subs, ...f.channels].reduce((n, c) => n + c.out.flatMap((t) => t.split(' ')).filter((t) => !/^(o\d|&|L|\?@\d+)$/.test(t)).length, 0);
+  const all = (['cuts', 'fine'] as const).flatMap((g) => (['none', 'count', 'major', 'both'] as const).map((p) => factorRepeats(chans, g, p)));
+  return all.reduce((best, f) => (size(f) < size(best) ? f : best));
 }
