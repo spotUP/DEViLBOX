@@ -10,9 +10,10 @@ import { useState, useCallback, useImperativeHandle, forwardRef, useRef, useEffe
 import type { EffectConfig } from '@typedefs/instrument';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { Plus, X } from 'lucide-react';
+import { Button } from '@components/ui/Button';
 import { VisualEffectEditorWrapper } from './VisualEffectEditors';
 import type { AvailableEffect } from '@constants/unifiedEffects';
-import { EffectBrowser } from './EffectBrowser';
+import { EffectBrowserModal } from './EffectBrowser';
 import { buildEffectConfigFromAvailable } from '@/lib/effects/buildEffectConfigFromAvailable';
 
 interface InstrumentEffectsPanelProps {
@@ -33,6 +34,7 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
   hideHeader = false,
 }, ref) => {
   const [showBrowser, setShowBrowser] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // Keep effects ref in sync to avoid stale closures in callbacks (critical for smooth knobs)
   const effectsRef = useRef(effects);
@@ -51,7 +53,6 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
 
   const handleAddEffect = useCallback((availableEffect: AvailableEffect) => {
     addEffectConfig(instrumentId, buildEffectConfigFromAvailable(availableEffect));
-    setShowBrowser(false);
   }, [instrumentId, addEffectConfig]);
 
   const handleToggle = useCallback((effectId: string) => {
@@ -79,7 +80,7 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
   }, [instrumentId, updateEffect]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-dark-bg">
+    <div ref={rootRef} className="flex flex-col h-full min-h-0 bg-dark-bg">
       {/* Header */}
       {!hideHeader && (
         <div className="flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-b border-dark-border shrink-0">
@@ -100,15 +101,16 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
         </div>
       )}
 
-      {/* Effect Browser (collapsible) */}
-      {showBrowser && (
-        <div className="border-b border-dark-border bg-dark-bgTertiary shrink-0 h-[300px]">
-          <EffectBrowser compact onSelect={handleAddEffect} />
-        </div>
-      )}
+      <EffectBrowserModal
+        isOpen={showBrowser}
+        onClose={() => setShowBrowser(false)}
+        onSelect={handleAddEffect}
+        targetLabel={`Instrument: ${instrumentName}`}
+        anchor={rootRef.current}
+      />
 
       {/* Effects Chain — visual pedal enclosures */}
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-modern p-3 space-y-3">
+      <div data-fx-chain className="flex-1 min-h-0 overflow-y-auto scrollbar-modern p-3 space-y-3">
         {effects.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-text-muted">
             <div className="text-xs mb-2">No effects on this instrument</div>
@@ -162,6 +164,15 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
           })
         )}
       </div>
+
+      {/* hideHeader drops the header Add button; without this the empty-state button was the only add path, so a chain stopped at one effect. */}
+      {hideHeader && effects.length > 0 && (
+        <div className="px-3 pb-3 shrink-0">
+          <Button variant="ghost" size="sm" fullWidth icon={<Plus size={12} />} onClick={() => setShowBrowser(true)}>
+            Add Effect
+          </Button>
+        </div>
+      )}
     </div>
   );
 });

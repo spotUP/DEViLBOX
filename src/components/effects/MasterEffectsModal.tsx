@@ -42,6 +42,7 @@ import { ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
 import type { AvailableEffect } from '@constants/unifiedEffects';
 import { EffectBrowser } from './EffectBrowser';
 import { buildEffectConfigFromAvailable } from '@/lib/effects/buildEffectConfigFromAvailable';
+import { MASTER_FX_TARGET, fxChainActions, useFxChainEffects, type FxChainTarget } from './fxChainTarget';
 
 // User preset storage key
 const USER_MASTER_FX_PRESETS_KEY = 'master-fx-user-presets';
@@ -55,23 +56,25 @@ interface UserMasterFxPreset {
 
 // AVAILABLE_EFFECTS now imported from unifiedEffects.ts (60 total: 23 Tone.js + 37 Neural)
 
-interface MasterEffectsModalProps {
+export interface MasterEffectsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** The chain this editor edits. Default: the master bus. Pass a stable object. */
+  target?: FxChainTarget;
+  /** Header title. Default: "Master Effects". */
+  title?: string;
 }
 
-export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, onClose }) => {
+export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, onClose, target = MASTER_FX_TARGET, title = 'Master Effects' }) => {
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [presetName, setPresetName] = useState('');
   const [editingEffectId, setEditingEffectId] = useState<string | null>(null);
 
-  const masterEffects = useAudioStore((s) => s.masterEffects);
-  const addMasterEffectConfig = useAudioStore((s) => s.addMasterEffectConfig);
-  const removeMasterEffect = useAudioStore((s) => s.removeMasterEffect);
-  const updateMasterEffect = useAudioStore((s) => s.updateMasterEffect);
-  const reorderMasterEffects = useAudioStore((s) => s.reorderMasterEffects);
-  const setMasterEffects = useAudioStore((s) => s.setMasterEffects);
+  const masterEffects = useFxChainEffects(target);
+  const chain = useMemo(() => fxChainActions(target), [target]);
+  // Channel routing, sidechain keys, beat quantize and pop-out are master-bus features.
+  const isMaster = target.kind === 'master';
 
   const numChannels = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 16);
   const channelNames = useTrackerStore(useShallow(s =>
@@ -83,12 +86,12 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   // Picking channels by hand ends a preset's role-based targeting.
   const handleChannelSelect = useCallback((effectId: string, channels: number[] | undefined) => {
     requestChannelRouting(effectId, { selectedChannels: channels, channelRole: undefined },
-      (id, routing) => updateMasterEffect(id, routing));
-  }, [updateMasterEffect]);
+      (id, routing) => chain.update(id, routing));
+  }, [chain.update]);
   const handleChannelRole = useCallback((effectId: string, role: EffectConfig['channelRole']) => {
     requestChannelRouting(effectId, { selectedChannels: undefined, channelRole: role },
-      (id, routing) => updateMasterEffect(id, routing));
-  }, [updateMasterEffect]);
+      (id, routing) => chain.update(id, routing));
+  }, [chain.update]);
 
   // Derive editingEffect from store (never stale)
   const editingEffect = useMemo(
@@ -160,8 +163,8 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
-    setMasterEffects(effects, preset.gainCompensationDb);
-  }, [setMasterEffects]);
+    chain.setAll(effects, preset.gainCompensationDb);
+  }, [chain.setAll]);
 
   // Load user preset — the menu stays open so the owner can audition presets.
   const handleLoadUserPreset = useCallback((preset: UserMasterFxPreset) => {
@@ -169,13 +172,13 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
       ...fx,
       id: `master-fx-${Date.now()}-${index}`,
     }));
-    setMasterEffects(effects, preset.gainCompensationDb);
-  }, [setMasterEffects]);
+    chain.setAll(effects, preset.gainCompensationDb);
+  }, [chain.setAll]);
 
   // Clear the whole master chain — the menu stays open so the owner can audition presets.
   const handleClearEffects = useCallback(() => {
-    setMasterEffects([], 0);
-  }, [setMasterEffects]);
+    chain.setAll([], 0);
+  }, [chain.setAll]);
 
   // Delete user preset
   const handleDeleteUserPreset = useCallback((name: string) => {
@@ -199,12 +202,12 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
       if (!proceed) return;
     }
 
-    addMasterEffectConfig(buildEffectConfigFromAvailable(availableEffect));
+    chain.add(buildEffectConfigFromAvailable(availableEffect));
 
     // Store generates its own ID — read it back
-    const added = useAudioStore.getState().masterEffects;
+    const added = chain.read();
     setEditingEffectId(added[added.length - 1]?.id ?? null);
-  }, [neuralEffectCount, addMasterEffectConfig]);
+  }, [neuralEffectCount, chain.add]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -214,7 +217,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
       const newIndex = masterEffects.findIndex((fx) => fx.id === over.id);
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        reorderMasterEffects(oldIndex, newIndex);
+        chain.reorder(oldIndex, newIndex);
       }
     }
   };
@@ -222,12 +225,12 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
   const handleToggle = (effectId: string) => {
     const effect = masterEffects.find((fx) => fx.id === effectId);
     if (effect) {
-      updateMasterEffect(effectId, { enabled: !effect.enabled });
+      chain.update(effectId, { enabled: !effect.enabled });
     }
   };
 
   const handleWetChange = (effectId: string, wet: number) => {
-    updateMasterEffect(effectId, { wet });
+    chain.update(effectId, { wet });
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -266,13 +269,13 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <Settings size={20} className="text-accent-primary" />
-              <h2 className="text-lg font-bold text-text-primary">Master Effects</h2>
+              <h2 className="text-lg font-bold text-text-primary">{title}</h2>
               <span className="text-xs text-text-muted px-2 py-1 bg-dark-bg rounded">
                 {masterEffects.length} FX
               </span>
             </div>
 
-            <MasterFxQuantizeSwitch />
+            {isMaster && <MasterFxQuantizeSwitch />}
 
             {/* Presets Dropdown */}
             <div className="relative">
@@ -322,7 +325,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
           )}
 
           {/* Pop Out Button */}
-          <button
+          {isMaster && <button
             onClick={() => {
               const already = useUIStore.getState().masterEffectsPoppedOut;
               if (already) {
@@ -336,7 +339,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
             title="Pop out to separate window"
           >
             <ExternalLink size={20} />
-          </button>
+          </button>}
 
           {/* Close Button */}
           <button
@@ -428,15 +431,16 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                         isSelected={editingEffectId === effect.id}
                         onSelect={() => setEditingEffectId(effect.id)}
                         onToggle={() => handleToggle(effect.id)}
-                        onRemove={() => removeMasterEffect(effect.id)}
+                        onRemove={() => chain.remove(effect.id)}
                         onWetChange={(wet) => handleWetChange(effect.id, wet)}
                         onChannelSelect={(channels) => handleChannelSelect(effect.id, channels)}
                         onChannelRole={(role) => handleChannelRole(effect.id, role)}
-                        onKeyChange={(source) => updateMasterEffect(effect.id, { parameters: { ...effect.parameters, sidechainSource: source } })}
+                        onKeyChange={(source) => chain.update(effect.id, { parameters: { ...effect.parameters, sidechainSource: source } })}
                         numChannels={numChannels}
                         channelNames={channelNames}
                         isolationSupported={isolationSupported}
                         isolationReason={isolationReason}
+                        showChannelRouting={isMaster}
                       />
                     ))}
                   </SortableContext>
@@ -460,7 +464,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                       if (!editingEffectId) return;
                       const current = editingEffectRef.current;
                       if (!current) return;
-                      updateMasterEffect(editingEffectId, {
+                      chain.update(editingEffectId, {
                         parameters: { ...current.parameters, [key]: value }
                       });
                     }}
@@ -468,12 +472,12 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                       if (!editingEffectId) return;
                       const current = editingEffectRef.current;
                       if (!current) return;
-                      updateMasterEffect(editingEffectId, {
+                      chain.update(editingEffectId, {
                         parameters: { ...current.parameters, ...params }
                       });
                     }}
                     onUpdateWet={(wet) => {
-                      if (editingEffectId) updateMasterEffect(editingEffectId, { wet });
+                      if (editingEffectId) chain.update(editingEffectId, { wet });
                     }}
                   />
                 </div>
@@ -517,9 +521,11 @@ export interface SortableEffectItemProps {
   isolationSupported: boolean;
   /** Why not, shown beside the disabled channel buttons. */
   isolationReason?: string | null;
+  /** Channel scope ("Apply to") and sidechain key. Master bus only; default true. */
+  showChannelRouting?: boolean;
 }
 
-export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, onChannelRole, onKeyChange, numChannels, channelNames, isolationSupported, isolationReason = null }: SortableEffectItemProps) {
+export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onRemove, onWetChange, onChannelSelect, onChannelRole, onKeyChange, numChannels, channelNames, isolationSupported, isolationReason = null, showChannelRouting = true }: SortableEffectItemProps) {
   const sidechainKeyed = EffectRegistry.get(effect.type)?.sidechainKeyed === true;
   const nonDrums = effect.channelRole === 'nonDrums';
   const allChannels = !nonDrums && !Array.isArray(effect.selectedChannels);
@@ -681,7 +687,7 @@ export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onR
           "Apply to" (which channels the effect processes). Both used to be
           channel pickers with nothing to tell them apart, and the one on the
           card was the wrong one (2026-09-29). */}
-      {sidechainKeyed && (
+      {showChannelRouting && sidechainKeyed && (
         <div className="mt-2 pt-2 border-t flex items-center gap-2" style={{ borderColor: `${enc.border}` }}>
           <span
             className="text-[10px] font-semibold uppercase tracking-wider"
@@ -705,6 +711,7 @@ export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onR
       {/* Only the controls stop the click: the row's empty space selects the
           card like the rest of it. The whole row used to swallow clicks, so
           the lower half of every card did nothing (2026-09-29). */}
+      {showChannelRouting && (
       <div className="mt-2 pt-2 border-t" style={{ borderColor: `${enc.border}` }}>
         <div className="flex items-center gap-1.5 mb-1.5">
           <span
@@ -785,6 +792,7 @@ export function SortableEffectItem({ effect, isSelected, onSelect, onToggle, onR
           <p className="mt-1.5 text-[9px] text-accent-warning">{isolationReason}</p>
         )}
       </div>
+      )}
     </div>  );
 }
 

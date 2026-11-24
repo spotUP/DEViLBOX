@@ -31,11 +31,12 @@ import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/fxPresets';
 import { useClickOutside } from '@hooks/useClickOutside';
 import { MasterPresetMenu } from './MasterPresetMenu';
 import { matchMasterPresetName, masterPresetButtonLabel } from './masterPresetSearch';
-import { AVAILABLE_EFFECTS, type AvailableEffect } from '@constants/unifiedEffects';
+import type { AvailableEffect } from '@constants/unifiedEffects';
+import { EffectBrowserModal } from './EffectBrowser';
 import { buildEffectConfigFromAvailable } from '@/lib/effects/buildEffectConfigFromAvailable';
 import { getDefaultEffectWet } from '@engine/factories/EffectFactory';
 import { effectiveBassLock } from '@engine/dj/bassLockDefaults';
-import { VisualEffectEditorWrapper, ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
+import { VisualEffectEditorWrapper } from './VisualEffectEditors';
 
 interface SortableVisualEffectProps {
   effect: EffectConfig;
@@ -227,6 +228,7 @@ interface UserMasterFxPreset {
 
 export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEffectsPanelProps>(({ hideHeader = false }, ref) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [presetName, setPresetName] = useState('');
@@ -477,15 +479,8 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
       (id, routing) => updateMasterEffect(id, routing));
   }, [updateMasterEffect]);
 
-  // Group effects by group for the add menu
-  const effectsByCategory = AVAILABLE_EFFECTS.reduce((acc, effect) => {
-    if (!acc[effect.group]) acc[effect.group] = [];
-    acc[effect.group].push(effect);
-    return acc;
-  }, {} as Record<string, AvailableEffect[]>);
-
   return (
-    <div className={hideHeader ? "bg-dark-bg overflow-visible relative" : "bg-dark-bg border border-dark-border rounded-lg overflow-hidden"}>
+    <div ref={rootRef} className={hideHeader ? "bg-dark-bg overflow-visible relative" : "bg-dark-bg border border-dark-border rounded-lg overflow-hidden"}>
       {/* Header */}
       {!hideHeader && (
         <div className="flex items-center justify-between px-4 py-3 bg-dark-bgSecondary border-b border-dark-border">
@@ -583,38 +578,13 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
         </div>
       )}
 
-      {/* Add Effect Menu */}
-      {showAddMenu && (
-        <div className="p-4 bg-dark-bgTertiary border-b border-dark-border">
-          <div className="text-xs text-text-muted mb-3 font-medium">Select Effect Type:</div>
-          <div className="space-y-3">
-            {Object.entries(effectsByCategory).map(([category, effects]) => (
-              <div key={category}>
-                <div className="text-xs text-text-muted mb-1.5 uppercase tracking-wide">{category}</div>
-                <div className="flex flex-wrap gap-1">
-                  {effects.map((effect) => {
-                    const enc = ENCLOSURE_COLORS[effect.type ?? ''] || DEFAULT_ENCLOSURE;
-                    return (
-                      <button
-                        key={effect.neuralModelIndex != null ? `neural-${effect.neuralModelIndex}` : effect.type}
-                        onClick={() => handleAddEffect(effect)}
-                        className="px-2 py-1 text-[10px] rounded border transition-colors hover:text-text-primary"
-                        style={{
-                          borderColor: enc.border,
-                          background: enc.bg,
-                          color: enc.accent,
-                        }}
-                      >
-                        {effect.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <EffectBrowserModal
+        isOpen={showAddMenu}
+        onClose={() => setShowAddMenu(false)}
+        onSelect={handleAddEffect}
+        targetLabel="Master"
+        anchor={rootRef.current}
+      />
 
       {/* Signal Flow */}
       <div className="px-4 py-2 bg-dark-bgSecondary border-b border-dark-border">
@@ -642,7 +612,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
       </div>
 
       {/* Effects Chain — visual pedal enclosures */}
-      <div className="p-3">
+      <div data-fx-chain className="p-3">
         {masterEffects.length === 0 ? (
           <div className="p-8 text-center text-text-muted text-sm border border-dashed border-dark-border rounded-lg">
             No master effects. All audio passes through unchanged.

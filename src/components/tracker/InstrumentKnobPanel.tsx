@@ -57,7 +57,8 @@ const TabbedFxPane: React.FC<{
 
     const applyVisibility = () => {
       if (!contentRef.current) return;
-      const containers = contentRef.current.querySelectorAll('.space-y-3, .overflow-y-auto');
+      // Only the chain lists (marked data-fx-chain), never the effect picker or other scroll areas.
+      const containers = contentRef.current.querySelectorAll('[data-fx-chain]');
       containers.forEach(container => {
         const items = Array.from(container.children) as HTMLElement[];
         items.forEach((item, i) => {

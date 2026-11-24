@@ -1,17 +1,21 @@
 /**
  * EffectBrowser - the one effect picker (group select + search + grouped list).
- * Used by the master FX modal and the per-instrument FX panel.
+ * Used by every effect chain: the master FX modal shows it as a column,
+ * every other chain (instrument panel, instrument FX modal, master FX panel)
+ * opens it through EffectBrowserModal. Only the target callback differs.
  */
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Cpu, Globe } from 'lucide-react';
 import { getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
+import { Modal } from '@components/ui/Modal';
+import { ModalHeader } from '@components/ui/ModalHeader';
 
 export interface EffectBrowserProps {
   onSelect: (effect: AvailableEffect) => void;
-  compact?: boolean;
 }
 
-export const EffectBrowser: React.FC<EffectBrowserProps> = ({ onSelect, compact = false }) => {
+export const EffectBrowser: React.FC<EffectBrowserProps> = ({ onSelect }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
 
@@ -29,12 +33,10 @@ export const EffectBrowser: React.FC<EffectBrowserProps> = ({ onSelect, compact 
     return filtered;
   }, [effectsByGroup, searchQuery, selectedGroup]);
 
-  const inputText = compact ? 'text-xs' : 'text-sm';
-
   return (
     <div className="flex flex-col min-h-0 h-full">
-      <div className={`${compact ? 'p-2' : 'p-4'} border-b border-dark-border bg-dark-bgSecondary space-y-2 shrink-0`}>
-        {!compact && <h3 className="text-sm font-bold text-text-primary">Effect Browser</h3>}
+      <div className={`p-4 border-b border-dark-border bg-dark-bgSecondary space-y-2 shrink-0`}>
+        <h3 className="text-sm font-bold text-text-primary">Effect Browser</h3>
         <select
           value={selectedGroup}
           onChange={(e) => setSelectedGroup(e.target.value)}
@@ -53,7 +55,7 @@ export const EffectBrowser: React.FC<EffectBrowserProps> = ({ onSelect, compact 
             placeholder="Search effects..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={`w-full pl-9 pr-8 py-2 ${inputText} bg-dark-bg border border-dark-border rounded-lg text-text-primary
+            className={`w-full pl-9 pr-8 py-2 text-sm bg-dark-bg border border-dark-border rounded-lg text-text-primary
                      placeholder-text-muted focus:outline-none focus:border-accent-primary transition-colors`}
           />
           {searchQuery && (
@@ -66,7 +68,7 @@ export const EffectBrowser: React.FC<EffectBrowserProps> = ({ onSelect, compact 
           )}
         </div>
       </div>
-      <div className={`flex-1 overflow-y-auto scrollbar-modern ${compact ? 'p-2' : 'p-3'}`}>
+      <div className="flex-1 overflow-y-auto scrollbar-modern p-3">
         <div className="space-y-3">
           {Object.keys(filteredEffectsByGroup).length === 0 && (
             <div className="p-6 text-center text-text-muted text-xs">No effects matching "{searchQuery}"</div>
@@ -79,7 +81,7 @@ export const EffectBrowser: React.FC<EffectBrowserProps> = ({ onSelect, compact 
                   <button
                     key={effect.label}
                     onClick={() => onSelect(effect)}
-                    className={`w-full px-3 ${compact ? 'py-1.5 text-xs' : 'py-2 text-sm'} rounded-lg border border-dark-border bg-dark-bgSecondary
+                    className={`w-full px-3 py-2 text-sm rounded-lg border border-dark-border bg-dark-bgSecondary
                              hover:bg-accent-primary/80 hover:text-text-primary hover:border-accent-primary
                              transition-colors text-left flex items-center justify-between gap-2`}
                   >
@@ -94,5 +96,29 @@ export const EffectBrowser: React.FC<EffectBrowserProps> = ({ onSelect, compact 
         </div>
       </div>
     </div>
+  );
+};
+
+export interface EffectBrowserModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (effect: AvailableEffect) => void;
+  /** Chain the pick goes to, shown in the header (e.g. the instrument name). */
+  targetLabel: string;
+  /** Any element in the calling window; the modal portals to that window's body (pop-out windows). */
+  anchor: HTMLElement | null;
+}
+
+/** The EffectBrowser in a dialog, portalled out of the caller's tree so no panel layout clips or restyles it. */
+export const EffectBrowserModal: React.FC<EffectBrowserModalProps> = ({ isOpen, onClose, onSelect, targetLabel, anchor }) => {
+  if (!isOpen || !anchor) return null;
+  return createPortal(
+    <Modal isOpen onClose={onClose} size="md">
+      <ModalHeader title="Add Effect" subtitle={targetLabel} onClose={onClose} />
+      <div className="h-[70vh] min-h-0">
+        <EffectBrowser onSelect={(e) => { onSelect(e); onClose(); }} />
+      </div>
+    </Modal>,
+    anchor.ownerDocument.body,
   );
 };
