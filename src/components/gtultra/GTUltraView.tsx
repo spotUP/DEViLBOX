@@ -23,12 +23,16 @@ import { useGTDAWKeyboardHandler } from '../../hooks/useGTDAWKeyboardHandler';
 import { useGTUltraEngineInit } from '../../engine/gtultra/useGTUltraEngineInit';
 import { useGTUltraFormatData } from './useGTUltraFormatData';
 import { GTKeyHelp } from './GTKeyHelp';
+import { GTSoundDesigner } from './GTSoundDesigner';
+import { GTTableEditor } from './GTTableEditor';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 import { useUIStore } from '../../stores/useUIStore';
 
 const GTDAWView = lazy(() => import('./daw/GTDAWView').then(m => ({ default: m.GTDAWView })));
 
 const TOOLBAR_H = 36;
+// Studio: the table editor takes this share of the column, the designer above scrolls in the rest.
+const STUDIO_TABLE_SHARE = 0.45;
 
 export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => {
   const viewMode = useGTUltraStore((s) => s.viewMode);
@@ -38,21 +42,25 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
+  const [containerHeight, setContainerHeight] = useState(600);
   const [ordersCollapsed, setOrdersCollapsed] = useState(false);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver(([entry]) => {
-      const { width } = entry.contentRect;
+      const { width, height } = entry.contentRect;
       if (width > 0) setContainerWidth(width);
+      if (height > 0) setContainerHeight(height);
     });
     ro.observe(el);
     setContainerWidth(el.clientWidth || 800);
+    setContainerHeight(el.clientHeight || 600);
     return () => ro.disconnect();
-  }, []);
+  }, [viewMode]); // each view mode mounts its own container div
 
-  useGTKeyboardHandler(viewMode !== 'daw');
+  // Pattern keys only where the pattern is visible, so Studio never writes unseen notes.
+  useGTKeyboardHandler(viewMode === 'pro');
   useGTDAWKeyboardHandler(viewMode === 'daw');
   useGTUltraEngineInit();
 
@@ -64,6 +72,23 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
       <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', background: '#121218', color: '#6b6b80', fontFamily: 'monospace' }}>Loading DAW mode...</div>}>
         <GTDAWView />
       </Suspense>
+    );
+  }
+
+  // Studio mode: visual sound designer plus the table editor (its Studio button opens the Waveform Studio)
+  if (viewMode === 'studio') {
+    return (
+      <div ref={containerRef} className="flex flex-col w-full h-full bg-dark-bg text-text-primary">
+        <div style={{ height: `${TOOLBAR_H}px`, flexShrink: 0 }}>
+          <GTToolbar />
+        </div>
+        <div className="flex-1 min-h-0 overflow-auto">
+          <GTSoundDesigner />
+        </div>
+        <div className="flex-shrink-0 border-t border-dark-border">
+          <GTTableEditor width={containerWidth} height={Math.floor((containerHeight - TOOLBAR_H) * STUDIO_TABLE_SHARE)} />
+        </div>
+      </div>
     );
   }
 

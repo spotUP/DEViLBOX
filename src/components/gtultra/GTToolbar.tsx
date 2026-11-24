@@ -18,7 +18,7 @@ const BTN = 'px-2 py-0.5 text-[10px] font-mono border cursor-pointer transition-
 const BTN_DEFAULT = `${BTN} bg-ft2-header text-ft2-textDim border-ft2-border hover:bg-ft2-border hover:text-ft2-text`;
 const SEL = 'bg-ft2-header text-ft2-text border border-ft2-border font-mono text-[11px] px-1 py-0';
 
-/** View mode toggle (Pro / DAW) — DAW mode auto-switches to WebGL rendering */
+/** View mode toggle (Pro / Studio / DAW) — DAW mode auto-switches to WebGL rendering */
 const ViewModeSwitch: React.FC = () => {
   const viewMode = useGTUltraStore((s) => s.viewMode);
   const setViewMode = useGTUltraStore((s) => s.setViewMode);
@@ -29,6 +29,7 @@ const ViewModeSwitch: React.FC = () => {
 
   const modes: { id: GTViewMode; label: string }[] = [
     { id: 'pro', label: 'PRO' },
+    { id: 'studio', label: 'Studio' },
     { id: 'daw', label: 'DAW' },
   ];
 
@@ -42,7 +43,7 @@ const ViewModeSwitch: React.FC = () => {
             ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50 font-bold'
             : BTN_DEFAULT
           }`}
-          title={id === 'daw' ? 'Switch to DAW mode (visual editor)' : 'Switch to Pro mode (hex tracker)'}
+          title={id === 'daw' ? 'Switch to DAW mode (visual editor)' : id === 'studio' ? 'Switch to Studio mode (sound designer and table Waveform Studio)' : 'Switch to Pro mode (hex tracker)'}
         >
           {label}
         </button>
@@ -122,6 +123,8 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
 
   return (
     <div className={`flex items-center gap-1.5 px-2 bg-ft2-header border-b border-ft2-border font-mono text-xs h-9 ${recordMode ? 'ring-1 ring-inset ring-red-500/60' : ''}`}>
+      {/* Controls scroll sideways when the column is narrow (instrument list open); the view switch stays pinned. */}
+      <div className="flex flex-1 min-w-0 items-center gap-1.5 overflow-x-auto overflow-y-hidden [&>*]:flex-shrink-0">
       {/* GT-specific file ops */}
       <button onClick={handleSave} className={BTN_DEFAULT} title="Save .sng">Save</button>
       <button ref={exportRef} onClick={() => setExportOpen((o) => !o)} className={BTN_DEFAULT} title="Export the song for a C64, a SID player or as raw data">Export</button>
@@ -247,11 +250,14 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
       </button>
 
       <ASIDToggle />
+      </div>
 
-      <div className="w-px h-5 bg-ft2-border mx-0.5" />
+      <div className="w-px h-5 bg-ft2-border mx-0.5 flex-shrink-0" />
 
       {/* View mode switcher */}
-      <ViewModeSwitch />
+      <div className="flex-shrink-0">
+        <ViewModeSwitch />
+      </div>
     </div>
   );
 };

@@ -14,6 +14,8 @@ import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { EnvelopeVisualization, SectionLabel, NumBox } from '@components/instruments/shared';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
 import { GTSoundDesigner } from '@/components/gtultra/GTSoundDesigner';
+import { GTUltraTableStudioModal } from '@/components/gtultra/GTUltraTableStudioModal';
+import { Button } from '@components/ui/Button';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 
 // ── Types ──
@@ -95,6 +97,7 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
   const [activeTab, setActiveTab] = useState<GTTab>('instrument');
   const [showEffectRef, setShowEffectRef] = useState(false);
   const [showTableRef, setShowTableRef] = useState(false);
+  const [studioTable, setStudioTable] = useState<typeof TABLE_DEFS[number]['key'] | null>(null);
 
   const { isCyan: isCyanTheme, accent: accentColor, dim: dimColor, panelBg, panelStyle } = useInstrumentColors('#44ff88', { dim: '#1a3328' });
 
@@ -381,6 +384,11 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
                 <span className="text-[8px] font-mono" style={{ color: td.color, opacity: 0.6 }}>
                   ${hex2(ptr)}{isPlaying && livePos > 0 ? ` @${hex2(livePos)}` : ''}
                 </span>
+                <Button variant="ghost" size="sm" className="ml-auto"
+                  onClick={() => setStudioTable(td.key)}
+                  title={`Open Waveform Studio for the ${td.label} table (draw, harmonic, math, presets)`}>
+                  Studio
+                </Button>
               </div>
               <div style={{ flex: 1, minHeight: 0 }}>
                 <PatternEditorCanvas
@@ -409,6 +417,14 @@ export const GTUltraControls: React.FC<GTUltraControlsProps> = ({
           </div>
         )}
       </div>
+
+      {studioTable && (
+        <GTUltraTableStudioModal
+          isOpen
+          onClose={() => setStudioTable(null)}
+          tableType={studioTable}
+        />
+      )}
     </div>
   );
 
