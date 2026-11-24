@@ -329,14 +329,18 @@ describe('panSplit', () => {
 });
 
 describe('tadRowTicks', () => {
-  it('keeps 60 Hz rows on absolute time with timer 133 (no 0.25% drift), clamped timers untouched', () => {
+  it('keeps 60 Hz rows on absolute time with timer 133 (no 0.25% drift), rows over 125 Hz rescaled', () => {
     const rows = Array.from({ length: 400 }, (_, i) => ({ ticks: 6, rate: 60, row: i % 64 }));
     tadRowTicks(rows, 133, 1, false);
     const sum = rows.reduce((s, r) => s + r.ticks, 0);
     expect(sum).toBe(Math.round(2400 * (8000 / 60) / 133)); // 2406 TAD ticks = 40 s at 16.625 ms
     expect(rows.every((r, i) => r.ticks === 6 || (r.ticks === 7 && i % 64 === 63))).toBe(true);
-    const fast = Array.from({ length: 10 }, () => ({ ticks: 6, rate: 200 }));
-    tadRowTicks(fast, 64, 1, false); // 200 Hz needs timer 40: clamped to 64, warned elsewhere
-    expect(fast.every((r) => r.ticks === 6)).toBe(true);
+    const fast = Array.from({ length: 10 }, (_, i) => ({ ticks: 6, rate: 200, row: i }));
+    tadRowTicks(fast, 64, 1, false); // 200 Hz needs timer 40: clamped to 64, rows rescaled to 125 Hz (6 -> 3.75 ticks)
+    expect(fast.reduce((s, r) => s + r.ticks, 0)).toBe(38); // 60 Furnace ticks = 37.5 TAD ticks
+    expect(fast.every((r) => r.ticks === 3 || r.ticks === 4)).toBe(true);
+    const speed1 = Array.from({ length: 4 }, (_, i) => ({ ticks: 1, rate: 200, row: i }));
+    tadRowTicks(speed1, 64, 1, false);
+    expect(speed1.every((r) => r.ticks >= 1)).toBe(true); // rows never merge
   });
 });

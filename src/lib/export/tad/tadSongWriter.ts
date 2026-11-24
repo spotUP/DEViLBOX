@@ -178,7 +178,8 @@ function snesEchoFlags(raw: string | undefined) {
 /**
  * Row lengths (Furnace ticks * k on entry) in TAD ticks from absolute time, so the integer timer's rounding does not
  * drift (60 Hz: timer 133 vs 133.33 runs 0.25% fast, about 50 ms late after 20 s). Sound effects rescale to 125 Hz.
- * A clamped timer (already warned) keeps the Furnace tick count: correcting it would merge rows.
+ * A tick rate above 125 Hz (timer clamped to 64, warned) is rescaled per row like sound effects, keeping the song's
+ * tempo; each row keeps at least 1 tick, so only speed-1 runs lag. A timer clamped at 256 keeps the Furnace tick count.
  */
 export function tadRowTicks(rows: Array<{ ticks: number; rate: number; timer?: number; row?: number }>, timer: number, k: number, sfx: boolean): void {
   let acc = 0, prev = 0, t = timer;
@@ -187,10 +188,11 @@ export function tadRowTicks(rows: Array<{ ticks: number; rate: number; timer?: n
     // Songs round per pattern (no carried error), so identical patterns get identical ticks for subroutine dedup.
     if (!sfx && r.row === 0) { acc = 0; prev = 0; }
     const f = sfx ? SFX_TICK_HZ / (r.rate * k) : 8000 / (r.rate * k * t);
-    acc += r.ticks * (sfx || Math.abs(f - 1) <= 0.005 ? f : 1);
+    const fast = !sfx && 8000 / (r.rate * k) < 63.5; // timer would be under 64
+    acc += r.ticks * (sfx || fast || Math.abs(f - 1) <= 0.005 ? f : 1);
     // Songs correct only on the last row of a pattern, so repeated patterns stay identical for subroutine dedup
     // (the error stays under about one tick per pattern).
-    if (!sfx && rows[i + 1]?.row !== 0 && i < rows.length - 1) { prev += r.ticks; return; }
+    if (!sfx && !fast && rows[i + 1]?.row !== 0 && i < rows.length - 1) { prev += r.ticks; return; }
     const n = sfx ? Math.round(acc) : Math.max(prev + 1, Math.round(acc));
     r.ticks = n - prev; prev = n;
   });
@@ -261,11 +263,11 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   let curRate = rate, curTimer = timer;
   if (sfx) timer = 64;
   else if (timer < 64) {
-    warnings.push(`Tick rate ${rate.toFixed(2)} Hz is faster than TAD allows (125 Hz); the song plays slower.`);
+    warnings.push(`Tick rate ${rate.toFixed(2)} Hz is faster than TAD allows (125 Hz); rows are rescaled to 125 Hz ticks.`);
     timer = 64;
   }
   if (sfx && rate > SFX_TICK_HZ) warnings.push(`Tick rate ${rate.toFixed(2)} Hz is faster than TAD sound effects (125 Hz); short rows merge.`);
-  if (!sfx && Math.abs(timer - timerExact) / timerExact > 0.005) {
+  if (!sfx && timerExact >= 63.5 && Math.abs(timer - timerExact) / timerExact > 0.005) {
     warnings.push(`Tempo differs by ${((timer / timerExact - 1) * 100).toFixed(1)}% (TAD timer ${timer}).`);
   }
 
@@ -421,8 +423,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     let curSmp = '', curPitch = -1, echoOn = echoUsed && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, trem: { d: number; q: number } | null = null, lastTrem = '', volSlide = 0, slideSkip = 0, lastEnv = '', legatoOn = false, sampleOff = 0, insId = -1, relTok = '';
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
-    // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
-    const tickScale = sfx ? SFX_TICK_HZ / rate : k;
+    // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects and songs over 125 Hz run at 125 Hz).
+    const tickScale = sfx || timerExact < 63.5 ? SFX_TICK_HZ / rate : k;
     const linear = Number(native.compatFlags?.linearPitch ?? 1) !== 0;
     // cont: the note keeps sounding past this boundary. TAD has no tie after a command, so the
     // note is slurred (`&`) into a repeat of itself.
