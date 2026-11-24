@@ -12,8 +12,10 @@
  * followed, stopped at the loop or end), and a note, glide or tie lasting `track speed` rows (one row = one sequencer step).
  * A note cell sits on the first row of its event. Each representable note cell carries the file byte of the command that
  * played it (`noteBytes`); the exporter moves that byte by the cell's change. Not editable: instruments, volumes, effects, the
- * length of an event, notes below grid note 1 (period table index < 36) and note-offs. The fine-tune command is ignored for the
- * pitch shown. Tempo commands change the playing speed only, not the row structure. A pattern shared by several plays shares its
+ * length of an event, and the pitch of a note below grid note 1 (period table index < 36) or at table index 97 and up (a byte
+ * that reads into the next fine-tune table: a very low note, the player has no note-off byte). Those play but have no grid
+ * pitch: the cell shows the instrument with no note, and a note typed there moves the command's byte from its true index. The
+ * fine-tune command is ignored for the pitch shown. Tempo commands change the playing speed only, not the row structure. A pattern shared by several plays shares its
  * note bytes, so editing one play edits them all (the first edited cell wins).
  */
 
@@ -38,9 +40,10 @@ const MAX_STEPS = 8192;
 const NOTE_MASK = 0x7f;
 /** Period table index of the first note the grid can show (grid note 1). */
 const FIRST_INDEX = 36;
+/** Table index 97 and up reads into the next fine-tune table: a real (very low) pitch, not a note-off. */
+const TABLE_NOTES = 97;
 /** Period table index 60 plays period 428; the grid names that note by the shared period table. */
 const GRID_NOTE_OFFSET = periodToNote(428) - 60;
-const NOTE_OFF = 97;
 
 const u16 = (b: Uint8Array, o: number): number => (o + 1 < b.length ? (b[o] << 8) | b[o + 1] : 0xfffe);
 const u32 = (b: Uint8Array, o: number): number => (o + 3 < b.length ? ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0 : 0);
@@ -75,6 +78,7 @@ function commandLength(code: number): number {
   }
 }
 
+/** `note` is the linear note (index - 35, maybe outside 1..96) the exporter moves the byte by; `shown` is the grid note, 0 when below the grid. */
 interface NoteEvent { rowStart: number; note: number; instrument: number; offset: number | null; shown: number }
 interface ChannelRead { events: NoteEvent[]; rows: number }
 
@@ -88,10 +92,9 @@ function walkChannel(b: Uint8Array, listAbs: number, patternBase: number, patter
     const span = speed === 0 ? 256 : speed;
     if (noteByte !== null) {
       const index = ((noteByte + transpose) & 0xff) & NOTE_MASK;
-      let note = 0;
-      if (index >= 97) note = NOTE_OFF;
-      else if (index >= FIRST_INDEX) note = index + GRID_NOTE_OFFSET;
-      events.push({ rowStart: rows, note, instrument: instrument + 1, offset: note >= 1 && note < NOTE_OFF ? offset : null, shown: note });
+      const note = index + GRID_NOTE_OFFSET;
+      const shown = index >= FIRST_INDEX && index < TABLE_NOTES ? note : 0;
+      events.push({ rowStart: rows, note, instrument: instrument + 1, offset, shown });
     }
     rows += span;
   };
@@ -187,7 +190,7 @@ export function parseEMSv6File(buffer: ArrayBuffer, filename: string): TrackerSo
       if (e.rowStart >= patternTotal * ROWS) continue;
       const pattern = Math.floor(e.rowStart / ROWS), row = e.rowStart % ROWS;
       const cell = grid[pattern][ch][row];
-      cell.note = e.note;
+      cell.note = e.shown;
       cell.instrument = e.instrument;
       if (e.offset !== null) noteBytes.push({ pattern, channel: ch, row, offset: e.offset, note: e.note });
     }

@@ -40,7 +40,7 @@ export async function exportEmsV6(song: TrackerSong): Promise<EmsV6ExportResult>
     }
     if (cell.note === n.note) continue;
     if (cell.note < 1 || cell.note > MAX_GRID_NOTE) {
-      warnings.push(`${where}: a removed note or note-off needs a different command; not written`);
+      warnings.push(`${where}: a removed note needs a different command (the stream has no note-off byte); not written`);
       continue;
     }
     const nb = loaded[n.offset] + (cell.note - n.note);
