@@ -1042,7 +1042,11 @@ export class TrackerReplayer {
    * The next song reaches the replayer only at play, so a song kept here routed
    * grid edits of the new song to the old song's engine.
    */
-  releaseSong(): void { this.song = null; }
+  releaseSong(): void {
+    this.song = null;
+    // An in-flight play() reads this.song after its awaits: the song leaving ends that play.
+    this._playGeneration++;
+  }
 
   /** Update a single instrument in the replayer's cached instrument map.
    *  Called when the user replaces/edits an instrument while a song is loaded. */
@@ -4590,6 +4594,7 @@ export class TrackerReplayer {
     this.masterGain.dispose();
     this.channels = [];
     this.song = null;
+    this._playGeneration++;
   }
 }
 
