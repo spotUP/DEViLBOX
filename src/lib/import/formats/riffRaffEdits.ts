@@ -97,8 +97,21 @@ export function applyRiffRaffGridEdits(original: Uint8Array, patterns: readonly 
       }
     }
     const src = base.sources[c]?.[pi * ROWS_PER_PATTERN + r];
-    if (!src && noteChanged && cell.note > 0 && cell.note < NOTE_OFF) {
+    if (!src && noteChanged && cell.note > 0 && cell.note <= NOTE_OFF) {
       adds.push({ ...at, note: cell.note, instrument: cell.instrument });
+      return;
+    }
+    // a note off cleared: its Rest Silence command becomes a Rest, same two bytes (the rate argument stays)
+    const cov = base.covers[c]?.[pi * ROWS_PER_PATTERN + r];
+    if (!src && noteChanged && cell.note === 0 && was.note === NOTE_OFF && cov?.kind === 'silence' && base.restByte(false) >= 0) {
+      const restByte = base.restByte(false);
+      const other = claimed.get(cov.at);
+      if (other !== undefined && other !== restByte) {
+        warnings.push(`${PREFIX} ${where(at)}: another edited row shares a pattern byte with this one and wants a different value; this edit was not written.`);
+        return;
+      }
+      claimed.set(cov.at, restByte);
+      accepted.push({ ...at, note: 0, instrument: 0, noteAt: cov.at, noteByte: restByte, instrumentAt: -1, instrumentByte: -1, fxPatches: [], fx: cellEffects(cell) });
       return;
     }
     if (!src || was.note < 1 || was.note >= NOTE_OFF) {
@@ -172,6 +185,9 @@ export function applyRiffRaffGridEdits(original: Uint8Array, patterns: readonly 
   base.sources.forEach((col, c) => col.forEach((s, row) => {
     if (s && (touched.has(s.noteAt) || touched.has(s.instrumentAt))) shared.add(`${c}:${row}`);
   }));
+  base.covers.forEach((col, c) => col.forEach((cv, row) => {
+    if (cv && cv.kind !== 'note' && touched.has(cv.at)) shared.add(`${c}:${row}`);
+  }));
   base.effectSources.forEach((col, c) => col.forEach((list, row) => {
     if (list.some((s) => touched.has(s.at))) shared.add(`${c}:${row}`);
   }));
@@ -218,7 +234,7 @@ const be32 = (d: Uint8Array, o: number): number => ((d[o] << 24) | (d[o + 1] << 
 const put32 = (d: Uint8Array, o: number, v: number): void => { d[o] = v >>> 24; d[o + 1] = (v >>> 16) & 0xff; d[o + 2] = (v >>> 8) & 0xff; d[o + 3] = v & 0xff; };
 
 /**
- * A note on a row no note starts on. A rest (or rest silence) starting on the row becomes the note in place (same two
+ * A note, or a note off (the Rest Silence command), on a row no note starts on. A rest (or rest silence) starting on the row becomes the note in place (same two
  * bytes). Any other row lies inside a held note or rest: that event is cut in two at the row, the first part keeps its
  * kind, the second is the new note, and the two rates are found in the rate table among those the module already uses
  * (the song keeps its length). The pattern stream grows by two bytes, so the whole stream moves to the end of the code
@@ -232,14 +248,17 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
   const cov = g.covers[a.channel]?.[row];
   const refuse = (why: string): Uint8Array => { warnings.push(`${PREFIX} ${where(a)}: ${why}; the note was not written.`); return file; };
   if (!cov) return refuse('no event sounds on this row');
-  if (a.instrument !== 0 && a.instrument !== cov.instrument + 1) return refuse('a different instrument would need a Set Sample command');
-  let byte = -1;
+  // a note off is the Rest Silence command, which takes one rate argument like a note
+  const off = a.note === NOTE_OFF;
+  if (!off && a.instrument !== 0 && a.instrument !== cov.instrument + 1) return refuse('a different instrument would need a Set Sample command');
+  let byte = off ? g.restByte(true) : -1;
+  if (off && byte < 0) return refuse('this driver has no Rest Silence command');
   for (let b = 0; b < COMMAND_BASE && byte < 0; b++) if (g.noteForByte(b, cov.transpose) === a.note) byte = b;
   if (byte < 0) return refuse(`note ${a.note} is not in the module's period table for this voice`);
   const out = new Uint8Array(file);
   const offset = row * g.ticksPerRow - cov.tick;
   if (offset === 0) {
-    if (cov.kind === 'note') return refuse('a note already starts here');
+    if (cov.kind === 'note' || (off && cov.kind === 'silence')) return refuse('an event already starts here');
     out[cov.at] = byte; // Rest and Rest Silence carry the same one rate argument a note does
   } else {
     const stream = g.streams[cov.stream];

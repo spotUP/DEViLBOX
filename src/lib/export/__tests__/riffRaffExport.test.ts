@@ -151,4 +151,28 @@ describe.each(FILES)('Riff Raff native export: $name', (file) => {
     expect(g1.rows).toBe(g0.rows);
     expect(g1.patterns[0].channels[0].rows[at].note).toBe(note);
   }, 240000);
+
+  it('writes a note off on a blank row as a Rest Silence, then clears it back to a Rest in one byte', async () => {
+    const { raw, song } = await load(file);
+    const rows = song.patterns[0].channels[0].rows;
+    let written: Uint8Array | null = null;
+    let at = -1;
+    for (let r = 1; r < rows.length && !written; r++) {
+      if (rows[r].note !== 0) continue;
+      const { song: s } = await load(file);
+      s.patterns[0].channels[0].rows[r].note = 97;
+      const res = await exportOf(s);
+      if (res.warnings.length === 0 && res.data.length !== raw.length) { written = res.data; at = r; }
+    }
+    expect(written, 'some blank row of voice 1 takes a note off').not.toBeNull();
+    const off = await load(file, written as Uint8Array);
+    expect(off.song.patterns[0].channels[0].rows[at].note).toBe(97);
+    off.song.patterns[0].channels[0].rows[at].note = 0;
+    const res = await exportOf(off.song);
+    expect(res.warnings).toEqual([]);
+    expect(res.data.length).toBe((written as Uint8Array).length);
+    expect(diffCount(res.data, written as Uint8Array)).toBe(1);
+    const again = await load(file, res.data);
+    expect(again.song.patterns[0].channels[0].rows[at].note).toBe(0);
+  }, 240000);
 });
