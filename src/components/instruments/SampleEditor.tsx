@@ -2404,6 +2404,18 @@ const SampleWaveformStudioModal: React.FC<{
     await onCommit(buf, 'Waveform Studio', keepOpen);
   }, [wavetable, onCommit]);
 
+  // Live preview: every edit re-renders and writes the sample (same path as
+  // Apply and Audition) after a short pause, so held keys play what is drawn.
+  // The first render is skipped so opening the studio does not rewrite the sample.
+  const commitRef = React.useRef(handleCommit);
+  commitRef.current = handleCommit;
+  const firstRender = React.useRef(true);
+  React.useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    const t = setTimeout(() => { void commitRef.current(true); }, 150);
+    return () => clearTimeout(t);
+  }, [wavetable]);
+
   return (
     <div className="fixed inset-0 z-[9999] bg-black/70 flex items-center justify-center p-4">
       <div className="bg-dark-bg border border-dark-border rounded-lg shadow-2xl w-full max-w-[1100px] max-h-[90vh] flex flex-col">
@@ -2442,10 +2454,10 @@ const SampleWaveformStudioModal: React.FC<{
           </button>
           <button
             onClick={() => handleCommit(true)}
-            title="Write the waveform to the instrument, looped, and keep the studio open so you can play it from the keyboard"
+            title="Edits already play live from the keyboard; this writes the current waveform immediately and keeps the studio open"
             className="px-3 py-1.5 rounded text-[10px] font-mono font-bold uppercase bg-dark-bgSecondary text-text-primary hover:bg-dark-bgHover border border-dark-border"
           >
-            Apply and Audition
+            Apply Now
           </button>
           <button
             onClick={() => handleCommit(false)}
