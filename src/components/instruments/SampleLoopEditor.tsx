@@ -2,7 +2,7 @@
  * SampleLoopEditor - Loop controls extracted from SampleEditor.
  *
  * Renders the loop enable checkbox, forward/pingpong type selector,
- * auto-find button, and loop start/end sliders.
+ * and auto-find button. Start/end are edited on the waveform.
  */
 
 import React from 'react';
@@ -81,30 +81,5 @@ export const SampleLoopEditor: React.FC<SampleLoopEditorProps> = ({
         </>
       )}
     </div>
-
-    {loopEnabled && (
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block font-mono text-text-muted text-xs mb-1">
-            {'LOOP START: '}<span className="text-blue-400">{(loopStart * 100).toFixed(1)}%</span>
-          </label>
-          <input
-            type="range" min="0" max="0.99" step="0.001" value={loopStart}
-            onChange={(e) => updateParam('loopStart', Math.min(parseFloat(e.target.value), loopEnd - 0.01))}
-            className="w-full"
-          />
-        </div>
-        <div>
-          <label className="block font-mono text-text-muted text-xs mb-1">
-            {'LOOP END: '}<span className="text-blue-400">{(loopEnd * 100).toFixed(1)}%</span>
-          </label>
-          <input
-            type="range" min="0.01" max="1" step="0.001" value={loopEnd}
-            onChange={(e) => updateParam('loopEnd', Math.max(parseFloat(e.target.value), loopStart + 0.01))}
-            className="w-full"
-          />
-        </div>
-      </div>
-    )}
   </div>
 );

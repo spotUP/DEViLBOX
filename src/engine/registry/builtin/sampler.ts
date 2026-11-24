@@ -112,6 +112,9 @@ const samplerDescs: SynthDescriptor[] = [
         return true;
       }
 
+      // Looped sample is a Tone.Player (no triggerAttack): let ToneEngine's Player branch start it.
+      if (synth instanceof Tone.Player) return false;
+
       // Regular Sampler
       const sampler = synth as Tone.Sampler;
       if (!sampler.loaded) return true; // Skip silently
@@ -127,6 +130,10 @@ const samplerDescs: SynthDescriptor[] = [
         // Player uses stop()
         const player = synth as Tone.Player;
         if (player.state === 'started') player.stop(time);
+        return true;
+      }
+      if (synth instanceof Tone.Player) {
+        if (synth.state === 'started') synth.stop(time);
         return true;
       }
       const sampler = synth as Tone.Sampler;
