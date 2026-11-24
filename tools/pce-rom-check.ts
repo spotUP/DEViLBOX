@@ -15,6 +15,7 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseFurnaceSong } from '../src/lib/import/formats/FurnaceSongParser';
 import { furnaceToHusic, husicSystemsSupported, type HusicLayout } from '../src/lib/export/pce/husicSong';
+import { heardWaves } from './pceWaves';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SONGS = path.join(ROOT, 'public/data/songs/furnace');
@@ -119,18 +120,6 @@ function states(ws: W[]): St[][] {
   return first < 0 ? [] : all.slice(first, first + TICKS);
 }
 
-/** Complete 32-sample waveforms written to wave RAM (reg 6, channel off), as strings. */
-function waves(ws: W[]): Set<string> {
-  const buf = new Map<number, number[]>(), out = new Set<string>();
-  let sel = 0;
-  for (const { reg, val } of ws) {
-    if (reg === 0) sel = val & 7;
-    else if (reg === 6) { const b = buf.get(sel) ?? []; b.push(val & 31); if (b.length === 32) { out.add(b.join(',')); b.length = 0; } buf.set(sel, b); }
-    else if (reg === 4) buf.set(sel, []);
-  }
-  return out;
-}
-
 /** Note starts: silent -> sounding, or a period jump of at least 80 cents in one tick on a sounding tone channel (a new note or an
  * arpeggio step; vibrato and slides move the period by a few cents per tick and are not starts). */
 function starts(s: St[][]): Array<{ t: number; ch: number }> {
@@ -149,7 +138,7 @@ const pct = (a: number, b: number) => (b ? Math.round((a / b) * 10000) / 100 : 0
 
 mkdirSync(path.dirname(RESULTS), { recursive: true });
 const results: Record<string, Verdict> = existsSync(RESULTS) ? JSON.parse(readFileSync(RESULTS, 'utf8')) : {};
-const toolHash = createHash('sha1').update(PLAYER).update(JSON.stringify(LAYOUT)).update(readFileSync(import.meta.filename))
+const toolHash = createHash('sha1').update(PLAYER).update(JSON.stringify(LAYOUT)).update(readFileSync(import.meta.filename)).update(readFileSync(path.join(import.meta.dirname, 'pceWaves.ts')))
   .update(readFileSync(path.join(ROOT, 'src/lib/export/pce/husicSong.ts'))).digest('hex');
 if (!convertOnly && !existsSync(MESEN)) throw new Error(`Mesen2 not installed at ${MESEN}`);
 for (const file of walk(SONGS)) {
@@ -213,8 +202,8 @@ for (const file of walk(SONGS)) {
     v.noiseMatch = pct(nzEq, nz);
     if (dda) v.ddaMatch = pct(ddaEq, dda);
     Object.assign(v, { furnaceStarts: wantStarts.length, keyOnMatch: pct(hit, wantStarts.length), pitchMatch: pct(inTune, tone), volumeMatch: pct(volOk, tone), volumeExact: pct(volEq, tone), panMatch: pct(panOk, tone) });
-    const fw = waves(furW), rw = waves(romW);
-    v.waveMatch = pct([...rw].filter((x) => fw.has(x)).length, rw.size); // ROM waves that Furnace also writes (it writes extra ones at start-up)
+    const fw = heardWaves(furW), rw = heardWaves(romW);
+    v.waveMatch = pct([...rw].filter((x) => fw.has(x)).length, rw.size); // waves the ROM plays that Furnace also plays (phase-free)
     v.pass = romStarts.length > 0 && (v.keyOnMatch ?? 0) >= 90 && (v.pitchMatch ?? 0) >= 90 && (v.ddaMatch ?? 100) >= 90;
   } catch (e) {
     v = { inputHash, file: rel, pass: false, seconds: SECONDS, error: e instanceof Error ? e.message.split('\n')[0] : String(e) };
