@@ -36,6 +36,7 @@ import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, FileUp, Plus, Tras
 import { InstrumentOscilloscope } from '@components/visualization';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { MacroListEditor } from './MacroEditor';
+import { FurnaceMacroType } from '@typedefs/instrument';
 import { SNESPanel, SNESEchoPanel } from './SNESPanels';
 import { SNES_MACRO_LABELS } from '@/lib/furnace/snesDsp';
 import { chipMacroProfile, NEOGEO_MACRO_PROFILES } from '@/lib/furnace/chipMacroProfiles';
@@ -829,6 +830,20 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           <WavetableListEditor
             wavetables={config.wavetables as WavetableData[]}
             onChange={(wavetables) => onChange({ wavetables })}
+            macroLanes={
+              <MacroListEditor
+                macros={config.macros}
+                onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
+                chipType={config.chipType}
+                types={STUDIO_MACRO_TYPES}
+                labels={voiceProfile?.labels}
+                ranges={voiceProfile?.ranges}
+                valueNames={voiceProfile?.valueNames}
+                maxSteps={voiceProfile?.maxSteps}
+                allowRelease={voiceProfile?.allowRelease}
+                allowSpeed={voiceProfile?.allowSpeed}
+              />
+            }
           />
         </div>
       )}
@@ -884,6 +899,9 @@ type FmNumericParameter = Exclude<FmOperatorParameter, 'am' | 'vib' | 'sus' | 'k
 type FmSwitchParameter = Extract<FmOperatorParameter, 'am' | 'vib' | 'sus' | 'ksr' | 'egt'>;
 
 /** Operator parameters the MIDI parameter router maps, by key suffix. */
+/** Lanes the Waveform Studio shows beside the wave (plan P3). */
+const STUDIO_MACRO_TYPES = [FurnaceMacroType.VOL, FurnaceMacroType.PITCH, FurnaceMacroType.DUTY, FurnaceMacroType.ARP] as const;
+
 const OPERATOR_PARAM_KEY_SUFFIX: Partial<Record<FmNumericParameter, string>> = {
   tl: 'TL', ar: 'AR', dr: 'DR', sl: 'SL', rr: 'RR',
 };

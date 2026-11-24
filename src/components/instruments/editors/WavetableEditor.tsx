@@ -47,12 +47,15 @@ interface WavetableEditorProps {
   color?: string;
   /** Initial layout — 'compact' (default) or 'studio' */
   initialLayout?: StudioLayout;
+  /** Macro lanes the host instrument owns, shown under the wave in the studio layout. */
+  macroLanes?: React.ReactNode;
 }
 
 interface WavetableListEditorProps {
   wavetables: WavetableData[];
   onChange: (wavetables: WavetableData[]) => void;
   maxWavetables?: number;
+  macroLanes?: React.ReactNode;
 }
 
 // ============================================================================
@@ -127,6 +130,7 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
   onRemove,
   height = 180,
   initialLayout = 'compact',
+  macroLanes,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showGenerator, setShowGenerator] = useState(false);
@@ -529,6 +533,13 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
           </div>
         )}
       </div>
+
+      {showStudioPanels && macroLanes && (
+        <div className="px-2 pb-2">
+          <div className="text-[10px] font-mono text-text-muted mb-1">Macros: stepped each tick while a key is held; the keyboard plays them</div>
+          {macroLanes}
+        </div>
+      )}
     </div>
   );
 };
@@ -541,6 +552,7 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
   wavetables,
   onChange,
   maxWavetables = 64,
+  macroLanes,
 }) => {
   const [selectedWave, setSelectedWave] = useState<number | null>(
     wavetables.length > 0 ? 0 : null,
@@ -652,6 +664,7 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
           wavetable={wavetables[selectedWave]}
           onChange={(w) => updateWavetable(selectedWave, w)}
           onRemove={wavetables.length > 1 ? () => removeWavetable(selectedWave) : undefined}
+          macroLanes={macroLanes}
         />
       )}
 

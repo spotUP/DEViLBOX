@@ -59,6 +59,13 @@ interface MacroListEditorProps {
   allowSpeed?: boolean;
   /** One line above the macros: what the target driver does with them. */
   note?: string;
+  /** Show and offer only these macro types; the others stay in `macros` untouched (Waveform Studio lanes). */
+  types?: readonly number[];
+}
+
+/** Indices into `macros` of the macros to show; all when `types` is absent. */
+export function shownMacroIndices(macros: readonly FurnaceMacro[], types?: readonly number[]): number[] {
+  return macros.flatMap((m, i) => (!types || types.includes(macroCode(m)) ? [i] : []));
 }
 
 // ── Macro type metadata ────────────────────────────────────────────────────────
@@ -668,6 +675,7 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
   allowRelease,
   allowSpeed,
   note,
+  types,
 }) => {
   const typeNames = labels ?? MACRO_TYPE_NAMES;
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -724,6 +732,7 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
 
   // Types not yet added
   const availableTypes = Object.entries(typeNames)
+    .filter(([typeNum]) => !types || types.includes(parseInt(typeNum)))
     .filter(([typeNum]) => !macros.some(m => macroCode(m) === parseInt(typeNum)))
     .map(([typeNum, name]) => ({ type: parseInt(typeNum), name }));
 
@@ -732,7 +741,7 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
       {note && <p className="text-[10px] font-mono text-text-muted">{note}</p>}
       {/* Macros — side by side grid, always visible */}
       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
-        {macros.map((macro, index) => (
+        {shownMacroIndices(macros, types).map((index) => { const macro = macros[index]; return (
           <div key={index} className="border border-dark-border rounded-lg overflow-hidden flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between px-2 py-1 bg-dark-bg select-none">
@@ -774,7 +783,7 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
               playbackPosition={playbackPositions?.[macroCode(macro)]}
             />
           </div>
-        ))}
+        ); })}
       </div>
 
       {/* Add macro — click-toggle dropdown */}
