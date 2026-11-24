@@ -73,7 +73,7 @@ export function applyRiffRaffGridEdits(original: Uint8Array, patterns: readonly 
     if (!noteChanged && !instChanged && !otherChanged && !fxChanged) return;
     const at = { pattern: pi, channel: c, row: r };
     if (otherChanged) {
-      warnings.push(`${PREFIX} ${where(at)}: the volume column is not stored per row in this format; that change was not written.`);
+      warnings.push(`${PREFIX} ${where(at)}: the volume column is not stored per row in this format (volume is the Set Volume command V, written through its effect column when the row has one); that change was not written.`);
       if (!noteChanged && !instChanged && !fxChanged) return;
     }
     let fxPatches: Array<[number, number]> = [];

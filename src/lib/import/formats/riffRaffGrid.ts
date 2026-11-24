@@ -272,7 +272,7 @@ class Walker {
       if (byte < COMMAND_BASE) { at++; continue; }
       const command = this.commands[byte - COMMAND_BASE];
       if (command === undefined) { this.reason ??= `pattern ${id} holds the unknown command ${byte.toString(16)}`; break; }
-      if (command === 'portamento') { this.reason ??= 'the Portamento command (argument size unknown) is not decoded'; break; }
+      if (command === 'portamento') { this.reason ??= 'the Portamento command (command 0x8A looping / 0x8C one-shot; the argument size is read only by the 68k code and no corpus song uses it) is not decoded'; break; }
       at += argBytes(command);
     }
     const index = this.streams.length;
