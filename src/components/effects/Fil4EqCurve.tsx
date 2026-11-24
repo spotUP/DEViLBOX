@@ -3,6 +3,7 @@
  * Interactive: handles overlaid on canvas for dragging freq/gain per band.
  */
 import React, { useRef, useEffect, useCallback, useState } from 'react';
+import { useHiDpiCanvas, prepareHiDpiCanvas } from '@/hooks/useHiDpiCanvas';
 import type { Fil4EqEffect, Fil4Params } from '@/engine/effects/Fil4EqEffect';
 
 const W = 600, H = 160;
@@ -56,6 +57,8 @@ interface Props {
 export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, onBandChange }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Canvas CSS size is fixed to the props; the hook supplies dpr and its changes.
+  const size = useHiDpiCanvas(canvasRef, width, height);
   const [magnitude, setMagnitude] = useState<Float32Array | null>(null);
   const [params, setParams] = useState<Fil4Params>(() => effect.getParams());
   const [activeHandle, setActiveHandle] = useState<BandId | null>(null);
@@ -116,7 +119,7 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = prepareHiDpiCanvas(canvas, size);
     if (!ctx) return;
 
     ctx.clearRect(0, 0, width, height);
@@ -155,7 +158,7 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
       }
       ctx.stroke();
     }
-  }, [magnitude, params, width, height, plotW, plotH]);
+  }, [magnitude, params, width, height, plotW, plotH, size]);
 
   useEffect(() => {
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
@@ -249,8 +252,8 @@ export const Fil4EqCurve: React.FC<Props> = ({ effect, width = W, height = H, on
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width, height, display: 'inline-block' }}>
-      <canvas ref={canvasRef} width={width} height={height}
-        className="block rounded" style={{ background: COLOR_BG }} />
+      <canvas ref={canvasRef}
+        className="block rounded" style={{ background: COLOR_BG, width, height }} />
       {onBandChange && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
           {handles.map(h => {

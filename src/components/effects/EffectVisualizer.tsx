@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react';
+import { useHiDpiCanvas, prepareHiDpiCanvas } from '@/hooks/useHiDpiCanvas';
 
 // ---------------------------------------------------------------------------
 // Helper: computeRMS
@@ -46,10 +47,12 @@ export const EffectOscilloscope: React.FC<EffectOscilloscopeProps> = ({
   pre,
   post,
   color,
-  width = 300,
-  height = 80,
+  width: widthProp = 300,
+  height: heightProp = 80,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const size = useHiDpiCanvas(canvasRef, widthProp, heightProp);
+  const { width, height } = size;
 
   // No dep array — Float32Array is mutated in-place by the analyser hook;
   // React can't diff it by reference, so we redraw on every parent render (30fps).
@@ -57,14 +60,8 @@ export const EffectOscilloscope: React.FC<EffectOscilloscopeProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== width * dpr) canvas.width = width * dpr;
-    if (canvas.height !== height * dpr) canvas.height = height * dpr;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = prepareHiDpiCanvas(canvas, size);
     if (!ctx) return;
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
     ctx.fillStyle = '#0a0a0f';
@@ -127,7 +124,7 @@ export const EffectOscilloscope: React.FC<EffectOscilloscopeProps> = ({
       ref={canvasRef}
       style={{
         width: '100%',
-        height: `${height}px`,
+        height: `${heightProp}px`,
         borderRadius: 4,
         display: 'block',
       }}
@@ -152,11 +149,13 @@ export const EffectSpectrum: React.FC<EffectSpectrumProps> = ({
   pre,
   post,
   color,
-  width = 300,
-  height = 80,
+  width: widthProp = 300,
+  height: heightProp = 80,
   sampleRate = 44100,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const size = useHiDpiCanvas(canvasRef, widthProp, heightProp);
+  const { width, height } = size;
 
   // No dep array — Float32Array is mutated in-place by the analyser hook;
   // React can't diff it by reference, so we redraw on every parent render (30fps).
@@ -164,14 +163,8 @@ export const EffectSpectrum: React.FC<EffectSpectrumProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== width * dpr) canvas.width = width * dpr;
-    if (canvas.height !== height * dpr) canvas.height = height * dpr;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = prepareHiDpiCanvas(canvas, size);
     if (!ctx) return;
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
     ctx.fillStyle = '#0a0a0f';
@@ -230,7 +223,7 @@ export const EffectSpectrum: React.FC<EffectSpectrumProps> = ({
       ref={canvasRef}
       style={{
         width: '100%',
-        height: `${height}px`,
+        height: `${heightProp}px`,
         borderRadius: 4,
         display: 'block',
       }}
@@ -258,23 +251,19 @@ export const WaveshaperCurve: React.FC<WaveshaperCurveProps> = ({
   order = 3,
   bits = 8,
   color,
-  width = 120,
-  height = 120,
+  width: widthProp = 120,
+  height: heightProp = 120,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const size = useHiDpiCanvas(canvasRef, widthProp, heightProp);
+  const { width, height } = size;
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = prepareHiDpiCanvas(canvas, size);
     if (!ctx) return;
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
     ctx.fillStyle = '#0a0a0f';
@@ -339,7 +328,7 @@ export const WaveshaperCurve: React.FC<WaveshaperCurveProps> = ({
     }
 
     ctx.stroke();
-  }, [type, drive, order, bits, color, width, height]);
+  }, [type, drive, order, bits, color, size]);
 
   useEffect(() => {
     draw();
@@ -349,9 +338,9 @@ export const WaveshaperCurve: React.FC<WaveshaperCurveProps> = ({
     <canvas
       ref={canvasRef}
       style={{
-        width: `${width}px`,
+        width: `${widthProp}px`,
         maxWidth: '100%',
-        height: `${height}px`,
+        height: `${heightProp}px`,
         aspectRatio: '1',
         borderRadius: 4,
         display: 'block',
@@ -374,10 +363,12 @@ interface GainReductionMeterProps {
 export const GainReductionMeter: React.FC<GainReductionMeterProps> = ({
   pre,
   post,
-  width = 80,
-  height = 120,
+  width: widthProp = 80,
+  height: heightProp = 120,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const size = useHiDpiCanvas(canvasRef, widthProp, heightProp);
+  const { width, height } = size;
 
   // No dep array — Float32Array is mutated in-place by the analyser hook;
   // React can't diff it by reference, so we redraw on every parent render (30fps).
@@ -385,14 +376,8 @@ export const GainReductionMeter: React.FC<GainReductionMeterProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = prepareHiDpiCanvas(canvas, size);
     if (!ctx) return;
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
     ctx.fillStyle = '#0a0a0f';
@@ -467,8 +452,8 @@ export const GainReductionMeter: React.FC<GainReductionMeterProps> = ({
     <canvas
       ref={canvasRef}
       style={{
-        width: `${width}px`,
-        height: `${height}px`,
+        width: `${widthProp}px`,
+        height: `${heightProp}px`,
         borderRadius: 4,
         display: 'block',
       }}
@@ -494,8 +479,8 @@ export const MiniOutputMeter: React.FC<MiniOutputMeterProps> = ({
   grMode = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const W = 48;
-  const H = 16;
+  const size = useHiDpiCanvas(canvasRef, 48, 16);
+  const { width: W, height: H } = size;
 
   // No dep array — Float32Array is mutated in-place by the analyser hook;
   // React can't diff it by reference, so we redraw on every parent render (30fps).
@@ -503,14 +488,8 @@ export const MiniOutputMeter: React.FC<MiniOutputMeterProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = prepareHiDpiCanvas(canvas, size);
     if (!ctx) return;
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
     ctx.fillStyle = '#111';

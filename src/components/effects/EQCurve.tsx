@@ -8,6 +8,7 @@
  */
 
 import React, { useRef, useEffect, useMemo } from 'react';
+import { useHiDpiCanvas, prepareHiDpiCanvas } from '@/hooks/useHiDpiCanvas';
 
 export type EQBandType = 'peaking' | 'lowShelf' | 'highShelf' | 'highpass' | 'lowpass';
 
@@ -115,12 +116,14 @@ function magnitudeResponse(
 export const EQCurve: React.FC<EQCurveProps> = ({
   bands,
   color = '#3b82f6',
-  width = 300,
-  height = 120,
+  width: widthProp = 300,
+  height: heightProp = 120,
   dbRange = 18,
   sampleRate = 48000,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const size = useHiDpiCanvas(canvasRef, widthProp, heightProp);
+  const { width, height } = size;
 
   // Pre-compute band coefficients
   const bandCoeffs = useMemo(
@@ -132,13 +135,8 @@ export const EQCurve: React.FC<EQCurveProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== width * dpr) canvas.width = width * dpr;
-    if (canvas.height !== height * dpr) canvas.height = height * dpr;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = prepareHiDpiCanvas(canvas, size);
     if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
     ctx.fillStyle = '#0a0a0f';
@@ -244,14 +242,14 @@ export const EQCurve: React.FC<EQCurveProps> = ({
       ctx.arc(x, height / 2, 2, 0, Math.PI * 2);
       ctx.fill();
     }
-  }, [bandCoeffs, bands, color, width, height, dbRange, sampleRate]);
+  }, [bandCoeffs, bands, color, size, dbRange, sampleRate]);
 
   return (
     <canvas
       ref={canvasRef}
       style={{
         width: '100%',
-        height: `${height}px`,
+        height: `${heightProp}px`,
         borderRadius: 4,
         display: 'block',
       }}
