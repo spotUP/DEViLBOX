@@ -250,6 +250,9 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
   const lastNote = [-1, -1, -1], curIns = [-1, -1, -1];
   const arpOn: Array<[number, number] | null> = [null, null, null];
   const arpProgs = new Map<string, number>();
+  // Furnace c64 E1xy/E2xy shorthand: x*0.0889 semitones per tick (measured on yeah!: x=15 slides 1.33 semitones, a constant 7.4 % of the frequency, per frame).
+  // GT slides linearly, so pick the speed that covers the same distance in the same whole number of ticks.
+  const slideTicks = (x: number, y: number): number => Math.max(1, Math.round(y / (x * 0.0889)));
   const speedRow = (spd: number): number => {
     const t = tables[3];
     for (let i = 0; i < t.left.length; i++) if (t.left[i] === (spd >> 8) && t.right[i] === (spd & 255) && i + 1 !== funk) return i + 1;
@@ -267,6 +270,27 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
     for (const off of [0, x, y]) { tb.left.push(w >= 0x10 ? w : 0xe0 | w); tb.right.push(off); }
     tb.left.push(0xff); tb.right.push(pos);
     arpProgs.set(key, pos);
+    return pos;
+  };
+  // Wave program for E1xy/E2xy on a row WITH a note (toneporta would not retrigger): waveform, wave-table slide command at speed x*4,
+  // delay until the slide has covered y semitones, then a stop command. Furnace stops at the target; GT stops after the same tick count.
+  // shortcut: replaces the instrument's own wave/arpeggio program for that note; ticks are rounded to whole frames.
+  const slideProgs = new Map<string, number>();
+  const sidFreq = (n: number): number => 440 * 2 ** ((n - 57) / 12) * 16777216 / (ntsc ? 1022730 : 985248);
+  const slideProgram = (ins: number, note: number, dest: number, x: number): number => {
+    const key = `${ins}_${note}_${dest}_${x}`;
+    const have = slideProgs.get(key);
+    if (have) return have;
+    const c = m.instruments[ins]?.c64;
+    const w = ((c ? baseWaveOf(c) : 1) << 4) | (c ? waveCtl(c) : 1);
+    const tb = tables[0], pos = tb.left.length + 1;
+    const ticks = slideTicks(x, Math.abs(dest - note)), spd = Math.max(1, Math.round(Math.abs(sidFreq(dest) - sidFreq(note)) / ticks));
+    tb.left.push(w >= 0x10 ? w : 0xe0 | w); tb.right.push(0);
+    tb.left.push(0xe0 | (dest > note ? 1 : 2)); tb.right.push(speedRow(spd));
+    for (let left = ticks - 1; left > 0; left -= 15) { tb.left.push(Math.min(15, left)); tb.right.push(0); }
+    tb.left.push(0xe0); tb.right.push(0);
+    tb.left.push(0xff); tb.right.push(0);
+    slideProgs.set(key, pos);
     return pos;
   };
   const slices = Math.ceil(s.patLen / GT_MAX_ROWS);
@@ -312,7 +336,11 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
                 // Slide without a note on the row: GT toneportamento to the note y semitones away at Furnace's speed x*4 (SID frequency units per tick).
                 const dest = lastNote[ch] + (t === 0xe1 ? 1 : -1) * (v & 15);
                 if (dest < 0 || dest > 95) lossy.add(`effect ${name} (target outside GT range)`);
-                else { note = GT_FIRSTNOTE + dest; lastNote[ch] = dest; c = 3; d = speedRow((v >> 4) * 4); }
+                else { note = GT_FIRSTNOTE + dest; c = 3; d = speedRow(Math.max(1, Math.round(Math.abs(sidFreq(dest) - sidFreq(lastNote[ch])) / slideTicks(v >> 4, v & 15)))); lastNote[ch] = dest; }
+              } else if ((t === 0xe1 || t === 0xe2) && note !== GT_REST && note !== GT_KEYOFF && v >> 4 && curIns[ch] >= 0 && m.instruments[curIns[ch]]?.c64 && curIns[ch] < GT_MAX_INSTR - 1) {
+                const dest = lastNote[ch] + (t === 0xe1 ? 1 : -1) * (v & 15);
+                if (dest < 0 || dest > 95 || !(v & 15)) lossy.add(`effect ${name} (target outside GT range)`);
+                else { c = 7; d = slideProgram(curIns[ch], lastNote[ch], dest, v >> 4); lastNote[ch] = dest; }
               } else if (t === 0x14) lossy.add('effect 14 (filter mode; GT sets it in a filter program only)');
               else lossy.add(`effect ${name}`);
               if (c) { if (cmd) lossy.add(`effect ${name} (second command on the row)`); else { cmd = c; data = d; } }
