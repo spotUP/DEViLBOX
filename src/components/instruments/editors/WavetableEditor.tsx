@@ -474,7 +474,11 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
               onDataChange={updateData}
             />
           )}
-          {showStudioPanels && mode === 'presets' && (
+        </div>
+
+        {/* Preset browser spans the full grid width, under both columns */}
+        {showStudioPanels && mode === 'presets' && (
+          <div style={{ gridColumn: '1 / -1', order: 3 }}>
             <PresetBrowser
               currentLen={length}
               currentMax={maxValue}
@@ -483,8 +487,8 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
                 onChange({ ...wavetable, data, len, max })
               }
             />
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Right column: live spectrum (studio layout only) */}
         {showLivePanels && (

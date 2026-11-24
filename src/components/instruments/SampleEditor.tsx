@@ -26,6 +26,7 @@ import {
   Activity, Waves, Clock, Filter, Mic, CircleDot, ChevronDown, X, Layers
 } from 'lucide-react';
 import { WavetableEditor } from './editors/WavetableEditor';
+import { STUDIO_LOOP_PARAMS } from './editors/wavetable/waveformOps';
 import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { StemSeparatorPanel } from '@components/common/StemSeparatorPanel';
@@ -76,9 +77,10 @@ const NOTE_OPTIONS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#'
 const OCTAVE_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 
 // Canvas sizes
-const CANVAS_W = 1120;
-const CANVAS_H = 300;
-const MINIMAP_H = 40;
+// Canvas logical size equals its CSS size, so text and lines are never stretched.
+const CANVAS_H = 150;
+const MINIMAP_H = 20;
+const DEFAULT_CANVAS_W = 1120;
 
 // ─── Icon button helper ────────────────────────────────────────────────
 
@@ -125,6 +127,19 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   // ─── Refs ────────────────────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [canvasW, setCanvasW] = useState(DEFAULT_CANVAS_W);
+  const canvasWRef = useRef(DEFAULT_CANVAS_W);
+  canvasWRef.current = canvasW;
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const w = Math.round(el.getBoundingClientRect().width);
+      if (w > 0) setCanvasW(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const playheadCanvasRef = useRef<HTMLCanvasElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -342,9 +357,9 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
-    const w = CANVAS_W;
+    const w = canvasWRef.current;
     const h = CANVAS_H;
-    if (canvas.width !== w * dpr) {
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
       canvas.width = w * dpr;
       canvas.height = h * dpr;
       ctx.scale(dpr, dpr);
@@ -609,8 +624,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== CANVAS_W * dpr) {
-      canvas.width = CANVAS_W * dpr;
+    if (canvas.width !== canvasW * dpr || canvas.height !== CANVAS_H * dpr) {
+      canvas.width = canvasW * dpr;
       canvas.height = CANVAS_H * dpr;
       ctx.scale(dpr, dpr);
     }
@@ -633,7 +648,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       selectedSliceId: showBeatSlicer ? selectedSliceId : null,
       offsetMarkers,
     };
-    drawSampleWaveform(ctx, CANVAS_W, CANVAS_H, opts);
+    drawSampleWaveform(ctx, canvasW, CANVAS_H, opts);
     // Re-draw playhead on overlay after waveform redraws (zoom, selection, etc.)
     drawPlayhead(playbackPosRef.current);
   }, [
@@ -641,7 +656,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     selectionStart, selectionEnd, loopEnabled, loopStart, loopEnd, loopType,
     isGranular, granular, dragTarget, showSpectrum,
     showBeatSlicer, instrument.sample?.slices, selectedSliceId, offsetMarkers,
-    drawPlayhead,
+    drawPlayhead, canvasW,
   ]);
 
   // ─── Canvas draw: minimap ────────────────────────────────────────
@@ -652,8 +667,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== CANVAS_W * dpr) {
-      canvas.width = CANVAS_W * dpr;
+    if (canvas.width !== canvasW * dpr || canvas.height !== MINIMAP_H * dpr) {
+      canvas.width = canvasW * dpr;
       canvas.height = MINIMAP_H * dpr;
       ctx.scale(dpr, dpr);
     }
@@ -673,10 +688,10 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       simplified: true,
       viewportRect: { start: viewStart, end: viewEnd },
     };
-    drawSampleWaveform(ctx, CANVAS_W, MINIMAP_H, opts);
+    drawSampleWaveform(ctx, canvasW, MINIMAP_H, opts);
   }, [
     audioBuffer, viewStart, viewEnd,
-    selectionStart, selectionEnd, loopEnabled, loopStart, loopEnd, loopType,
+    selectionStart, selectionEnd, loopEnabled, loopStart, loopEnd, loopType, canvasW,
   ]);
 
   // ─── Granular helper ─────────────────────────────────────────────
@@ -1285,12 +1300,13 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
 
   // ─── Buffer processed (enhancer / resampler / beat sync / filter) ─
   const handleBufferProcessed = useCallback(
-    async (result: ProcessedResult, prefix: string) => {
+    async (result: ProcessedResult, prefix: string, extraParams?: Record<string, unknown>) => {
       const { buffer: newBuf, dataUrl } = result;
       setAudioBuffer(newBuf);
       updateInstrument(instrument.id, {
         parameters: {
           ...instrument.parameters,
+          ...extraParams,
           sampleUrl: dataUrl,
           sampleInfo: {
             name: sampleInfo?.name
@@ -1580,20 +1596,16 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       >
         <canvas
           ref={canvasRef}
-          width={CANVAS_W}
-          height={CANVAS_H}
           className="w-full h-[150px]"
-          style={{ imageRendering: 'pixelated', touchAction: 'none' }}
+          style={{ touchAction: 'none' }}
           onPointerDown={handleCanvasPointerDown}
           onPointerMove={handleCanvasPointerMove}
           onDoubleClick={(e) => { e.preventDefault(); selectAll(); }}
         />
         <canvas
           ref={playheadCanvasRef}
-          width={CANVAS_W}
-          height={CANVAS_H}
           className="absolute inset-0 w-full h-[150px] pointer-events-none"
-          style={{ imageRendering: 'pixelated' }}
+          
         />
         {isLoading && (
           <div className="absolute inset-0 bg-dark-bg/80 flex items-center justify-center">
@@ -1606,10 +1618,8 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       {audioBuffer && isZoomed && (
         <canvas
           ref={minimapRef}
-          width={CANVAS_W}
-          height={MINIMAP_H}
           className="w-full h-[20px] rounded border border-dark-border cursor-pointer"
-          style={{ imageRendering: 'pixelated' }}
+          
           onClick={handleMinimapClick}
         />
       )}
@@ -2012,10 +2022,10 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         <SampleWaveformStudioModal
           audioBuffer={audioBuffer}
           onClose={() => setShowWaveformStudio(false)}
-          onCommit={async (buf, label) => {
+          onCommit={async (buf, label, keepOpen) => {
             const dataUrl = await bufferToDataUrl(buf);
-            handleBufferProcessed({ buffer: buf, dataUrl }, label);
-            setShowWaveformStudio(false);
+            handleBufferProcessed({ buffer: buf, dataUrl }, label, STUDIO_LOOP_PARAMS);
+            if (!keepOpen) setShowWaveformStudio(false);
           }}
         />
       )}
@@ -2318,7 +2328,7 @@ const RecordingEffectsDialog: React.FC<{ onClose: () => void }> = ({ onClose }) 
 const SampleWaveformStudioModal: React.FC<{
   audioBuffer: AudioBuffer | null;
   onClose: () => void;
-  onCommit: (buf: AudioBuffer, label: string) => Promise<void>;
+  onCommit: (buf: AudioBuffer, label: string, keepOpen?: boolean) => Promise<void>;
 }> = ({ audioBuffer, onClose, onCommit }) => {
   // Build initial WavetableData from the existing sample (resampled to one cycle)
   // or default if there's no sample.
@@ -2365,7 +2375,7 @@ const SampleWaveformStudioModal: React.FC<{
   // Convert the int array back to a Float32 AudioBuffer at the audio context's
   // sample rate. The cycle is repeated enough times to be a usable sample
   // (the user can loop it in the sample editor for sustain).
-  const handleCommit = useCallback(async () => {
+  const handleCommit = useCallback(async (keepOpen = false) => {
     const { getDevilboxAudioContext } = await import('@utils/audio-context');
     let ctx: AudioContext;
     try { ctx = getDevilboxAudioContext(); }
@@ -2387,7 +2397,7 @@ const SampleWaveformStudioModal: React.FC<{
       out[i] = cycle[i % cycle.length];
     }
 
-    await onCommit(buf, 'Waveform Studio');
+    await onCommit(buf, 'Waveform Studio', keepOpen);
   }, [wavetable, onCommit]);
 
   return (
@@ -2427,7 +2437,14 @@ const SampleWaveformStudioModal: React.FC<{
             Cancel
           </button>
           <button
-            onClick={handleCommit}
+            onClick={() => handleCommit(true)}
+            title="Write the waveform to the instrument, looped, and keep the studio open so you can play it from the keyboard"
+            className="px-3 py-1.5 rounded text-[10px] font-mono font-bold uppercase bg-dark-bgSecondary text-text-primary hover:bg-dark-bgHover border border-dark-border"
+          >
+            Apply and Audition
+          </button>
+          <button
+            onClick={() => handleCommit(false)}
             className="px-3 py-1.5 rounded text-[10px] font-mono font-bold uppercase bg-accent-highlight/20 text-accent-highlight hover:bg-accent-highlight/30 border border-accent-highlight/50"
           >
             Save as sample
