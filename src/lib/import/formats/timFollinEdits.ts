@@ -117,7 +117,7 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
       claimed.set(src.instrumentAt, value);
       accepted.push({ ...at, col, note: noteIn(cell, col), instrument: want, offset: src.instrumentAt, value });
     }
-    if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect columns are not stored per row in this format; that change was not written.`);
+    if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect edits are refused: this build has no per-note volume byte, the level comes from the voice's Set Envelope command (start level, sustain, attack and release, valid for every following note) and effects are voice-wide pitch-modulation commands, so a row cannot carry its own; that change was not written.`);
     for (let col = 0; col < base.noteCols[c]; col++) {
       const now = noteIn(cell, col);
       const wasNote = noteIn(was, col);

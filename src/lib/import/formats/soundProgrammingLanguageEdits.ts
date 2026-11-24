@@ -106,7 +106,7 @@ export function applySplGridEdits(original: Uint8Array, patterns: readonly Patte
     const fxChanged = JSON.stringify(cellEffects(cell)) !== JSON.stringify(cellEffects(was));
     if (!noteChanged && !instChanged && !otherChanged && !fxChanged) return;
     const at = { pattern: pi, channel: c, row: r };
-    if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect columns are not stored per row in this format; that change was not written.`);
+    if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect edits are refused: the volume (start, decay and release) sits in the 0x22-byte instrument record shared by every note that uses it, and this build has no per-note volume or effect byte, so a row cannot carry its own; that change was not written.`);
     const instSrc = base.rowSources[pi]?.[c]?.[r];
     const instEdit = instChanged && !noteChanged && was.note >= 1 && was.note < NOTE_OFF && !!instSrc;
     if (instEdit && instSrc) {
