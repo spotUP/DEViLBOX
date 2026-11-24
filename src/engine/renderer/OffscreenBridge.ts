@@ -25,6 +25,8 @@ export interface OffscreenBridgeOptions<TReply> {
   onMessage?: (msg: TReply) => void;
   /** Called if the worker encounters an error */
   onError?: (err: ErrorEvent) => void;
+  /** Called if a worker reply could not be deserialised */
+  onMessageError?: (e: MessageEvent) => void;
 }
 
 export class OffscreenBridge<TMsg, TReply> {
@@ -48,6 +50,11 @@ export class OffscreenBridge<TMsg, TReply> {
     this.worker.onerror = (err) => {
       opts.onError?.(err);
       console.error('[OffscreenBridge] Worker error:', err);
+    };
+
+    this.worker.onmessageerror = (e) => {
+      opts.onMessageError?.(e);
+      console.error('[OffscreenBridge] Worker message could not be read:', e);
     };
   }
 

@@ -57,7 +57,7 @@ import type { CursorPosition } from '@typedefs';
 import { TrackerOffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import { feedWorkerFromTracker } from './trackerWorkerFeed';
 import { reportSynthError } from '@stores/useSynthErrorStore';
-import { watchdogStage1, watchdogStage2, MainThreadLiveness } from './trackerWatchdog';
+import { nextWorkerStartState, GL_INIT_GRACE_MS, type WorkerStartEvent, type WorkerStartState } from './trackerWatchdog';
 import type {
   PatternSnapshot,
   ThemeSnapshot,
@@ -276,6 +276,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Set to true if worker reports WebGL2 is unsupported (iOS Safari)
   const [webglUnsupported, setWebglUnsupported] = useState(false);
+  // True while the pattern-grid worker loads; shows "starting" instead of a blank grid.
+  const [workerStarting, setWorkerStarting] = useState(false);
   // Main-thread Canvas2D renderer ref (iOS fallback)
   const mainThreadRendererRef = useRef<TrackerCanvas2DRenderer | null>(null);
   const mainThreadRafRef = useRef<number>(0);
@@ -2026,44 +2028,49 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     container.appendChild(canvas);
     canvasRef.current = canvas;
 
-    let readyReceived = false;
-    let bootingReceived = false;
-    // The 10 s ready-watchdog is armed only AFTER the init message is actually
-    // posted to the worker (see below). Arming it at bridge-construction time
-    // produced false positives: during heavy startup (86 MB CED model load,
-    // DSP WASM compile, worklet spin-up) the main thread can jank for ~10 s, so
-    // the wall-clock window elapsed before `init` was even sent — flagging a
-    // perfectly healthy worker as failed. Measuring from the init post instead
-    // times the only thing we're actually waiting on: the worker's reply.
-    let readyTimeoutId: ReturnType<typeof setTimeout> | undefined;
-    // How much of its own time the MAIN thread got while we waited. The
-    // worker's heartbeat is delivered by this thread's event loop, so a thread
-    // that was blocked cannot be believed when it says nothing arrived.
-    const liveness = new MainThreadLiveness();
+    // Worker start: failure only on a real signal (error event, messageerror,
+    // 'error' reply). No clock while the module loads — under load (Vite cold
+    // transform, busy machine) loading can take far longer than any fixed
+    // window. The one clock arms on 'booting', for GL init. See trackerWatchdog.
+    let startState: WorkerStartState = 'loading';
+    let glInitTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    setWorkerStarting(true);
+    const startEvent = (ev: WorkerStartEvent): WorkerStartState => {
+      startState = nextWorkerStartState(startState, ev);
+      if (startState !== 'loading' && startState !== 'booted') {
+        clearTimeout(glInitTimeoutId);
+        setWorkerStarting(false);
+      }
+      return startState;
+    };
 
     const bridge = new TrackerOffscreenBridge(TrackerWorkerFactory, {
       onReady: () => {
-        readyReceived = true;
-        clearTimeout(readyTimeoutId);
-        liveness.stop();
+        startEvent('ready');
         // Worker is ready — send layout so it can start rendering
         bridge.post(buildLayoutMsg());
         bridge.post({ type: 'previewCells', preview: useVoicePreviewStore.getState().preview });
       },
       onMessage: (msg) => {
         if (msg.type === 'booting') {
-          // Worker module + its (heavy) render imports finished loading. The
-          // thread is alive; any remaining delay is GL/shader init, not a dead
-          // worker — the watchdog gives that case a long leash instead of the
-          // scary "failed to start" dialog.
-          bootingReceived = true;
+          // Worker module + its (heavy) render imports finished loading; only
+          // GL/shader init remains, so a clock is meaningful from here on.
+          if (startEvent('booting') === 'booted') {
+            glInitTimeoutId = setTimeout(() => {
+              if (startEvent('deadline') !== 'failed') return;
+              reportSynthError(
+                'Tracker Worker',
+                'Pattern editor renderer stalled (worker loaded but GL init did not ' +
+                `complete after ${GL_INIT_GRACE_MS / 1000} s). Try reloading the page.`,
+                { errorType: 'init', debugData: { offscreenCanvasSupported: true, booting: true } },
+              );
+            }, GL_INIT_GRACE_MS);
+          }
         } else if (msg.type === 'webgl-unsupported') {
-          clearTimeout(readyTimeoutId);
-          liveness.stop();
+          startEvent('ready');
           setWebglUnsupported(true);
         } else if (msg.type === 'error') {
-          clearTimeout(readyTimeoutId);
-          liveness.stop();
+          startEvent('error');
           reportSynthError(
             'Tracker Worker',
             msg.message,
@@ -2072,12 +2079,24 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         }
       },
       onError: (err) => {
-        clearTimeout(readyTimeoutId);
-        liveness.stop();
+        // Also fires when the worker script fetch or module load fails
+        // (message is then empty).
+        const loading = startState === 'loading';
+        startEvent('error');
         reportSynthError(
           'Tracker Worker',
-          err.message || 'Pattern editor worker crashed unexpectedly.',
-          { errorType: 'runtime', debugData: { filename: err.filename, lineno: err.lineno } },
+          err.message || (loading
+            ? 'Pattern editor worker failed to load. Try reloading the page.'
+            : 'Pattern editor worker crashed unexpectedly.'),
+          { errorType: loading ? 'init' : 'runtime', debugData: { filename: err.filename, lineno: err.lineno } },
+        );
+      },
+      onMessageError: () => {
+        startEvent('error');
+        reportSynthError(
+          'Tracker Worker',
+          'Pattern editor worker sent a message that could not be read. Try reloading the page.',
+          { errorType: 'runtime' },
         );
       },
     });
@@ -2087,9 +2106,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // yet at mount time, so clientWidth/clientHeight are 0 if read
     // synchronously (the ResizeObserver corrects this anyway).
     // NOTE: requestAnimationFrame is NOT used here because it is paused
-    // indefinitely in background tabs, causing the 10 s ready-timeout to fire
-    // before the init message is ever sent.  setTimeout(0) throttles to ~1 s
-    // in background tabs (well within the 10 s window) and fires immediately
+    // indefinitely in background tabs, so the init message would never be sent.
+    // setTimeout(0) throttles to ~1 s in background tabs and fires immediately
     // when foregrounded.
     const initTimerId = setTimeout(() => {
       try {
@@ -2143,48 +2161,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         [offscreen],
       );
 
-      // Two-stage ready-watchdog, armed now that init is in the worker's queue.
-      // Stage 1 (12 s): if we've had NO 'booting' heartbeat, the worker module
-      // itself never loaded — a genuine failure, report it. If 'booting' DID
-      // arrive, the thread is alive and merely slow finishing GL/shader init
-      // under startup contention (86 MB CED model load, WASM compiles); that is
-      // NOT a failure, so escalate to a long stage-2 grace instead of the scary
-      // dialog. Stage 2 (+30 s) only fires if the alive worker never becomes
-      // ready — i.e. GL init genuinely hung, a different, real error.
-      liveness.start();
-      readyTimeoutId = setTimeout(() => {
-        const mainThreadShare = liveness.ratio();
-        const s1 = watchdogStage1(bootingReceived, readyReceived, mainThreadShare);
-        if (s1.action === 'ok') { liveness.stop(); return; }
-        if (s1.action === 'error-never-loaded') {
-          liveness.stop();
-          reportSynthError(
-            'Tracker Worker',
-            'Pattern editor failed to start (worker never loaded after 12 s). ' +
-            'Try reloading the page. If this persists, your browser may not support OffscreenCanvas WebGL2.',
-            { errorType: 'init', debugData: {
-              offscreenCanvasSupported: true,
-              booting: false,
-              mainThreadShare: Math.round(mainThreadShare * 100) / 100,
-            } },
-          );
-          return;
-        }
-        // 'wait' — alive but not ready yet — keep waiting quietly, then a final check.
-        readyTimeoutId = setTimeout(() => {
-          liveness.stop();
-          if (watchdogStage2(readyReceived).action === 'ok') return;
-          reportSynthError(
-            'Tracker Worker',
-            'Pattern editor renderer stalled (worker booted but GL init did not ' +
-            'complete after 42 s). Try reloading the page.',
-            { errorType: 'init', debugData: { offscreenCanvasSupported: true, booting: true } },
-          );
-        }, 30_000);
-      }, 12_000);
       } catch (initErr) {
-        clearTimeout(readyTimeoutId);
-        liveness.stop();
+        startEvent('error');
         reportSynthError(
           'Tracker Worker',
           `Worker init failed: ${(initErr as Error)?.message ?? String(initErr)}`,
@@ -2263,8 +2241,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     return () => {
       clearTimeout(initTimerId);
-      clearTimeout(readyTimeoutId);
-      liveness.stop();
+      clearTimeout(glInitTimeoutId);
+      setWorkerStarting(false);
       unsubTracker();
       unsubEditor();
       unsubCursor();
@@ -3689,6 +3667,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         {...patternGestures}
       >
         {effectHoverTooltip}
+        {workerStarting && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none text-[10px] font-mono text-text-muted">
+            Starting pattern editor...
+          </div>
+        )}
         {/* Visual background — rendered inside the grid container so it doesn't bleed into channel headers */}
         {trackerVisualBg && dimensions.width > 0 && dimensions.height > 0 && (
           <div className="absolute inset-0 z-0 pointer-events-none">
