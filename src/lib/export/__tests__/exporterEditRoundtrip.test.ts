@@ -9,7 +9,7 @@
  * Single rows: ROW=id1,id2 (module-level measure, -t does not filter).
  *   DEVILBOX_GEN_RATCHET=1 npx vitest run src/lib/export/__tests__/exporterEditRoundtrip.test.ts
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { TrackerSong } from '@engine/TrackerReplayer';
@@ -24,6 +24,17 @@ import { installWasmNodeFetches } from '@lib/import/__tests__/helpers/dwNodeFetc
 import { readFixture, parseAs as parseAsPlain, invokeLayoutExport, invokeNamedExport } from './exporterHarness.shared';
 import { LAYOUT_FIXTURES, NAMED_EXPORTERS } from './exporterFixtures.map';
 import { parseHippel7VPlayed } from '@/engine/__tests__/helpers/tfmxWalkHost';
+import { loadKlysNodeHost, type KlysNodeHost } from '@/engine/__tests__/helpers/klysNodeHost';
+
+// KlysEngine needs an AudioWorkletNode; the exporter asks the singleton, so the Node host (the same WASM) answers in its place.
+const klys = vi.hoisted(() => ({ host: null as null | { serialize(): Uint8Array } }));
+vi.mock('@/engine/klystrack/KlysEngine', async (orig) => ({
+  ...(await orig<typeof import('@/engine/klystrack/KlysEngine')>()),
+  KlysEngine: {
+    hasInstance: () => !!klys.host,
+    getInstance: () => ({ serializeSong: async () => { const b = klys.host!.serialize(); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); } }),
+  },
+}));
 
 /** Hippel 7V draws its grid from the decoder's played pitches (the app's import supplies them); without them the grid is empty. */
 const parseAs = (rel: string, raw: Uint8Array) => /\.hip7$/i.test(rel)
@@ -62,8 +73,36 @@ function pickCell(song: TrackerSong): [number, number, number] | undefined {
   return fallback;
 }
 
+/**
+ * Klystrack: the exporter serializes the engine's song, not the grid, so the edit goes where the app's klysEdit.pushStep
+ * sends it (klys_set_pattern_step on the engine) and the bytes come from the real exportAsKlystrack.
+ */
+async function measureKlystrack(fx: string): Promise<Row> {
+  const raw = readFixture(fx);
+  const song = await parseAs(fx, raw);
+  const rows = song.uadeVariableLayout?.blockRows;
+  const fail = (detail: string): Row => ({ verdict: 'fail', edited: 'none', slotClean: null, detail });
+  if (!rows) return fail('no carrier blocks');
+  const pat = rows.findIndex((b) => b.some((c) => isPitch(c.note)));
+  if (pat < 0) return { verdict: 'no-edit-path', edited: 'none', slotClean: null, detail: 'no noted step' };
+  const step = rows[pat]!.findIndex((c) => isPitch(c.note));
+  const want = rows[pat]![step]!.note + 1;
+  const host: KlysNodeHost = await loadKlysNodeHost();
+  host.load(raw);
+  const s = host.getStep(pat, step);
+  host.setStep(pat, step, s.note + 1, s.instrument, s.ctrl, s.volume, s.command);
+  klys.host = host;
+  let out: Uint8Array;
+  try { out = await invokeNamedExport('klystrack', song); } catch (e) { return fail(`export: ${(e as Error).message}`); } finally { klys.host = null; }
+  const reread = (await parseAs(fx, out)).uadeVariableLayout?.blockRows;
+  const got = reread ? reread[pat]?.[step] : undefined;
+  if (got?.note === want) return { verdict: 'pass', edited: 'note', slotClean: null, detail: '' };
+  return { verdict: 'fail', edited: 'note', slotClean: null, detail: `note read back ${got?.note} want ${want}` };
+}
+
 async function measure(id: string): Promise<Row> {
   const fx = fixtureOf(id);
+  if (id === 'klystrack' && fx) return measureKlystrack(fx);
   const none = (verdict: Verdict, detail: string): Row => ({ verdict, edited: 'none', slotClean: null, detail });
   if (!fx) return none('no-edit-path', 'no fixture');
   let raw: Uint8Array, song: TrackerSong;
