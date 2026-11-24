@@ -1,5 +1,7 @@
 // MDSDRV converter: header bytes, command encoding, and a decode round-trip.
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseFurnaceSong } from '../../import/formats/FurnaceSongParser';
@@ -745,5 +747,28 @@ describe('FM phase-reset macro', () => {
   it('Solar_Man has no phase-reset macro and gets no such lossy line', async () => {
     const s = await convert('Solar_Man.fur');
     expect(s.lossy.some((l) => l.startsWith('FM phase-reset macro'))).toBe(false);
+  });
+});
+
+// tools/md-phase0/events.py feeds md-rom-check's key-on score. MDSDRV keys ext-ch3 operators one track at a time
+// (op1 off/on, then op2 off/on); Furnace keys them in one write. Both are the same two slot restarts on the chip.
+describe('events.py FM key-on starts', () => {
+  const decode = (tap: string) => {
+    const dir = mkdtempSync(join(tmpdir(), 'mdev-'));
+    try {
+      writeFileSync(join(dir, 'k.tap'), tap);
+      return execFileSync('python3', ['-I', join(ROOT, 'tools/md-phase0/events.py'), join(dir, 'k.tap')], { encoding: 'utf8' }).trim().split('\n');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  };
+  const w = (t: number, ...vals: number[]) => vals.map((v) => `${t} m a04000 28\n${t} m a04001 ${v.toString(16)}\n`).join('');
+
+  it('counts FM3 per risen slot and skips re-sent on slots, so Furnace and MDSDRV write orders match', () => {
+    // Ops 1+2 on at 0; at 0.1 Furnace retriggers 1+2 in one write pair, MDSDRV per operator; at 0.2 MDSDRV re-sends 3 (no edge).
+    const head = w(0, 0x12, 0x32);
+    const furnace = decode(head + w(0.1, 0xc2, 0xf2) + w(0.2));
+    const mdsdrv = decode(head + w(0.1, 0x32, 0x72, 0x72, 0xf2, 0xe2, 0xf2, 0xd2, 0xf2) + w(0.2, 0xf2));
+    const keyOns = (ev: string[]) => ev.filter((l) => l.includes('KEYON')).sort();
+    expect(keyOns(furnace)).toEqual(['0.0 FM3 KEYON 1', '0.0 FM3 KEYON 2', '0.1 FM3 KEYON 1', '0.1 FM3 KEYON 2', '0.1 FM3 KEYON 4', '0.1 FM3 KEYON 8']);
+    expect(keyOns(mdsdrv)).toEqual(keyOns(furnace));
   });
 });

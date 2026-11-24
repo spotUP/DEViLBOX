@@ -32,7 +32,7 @@ def writes_vgm(path):
         else: raise SystemExit(f'vgm command {c:02x} at {p - 1:x}')
 
 def events(path):
-    ym = {}; hi = {}; lat = None; per = {}; out = []
+    ym = {}; hi = {}; lat = None; per = {}; out = []; key = {}
     src = writes_vgm(path) if path.endswith('.vgm') else writes_tap(path)
     for t, chip, a, v in src:
         if chip == 'sn':
@@ -51,7 +51,14 @@ def events(path):
         r = ym.get(port)
         if port == 0 and r == 0x28:
             c = CH.get(v & 7)
-            if c: out.append((t, f'FM{c}', 'KEYON' if v & 0xF0 else 'KEYOFF', v >> 4))
+            if c:
+                # A slot restarts its envelope only on a 0->1 key bit (YM2612 per-operator key edge), so a write that re-sends
+                # already-on slots is no start. FM3 counts each risen slot: its operators are separate voices in ext-ch3 mode,
+                # keyed together by Furnace (one write) but one track at a time by MDSDRV (one write per operator).
+                rose = v >> 4 & ~key.get(c, 0); key[c] = v >> 4
+                if not v & 0xF0: out.append((t, f'FM{c}', 'KEYOFF', 0))
+                elif c == 3: out.extend((t, 'FM3', 'KEYON', 1 << i) for i in range(4) if rose >> i & 1)
+                elif rose: out.append((t, f'FM{c}', 'KEYON', v >> 4))
         elif 0x40 <= r <= 0x4F and r & 3 != 3: out.append((t, f'FM{port * 3 + (r & 3) + 1}', f'TL{(r >> 2) & 3}', v & 0x7F))
         elif 0xA4 <= r <= 0xA6: hi[port * 3 + r - 0xA4] = v
         elif 0xA0 <= r <= 0xA2:
