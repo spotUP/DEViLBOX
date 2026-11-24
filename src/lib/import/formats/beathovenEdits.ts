@@ -288,7 +288,7 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
         }
       }
     }
-    if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: the volume column is not stored per row in this format; that change was not written.`);
+    if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume edits are refused: the volume is a field of the 14-byte (12-byte in the basic engine) instrument record that the Instrument command points to, shared by every note that uses it, and the note commands carry no volume of their own; that change was not written.`);
     const now = cellEffects(cell), before = cellEffects(was);
     const arpOnly = fxChanged && src != null && src.noteOffset !== src.offset && now.length === before.length
       && now.every(([t, v], i) => t === before[i][0] && (v === before[i][1] || t === BTH_FX.arpeggio));
@@ -328,7 +328,7 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
       return;
     }
     if (cell.note < 1 || cell.note >= NOTE_OFF) {
-      warnings.push(`${PREFIX} ${where(at)}: a note cannot be removed or turned into a note off without changing the stream length; the edit was not written.`);
+      warnings.push(`${PREFIX} ${where(at)}: note off edits are refused: the replayer has no gate or release command (a note sounds until the next note or Rest/Hold word), so a note off has no byte to land in; the edit was not written.`);
       return;
     }
     const value = numberFor(original, cell.note, src.base, src.noteNum);
