@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { WavetableEditor } from './editors/WavetableEditor';
 import { STUDIO_LOOP_PARAMS } from './editors/wavetable/waveformOps';
+import { cyclePitch } from '../../utils/audio/cyclePitch';
 import { viewLoopToSample, newSampleConfig, type SampleLoopView } from '../../utils/audio/sampleLoopView';
 import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
@@ -1301,13 +1302,13 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
 
   // ─── Buffer processed (enhancer / resampler / beat sync / filter) ─
   const handleBufferProcessed = useCallback(
-    async (result: ProcessedResult, prefix: string, loop?: Partial<SampleLoopView>) => {
+    async (result: ProcessedResult, prefix: string, loop?: Partial<SampleLoopView>, pitch?: { baseNote: string; detune: number }) => {
       const { buffer: newBuf, dataUrl } = result;
       setAudioBuffer(newBuf);
       // The loop lives on the sample (see useSampleEditorState); sample.url wins over parameters.sampleUrl.
       const loopFields = loop ? viewLoopToSample(loop, instrument.sample, newBuf.duration, newBuf.sampleRate) : null;
       updateInstrument(instrument.id, {
-        ...(loopFields ? { sample: { ...(instrument.sample ?? newSampleConfig(dataUrl)), ...loopFields, url: dataUrl, audioBuffer: undefined } } : {}),
+        ...(loopFields ? { sample: { ...(instrument.sample ?? newSampleConfig(dataUrl)), ...loopFields, ...pitch, url: dataUrl, audioBuffer: undefined } } : {}),
         parameters: {
           ...instrument.parameters,
           sampleUrl: dataUrl,
@@ -2026,9 +2027,9 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         <SampleWaveformStudioModal
           audioBuffer={audioBuffer}
           onClose={() => setShowWaveformStudio(false)}
-          onCommit={async (buf, label, keepOpen) => {
+          onCommit={async (buf, label, keepOpen, pitch) => {
             const dataUrl = await bufferToDataUrl(buf);
-            handleBufferProcessed({ buffer: buf, dataUrl }, label, STUDIO_LOOP_PARAMS);
+            handleBufferProcessed({ buffer: buf, dataUrl }, label, STUDIO_LOOP_PARAMS, pitch);
             if (!keepOpen) setShowWaveformStudio(false);
           }}
         />
@@ -2332,7 +2333,7 @@ const RecordingEffectsDialog: React.FC<{ onClose: () => void }> = ({ onClose }) 
 const SampleWaveformStudioModal: React.FC<{
   audioBuffer: AudioBuffer | null;
   onClose: () => void;
-  onCommit: (buf: AudioBuffer, label: string, keepOpen?: boolean) => Promise<void>;
+  onCommit: (buf: AudioBuffer, label: string, keepOpen?: boolean, pitch?: { baseNote: string; detune: number }) => Promise<void>;
 }> = ({ audioBuffer, onClose, onCommit }) => {
   // Build initial WavetableData from the existing sample (resampled to one cycle)
   // or default if there's no sample.
@@ -2401,7 +2402,8 @@ const SampleWaveformStudioModal: React.FC<{
       out[i] = cycle[i % cycle.length];
     }
 
-    await onCommit(buf, 'Waveform Studio', keepOpen);
+    // Fundamental = one cycle per sampleRate/cycle.length Hz; the key plays relative to it.
+    await onCommit(buf, 'Waveform Studio', keepOpen, cyclePitch(ctx.sampleRate, cycle.length));
   }, [wavetable, onCommit]);
 
   // Live preview: every edit re-renders and writes the sample (same path as

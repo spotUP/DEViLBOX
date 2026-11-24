@@ -9,6 +9,7 @@ import { SynthRegistry } from '../SynthRegistry';
 import type { SynthDescriptor } from '../SynthDescriptor';
 import { getNormalizedVolume } from '../../factories/volumeNormalization';
 import type { InstrumentConfig } from '@typedefs/instrument';
+import { DEFAULT_SAMPLE_BASE_NOTE } from '@typedefs/instrument';
 import { periodToNoteIndex, getPeriodExtended } from '../../effects/PeriodTables';
 
 /**
@@ -46,7 +47,7 @@ function handlePeriodPlayback(
     player.playbackRate = playbackRate;
   } else {
     // Keyboard playback — calculate rate from note
-    const baseNote = config.sample?.baseNote || 'C3';
+    const baseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
     const baseFreq = Tone.Frequency(baseNote).toFrequency();
     const targetFreq = Tone.Frequency(note).toFrequency();
     player.playbackRate = targetFreq / baseFreq;
@@ -92,7 +93,7 @@ const samplerDescs: SynthDescriptor[] = [
       // to match SampleEditor's display priority and avoid stale data URLs)
       const params = config.parameters as Record<string, string | number> | undefined;
       const sampleUrl = config.sample?.url || params?.sampleUrl as string | undefined;
-      const baseNote = config.sample?.baseNote || 'C3';
+      const baseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
 
       if (sampleUrl) {
         const urls: { [note: string]: string } = {};

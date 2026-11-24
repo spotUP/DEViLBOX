@@ -200,6 +200,9 @@ export interface InstrumentMetadata {
   hippelKeySeq?: number;
 }
 
+/** Note at which a Sampler plays at playbackRate 1 when the sample names none. */
+export const DEFAULT_SAMPLE_BASE_NOTE = 'C4';
+
 export interface SampleConfig {
   audioBuffer?: ArrayBuffer;
   url: string;

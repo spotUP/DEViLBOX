@@ -11,6 +11,7 @@ import { watchSignal, isSounding, subscribeSounding } from './audio/signalPresen
 import { EngineGainDuck } from './engineGainDuck';
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
+import { DEFAULT_SAMPLE_BASE_NOTE } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
 import { isDevilboxSynth } from '@typedefs/synth';
 import { DB303Synth, DB303Synth as JC303Synth } from './db303';
@@ -2229,7 +2230,7 @@ export class ToneEngine {
         let sampleUrl = (config.sample?.url || config.parameters?.sampleUrl) as string | undefined;
         // CRITICAL FIX: Use the actual base note from the sample config, not hardcoded C4
         // Strip dash from tracker-style notes (C-4 → C4) for Tone.js compatibility
-        const rawBaseNote = config.sample?.baseNote || 'C4';
+        const rawBaseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
         const baseNote = rawBaseNote.replace('-', '');
         const hasLoop = config.sample?.loop === true;
 
@@ -3292,7 +3293,7 @@ export class ToneEngine {
           } else {
             // No period provided (keyboard playback) - calculate playback rate from note
             // The sample's base note is the pitch at playbackRate 1.0
-            const baseNote = config.sample?.baseNote || 'C4';
+            const baseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
             const baseFreq = cachedFrequency(baseNote);
             const targetFreq = cachedFrequency(note);
             const playbackRate = targetFreq / baseFreq;
@@ -3316,7 +3317,7 @@ export class ToneEngine {
 
           if (isSlicedSample) {
             // Play only the slice range using Tone.Player
-            const baseNote = config.sample?.baseNote || 'C4';
+            const baseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
             const samplerInternal = sampler as unknown as { _buffers?: { get?: (note: string) => Tone.ToneAudioBuffer | undefined; _buffers?: Record<string, Tone.ToneAudioBuffer> } };
             const buffer = samplerInternal._buffers?.get?.(baseNote) ||
                            samplerInternal._buffers?._buffers?.[baseNote];
@@ -3402,7 +3403,7 @@ export class ToneEngine {
           player.playbackRate = playbackRate;
         } else {
           // No period provided (keyboard playback) - calculate playback rate from note
-          const baseNote = config.sample?.baseNote || 'C4';
+          const baseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
           const baseFreq = cachedFrequency(baseNote);
           const targetFreq = cachedFrequency(note);
           const playbackRate = targetFreq / baseFreq;
@@ -4149,7 +4150,7 @@ export class ToneEngine {
             (voiceNode as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
           } else {
             // FIX: Handle non-period playback for voice nodes (matches triggerNoteAttack)
-            const baseNote = config.sample?.baseNote || 'C4';
+            const baseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
             const baseFreq = cachedFrequency(baseNote);
             const targetFreq = cachedFrequency(note);
             const playbackRate = targetFreq / baseFreq;
@@ -4385,7 +4386,7 @@ export class ToneEngine {
 
           if (isSlicedSample) {
             // Play only the slice range using Tone.Player
-            const baseNote = config.sample?.baseNote || 'C4';
+            const baseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
             const samplerInternal = sampler as unknown as { _buffers?: { get?: (note: string) => Tone.ToneAudioBuffer | undefined; _buffers?: Record<string, Tone.ToneAudioBuffer> } };
             const buffer = samplerInternal._buffers?.get?.(baseNote) ||
                            samplerInternal._buffers?._buffers?.[baseNote];
@@ -4436,7 +4437,7 @@ export class ToneEngine {
           } else if (sampleOffset && sampleOffset > 0) {
             // 9xx Sample offset: Use Player for offset support
             // Tone.Sampler doesn't support sample offset, so we create a one-shot Player
-            const baseNote = config.sample?.baseNote || 'C4';
+            const baseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
             const samplerInternal = sampler as unknown as { _buffers?: { get?: (note: string) => Tone.ToneAudioBuffer | undefined; _buffers?: Record<string, Tone.ToneAudioBuffer> } };
             const buffer = samplerInternal._buffers?.get?.(baseNote) ||
                            samplerInternal._buffers?._buffers?.[baseNote];
