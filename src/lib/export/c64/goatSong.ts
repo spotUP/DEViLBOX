@@ -85,6 +85,41 @@ const at = (t: Track | undefined, tick: number, dflt: number): number => {
   return t.vals[start + ((tick - start) % (t.vals.length - start))];
 };
 
+/** Pulse program for one duty value per tick: a $8X set row, then runs of equal steps as modulation rows (left 1-127 ticks,
+ * right signed speed added each tick, player.s mt_pulsemod), so long duty sweeps fit GT's 255-row table. The loop tick
+ * always starts with a set row, since a step row there would add to the value at the end of the loop instead.
+ * A run continues while the played value stays within `tol` of Furnace's (LFO macros round to uneven steps); `err` is the largest miss. */
+export function pulseRows(vals: number[], loop: number, tol = 0): { rows: Array<[number, number]>; loopRow: number; err: number } {
+  const rows: Array<[number, number]> = [];
+  let loopRow = -1, err = 0;
+  for (let t = 0; t < vals.length;) {
+    if (t === loop) loopRow = rows.length;
+    rows.push([0x80 | ((vals[t] >> 8) & 15), vals[t] & 0xff]);
+    let cur = vals[t];
+    t++;
+    while (t < vals.length && t !== loop) {
+      // Furnace's own step, not the gap to the drifted value (that overshoots and the next run swings back further).
+      const d = s12(vals[t] - vals[t - 1]);
+      if (d < -128 || d > 127) break;
+      let n = 0, runErr = 0;
+      for (; n < 127 && t + n < vals.length && (n === 0 || t + n !== loop); n++) {
+        const miss = Math.abs(s12(cur + d * (n + 1) - vals[t + n]));
+        if (miss > tol) break;
+        runErr = Math.max(runErr, miss);
+      }
+      if (!n) break;
+      rows.push([n, d & 0xff]);
+      cur += d * n;
+      err = Math.max(err, runErr);
+      t += n;
+    }
+  }
+  return { rows, loopRow, err };
+}
+/** Largest pulse width miss (of 4096) a modulation run may take to fit an LFO duty macro in the pulse table. */
+const PULSE_TOL = 8;
+const s12 = (v: number) => (((v & 4095) << 20) >> 20);
+
 /** One instrument: ADSR, wave program (waveform + gate, arpeggio), pulse program, filter program, from the
  * instrument and its arp / wave / duty / cutoff / filter mode / resonance macros. */
 function instrumentOf(ins: FurnaceInstrument | undefined, idx: number, tables: GTSongData['tables'], lossy: Lossy,
@@ -136,9 +171,9 @@ function instrumentOf(ins: FurnaceInstrument | undefined, idx: number, tables: G
     c.dutyIsAbs ? (_, v) => v & 4095 : (p, v) => (p - (multiplyRel ? s8(v) * 4 : v)) & 4095, lossy, 'duty');
   if (c.pulseOn || duty || wav?.vals.some((v) => v & 4)) {
     const ps = schedule([duty], lossy, 'duty');
-    const rows: Array<[number, number]> = [];
-    for (let t = 0; t < ps.end; t++) { const d = at(duty, t, c.duty); rows.push([0x80 | ((d >> 8) & 15), d & 0xff]); }
-    g.ptr[1] = program(1, rows, ps.loop);
+    const { rows, loopRow, err } = pulseRows(Array.from({ length: ps.end }, (_, t) => at(duty, t, c.duty)), ps.loop, PULSE_TOL);
+    if (err) lossy.add(`duty macro steps rounded (up to ${PULSE_TOL}/4096 pulse width)`);
+    g.ptr[1] = program(1, rows, loopRow);
   }
 
   if (c.initFilter) {
