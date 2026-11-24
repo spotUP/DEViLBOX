@@ -3007,6 +3007,11 @@ mds_dummy_update
 mds_pcm2_ch_update
 	btst	#cf+cf_pcm_control,flag
 	bne.w	mds_pcm2_update
+	move.b	t_op_mask(twork),d4			; DEViLBOX: FM3 operator track on this id
+	bpl.s	@no_fm3
+	andi.b	#$7f,d4
+	bne.w	mds_fm3_update
+@no_fm3
 	bclr	#pe_pcm2,w_pcm_mode(work)
 	beq.w	mds_update_return
 	mds_z80_pcm_stop_i	1
@@ -3018,6 +3023,11 @@ mds_pcm2_ch_update
 mds_pcm3_ch_update
 	btst	#cf+cf_pcm_control,flag
 	bne.w	mds_pcm3_update
+	move.b	t_op_mask(twork),d4			; DEViLBOX: FM3 operator track on this id
+	bpl.s	@no_fm3
+	andi.b	#$7f,d4
+	bne.w	mds_fm3_update
+@no_fm3
 	bclr	#pe_pcm3,w_pcm_mode(work)
 	beq.w	mds_update_return
 	mds_z80_pcm_stop_i	2
