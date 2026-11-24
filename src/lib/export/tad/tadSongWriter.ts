@@ -175,6 +175,27 @@ function snesEchoFlags(raw: string | undefined) {
   };
 }
 
+/**
+ * Row lengths (Furnace ticks * k on entry) in TAD ticks from absolute time, so the integer timer's rounding does not
+ * drift (60 Hz: timer 133 vs 133.33 runs 0.25% fast, about 50 ms late after 20 s). Sound effects rescale to 125 Hz.
+ * A clamped timer (already warned) keeps the Furnace tick count: correcting it would merge rows.
+ */
+export function tadRowTicks(rows: Array<{ ticks: number; rate: number; timer?: number; row?: number }>, timer: number, k: number, sfx: boolean): void {
+  let acc = 0, prev = 0, t = timer;
+  rows.forEach((r, i) => {
+    if (r.timer) t = r.timer;
+    // Songs round per pattern (no carried error), so identical patterns get identical ticks for subroutine dedup.
+    if (!sfx && r.row === 0) { acc = 0; prev = 0; }
+    const f = sfx ? SFX_TICK_HZ / (r.rate * k) : 8000 / (r.rate * k * t);
+    acc += r.ticks * (sfx || Math.abs(f - 1) <= 0.005 ? f : 1);
+    // Songs correct only on the last row of a pattern, so repeated patterns stay identical for subroutine dedup
+    // (the error stays under about one tick per pattern).
+    if (!sfx && rows[i + 1]?.row !== 0 && i < rows.length - 1) { prev += r.ticks; return; }
+    const n = sfx ? Math.round(acc) : Math.max(prev + 1, Math.round(acc));
+    r.ticks = n - prev; prev = n;
+  });
+}
+
 export function writeTadSong(input: TadSongInput): TadSongResult {
   return writeTad(input, false);
 }
@@ -313,11 +334,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     if (seen !== undefined) { if (!sfx) loopRow = seen; break; }
   }
   if (rows.length >= ROW_GUARD) warnings.push('The song did not loop within 100000 rows; it is cut there.');
-  if (sfx) {
-    // Rescale row lengths to 125 Hz; accumulate so rounding does not drift.
-    let acc = 0, prev = 0;
-    for (const r of rows) { acc += r.ticks / k * SFX_TICK_HZ / r.rate; const t = Math.round(acc); r.ticks = t - prev; prev = t; }
-  }
+  tadRowTicks(rows, timer, k, sfx);
 
   // Notes on channels of other chips cannot play.
   for (let ch = 0; ch < nCh; ch++) {

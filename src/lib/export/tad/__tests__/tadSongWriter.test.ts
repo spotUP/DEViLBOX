@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { parseFurnaceSong, toSequencerSamples, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
 import { openTadSession, type CreateTadCompiler } from '../tadCompilerWasm';
-import { writeTadSong, panSplit, stepCompileState, initialCompileState, noteSemitone } from '../tadSongWriter';
+import { writeTadSong, panSplit, stepCompileState, initialCompileState, noteSemitone, tadRowTicks } from '../tadSongWriter';
 import { tadProjectJson, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 
 const DIR = resolve(__dirname, '../../../../../public/data/songs/furnace/snes');
@@ -326,4 +326,17 @@ describe('panSplit', () => {
     expect(factored.length).toBeLessThan(inline.length);
     expect(expand(factored)).toEqual(expand(inline));
   }, 60000);
+});
+
+describe('tadRowTicks', () => {
+  it('keeps 60 Hz rows on absolute time with timer 133 (no 0.25% drift), clamped timers untouched', () => {
+    const rows = Array.from({ length: 400 }, (_, i) => ({ ticks: 6, rate: 60, row: i % 64 }));
+    tadRowTicks(rows, 133, 1, false);
+    const sum = rows.reduce((s, r) => s + r.ticks, 0);
+    expect(sum).toBe(Math.round(2400 * (8000 / 60) / 133)); // 2406 TAD ticks = 40 s at 16.625 ms
+    expect(rows.every((r, i) => r.ticks === 6 || (r.ticks === 7 && i % 64 === 63))).toBe(true);
+    const fast = Array.from({ length: 10 }, () => ({ ticks: 6, rate: 200 }));
+    tadRowTicks(fast, 64, 1, false); // 200 Hz needs timer 40: clamped to 64, warned elsewhere
+    expect(fast.every((r) => r.ticks === 6)).toBe(true);
+  });
 });
