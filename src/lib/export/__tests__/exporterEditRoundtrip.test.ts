@@ -20,6 +20,7 @@ import { useFormatStore } from '@/stores/useFormatStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { editHivelyCell } from '@/components/hively/hivelyEdit';
 import { LAYOUT_EXPORTERS } from '../nativeExportRouter';
+import { installWasmNodeFetches } from '@lib/import/__tests__/helpers/dwNodeFetch';
 import { readFixture, parseAs, invokeLayoutExport, invokeNamedExport } from './exporterHarness.shared';
 import { LAYOUT_FIXTURES, NAMED_EXPORTERS } from './exporterFixtures.map';
 
@@ -123,6 +124,8 @@ async function measure(id: string): Promise<Row> {
 }
 
 const results: Record<string, Row> = {};
+// benDaglish and davidWhittaker draw their grid from a WASM walk at import; without these bundles the parse falls back to an empty scope view.
+installWasmNodeFetches([['bd', 'Bd'], ['davidwhittaker', 'DavidWhittaker']]);
 const runAll = (async () => { for (const id of ids) results[id] = await measure(id); })();
 
 describe('exporter edit round-trip (byte-exact rows)', () => {

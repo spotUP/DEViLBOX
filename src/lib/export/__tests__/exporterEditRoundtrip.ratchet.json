@@ -1,5 +1,11 @@
 {
   "results": {
+    "aProSys": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
     "actionamics": {
       "verdict": "pass",
       "edited": "note",
@@ -7,6 +13,18 @@
       "detail": ""
     },
     "activisionPro": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "adPlug": {
+      "verdict": "fail",
+      "edited": "instrument",
+      "slotClean": null,
+      "detail": "instrument read back 0 want 3"
+    },
+    "amosMusicBank": {
       "verdict": "pass",
       "edited": "note",
       "slotClean": null,
@@ -24,10 +42,22 @@
       "slotClean": true,
       "detail": ""
     },
+    "artAndMagic": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
     "artOfNoise": {
       "verdict": "pass",
       "edited": "note",
       "slotClean": true,
+      "detail": ""
+    },
+    "ashleyHogg": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
       "detail": ""
     },
     "beathoven": {
@@ -37,12 +67,42 @@
       "detail": ""
     },
     "benDaglish": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": null,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
+    },
+    "benDaglishSID": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "c67": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "chuckBiscuits": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
+    "composer667": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
     },
     "coreDesign": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
+    "dariusZendeh": {
       "verdict": "pass",
       "edited": "note",
       "slotClean": true,
@@ -61,10 +121,10 @@
       "detail": ""
     },
     "davidWhittaker": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": null,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "deltaMusic1": {
       "verdict": "pass",
@@ -90,7 +150,31 @@
       "slotClean": true,
       "detail": ""
     },
+    "digiBoosterPro": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "digitalMugician": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
     "digitalSonixChrome": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
+    "digitalSymphony": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "dsm_dyn": {
       "verdict": "pass",
       "edited": "note",
       "slotClean": true,
@@ -168,6 +252,12 @@
       "slotClean": null,
       "detail": ""
     },
+    "gameMusicCreator": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
     "glueMon": {
       "verdict": "pass",
       "edited": "note",
@@ -204,6 +294,18 @@
       "slotClean": null,
       "detail": ""
     },
+    "iffSmus": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "ims": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
     "inStereo1": {
       "verdict": "pass",
       "edited": "note",
@@ -226,6 +328,24 @@
       "verdict": "pass",
       "edited": "note",
       "slotClean": true,
+      "detail": ""
+    },
+    "jankoMrsicFlogel": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "jasonBrooke": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "jasonPage": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
       "detail": ""
     },
     "jeroenTel": {
@@ -264,6 +384,18 @@
       "slotClean": true,
       "detail": "instrument read back -1 want 3 (bytes unchanged)"
     },
+    "kris": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
+    "krisHatlelid": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
     "lme": {
       "verdict": "pass",
       "edited": "note",
@@ -283,6 +415,12 @@
       "detail": ""
     },
     "markCooksey": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "markII": {
       "verdict": "pass",
       "edited": "note",
       "slotClean": null,
@@ -312,10 +450,22 @@
       "slotClean": null,
       "detail": ""
     },
+    "mikeDavies": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
     "mmdc": {
       "verdict": "pass",
       "edited": "note",
       "slotClean": null,
+      "detail": ""
+    },
+    "mod": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
       "detail": ""
     },
     "monotone": {
@@ -340,6 +490,18 @@
       "verdict": "pass",
       "edited": "note",
       "slotClean": null,
+      "detail": ""
+    },
+    "musicLine": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "nru": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
       "detail": ""
     },
     "octaMED": {
@@ -402,6 +564,12 @@
       "slotClean": true,
       "detail": ""
     },
+    "psa": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
     "pt41": {
       "verdict": "pass",
       "edited": "note",
@@ -450,6 +618,12 @@
       "slotClean": null,
       "detail": ""
     },
+    "robHubbardST": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
     "ronKlaren": {
       "verdict": "pass",
       "edited": "note",
@@ -463,10 +637,22 @@
       "detail": ""
     },
     "scumm": {
-      "verdict": "fail",
-      "edited": "instrument",
-      "slotClean": true,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "seanConnolly": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "seanConran": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
     },
     "sidMon2": {
       "verdict": "pass",
@@ -484,6 +670,18 @@
       "verdict": "pass",
       "edited": "note",
       "slotClean": true,
+      "detail": ""
+    },
+    "sonicArranger": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "sonicArrangerSas": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
       "detail": ""
     },
     "soundControl": {
@@ -522,7 +720,25 @@
       "slotClean": null,
       "detail": ""
     },
+    "soundfx": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
+    "specialFX": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
     "speedySystem": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "steveBarrett": {
       "verdict": "pass",
       "edited": "note",
       "slotClean": null,
@@ -540,6 +756,12 @@
       "slotClean": true,
       "detail": ""
     },
+    "stp": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
     "stx": {
       "verdict": "pass",
       "edited": "note",
@@ -547,6 +769,12 @@
       "detail": ""
     },
     "sunTronic": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
+      "detail": ""
+    },
+    "symphoniePro": {
       "verdict": "pass",
       "edited": "note",
       "slotClean": null,
@@ -570,10 +798,22 @@
       "slotClean": true,
       "detail": ""
     },
+    "synthesis": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
     "tcbTracker": {
       "verdict": "pass",
       "edited": "note",
       "slotClean": true,
+      "detail": ""
+    },
+    "tfmx": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": null,
       "detail": ""
     },
     "tfmx7v": {
@@ -581,6 +821,12 @@
       "edited": "instrument",
       "slotClean": true,
       "detail": "instrument read back 0 want 3 (bytes unchanged)"
+    },
+    "thomasHermann": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
     },
     "timFollin": {
       "verdict": "pass",
@@ -624,13 +870,25 @@
       "slotClean": null,
       "detail": ""
     },
+    "unic": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
     "wallyBeben": {
       "verdict": "pass",
       "edited": "note",
       "slotClean": true,
       "detail": ""
     },
-    "dariusZendeh": {
+    "xmf": {
+      "verdict": "pass",
+      "edited": "note",
+      "slotClean": true,
+      "detail": ""
+    },
+    "zoundMonitor": {
       "verdict": "pass",
       "edited": "note",
       "slotClean": true,
