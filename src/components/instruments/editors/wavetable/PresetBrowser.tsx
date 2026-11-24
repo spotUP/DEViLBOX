@@ -4,15 +4,24 @@
  * Sources:
  * - Factory: FURNACE_WAVETABLE_PRESETS (100+ shipped presets)
  * - User: localStorage-backed list saved from the studio
+ * - From Songs: real waves harvested from the song corpus
+ *   (public/data/wavetables/corpus-waves.json, fetched on first open), chip filter
  *
  * Click to load, double-click to load + close.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Search, Save, X } from 'lucide-react';
 import { WaveformThumbnail } from '@components/instruments/shared';
 import { FURNACE_WAVETABLE_PRESETS, type FurnaceWavetablePreset } from '@constants/furnaceWavetablePresets';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { resample, requantize } from './waveformOps';
+import type { CorpusWave } from './corpusWaves';
+
+const CORPUS_URL = '/data/wavetables/corpus-waves.json';
+const ALL_CHIPS = 'all';
+// shortcut: the grid shows the first matches only; add paging if owners browse deeper.
+const CORPUS_GRID_LIMIT = 240;
 
 const USER_PRESET_KEY = 'devilbox:wavetable:user-presets';
 
@@ -52,7 +61,7 @@ interface PresetBrowserProps {
   onLoad: (data: number[], len: number, max: number) => void;
 }
 
-type Category = 'all' | '32x16' | '32x32' | '128x256' | 'user';
+type Category = 'all' | '32x16' | '32x32' | '128x256' | 'songs' | 'user';
 
 export const PresetBrowser: React.FC<PresetBrowserProps> = ({
   currentLen, currentMax, currentData, onLoad,
@@ -60,12 +69,41 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({
   const [category, setCategory] = useState<Category>('all');
   const [query, setQuery] = useState('');
   const [userPresets, setUserPresets] = useState<UserPreset[]>(() => loadUserPresets());
+  const [corpus, setCorpus] = useState<CorpusWave[] | null>(null);
+  const [corpusError, setCorpusError] = useState<string | null>(null);
+  const [chip, setChip] = useState<string>(ALL_CHIPS);
+
+  useEffect(() => {
+    if (category !== 'songs' || corpus) return;
+    let cancelled = false;
+    fetch(CORPUS_URL)
+      .then((r) => (r.ok ? r.json() as Promise<CorpusWave[]> : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((waves) => { if (!cancelled) setCorpus(waves); })
+      .catch((err: Error) => { if (!cancelled) setCorpusError(err.message); });
+    return () => { cancelled = true; };
+  }, [category, corpus]);
+
+  const chipOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const w of corpus ?? []) for (const c of w.chips) counts.set(c, (counts.get(c) ?? 0) + 1);
+    return [
+      { value: ALL_CHIPS, label: `All chips (${corpus?.length ?? 0})` },
+      ...[...counts].sort((a, b) => a[0].localeCompare(b[0])).map(([c, n]) => ({ value: c, label: `${c} (${n})` })),
+    ];
+  }, [corpus]);
+
+  const corpusMatches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (corpus ?? []).filter((w) =>
+      (chip === ALL_CHIPS || w.chips.includes(chip)) && (!q || w.name.toLowerCase().includes(q)));
+  }, [corpus, chip, query]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (category === 'user') {
       return userPresets.filter((p) => !q || p.name.toLowerCase().includes(q));
     }
+    if (category === 'songs') return [];
     return FURNACE_WAVETABLE_PRESETS.filter((p) => {
       if (category !== 'all' && p.category !== category) return false;
       if (q && !p.name.toLowerCase().includes(q)) return false;
@@ -73,7 +111,7 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({
     });
   }, [category, query, userPresets]);
 
-  const handleLoadFactory = (preset: FurnaceWavetablePreset) => {
+  const handleLoadFactory = (preset: Pick<FurnaceWavetablePreset, 'data' | 'max'>) => {
     // Resample to current length, requantize to current max
     const resampled = resample(preset.data, currentLen);
     const requantized = requantize(resampled, preset.max, currentMax);
@@ -113,6 +151,7 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({
     { id: '32x16', label: '4-bit' },
     { id: '32x32', label: '5-bit' },
     { id: '128x256', label: '8-bit' },
+    { id: 'songs', label: 'From Songs' },
     { id: 'user', label: 'User' },
   ];
 
@@ -148,6 +187,14 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({
             </button>
           ))}
         </div>
+        {category === 'songs' && (
+          <CustomSelect
+            value={chip}
+            onChange={setChip}
+            options={chipOptions}
+            className="bg-dark-bg border border-dark-border rounded px-1.5 py-1 text-[10px] font-mono text-text-primary hover:border-accent-highlight/50 focus:outline-none focus:border-accent-highlight/50"
+          />
+        )}
         <div className="flex-1 flex items-center gap-1 bg-dark-bg border border-dark-border rounded px-2">
           <Search size={11} className="text-text-muted" />
           <input
@@ -165,7 +212,38 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({
         className="grid gap-1.5 max-h-64 overflow-y-auto pr-1"
         style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))' }}
       >
-        {category === 'user' ? (
+        {category === 'songs' ? (
+          <>
+            {corpusMatches.slice(0, CORPUS_GRID_LIMIT).map((wave, i) => (
+              <button
+                key={`${i}-${wave.name}`}
+                onClick={() => handleLoadFactory(wave)}
+                title={`${wave.name} (${wave.chips.join(', ')})`}
+                className="flex flex-col items-center gap-0.5 p-1.5 rounded border border-dark-border bg-dark-bg hover:border-accent-highlight/50 transition-colors"
+              >
+                <WaveformThumbnail
+                  data={wave.data}
+                  maxValue={wave.max}
+                  width={80} height={30}
+                  color="#22d3ee"
+                  style="line"
+                />
+                <span className="font-mono text-[9px] text-text-primary truncate w-full text-center">
+                  {wave.name}
+                </span>
+                <span className="font-mono text-[8px] text-text-muted truncate w-full text-center">
+                  {wave.chips.join(', ')} {wave.len}×{wave.max + 1}
+                </span>
+              </button>
+            ))}
+            <div className="col-span-full text-center text-[10px] font-mono text-text-muted py-2">
+              {corpusError ? `Could not load song waves: ${corpusError}`
+                : !corpus ? 'Loading waves from songs...'
+                : corpusMatches.length > CORPUS_GRID_LIMIT ? `Showing ${CORPUS_GRID_LIMIT} of ${corpusMatches.length} waves; search by song name to narrow down.`
+                : corpusMatches.length === 0 ? 'No matching waves.' : `${corpusMatches.length} waves.`}
+            </div>
+          </>
+        ) : category === 'user' ? (
           <>
             {(filtered as UserPreset[]).map((preset) => (
               <div key={preset.id} className="relative group">
@@ -225,7 +303,7 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({
             </button>
           ))
         )}
-        {category !== 'user' && filtered.length === 0 && (
+        {category !== 'user' && category !== 'songs' && filtered.length === 0 && (
           <div className="col-span-full text-center text-[10px] font-mono text-text-muted py-4">
             No matching presets.
           </div>
