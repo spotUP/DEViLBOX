@@ -250,9 +250,10 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
   const lastNote = [-1, -1, -1], curIns = [-1, -1, -1];
   const arpOn: Array<[number, number] | null> = [null, null, null];
   const arpProgs = new Map<string, number>();
-  // Furnace c64 E1xy/E2xy shorthand: x*0.0889 semitones per tick (measured on yeah!: x=15 slides 1.33 semitones, a constant 7.4 % of the frequency, per frame).
-  // GT slides linearly, so pick the speed that covers the same distance in the same whole number of ticks.
-  const slideTicks = (x: number, y: number): number => Math.max(1, Math.round(y / (x * 0.0889)));
+  // Furnace E1xy/E2xy: portaSpeed x*4 times the linear-pitch slide speed (default 4), in 1/128 semitone per tick
+  // (measured on yeah!: E2FC slides 187.5 cents per frame). GT slides linearly, so pick the speed that covers the same distance in the same whole number of ticks.
+  const slideSemis = (Number(m.compatFlags?.pitchSlideSpeed) || 4) * 4 / 128;
+  const slideTicks = (x: number, y: number): number => Math.max(1, Math.round(y / (x * slideSemis)));
   const speedRow = (spd: number): number => {
     const t = tables[3];
     for (let i = 0; i < t.left.length; i++) if (t.left[i] === (spd >> 8) && t.right[i] === (spd & 255) && i + 1 !== funk) return i + 1;
@@ -272,8 +273,8 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
     arpProgs.set(key, pos);
     return pos;
   };
-  // Wave program for E1xy/E2xy on a row WITH a note (toneporta would not retrigger): waveform, wave-table slide command at speed x*4,
-  // delay until the slide has covered y semitones, then a stop command. Furnace stops at the target; GT stops after the same tick count.
+  // Wave program for E1xy/E2xy on a row WITH a note (toneporta would not retrigger): waveform, then one wave-table slide command per tick
+  // until the slide has covered y semitones (player.s mt_execwavecmd runs a wave-table portamento for that one frame only; delay rows do not repeat it).
   // shortcut: replaces the instrument's own wave/arpeggio program for that note; ticks are rounded to whole frames.
   const slideProgs = new Map<string, number>();
   const sidFreq = (n: number): number => 440 * 2 ** ((n - 57) / 12) * 16777216 / (ntsc ? 1022730 : 985248);
@@ -287,9 +288,8 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
     const ticks = slideTicks(x, Math.abs(dest - note)), spd = Math.max(1, Math.round(Math.abs(sidFreq(dest) - sidFreq(note)) / ticks));
     tb.left.push(w >= 0x10 ? w : 0xe0 | w); tb.right.push(0);
     // Wave-table commands are $F0+cmd ($E0-$EF is a silent waveform, which left the pitch constant).
-    tb.left.push(0xf0 | (dest > note ? 1 : 2)); tb.right.push(speedRow(spd));
-    for (let left = ticks - 1; left > 0; left -= 15) { tb.left.push(Math.min(15, left)); tb.right.push(0); }
-    tb.left.push(0xf0); tb.right.push(0);
+    const sp = speedRow(spd);
+    for (let t = 0; t < ticks; t++) { tb.left.push(0xf0 | (dest > note ? 1 : 2)); tb.right.push(sp); }
     tb.left.push(0xff); tb.right.push(0);
     slideProgs.set(key, pos);
     return pos;
@@ -330,7 +330,7 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
                 if (!v && !arpOn[ch]) continue; // 0000 with no arpeggio running is no effect
                 arpSeen = true; arpOn[ch] = v ? [v >> 4, v & 15] : null;
                 if (curIns[ch] < 0 || !m.instruments[curIns[ch]]?.c64 || curIns[ch] >= GT_MAX_INSTR - 1) lossy.add('effect 00 (arpeggio without an SID instrument)');
-                else { c = 7; d = v ? arpProgram(curIns[ch], v >> 4, v & 15) : instruments[curIns[ch] + 1].ptr[0]; }
+                else { c = 8; d = v ? arpProgram(curIns[ch], v >> 4, v & 15) : instruments[curIns[ch] + 1].ptr[0]; }
               } else if (t === 0x11) { c = 0x0c; d = coarseCutoffByte(v); }
               else if (t >= 0x40 && t <= 0x47) { c = 0x0c; d = fineCutoffByte(t, v); }
               else if ((t === 0xe1 || t === 0xe2) && note === GT_REST && lastNote[ch] >= 0 && v >> 4) {
@@ -341,7 +341,7 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
               } else if ((t === 0xe1 || t === 0xe2) && note !== GT_REST && note !== GT_KEYOFF && v >> 4 && curIns[ch] >= 0 && m.instruments[curIns[ch]]?.c64 && curIns[ch] < GT_MAX_INSTR - 1) {
                 const dest = lastNote[ch] + (t === 0xe1 ? 1 : -1) * (v & 15);
                 if (dest < 0 || dest > 95 || !(v & 15)) lossy.add(`effect ${name} (target outside GT range)`);
-                else { c = 7; d = slideProgram(curIns[ch], lastNote[ch], dest, v >> 4); lastNote[ch] = dest; }
+                else { c = 8; d = slideProgram(curIns[ch], lastNote[ch], dest, v >> 4); lastNote[ch] = dest; }
               } else if (t === 0x14) lossy.add('effect 14 (filter mode; GT sets it in a filter program only)');
               else lossy.add(`effect ${name}`);
               if (c) { if (cmd) lossy.add(`effect ${name} (second command on the row)`); else { cmd = c; data = d; } }

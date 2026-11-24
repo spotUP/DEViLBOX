@@ -19,10 +19,12 @@ describe('Furnace C64 effects in GoatTracker song data', () => {
     expect(lossy).not.toMatch(/effect (11|40|42|00)\b/);
     const cmds = new Set(g.song.patterns.flatMap((p) => p.map((r) => r[2])));
     expect(cmds.has(0x0c)).toBe(true);
-    expect(cmds.has(0x07)).toBe(true);
+    expect(cmds.has(0x08)).toBe(true); // CMD_SETWAVEPTR; 7 (CMD_SETWAVE) would write the table index into the waveform register
     expect(lossy).not.toMatch(/effect e[12]/); // slide on a row with a note runs as a wave-table slide program
-    // wave table slide commands ($F1 up / $F2 down; $E1/$E2 would be silent waveforms) followed by the stop command ($F0)
-    const wl = g.song.tables[0].left;
-    expect(wl.some((l, i) => (l === 0xf1 || l === 0xf2) && wl.slice(i + 1).includes(0xf0))).toBe(true);
+    // wave table slide commands ($F1 up / $F2 down; $E1/$E2 would be silent waveforms), one row per tick (a $F1/$F2 row acts
+    // for one frame only), ended by $FF 00
+    const wl = g.song.tables[0].left, wr = g.song.tables[0].right;
+    expect(wl.some((l, i) => (l === 0xf1 || l === 0xf2) && wl[i + 1] === l)).toBe(true);
+    expect(wl.some((l, i) => (l === 0xf1 || l === 0xf2) && wl[i + 1] === 0xff && wr[i + 1] === 0)).toBe(true);
   });
 });
