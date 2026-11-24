@@ -2784,6 +2784,9 @@ export class TrackerReplayer {
       }
     }
 
+    // The song can be cleared (failed load, new song) during the awaits above.
+    if (!this.song || gen !== this._playGeneration) return;
+
     // libopenmpt playback: if we have raw module data, delegate startup to
     // LibopenmptEngine.startWithCoordinator. The engine handles bridge
     // serialization, loadTune, audio routing, stereo separation, and the
