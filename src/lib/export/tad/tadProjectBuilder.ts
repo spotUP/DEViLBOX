@@ -11,6 +11,8 @@ import {
 } from './tadSongWriter';
 import { openTadSession, type CreateTadCompiler } from './tadCompilerWasm';
 import { injectTadPlayerRom, type TadPlayerRomMeta } from './tadPlayerRom';
+import { createWavFile } from '@/lib/import/InstrumentConverter';
+import { resample, readWavPcm16 } from '@/lib/export/neogeo/neoGeoCompose';
 import { TAD_AUDIO_RAM_BYTES, tadAudioRamBudget, tadAudioRamFromLog, tadAudioRamWarning, type TadAudioRamParts } from './tadAudioRam';
 
 /** One Furnace instrument in either shape (parsed module or store config) -> writer input. */
@@ -133,21 +135,121 @@ function readme(r: TadBuildResult, log: string): string {
   ].join('\n');
 }
 
-/** The echo buffer is the one Audio-RAM block the export can shrink: lower the echo delay until the compiler stops saying "too large". */
+/** Lowest rate a sample is resampled to when the samples do not fit Audio-RAM. */
+const MIN_SAMPLE_RATE = 4000;
+const brrBytes = (frames: number) => Math.ceil(frames / 16) * 9;
+
+/** SNES DSP BRR decode (fullsnes "BRR Samples"): 9-byte blocks of 16 nibbles, shift range and one of four filters. */
+function decodeBrr(brr: Uint8Array): Int16Array {
+  const out = new Int16Array(Math.floor(brr.length / 9) * 16);
+  let old = 0, older = 0, o = 0;
+  for (let b = 0; b + 9 <= brr.length; b += 9) {
+    const shift = brr[b] >> 4, filter = (brr[b] >> 2) & 3;
+    for (let i = 0; i < 16; i++) {
+      const byte = brr[b + 1 + (i >> 1)];
+      const nib = (((i & 1) ? byte & 15 : byte >> 4) << 28) >> 28;
+      let v = shift <= 12 ? (nib << shift) >> 1 : nib < 0 ? -2048 : 0;
+      if (filter === 1) v += old + (-old >> 4);
+      else if (filter === 2) v += old * 2 + ((-old * 3) >> 5) - older + (older >> 4);
+      else if (filter === 3) v += old * 2 + ((-old * 13) >> 6) - older + ((older * 3) >> 4);
+      v = Math.max(-32768, Math.min(32767, v));
+      const s16 = ((v * 2) << 16) >> 16;
+      out[o++] = s16;
+      older = old; old = s16 >> 1;
+    }
+  }
+  return out;
+}
+
+/** 16-bit PCM of an exported sample. BRR has no rate of its own: it counts as 32 kHz, the rate its TAD tuning refers to. */
+function samplePcm(s: TadSampleFile): { data: Int16Array; rate: number } {
+  return s.path.endsWith('.brr') ? { data: decodeBrr(s.data), rate: 32000 } : readWavPcm16(s.data);
+}
+
+/**
+ * WAV sample resampled to about `rate` Hz, the way an SNES port fits its samples: the loop keeps a whole number of
+ * 16-sample BRR blocks (the exact ratio comes from the loop length), data past the loop end is dropped, and the
+ * TAD tuning frequency (pitch at 32 kHz) scales by the same ratio so every note keeps its pitch.
+ */
+export function resampleTadSample(s: TadSampleFile, rate: number): { file: TadSampleFile; rate: number; from: number } {
+  const { data: pcm, rate: from } = samplePcm(s);
+  const src = s.entry.source as { loop_point?: number };
+  const loop = src.loop_point;
+  let ratio = from / rate;
+  let loopLen = 0;
+  if (loop !== undefined) {
+    loopLen = Math.max(16, Math.round((pcm.length - loop) / ratio / 16) * 16);
+    ratio = (pcm.length - loop) / loopLen;
+  }
+  const to = from / ratio;
+  const out = resample(pcm, from, to);
+  let body: Int16Array, pre = 0, loopPoint: number | undefined;
+  if (loop !== undefined) {
+    const start = Math.round(loop / ratio);
+    pre = (16 - (start % 16)) % 16;
+    body = out.subarray(0, start + loopLen);
+    loopPoint = pre + start;
+  } else body = out;
+  const padded = new Int16Array(Math.ceil((pre + body.length) / 16) * 16 || 16);
+  padded.set(body.subarray(0, padded.length - pre), pre);
+  const pitches = s.entry.pitches as { frequency: number };
+  // A resampled BRR sample goes back as WAV: the compiler encodes it again (gaussian check setting kept).
+  const path = s.path.replace(/\.brr$/, '.wav');
+  const entry = { ...s.entry, source: { ...src, type: 'wav', source: path, ...(loopPoint !== undefined ? { loop_point: loopPoint } : {}) }, pitches: { ...pitches, frequency: pitches.frequency * ratio } };
+  return { file: { ...s, path, data: new Uint8Array(createWavFile(padded, Math.round(to))), entry }, rate: Math.round(to), from };
+}
+
+/** Bytes the compiler says the project is over: "too large by N bytes" or "common audio data is too large (X bytes, max: M)". */
+function overBytes(msg: string): number | null {
+  const by = /too large by (\d+) bytes/.exec(msg);
+  if (by) return Number(by[1]);
+  const common = /common audio data is too large \((\d+) bytes, max: (\d+)\)/.exec(msg);
+  return common ? Number(common[1]) - Number(common[2]) : null;
+}
+
+/**
+ * When the project is too large for Audio-RAM: first lower the echo delay (the echo buffer is the one block the export
+ * can shrink without touching sound data), then resample the largest WAV samples to lower rates, largest first, until
+ * the compiler accepts it or every sample is at MIN_SAMPLE_RATE.
+ */
 export async function buildTadProject(files: TadBuildFile[], create: CreateTadCompiler, locateFile?: (f: string) => string, loadAsset?: (f: string) => Promise<Uint8Array>): Promise<TadBuildResult> {
   let cap = 15;
+  const rates = new Map<string, number>();
   for (;;) {
-    const r = await buildTadProjectOnce(files, create, locateFile, cap, loadAsset);
+    const { result: r, samples, shrunk } = await buildTadProjectOnce(files, create, locateFile, cap, loadAsset, rates);
+    if (r.ok) return r;
     const msg = r.warnings.join('\n');
-    const over = /too large by (\d+) bytes/.exec(msg), buf = /echo buffer:\s+(\d+) bytes/.exec(msg);
+    const over = overBytes(msg), buf = /echo buffer:\s+(\d+) bytes/.exec(msg);
     // compiler log: "echo buffer: N bytes" with 2048 bytes per 16 ms step
-    const next = over && buf ? Math.floor((Number(buf[1]) - Number(over[1])) / 2048) : -1;
-    if (r.ok || next < 0 || next >= cap) return r;
-    cap = next;
+    const next = over !== null && buf ? Math.floor((Number(buf[1]) - over) / 2048) : -1;
+    if (next >= 0 && next < cap) { cap = next; continue; }
+    if (over === null) return r;
+    // Greedy: take the sample with the most BRR bytes, lower its rate by a quarter, until the overshoot (plus a block of slack) is saved.
+    let need = over + 64;
+    const orig = new Map(samples.map((s) => [s.name, s]));
+    const cur = new Map(shrunk.map((s) => {
+      const { data, rate } = samplePcm(s);
+      return [s.name, { rate, bytes: brrBytes(data.length) }];
+    }));
+    let changed = false;
+    while (need > 0) {
+      const [name, big] = [...cur].filter(([, c]) => c.rate > MIN_SAMPLE_RATE).sort((a, b) => b[1].bytes - a[1].bytes)[0] ?? [];
+      if (!name || !big) break;
+      const { file, rate } = resampleTadSample(orig.get(name)!, Math.max(MIN_SAMPLE_RATE, big.rate * 0.75));
+      const bytes = brrBytes(samplePcm(file).data.length);
+      need -= big.bytes - bytes;
+      // Loop quantisation can hold the rate just above the floor: count that sample as done.
+      cur.set(name, { rate: rate < big.rate ? rate : MIN_SAMPLE_RATE, bytes });
+      if (rate < big.rate) { rates.set(name, rate); changed = true; }
+    }
+    if (!changed) return r;
   }
 }
 
-async function buildTadProjectOnce(files: TadBuildFile[], create: CreateTadCompiler, locateFile: ((f: string) => string) | undefined, echoDelayCap: number, loadAsset?: (f: string) => Promise<Uint8Array>): Promise<TadBuildResult> {
+async function buildTadProjectOnce(
+  files: TadBuildFile[], create: CreateTadCompiler, locateFile: ((f: string) => string) | undefined, echoDelayCap: number,
+  loadAsset: ((f: string) => Promise<Uint8Array>) | undefined, rates: ReadonlyMap<string, number>,
+): Promise<{ result: TadBuildResult; samples: TadSampleFile[]; shrunk: TadSampleFile[] }> {
   const warnings: string[] = [];
   const pieces: Piece[] = [];
   const usedNames = new Set<string>();
@@ -176,6 +278,14 @@ async function buildTadProjectOnce(files: TadBuildFile[], create: CreateTadCompi
   let samples: TadSampleFile[];
   if (files.length === 1) samples = mergeTadSamples(pieces.map((p) => p.samples));
   else { const canon = new Map<string, TadSampleFile>(); unifySamples(pieces, canon); samples = [...canon.values()]; }
+  const original = samples;
+  samples = samples.map((s) => {
+    const rate = rates.get(s.name);
+    if (rate === undefined) return s;
+    const r = resampleTadSample(s, rate);
+    warnings.push(`Sample ${s.name}: resampled from ${r.from} Hz to ${r.rate} Hz (${samplePcm(s).data.length} -> ${samplePcm(r.file).data.length} frames) to fit the SNES Audio-RAM; pitch kept.`);
+    return r.file;
+  });
 
   const songs = pieces.filter((p) => p.kind === 'song');
   const sfx = pieces.filter((p) => p.kind === 'sfx');
@@ -249,5 +359,5 @@ async function buildTadProjectOnce(files: TadBuildFile[], create: CreateTadCompi
   }
   zip.file('README.txt', readme(result, log));
   result.zip = await zip.generateAsync({ type: 'uint8array' });
-  return result;
+  return { result, samples: original, shrunk: samples };
 }

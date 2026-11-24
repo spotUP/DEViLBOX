@@ -1,4 +1,4 @@
-// Shared Audio-RAM budget: Breezy.fur is over, 64kb.fur fits.
+// Shared Audio-RAM budget: Breezy.fur is over until its samples are resampled, 64kb.fur fits as is.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -37,16 +37,15 @@ async function build(file: string, live = false) {
 }
 
 describe('TAD Audio-RAM budget', () => {
-  it('Breezy.fur is over, 64kb.fur fits', async () => {
+  it('Breezy.fur fits after resampling, 64kb.fur fits as is', async () => {
     const breezy = await build('Breezy.fur');
     expect(breezy.audioRam).not.toBeNull();
-    const b = tadAudioRamBudget(breezy.audioRam!);
-    expect(b.over).toBe(true);
-    expect(b.overBytes).toBeGreaterThan(0);
-    expect(breezy.warnings.some((w) => w.includes('Over the SNES Audio-RAM budget'))).toBe(true);
+    expect(tadAudioRamBudget(breezy.audioRam!).over).toBe(false);
+    expect(breezy.warnings.some((w) => w.includes('to fit the SNES Audio-RAM; pitch kept'))).toBe(true);
     const small = await build('64kb.fur');
     expect(small.audioRam).not.toBeNull();
     expect(tadAudioRamBudget(small.audioRam!).over).toBe(false);
+    expect(small.warnings.some((w) => w.includes('to fit the SNES Audio-RAM'))).toBe(false);
     expect(TAD_DRIVER_BYTES).toBe(4584);
     expect(TAD_MAX_COMMON_DATA_BYTES).toBe(60568);
   }, 300000);
@@ -55,7 +54,7 @@ describe('TAD Audio-RAM budget', () => {
     const parsed = await build('Breezy.fur');
     const live = await build('Breezy.fur', true);
     expect(live.audioRam).toEqual(parsed.audioRam);
-    expect(tadAudioRamBudget(live.audioRam!).over).toBe(true);
+    expect(tadAudioRamBudget(live.audioRam!).over).toBe(false);
     expect(tadAudioRamBudget((await build('64kb.fur', true)).audioRam!).over).toBe(false);
   }, 300000);
 });
