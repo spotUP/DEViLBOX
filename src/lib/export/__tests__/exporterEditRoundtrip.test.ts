@@ -21,8 +21,14 @@ import { useTrackerStore } from '@/stores/useTrackerStore';
 import { editHivelyCell } from '@/components/hively/hivelyEdit';
 import { LAYOUT_EXPORTERS } from '../nativeExportRouter';
 import { installWasmNodeFetches } from '@lib/import/__tests__/helpers/dwNodeFetch';
-import { readFixture, parseAs, invokeLayoutExport, invokeNamedExport } from './exporterHarness.shared';
+import { readFixture, parseAs as parseAsPlain, invokeLayoutExport, invokeNamedExport } from './exporterHarness.shared';
 import { LAYOUT_FIXTURES, NAMED_EXPORTERS } from './exporterFixtures.map';
+import { parseHippel7VPlayed } from '@/engine/__tests__/helpers/tfmxWalkHost';
+
+/** Hippel 7V draws its grid from the decoder's played pitches (the app's import supplies them); without them the grid is empty. */
+const parseAs = (rel: string, raw: Uint8Array) => /\.hip7$/i.test(rel)
+  ? parseHippel7VPlayed(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer, rel.split('/').pop()!)
+  : parseAsPlain(rel, raw);
 
 const DIR = join(process.cwd(), 'src/lib/export/__tests__');
 const OWN_RATCHET = join(DIR, 'exporterEditRoundtrip.ratchet.json');

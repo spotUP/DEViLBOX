@@ -817,10 +817,10 @@
       "detail": ""
     },
     "tfmx7v": {
-      "verdict": "fail",
-      "edited": "instrument",
+      "verdict": "pass",
+      "edited": "note",
       "slotClean": true,
-      "detail": "instrument read back 0 want 3 (bytes unchanged)"
+      "detail": ""
     },
     "thomasHermann": {
       "verdict": "pass",
