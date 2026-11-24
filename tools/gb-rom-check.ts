@@ -185,7 +185,8 @@ function fieldDiffs(want: BusWrite[][], got: BusWrite[][]): { shift: number; fie
 
 const results: Record<string, Verdict> = existsSync(RESULTS) ? JSON.parse(readFileSync(RESULTS, 'utf8')) : {};
 const names = readdirSync(SONGS).filter((f) => f.endsWith('.fur')).map((f) => f.slice(0, -4)).filter((n) => !only || n === only).filter((n) => !failedOnly || results[n]?.pass === false);
-const playerHash = createHash('sha1').update(PLAYER).update(readFileSync(path.join(ROOT, 'src/lib/export/gb/hugeSong.ts'))).digest('hex');
+// The check's own source is hashed too: a verdict recorded by an older check (e.g. before the VGM reference existed) must not be skipped.
+const playerHash = createHash('sha1').update(PLAYER).update(readFileSync(path.join(ROOT, 'src/lib/export/gb/hugeSong.ts'))).update(readFileSync(import.meta.filename)).digest('hex');
 for (const name of names) {
   const fur = readFileSync(path.join(SONGS, `${name}.fur`));
   const capPath = path.join(CAPTURES, `${name}.json`);
