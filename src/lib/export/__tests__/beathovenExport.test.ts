@@ -139,6 +139,31 @@ describe('Beathoven native export: beathoven_smallest.bss', () => {
     expect(again.song.patterns[pi].channels[voice].rows[row].instrument).toBe(to);
   }, 240000);
 
+  it('extended engine (tristar_cracktro.bss): an effect edit rewrites the command operand byte, same length, reads back', async () => {
+    const tri = { path: 'public/data/songs/formats/tristar_cracktro.bss', name: 'tristar_cracktro.bss' };
+    const { raw, song } = await load(undefined, tri);
+    const grid = buildBthGrid(raw) as BthGrid;
+    // the first effect slot whose operand byte can be edited in place
+    let pick: { pi: number; voice: number; row: number; slot: number; at: number } | null = null;
+    grid.rowSources.forEach((p, pi) => p.forEach((v, voice) => v.forEach((s, row) => {
+      const slot = s?.effects.findIndex((e) => e.at >= 0) ?? -1;
+      if (!pick && s && slot >= 0) pick = { pi, voice, row, slot, at: s.effects[slot].at };
+    })));
+    if (!pick) throw new Error('no editable effect command in this file');
+    const { pi, voice, row, slot, at } = pick;
+    const cell = song.patterns[pi].channels[voice].rows[row] as unknown as Record<string, number>;
+    const key = (['eff', 'eff2', 'eff3', 'eff4'] as const)[slot];
+    const value = raw[at] ^ 1;
+    cell[key] = value;
+    const res = await exportOf(song);
+    expect(res.warnings.join('\n')).toBe('');
+    expect(res.data.length).toBe(raw.length);
+    expect(diffAt(raw, res.data)).toEqual([at]);
+    expect(res.data[at]).toBe(value);
+    const again = await load(res.data, tri);
+    expect((again.song.patterns[pi].channels[voice].rows[row] as unknown as Record<string, number>)[key]).toBe(value);
+  }, 240000);
+
   it('writes a removed note as the legacy Rest command: same four bytes, the row reads back empty', async () => {
     const { raw, song } = await load();
     // a plain note command (not the legacy arpeggio, whose note word is not the command word)

@@ -9,8 +9,10 @@
  * An instrument edit rewrites the record address of the Instrument command [0x80][address] that chose the note's
  * instrument to the address another Instrument command of the module already names (same four bytes); every note that
  * command reaches changes with it, and an edit that renumbers the instruments (their order of first use) does not read
- * back and is refused. Edits the stream cannot hold at its length - a note on a row without one, a note removed in the basic replayer (no Rest or Hold), a note off, an
- * instrument on a note no Instrument command reaches, volume and effect columns (not stored per row) - are refused with a
+ * back and is refused. An effect edit (slide, legato, note bias) rewrites the operand of the command that shows in that
+ * slot, same two bytes; adding, removing or retyping a command, the arpeggio count and an operand above 0xff are refused.
+ * Edits the stream cannot hold at its length - a note on a row without one, a note removed in the basic replayer (no Rest or Hold), a note off, an
+ * instrument on a note no Instrument command reaches, the volume column (not stored per row) - are refused with a
  * warning and nothing is written for them. After patching, the grid is decoded again: every edited cell must read back
  * as edited and every cell that does not share an edited word must be unchanged, otherwise the edit is taken out again.
  *
@@ -20,7 +22,8 @@
  */
 import type { Pattern, TrackerCell } from '@/types';
 import { buildBthGrid, bthIsExtended, bthShownNote, readBthParams, type BthGrid, type BthParams } from './beathovenGrid';
-import { otherFieldsDiffer } from './timFollinEdits';
+import { otherFieldsDiffer } from './howieDaviesEdits';
+import { cellEffects, effectEditPatches } from './cellEffectSlots';
 
 const NOTE_OFF = 97;
 const ROWS_PER_PATTERN = 64;
@@ -120,7 +123,7 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
 }
 
 /** A same-length patch of `size` bytes (a note word, or an Instrument command's record address when `instrument` is set). */
-interface Edit { pattern: number; channel: number; row: number; note: number; instrument?: number; offset: number; value: number; size: 2 | 4 }
+interface Edit { pattern: number; channel: number; row: number; note: number; instrument?: number; offset: number; value: number; size: 1 | 2 | 4; fx?: Array<[number, number]> }
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
 
@@ -164,7 +167,8 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
     const noteChanged = cell.note !== was.note;
     const instChanged = cell.instrument !== was.instrument;
     const otherChanged = otherFieldsDiffer(cell, was);
-    if (!noteChanged && !instChanged && !otherChanged) return;
+    const fxChanged = JSON.stringify(cellEffects(cell)) !== JSON.stringify(cellEffects(was));
+    if (!noteChanged && !instChanged && !otherChanged && !fxChanged) return;
     const at = { pattern: pi, channel: c, row: r };
     const src = base.rowSources[pi]?.[c]?.[r];
     if (!src && was.note === 0 && cell.note >= 1 && cell.note < NOTE_OFF) {
@@ -189,7 +193,20 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
         }
       }
     }
-    if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect columns are not stored per row in this format; that change was not written.`);
+    if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: the volume column is not stored per row in this format; that change was not written.`);
+    if (fxChanged) {
+      const fxr = effectEditPatches(cell, was, src?.effects ?? []);
+      const conflict = fxr.patches.some(([offset, value]) => (claimed.get(offset) ?? value) !== value);
+      if (fxr.refusal) warnings.push(`${PREFIX} ${where(at)}: ${fxr.refusal}; the effect change was not written.`);
+      else if (conflict) warnings.push(`${PREFIX} ${where(at)}: another edited row shares a command with this one and wants a different value; the effect change was not written.`);
+      else {
+        const fx = cellEffects(cell);
+        for (const [offset, value] of fxr.patches) {
+          claimed.set(offset, value);
+          accepted.push({ ...at, note: was.note, offset, value, size: 1, fx });
+        }
+      }
+    }
     if (!noteChanged) return;
     if (!src || was.note < 1 || was.note >= NOTE_OFF) {
       warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one, or changing a rest, would change the length of the stream; the edit was not written.`);
@@ -242,6 +259,7 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
     if (typeof again === 'string' || again.rows !== base.rows) return edits;
     const bad = edits.filter((e) => {
       const got = cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row);
+      if (e.fx !== undefined) return !got || JSON.stringify(cellEffects(got)) !== JSON.stringify(e.fx);
       return got?.note !== e.note || (e.instrument !== undefined && got.instrument !== e.instrument);
     });
     if (bad.length > 0) return bad;

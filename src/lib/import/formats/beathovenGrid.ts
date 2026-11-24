@@ -92,7 +92,9 @@ export function bthIsExtended(buf: Uint8Array): boolean {
 export interface BthStream { offset: number; size: number; broken: boolean }
 /** The event a row's note was read from: the 16-bit note number sits at `noteOffset`, played under `base`. */
 /** instrumentAt: file offset of the Instrument command [0x80][record address] that chose the note's instrument, -1 when none did. */
-export type BthRowSource = { stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number; instrumentAt: number } | null;
+/** `effects`: the command behind each effect slot of the row, in slot order; `at` is the file offset of the operand's low
+ * byte, -1 when the operand cannot be edited in place (arpeggio count, or a 16-bit value the 8-bit column cannot show). */
+export type BthRowSource = { stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number; instrumentAt: number; effects: Array<{ typ: number; at: number }> } | null;
 
 export interface BthGrid {
   patterns: Pattern[];
@@ -111,7 +113,7 @@ export interface BthGrid {
   onsets: number[][];
 }
 
-interface Placed { tick: number; note: number; instrument: number; instrumentAt: number; stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number; fx: Array<[number, number]> }
+interface Placed { tick: number; note: number; instrument: number; instrumentAt: number; stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number; fx: Array<[number, number, number]> }
 
 /** The tracker note a note number shows under `base` (0 when the table holds no period there). */
 export function bthShownNote(buf: Uint8Array, prm: BthParams, num: number, base: number): number {
@@ -171,7 +173,7 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
     let instrument = 0;
     let instrumentAt = -1;
     /** Commands read since the last note: they set the voice's state for the next note, so they show on its row. */
-    let pending: Array<[number, number]> = [];
+    let pending: Array<[number, number, number]> = [];
     let ei = list.track;
     let visitedLoop = false;
     let guard = 0;
@@ -198,7 +200,7 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
         const place = (num: number, numAt: number, len: number, arpeggio = false): void => {
           const fx = pending;
           pending = [];
-          if (arpeggio) fx.push([BTH_FX.arpeggio, u16(buf, o + 4)]);
+          if (arpeggio) fx.push([BTH_FX.arpeggio, u16(buf, o + 4), -1]);
           placed.push({ tick: row, note: bthShownNote(buf, prm, num, base), instrument, instrumentAt, stream: si, offset: o, length: sz, noteOffset: numAt, noteNum: num, base, fx });
           row += len * rowUnit;
         };
@@ -214,7 +216,7 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
           else place(w, o, dur(op));
         } else if (w === 0x81 || w === 0x82 || w === 0x85) {
           // slide, legato and note bias change the sound, not the timeline: they show on the next note's row
-          pending.push([w === 0x81 ? BTH_FX.slide : w === 0x82 ? BTH_FX.legato : BTH_FX.noteBias, op]);
+          pending.push([w === 0x81 ? BTH_FX.slide : w === 0x82 ? BTH_FX.legato : BTH_FX.noteBias, op, op > 0xff ? -1 : o + 3]);
         } else if (w === 0x83) {
           row += op;
         } else if (w === 0x84) {
@@ -248,8 +250,9 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
       const cell = grid[v][row];
       cell.note = p.note || NOTE_OFF_UNUSED;
       if (p.note > 0) cell.instrument = p.instrument;
-      for (const [typ, val] of p.fx) addCellEffect(cell, typ, val);
-      sources[v][row] = { stream: p.stream, offset: p.offset, length: p.length, noteOffset: p.noteOffset, noteNum: p.noteNum, base: p.base, instrumentAt: p.instrumentAt };
+      const effects: Array<{ typ: number; at: number }> = [];
+      for (const [typ, val, at] of p.fx) if (addCellEffect(cell, typ, val)) effects.push({ typ, at });
+      sources[v][row] = { stream: p.stream, offset: p.offset, length: p.length, noteOffset: p.noteOffset, noteNum: p.noteNum, base: p.base, instrumentAt: p.instrumentAt, effects };
       const endRow = Math.min(rows, i + 1 < placed.length ? clock.tickToRow(placed[i + 1].tick).row : rows);
       for (let t = row; t < endRow; t++) streamAtTick[v][t] = p.stream;
     }
