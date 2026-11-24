@@ -33,6 +33,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
   const viewMode = useGTUltraStore((s) => s.viewMode);
   const { channels, currentRow, isPlaying, handleCellChange } = useGTUltraFormatData();
   const editorFullscreen = useUIStore(s => s.editorFullscreen);
+  const recordMode = useGTUltraStore((s) => s.recordMode);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
@@ -92,6 +93,16 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
         </>
       )}
 
+      <div
+        className={`flex-shrink-0 px-2 text-[10px] font-mono border-b ${recordMode
+          ? 'bg-accent-error/20 text-accent-error border-accent-error/50'
+          : 'bg-dark-bgSecondary text-text-muted border-dark-border'}`}
+        data-testid="gt-mode-banner"
+      >
+        {recordMode
+          ? 'Recording: keys write into the pattern. Esc stops recording.'
+          : 'Jam only: keys play notes but do not edit. Esc starts recording.'}
+      </div>
       <div style={{ flex: '2 1 0', minHeight: 0, overflow: 'hidden' }}>
         <PatternEditorCanvas
           formatColumns={GTU_COLUMNS}

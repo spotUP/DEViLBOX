@@ -13,6 +13,7 @@
 
 import { useEffect, useCallback } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
+import { notify } from '../../stores/useNotificationStore';
 import { gtCopy, gtPaste, gtDelete, gtTranspose, gtInsertRow, gtDeleteRow, gtInterpolate } from './GTBlockOperations';
 
 // QWERTY → note offset (C-based, relative to current octave)
@@ -32,6 +33,15 @@ function hexVal(char: string): number | null {
   if (c >= '0' && c <= '9') return c.charCodeAt(0) - 48;
   if (c >= 'a' && c <= 'f') return c.charCodeAt(0) - 87;
   return null;
+}
+
+let lastIgnoredAt = 0;
+/** An edit key was pressed while Record is off: say why nothing changed (at most once per 2 s). */
+function notifyEditIgnored(): void {
+  const now = Date.now();
+  if (now - lastIgnoredAt < 2000) return;
+  lastIgnoredAt = now;
+  notify.warning('Not recording: press Esc or click Record to edit the pattern', 2500);
 }
 
 export function useGTKeyboardHandler(active: boolean) {
@@ -123,7 +133,7 @@ export function useGTKeyboardHandler(active: boolean) {
           engine?.setPatternCell(patIdx, cursor.row, 0, 0xBE);
           state.refreshPatternData(patIdx);
           state.setCursor({ row: Math.min(cursor.row + editStep, state.patternLength) });
-        }
+        } else notifyEditIgnored();
         return;
       }
     }
@@ -158,7 +168,7 @@ export function useGTKeyboardHandler(active: boolean) {
           } else {
             state.setCursor({ digit: 1 });
           }
-        }
+        } else notifyEditIgnored();
         return;
       }
     }
@@ -331,7 +341,7 @@ export function useGTKeyboardHandler(active: boolean) {
         engine?.checkpointUndo();
         state.refreshPatternData(patIdx);
         state.setCursor({ row: Math.min(cursor.row + editStep, state.patternLength) });
-      }
+      } else notifyEditIgnored();
       return;
     }
 
