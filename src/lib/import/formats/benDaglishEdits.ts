@@ -19,6 +19,12 @@
  * one command, when every note it governs was edited to the same instrument and some mapping index holds that sample on
  * every run of the command; a lone note of a shared command cannot be changed without changing the others.
  *
+ * A blank row given a note with another instrument is written as [map byte][note][ticks][old map byte]: the sample is
+ * captured at note start (ben_daglish.c sample_info2 = sample_info), so the first byte sets the new sample for this note and
+ * the last restores the command in force for the next. The note byte is shifted by the new sample's own transpose. Written only
+ * when one command is in force on every run of the covering track, some mapping index holds the sample on every run, and
+ * the byte is 0x80-0xfe; else refused with the reason.
+ *
  * Not written, and named in `warnings`, never half-applied: a note where the replayer ran none, a note removed
  * (both change the track's length), a note outside 0x00-0x7e, a delay the duration bytes cannot hold (outside the
  * row, or a duration that would leave 1..255), an instrument edit that does not cover every note its sample-map
@@ -35,6 +41,8 @@ import { buildBDGridFromWalk, bdNotePlacements, bdIsVisibleNote, type BdNotePlac
 const ROWS_PER_PATTERN = 64;
 const NOTE_MAX = 0x7e;
 const REST_BYTE = 0x7f;
+/** A note on a row the replayer holds: `swap` adds the sample-map bytes around it (see swapFor). */
+type BdSplit = { cover: BdWalkEvent; at: number; first: number; note: number; where: string; swap?: { newByte: number; oldByte: number } };
 
 export interface BdEditResult {
   data: Uint8Array;
@@ -65,7 +73,7 @@ export function applyBdGridEdits(
 
   const wanted = new Map<number, number>();
   /** A note on a row the replayer holds (inside a note's or rest's duration): the track gets two bytes more. */
-  const splits: Array<{ cover: BdWalkEvent; at: number; first: number; note: number; where: string }> = [];
+  const splits: BdSplit[] = [];
   const step = baseGrid.step;
   const eventIndex = new Map(walk.events.map((e, i) => [e, i]));
   /** The duration byte of a timing command (note or rest) and the ticks it spans, when the bytes agree with the walk. */
@@ -93,7 +101,7 @@ export function applyBdGridEdits(
     wanted.set(pOff, p); wanted.set(nOff, n);
   };
   /** Plan the split of the timing command that holds `voice` at `row`: its duration is cut at the row and a note command follows. */
-  const planSplit = (voice: number, row: number, cn: number, where: string): void => {
+  const planSplit = (voice: number, row: number, cn: number, where: string, instrument: number): void => {
     const t = row * step;
     let cover: BdWalkEvent | undefined, prevNote: BdWalkEvent | undefined;
     for (const x of walk.events) {
@@ -104,16 +112,59 @@ export function applyBdGridEdits(
     if (!cover || !prevNote) { warnings.push(`${where}: no note or rest command holds this row; not written`); return; }
     const first = t - cover.ptick;
     const pb = source[trackFileOffsets[prevNote.track] + prevNote.pos];
-    const nb = pb + (cn - periodToNote(prevNote.c));
+    const swap = instrument > 0 ? swapFor(cover, instrument - 1, where) : null;
+    if (typeof swap === 'string') { warnings.push(swap); return; }
+    // the new sample's own transpose moves the sounding note: compensate by the difference of the samples' pitch offsets
+    let shift = 0;
+    if (swap) {
+      const k = pitchOffset(instrument - 1);
+      if (k === undefined) { warnings.push(`${where}: sample ${instrument} plays no note in this module, so its pitch offset is unknown; instrument not written`); return; }
+      shift = (periodToNote(prevNote.c) - prevNote.b) - k;
+    }
+    const nb = pb + (cn - periodToNote(prevNote.c)) + shift;
     if (pb > NOTE_MAX || nb < 0 || nb > NOTE_MAX) { warnings.push(`${where}: note ${cn} is outside the player's note range; not written`); return; }
     if (splits.some((s) => s.cover === cover)) { warnings.push(`${where}: another note already splits the same command; not written`); return; }
     if (first === 0) {
+      if (swap) { warnings.push(`${where}: the note replaces a rest byte, so a sample-map byte cannot go before it; instrument not written`); return; }
       // a rest that starts on this row: the note byte replaces the rest byte, the duration stays
       if (cover.kind !== BD_WALK.rest) { warnings.push(`${where}: the row starts a note the grid does not show; not written`); return; }
       wanted.set(trackFileOffsets[cover.track] + cover.pos, nb);
       return;
     }
-    splits.push({ cover, at: durationOf(cover), first, note: nb, where });
+    splits.push({ cover, at: durationOf(cover), first, note: nb, where, swap: swap ?? undefined });
+  };
+  /** Grid note minus transposed note byte a sample plays with (its own transpose and base note); most common over the walk's notes. */
+  const pitchOffset = (sample: number): number | undefined => {
+    const count = new Map<number, number>();
+    for (const e of walk.events) if (e.kind === BD_WALK.note && e.a === sample && e.c > 0) { const k = periodToNote(e.c) - e.b; count.set(k, (count.get(k) ?? 0) + 1); }
+    return [...count].sort((x, y) => y[1] - x[1])[0]?.[0];
+  };
+  /**
+   * The two sample-map bytes a blank-row note of another sample needs: [new] before the note, [old] after its rest, so the
+   * note starts with the wanted sample (the replayer copies the sample at note start, a map byte parsed during a note
+   * only changes the next one) and the command in force is back before the next note. null: the sample already plays;
+   * string: the reason it cannot be written.
+   */
+  const swapFor = (cover: BdWalkEvent, sample: number, where: string): { newByte: number; oldByte: number } | string | null => {
+    if (cover.voice >= 4) return `${where}: voice ${cover.voice + 1} has no sample mapping; instrument not written`;
+    if (sample >= walk.samples) return `${where}: instrument ${sample + 1} is not a sample of the module; not written`;
+    const mapping = Array.from({ length: 4 }, () => Array.from({ length: 10 }, (_, j) => j));
+    const last: Array<BdWalkEvent | undefined> = [undefined, undefined, undefined, undefined];
+    const runs: Array<{ cmd?: BdWalkEvent; map: number[] }> = [];
+    for (const e of walk.events) {
+      if (e.voice >= 4) continue;
+      if (e.kind === BD_WALK.mapSet && e.a >= 0 && e.a < 10) mapping[e.voice][e.a] = e.b;
+      else if (e.kind === BD_WALK.sampleMap && e.track >= 0) last[e.voice] = e;
+      else if (e.voice === cover.voice && e.kind === cover.kind && e.track === cover.track && e.pos === cover.pos) runs.push({ cmd: last[e.voice], map: mapping[e.voice].slice() });
+    }
+    if (runs.every((r) => r.cmd && r.map[r.cmd.a] === sample)) return null;
+    const cmd = runs[0]?.cmd;
+    if (!cmd || runs.some((r) => !r.cmd || r.cmd.track !== cmd.track || r.cmd.pos !== cmd.pos)) return `${where}: no single sample-map command is in force on every run of the track; instrument not written`;
+    const j = Array.from({ length: 10 }, (_, k) => k).find((k) => runs.every((r) => r.map[k] === sample));
+    if (j === undefined) return `${where}: no sample-mapping index holds sample ${sample + 1} on every run; instrument not written`;
+    const oldByte = source[trackFileOffsets[cmd.track] + cmd.pos], newByte = oldByte + (j - cmd.a);
+    if (oldByte < 0x80 || oldByte > 0xfe || newByte < 0x80 || newByte > 0xfe) return `${where}: the sample-map byte ${newByte} is outside 0x80-0xfe; instrument not written`;
+    return { newByte, oldByte };
   };
   for (let p = 0; p < edited.length; p++) {
     const bp = base[p];
@@ -132,7 +183,7 @@ export function applyBdGridEdits(
           if (cn === bn) continue;
           const at = noteAt.get(`${ch}:${p * ROWS_PER_PATTERN + row}:${col}`);
           if (!at) {
-            if (col === 0 && bn === 0 && cn >= 1 && cn <= 96) planSplit(ch, p * ROWS_PER_PATTERN + row, cn, where);
+            if (col === 0 && bn === 0 && cn >= 1 && cn <= 96) planSplit(ch, p * ROWS_PER_PATTERN + row, cn, where, c.instrument ?? 0);
             else warnings.push(`${where}: a note where the replayer runs none needs a longer track; not written`);
           }
           else if (cn < 1 || cn > 96 || bn < 1 || bn > 96) warnings.push(`${where}: a note removed or turned into a note-off needs a different command; not written`);
@@ -152,7 +203,8 @@ export function applyBdGridEdits(
           else if (d < 0 || d >= step) warnings.push(`${where}: a delay of ${d} is outside the row (0-${step - 1} ticks); not written`);
           else moveOnset(pl, d - pl.offset, where);
         }
-        if (c.instrument !== b.instrument && !noteAt.has(`${ch}:${p * ROWS_PER_PATTERN + row}:0`)) warnings.push(`${where}: an instrument on a cell with no note has no command byte; not written`);
+        const splitCell = (b.note ?? 0) === 0 && (c.note ?? 0) > 0;
+        if (c.instrument !== b.instrument && !noteAt.has(`${ch}:${p * ROWS_PER_PATTERN + row}:0`) && !splitCell) warnings.push(`${where}: an instrument on a cell with no note has no command byte; not written`);
         const fx = (x: typeof c) => [x.effTyp, x.eff, x.effTyp2, x.eff2, x.effTyp3, x.eff3, x.effTyp4, x.eff4, x.effTyp5, x.eff5].join();
         if (fx(c) !== fx(b)) warnings.push(`${where}: an effect column change has no command byte mapped yet; not written`);
       }
@@ -170,7 +222,7 @@ export function applyBdGridEdits(
  * file moves, so no other pointer needs fixing; the old copy stays as dead bytes.
  */
 function growTracks(
-  out: Uint8Array, splits: Array<{ cover: BdWalkEvent; at: number; first: number; note: number; where: string }>,
+  out: Uint8Array, splits: BdSplit[],
   trackFileOffsets: readonly number[], grow: { sizes: readonly number[]; pointersAt: number; base: number } | undefined,
   patched: number, warnings: string[],
 ): BdEditResult {
@@ -186,7 +238,7 @@ function growTracks(
       const i = s.at - start;
       const rest = bytes[i] - s.first;
       bytes[i] = s.first;
-      bytes.splice(i + 1, 0, s.note, rest);
+      bytes.splice(i + 1, 0, ...(s.swap ? [s.swap.newByte, s.note, rest, s.swap.oldByte] : [s.note, rest]));
     }
     const newAt = (data.length + 1) & ~1;
     const entry = newAt - grow.base;
@@ -195,7 +247,7 @@ function growTracks(
     next.set(data); next.set(bytes, newAt);
     next[grow.pointersAt + track * 2] = entry >> 8; next[grow.pointersAt + track * 2 + 1] = entry & 0xff;
     data = next;
-    patched += list.length * 2;
+    patched += list.reduce((n, s) => n + (s.swap ? 4 : 2), 0);
   }
   return { data, patched, warnings };
 }
