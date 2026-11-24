@@ -2,8 +2,9 @@
  * PSG (Bulba AY dump) and TAYM exporters for AY/YM register captures.
  * Frames come from the ZX capture path (captureToFrames): 50 Hz, reg 13 present only on an envelope retrigger.
  *
- * PSG: "PSG" 1A, 12 zero bytes, then per frame: (reg,value)* FF; runs of empty frames are FE n (n*4 frames); no FD
- * end marker is needed by players but is not written either (EOF ends the stream).
+ * PSG: "PSG" 1A, 12 zero bytes, then per frame: FF (frame start) then (reg,value)*; runs of frame starts with no data
+ * between them are FE n (n*4 frames) plus FF for the remainder. FF opens a frame (zxtune INT_BEGIN), it does not close
+ * one: real dumps (test-data/psg/uranus.psg) put data straight after FE. No FD end marker (EOF ends the stream).
  * TAYM: header "TAYM" u16 version=1, u16 headerSize=16, u32 flags, u32 chunk bytes; chunks tag+u32 len+payload.
  */
 import { type RegisterWrite } from './VGMExporter';
@@ -22,7 +23,7 @@ export function canExportPSG(writes: RegisterWrite[]): boolean {
 export function encodePsg(frames: readonly AyFrame[]): Uint8Array {
   const out: number[] = [0x50, 0x53, 0x47, 0x1A, ...new Array<number>(12).fill(0)];
   const cur: Array<number | undefined> = new Array(AY_REG_COUNT).fill(0);
-  let empty = 0;
+  let empty = 0; // pending frame starts
   const flushEmpty = () => {
     while (empty >= 4) {
       const n = Math.min(255, Math.floor(empty / 4));
@@ -32,6 +33,7 @@ export function encodePsg(frames: readonly AyFrame[]): Uint8Array {
     while (empty > 0) { out.push(0xFF); empty--; }
   };
   for (const f of frames) {
+    empty++;
     const pairs: number[] = [];
     for (let r = 0; r < AY_REG_COUNT; r++) {
       const v = f[r];
@@ -39,9 +41,9 @@ export function encodePsg(frames: readonly AyFrame[]): Uint8Array {
       pairs.push(r, v);
       cur[r] = v;
     }
-    if (pairs.length === 0) { empty++; continue; }
+    if (pairs.length === 0) continue;
     flushEmpty();
-    out.push(...pairs, 0xFF);
+    out.push(...pairs);
   }
   flushEmpty();
   return Uint8Array.from(out);

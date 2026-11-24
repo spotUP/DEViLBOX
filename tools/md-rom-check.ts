@@ -2,8 +2,8 @@
 // -> compare with the Furnace CLI -vgmout register stream of the same song (both decoded by tools/md-phase0/events.py).
 // Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/md-rom-check.ts [--only <name>] [--failed] [--seconds N]
 // Results: test-data/md-rom-check.json (skips songs whose input hash matches a recorded verdict).
-// pass = the ROM wrote YM2612 key-ons in MAME. keyOnMatch = share of Furnace FM/PSG key-on/att-from-silence events (same channel) that have
-// a MAME event within 30 ms (both streams start at their first FM key-on). Needs mame and the Furnace CLI (FURNACE_CLI overrides the path).
+// pass = the ROM wrote YM2612 key-ons in MAME. keyOnMatch = matched FM/PSG key-on/att-from-silence starts (same channel,
+// within 30 ms, counted both ways) / max(Furnace starts, MAME starts), so missing and extra starts both lower it (both streams start at their first FM key-on). Needs mame and the Furnace CLI (FURNACE_CLI overrides the path).
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -21,7 +21,7 @@ const TAP = path.join(ROOT, 'tools/md-phase0/tap_pcm.lua');
 const EVENTS = path.join(ROOT, 'tools/md-phase0/events.py');
 const FURNACE = process.env.FURNACE_CLI ?? '/Applications/Furnace.app/Contents/MacOS/furnace';
 
-interface Verdict { inputHash: string; pass: boolean; seconds: number; romBytes?: number; lossy?: string[]; mameKeyOns?: number; furnaceKeyOns?: number; keyOnMatch?: number; error?: string }
+interface Verdict { inputHash: string; pass: boolean; seconds: number; romBytes?: number; lossy?: string[]; mameKeyOns?: number; mameStarts?: number; furnaceKeyOns?: number; keyOnMatch?: number; error?: string }
 type Ev = { t: number; ch: string; ev: string; v: string };
 
 const args = process.argv.slice(2);
@@ -62,10 +62,15 @@ for (const name of names) {
     if (existsSync(FURNACE)) try {
       execFileSync(FURNACE, ['-console', '-nostatus', '-nocontrols', '-noreport', '-loglevel', 'error', '-loops', '0', '-vgmout', path.join(dir, 'f.vgm'), path.join(SONGS, `${name}.fur`)], { stdio: 'ignore', timeout: 120000 });
       const want = starts(decode(path.join(dir, 'f.vgm'))).filter((e) => e.t < SECONDS - 1);
-      const hit = want.filter((w) => all.some((g) => g.ch === w.ch && Math.abs(g.t - w.t) < 0.03)).length;
+      const have = all.filter((e) => e.t < SECONDS - 1);
+      const near = (a: Ev, b: Ev[]) => b.some((x) => x.ch === a.ch && Math.abs(x.t - a.t) < 0.03);
+      // Symmetric: missing (Furnace start with no MAME start) and extra (MAME start with no Furnace start) both lower the score.
+      const hit = Math.min(want.filter((w) => near(w, have)).length, have.filter((g) => near(g, want)).length);
       if (process.env.MD_DIAG_CH) { const f = (e: Ev[]) => e.filter((x) => x.ch === process.env.MD_DIAG_CH && x.ev !== 'FREQ' && x.t >= Number(process.env.MD_DIAG_T0 ?? 0) && x.t < Number(process.env.MD_DIAG_T1 ?? 1.5)).map((x) => `${x.t.toFixed(3)}:${x.ev}:${x.v}`).join(' '); console.log(`[EV-F] ${f(decode(path.join(dir, 'f.vgm')))}`); console.log(`[EV-M] ${f(raw)}`); }
       if (process.env.MD_DIAG) for (const w of want) if (!all.some((g) => g.ch === w.ch && Math.abs(g.t - w.t) < 0.03)) console.log(`[MISS] ${name} ${w.ch} ${w.t.toFixed(3)} ${w.ev} ${w.v} nearest ${all.filter((g) => g.ch === w.ch).map((g) => g.t - w.t).sort((x, y) => Math.abs(x) - Math.abs(y))[0]?.toFixed(3) ?? 'none'}`);
-      Object.assign(v, { furnaceKeyOns: want.length, keyOnMatch: want.length ? Math.round((hit / want.length) * 10000) / 100 : 0 });
+      if (process.env.MD_DIAG) for (const g of have) if (!near(g, want)) console.log(`[EXTRA] ${name} ${g.ch} ${g.t.toFixed(3)} ${g.ev} ${g.v}`);
+      const denom = Math.max(want.length, have.length);
+      Object.assign(v, { furnaceKeyOns: want.length, mameStarts: have.length, keyOnMatch: denom ? Math.round((hit / denom) * 10000) / 100 : 0 });
     } catch (e) {
       // The ROM ran; only the reference is missing (e.g. the Furnace CLI is older than the .fur format version): keep the ROM verdict.
       v.error = `no reference: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`;
