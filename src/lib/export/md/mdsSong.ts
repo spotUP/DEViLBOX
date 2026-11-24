@@ -68,6 +68,10 @@ const LAYOUT: Record<number, { ids: number[]; kinds: Kind[]; ops?: number[]; fm:
 const FM_TRANSPOSE = 0x30;
 const MAX_NOTE = 0xdf - 0x82;
 const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_PITCH = 4;
+// Notes below octave 0 convert to negative values (C--1 = -12), so "no note" needs its own value; -1 stays empty (B--1 shares it).
+// MegadriveOverdrive FM5 C--1..C--3 were dropped as empty cells: no key-on at all.
+const NO_NOTE = -1000;
+const noteOf = (cell: Parameters<typeof convertFurnaceNoteValue>[0] | undefined): number => { const v = cell ? convertFurnaceNoteValue(cell) : -1; return v === -1 ? NO_NOTE : v; };
 const FX_FLOW = new Set([0x0b, 0x0d, 0x09, 0x0f, 0xff]);
 const NTSC_HZ = 59.922743;
 /** Furnace SN noise mode bits (sms.cpp snNoiseMode: bit 0 white, bit 1 PSG3 period) -> MDSDRV `EA` (mdsseq.md). Reset value 3. */
@@ -324,14 +328,25 @@ export function psgEnvelope(ins: FurnaceInstrument | undefined, version: number,
   const { vals, loop } = framesOf(ticksOf(m, lossy, 'PSG volume'), tickHz, phase);
   const out: number[] = [];
   let loopPos = -1;
+  const steps: number[] = [];
   for (let t = 0; t < vals.length;) {
-    if (t === loop) loopPos = out.length;
+    if (t === loop) loopPos = steps.length;
     let n = 1;
     while (n < 15 && t + n < vals.length && vals[t + n] === vals[t] && t + n !== loop) n++;
-    out.push((n << 4) | (15 - Math.max(0, Math.min(15, vals[t]))));
+    steps.push((n << 4) | (15 - Math.max(0, Math.min(15, vals[t]))));
     t += n;
   }
-  return loopPos >= 0 ? [...out, 0x02, loopPos] : [...out, 0x01, 0x00];
+  // Furnace silences a PSG note-off at once (no release point); the driver walks the remaining steps one per frame after key off
+  // (mds_psg_update_env), so every step after the first sits behind `02 <its pos>`: a no-op jump while held, silence once keyed off.
+  if (steps.length * 3 + 1 <= 0xff) {
+    const at = steps.map((_, k) => (k ? 3 * k : 0));
+    for (let k = 0; k < steps.length; k++) { if (k) out.push(0x02, at[k]); out.push(steps[k]); }
+    return loopPos >= 0 ? [...out, 0x02, at[loopPos]] : [...out, 0x01, 0x00];
+  }
+  lossy.add('PSG volume macro too long for a key-off jump per step (note-off walks the rest of the envelope)');
+  out.push(...steps);
+  if (loopPos >= 0) return [...out, 0x02, loopPos];
+  return [...out, 0x01, 0x00];
 }
 
 /** Pitch envelope from an absolute pitch macro (1/128 semitone, Furnace linear pitch) in $100-per-semitone units. */
@@ -931,7 +946,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // The loop point sits at the track's first note in the loop chunk: the rows before it (rests, 04xy on the release tail) replay in
     // the wrap with song-end state, so a vibrato E8 there continues Furnace's song-end phase (newer_song_lol FM4 96.17 s).
     const lc = chunks[loopChunk];
-    const firstNote = lc ? lc.rows.findIndex((r) => { const cell = cellAt(ch, lc.o, r); const v = cell ? convertFurnaceNoteValue(cell) : -1; return v >= 0 && v < 253; }) : -1;
+    const firstNote = lc ? lc.rows.findIndex((r) => { const cell = cellAt(ch, lc.o, r); const v = noteOf(cell); return v > NO_NOTE && v < 253; }) : -1;
     for (const [ci, c] of (lc ? [...chunks, lc] : chunks).entries()) {
       const wrapPass = ci === chunks.length;
       let faAt = -1;
@@ -1001,17 +1016,17 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if ((ci === loopChunk || wrapPass) && i === firstNote) { if (tok.length) emit(tok.pop()!); faAt = bytes.length; }
         if (wrapPass && faAt >= 0) return;
         const cell = cellAt(ch, c.o, r);
-        let nv = cell ? convertFurnaceNoteValue(cell) : -1, shY = 0, shX = 0, shFrom = NaN;
+        let nv = noteOf(cell), shY = 0, shX = 0, shFrom = NaN;
         if (cell && cell.instrument >= 0) ins = cell.instrument;
         // PCM2 only plays sample instruments (sysDef.cpp: DIV_INS_AMIGA); MDSDRV id 0a has no FM voice.
-        if (pcm2 && nv >= 0 && nv < 253 && !isDac(ins)) { lossy.add('DualPCM PCM2: non-sample instrument note dropped'); nv = -1; }
+        if (pcm2 && nv > NO_NOTE && nv < 253 && !isDac(ins)) { lossy.add('DualPCM PCM2: non-sample instrument note dropped'); nv = NO_NOTE; }
         // shortcut: the FM3 voice is OP1's instrument (channel 2 E1); an OP2-OP4 instrument only brings its own operator in Furnace.
-        if (op === 1 && nv >= 0) op1Ins.add(ins);
-        else if (op > 1 && nv >= 0 && !op1Ins.has(ins)) lossy.add('extended channel 3: OP2-OP4 instrument other than OP1\'s (FM3 plays OP1\'s voice)');
+        if (op === 1 && nv > NO_NOTE) op1Ins.add(ins);
+        else if (op > 1 && nv > NO_NOTE && !op1Ins.has(ins)) lossy.add('extended channel 3: OP2-OP4 instrument other than OP1\'s (FM3 plays OP1\'s voice)');
         const cmds: number[] = [];
         let pChanged = false, vChanged = false, dacOff = false;
         // Furnace commits the instrument's operators at a note-on after an instrument change, before the row's post effects (12xx-16xy).
-        if (kind === 'fm' && nv >= 0 && nv < 253 && ins !== curIns) { tlOv.fill(-1); mulOv.fill(-1); }
+        if (kind === 'fm' && nv > NO_NOTE && nv < 253 && ins !== curIns) { tlOv.fill(-1); mulOv.fill(-1); }
         // EDxx runs the whole row xx ticks late; ECxx keys off xx ticks after the row runs (playback.cpp rowDelay / cut, delayBehavior 2).
         // Both count Furnace engine ticks (hz), so under virtual tempo they land on the nearest sequence tick.
         const fxv = (t: number) => cell?.effects?.find((e) => e.type === t && e.value > 0)?.value ?? 0;
@@ -1089,15 +1104,15 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         // it slides from the pitch playing to the current note +-y, as a 03xx slur. Both become a slide onto the target note.
         // shortcut: a note-less E1/E2 on a keyed-off channel (Furnace slides the release tail) is dropped.
         if (shY && !(kind === 'fm' && isDac(ins))) {
-          if (nv >= 0 && nv < 253) { shFrom = nv * 128; nv += shY; portaXx = shX; }
-          else if (sounding && prevKey >= 0 && nv < 0) { nv = prevKey + shY; portaXx = shX; }
+          if (nv > NO_NOTE && nv < 253) { shFrom = nv * 128; nv += shY; portaXx = shX; }
+          else if (sounding && prevKey >= 0 && nv === NO_NOTE) { nv = prevKey + shY; portaXx = shX; }
         }
         // A sample instrument (DIV_INS_AMIGA = 4) on FM6 plays the DAC (genesis.cpp note-on): the note map (Furnace note = nv + 60)
         // picks sample and freq note, an unmapped note plays nothing. One F0 header per (sample, freq note) replaces drum mode.
         // DAC volume: driver PCM step (pcmDacAtt) times the residual baked per note-on volume (pcmRef) = dacVolTable[vol] >> 7.
         // shortcut: a volume change mid-note moves only the driver step (sample keeps its note-on residual, under 2 dB), and a DAC volume
         // macro is not applied; upgrade with a header per (sample, volume) at each change if a song needs it.
-        const dac = nv >= 0 && nv < 253 && isDac(ins);
+        const dac = nv > NO_NOTE && nv < 253 && isDac(ins);
         let dacHdr = -1;
         if (dac) {
           const a = m.instruments[ins].amiga, fn = Math.max(0, Math.min(179, nv + 60));
@@ -1105,7 +1120,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           const smp = a?.useNoteMap ? a.noteMap?.[fn]?.map ?? -1 : a?.initSample ?? 0;
           if (smp >= 0 && smp < m.samples.length && m.samples[smp].length > 0) dacHdr = pcmRef(smp, a?.useNoteMap ? a.noteMap?.[fn]?.freq ?? fn : fn, dacVol(vol));
         }
-        const isNote = nv >= 0 && nv < 253 && (!dac || dacHdr >= 0), isOff = (dac && dacHdr < 0) || nv >= 253 || (dacOff && !isNote);
+        const isNote = nv > NO_NOTE && nv < 253 && (!dac || dacHdr >= 0), isOff = (dac && dacHdr < 0) || nv >= 253 || (dacOff && !isNote);
         if (pcmOn && !isNote && cell && cell.volume >= 0 && isDac(ins) && !m.compatFlags.noOPN2Vol) lossy.add('FM6 DAC volume change mid-note (driver 2 dB step only)');
         if (dac && isNote) { curIns = ins; pcmOn = true; if (dacHdr !== curPcm) { curPcm = dacHdr; cmds.unshift(0xf0, dacHdr); } }
         else if (isNote) { pcmOn = false; curPcm = -1; }

@@ -173,7 +173,9 @@ describe('PSG envelope rate', () => {
   // Solar_Man "Hi-Hat Open" volume macro, 26 ticks.
   const hat = [15, 15, 15, 14, 14, 13, 13, 12, 11, 11, 10, 10, 9, 9, 8, 7, 6, 6, 5, 5, 4, 3, 2, 1, 1, 0];
   const ins = { macros: [{ code: 0, type: 0, mode: 0, length: hat.length, data: hat, speed: 1, delay: 0, loop: -1, release: -1 }] } as unknown as Parameters<typeof psgEnvelope>[0];
-  const frames = (env: number[]) => env.slice(0, -2).reduce((n, b) => n + (b >> 4), 0);
+  // Volume steps only: `02 dd` before each later step is the key-off jump (silence once keyed off), and the last 2 bytes end the envelope.
+  const steps = (env: number[]) => env.slice(0, -2).filter((b, k, e) => b >= 0x10 && e[k - 1] !== 0x02);
+  const frames = (env: number[]) => steps(env).reduce((n, b) => n + (b >> 4), 0);
   it('a 56 Hz macro is resampled to NTSC frames (MDSDRV steps the envelope per VINT): 26 ticks play 28 frames, first node 3 frames at 15', () => {
     const env = psgEnvelope(ins, 184, new Lossy(), 56);
     expect(frames(env)).toBe(28);
@@ -187,7 +189,8 @@ describe('PSG envelope rate', () => {
   it('an on-frame (60 Hz) macro keeps one node per tick', () => {
     const env = psgEnvelope(ins, 184, new Lossy());
     expect(frames(env)).toBe(26);
-    expect(env.slice(0, 4)).toEqual([0x30, 0x21, 0x22, 0x13]);
+    expect(steps(env).slice(0, 4)).toEqual([0x30, 0x21, 0x22, 0x13]);
+    expect(env.slice(0, 7)).toEqual([0x30, 0x02, 3, 0x21, 0x02, 6, 0x22]);
   });
 });
 
