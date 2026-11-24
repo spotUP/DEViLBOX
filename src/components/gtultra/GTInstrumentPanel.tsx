@@ -142,7 +142,7 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
       {/* Table pointers + Settings — 4-column grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px 12px', marginBottom: 4 }}>
         {/* Row 1: Section headers */}
-        <div style={{ gridColumn: '1 / 3', color: 'var(--color-text-muted)', fontWeight: 'bold', fontSize: 10 }}>TABLE POINTERS</div>
+        <div style={{ gridColumn: '1 / 3', color: 'var(--color-text-muted)', fontWeight: 'bold', fontSize: 10 }}>Table Pointers</div>
         <div style={{ gridColumn: '3 / 5', color: 'var(--color-text-muted)', fontWeight: 'bold', fontSize: 10 }}>Settings</div>
 
         {/* Row 2 */}
@@ -177,7 +177,7 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
           <HexInput value={instr?.speedPtr ?? 0} max={255} onChange={(v) => setTablePtr(3, v)} color="#ffcc00" />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', height: 20 }}>
-          <span style={{ color: 'var(--color-text-muted)', fontSize: 10, marginRight: 4 }}>1stWv</span>
+          <span style={{ color: 'var(--color-text-muted)', fontSize: 10, marginRight: 4 }}>First Wave</span>
           <HexInput value={instr?.firstwave ?? 0} max={255} onChange={setFirstwave} />
         </div>
       </div>

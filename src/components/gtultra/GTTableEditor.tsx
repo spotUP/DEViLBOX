@@ -32,6 +32,14 @@ const WAVE_LEFT_ANNOTATIONS: Record<number, string> = {
   0xE0: 'inaudible', 0xE1: 'noise plus', 0xFE: 'restart', 0xFF: 'end',
 };
 
+// Column meaning depends on the table (GoatTracker table format)
+const TABLE_COLUMNS: Record<TableType, [string, string]> = {
+  wave: ['Waveform', 'Note'],
+  pulse: ['Pulse Step', 'Duration'],
+  filter: ['Cutoff Step', 'Duration'],
+  speed: ['Vibrato Speed', 'Depth'],
+};
+
 const ROW_H = 14;
 
 export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ width, height }) => {
@@ -77,12 +85,12 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
     ctx.fillStyle = '#888';
     ctx.fillText(' Index', 4, 2);
     ctx.fillStyle = activeCol === 0 ? '#e0e0e0' : '#555';
-    ctx.fillText('Left', 40, 2);
+    ctx.fillText(TABLE_COLUMNS[activeTable][0], 40, 2);
     ctx.fillStyle = activeCol === 1 ? '#e0e0e0' : '#555';
-    ctx.fillText('Right', 80, 2);
+    ctx.fillText(TABLE_COLUMNS[activeTable][1], 128, 2);
     if (activeTable === 'wave') {
       ctx.fillStyle = '#444';
-      ctx.fillText('Info', 126, 2);
+      ctx.fillText('Info', 170, 2);
     }
 
     const scrollTop = Math.max(0, tableCursor - Math.floor(visibleRows / 2));
@@ -118,22 +126,22 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
       // Right value
       const right = table.right[idx];
       ctx.fillStyle = right === 0 ? 'var(--color-border-light)' : color;
-      ctx.fillText(right.toString(16).toUpperCase().padStart(2, '0'), 80, y + 1);
+      ctx.fillText(right.toString(16).toUpperCase().padStart(2, '0'), 128, y + 1);
 
       // Annotations for wave table left column
       if (activeTable === 'wave' && left !== 0) {
         const anno = WAVE_LEFT_ANNOTATIONS[left];
         if (anno) {
           ctx.fillStyle = '#555';
-          ctx.fillText(anno, 126, y + 1);
+          ctx.fillText(anno, 170, y + 1);
         }
       }
 
       // Visual bar for pulse/filter right value
       if (right > 0 && (activeTable === 'pulse' || activeTable === 'filter')) {
-        const barW = (right / 255) * (width - 170);
+        const barW = (right / 255) * (width - 180);
         ctx.fillStyle = color + '22';
-        ctx.fillRect(126, y + 2, barW, ROW_H - 4);
+        ctx.fillRect(170, y + 2, barW, ROW_H - 4);
       }
     }
   }, [width, contentHeight, activeTable, table, tableCursor, visibleRows, headerHeight, activeCol]);
@@ -156,7 +164,7 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
     if (idx < 0) return;
 
     // If clicking in the bar area (right side), use X position to set value
-    const barAreaStart = 130;
+    const barAreaStart = 170;
     const barAreaEnd = width - 10;
     if (x >= barAreaStart && (activeTable === 'pulse' || activeTable === 'filter' || activeTable === 'speed')) {
       const frac = Math.max(0, Math.min(1, (x - barAreaStart) / (barAreaEnd - barAreaStart)));
@@ -176,7 +184,7 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
     const idx = scrollTop + Math.floor((y - headerHeight) / ROW_H);
     if (idx < 255) setTableCursor(idx);
     // Detect column click
-    setActiveCol(x >= 66 && x < 120 ? 1 : 0);
+    setActiveCol(x >= 110 && x < 165 ? 1 : 0);
     setHexDigit(null);
     canvasRef.current?.focus();
   }, [tableCursor, visibleRows, headerHeight, setTableCursor]);
