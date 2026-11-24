@@ -19,11 +19,18 @@
  * A note on an empty row inside a held plain note splits that note ([num][dur] -> [num][d][new][dur - d]); the stream
  * grows by 4 bytes, moves to the end of the code hunk (hunk size words and file grow, relocations stay valid) and every
  * track-list entry naming it is repointed (addNote).
+ *
+ * A lower arpeggio count drops note numbers from the end of the Arpeggio command [0x81|0x84][dur][count][n1..nk]
+ * (beathoven_legacy.c / beathoven_voice.c start_arpeggio: the command is 2 * count + 6 bytes). The rest of the stream
+ * moves up inside its own bytes, the freed bytes become 0x0000 (End) and the code hunk's relocations in the moved bytes
+ * are lowered, so the file keeps its length (shrinkArpeggio). A higher count would need note numbers the module does not
+ * have and is refused.
  */
 import type { Pattern, TrackerCell } from '@/types';
 import { buildBthGrid, bthIsExtended, bthShownNote, readBthParams, type BthGrid, type BthParams } from './beathovenGrid';
 import { otherFieldsDiffer } from './howieDaviesEdits';
 import { cellEffects, effectEditPatches } from './cellEffectSlots';
+import { BTH_FX } from './beathovenEffectGlyphs';
 
 const NOTE_OFF = 97;
 const ROWS_PER_PATTERN = 64;
@@ -122,6 +129,60 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
   return refuse('no split of the held note reads back as the new note on this row');
 }
 
+interface Arp { pattern: number; channel: number; row: number; count: number; fx: Array<[number, number]> }
+
+/**
+ * The arpeggio on a row plays fewer of its note numbers: the trailing ones leave the command and the stream after it
+ * moves up in place (see the header). Refused: a count above the command's or below 1, a stream that another stream
+ * starts inside, a relocation among the dropped words, and any result that does not read back as the new count on this
+ * row with every cell not played from this command unchanged.
+ */
+function shrinkArpeggio(file: Uint8Array, a: Arp, warnings: string[]): Uint8Array {
+  const refuse = (why: string): Uint8Array => { warnings.push(`${PREFIX} ${where(a)}: ${why}; the arpeggio change was not written.`); return file; };
+  const g = buildBthGrid(file);
+  if (typeof g === 'string') return refuse(g);
+  const src = g.rowSources[a.pattern]?.[a.channel]?.[a.row];
+  if (!src || src.noteOffset === src.offset) return refuse('no arpeggio command plays on this row');
+  const count = rd16(file, src.offset + 4);
+  if (a.count === count) return file; // another edited row on the same command already wrote it
+  if (a.count < 1 || a.count > count) return refuse(`an arpeggio can only drop note numbers (1 to ${count}); more would need notes the module does not hold`);
+  const stream = g.streams[src.stream];
+  const end = stream.offset + stream.size + 2; // through the End word
+  if (g.streams.some((s) => s.offset > src.offset && s.offset < end)) return refuse('another command stream starts inside the bytes that would move');
+  const cut = src.offset + 6 + 2 * a.count;
+  const delta = 2 * (count - a.count);
+  const out = new Uint8Array(file);
+  out.copyWithin(cut, cut + delta, end);
+  out.fill(0, end - delta, end);
+  out[src.offset + 4] = a.count >> 8; out[src.offset + 5] = a.count & 0xff;
+  // HUNK_RELOC32 after the code hunk: [0x3ec] then ([n][hunk][n offsets])* [0]; offsets are code-relative
+  let ro = CODE + be32(file, 28) * 4;
+  if (be32(file, ro) === 0x3ec) {
+    for (ro += 4; ro + 4 <= file.length && be32(file, ro) !== 0;) {
+      const n = be32(file, ro);
+      for (let i = 0, at = ro + 8; i < n; i++, at += 4) {
+        const r = be32(file, at) + CODE;
+        if (r >= cut && r < cut + delta) return refuse('a relocated address sits among the dropped note numbers');
+        if (r >= cut + delta && r < end) put32(out, at, r - delta - CODE);
+      }
+      ro += 8 + 4 * n;
+    }
+  }
+  const again = buildBthGrid(out);
+  const got = typeof again === 'string' ? undefined : cellAt(again, a.channel, a.pattern * ROWS_PER_PATTERN + a.row);
+  if (typeof again === 'string' || again.rows !== g.rows || !got || JSON.stringify(cellEffects(got)) !== JSON.stringify(a.fx)) {
+    return refuse('the replayer would not play the new count on this row');
+  }
+  for (let c = 0; c < VOICES; c++) for (let r = 0; r < g.rows; r++) {
+    if (g.rowSources[Math.floor(r / ROWS_PER_PATTERN)]?.[c]?.[r % ROWS_PER_PATTERN]?.offset === src.offset) continue; // plays the same command
+    const x = cellAt(again, c, r), y = cellAt(g, c, r);
+    if (x?.note !== y?.note || x?.instrument !== y?.instrument || JSON.stringify(x && cellEffects(x)) !== JSON.stringify(y && cellEffects(y))) {
+      return refuse('the change moves other rows');
+    }
+  }
+  return out;
+}
+
 /** A same-length patch of `size` bytes (a note word, or an Instrument command's record address when `instrument` is set). */
 interface Edit { pattern: number; channel: number; row: number; note: number; instrument?: number; offset: number; value: number; size: 1 | 2 | 4; fx?: Array<[number, number]> }
 
@@ -160,6 +221,7 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
   const claimed = new Map<number, number>();
   const accepted: Edit[] = [];
   const adds: Add[] = [];
+  const arps: Arp[] = [];
 
   patterns.forEach((pat, pi) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
     const was = base.patterns[pi]?.channels[c]?.rows[r];
@@ -194,7 +256,16 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
       }
     }
     if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: the volume column is not stored per row in this format; that change was not written.`);
-    if (fxChanged) {
+    const now = cellEffects(cell), before = cellEffects(was);
+    const arpOnly = fxChanged && src != null && src.noteOffset !== src.offset && now.length === before.length
+      && now.every(([t, v], i) => t === before[i][0] && (v === before[i][1] || t === BTH_FX.arpeggio));
+    if (arpOnly) {
+      // the count is not a byte to patch: dropping note numbers shortens the command (shrinkArpeggio, after the patches)
+      const count = now.find(([t]) => t === BTH_FX.arpeggio)?.[1] ?? 0;
+      const other = arps.find((x) => base.rowSources[x.pattern]?.[x.channel]?.[x.row]?.offset === src?.offset);
+      if (other && other.count !== count) warnings.push(`${PREFIX} ${where(at)}: another edited row plays the same arpeggio command and wants a different count; the effect change was not written.`);
+      else if (!other) arps.push({ ...at, count, fx: now });
+    } else if (fxChanged) {
       const fxr = effectEditPatches(cell, was, src?.effects ?? []);
       const conflict = fxr.patches.some(([offset, value]) => (claimed.get(offset) ?? value) !== value);
       if (fxr.refusal) warnings.push(`${PREFIX} ${where(at)}: ${fxr.refusal}; the effect change was not written.`);
@@ -287,6 +358,7 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
   }
   writeAll(live);
   let out: Uint8Array = data;
+  for (const a of arps) out = shrinkArpeggio(out, a, warnings);
   for (const a of adds) out = addNote(out, a, warnings);
   let patched = 0;
   for (let i = 0; i < out.length; i++) if (out[i] !== original[i]) patched++;

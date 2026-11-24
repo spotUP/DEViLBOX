@@ -212,4 +212,51 @@ describe('Beathoven native export: beathoven_smallest.bss', () => {
     const again = await load(res.data, tri);
     expect(notes(again.song)).toBeLessThan(before); // the removed note (and every play of its stream) reads empty
   }, 240000);
+
+  it('writes a lower arpeggio count by dropping note numbers in place: same length, relocations lowered, reads back; a higher count is refused', async () => {
+    const { raw, song } = await load();
+    const grid = buildBthGrid(raw) as BthGrid;
+    const ARP = 1283; // BTH_FX.arpeggio
+    let hit: { pi: number; voice: number; row: number; src: number; key: string; count: number } | undefined;
+    grid.rowSources.forEach((pat, pi) => pat.forEach((v, voice) => v.forEach((s, row) => {
+      const cell = grid.patterns[pi].channels[voice].rows[row] as unknown as Record<string, number>;
+      const slot = (['effTyp', 'effTyp2', 'effTyp3', 'effTyp4'] as const).findIndex((k) => cell[k] === ARP);
+      const key = (['eff', 'eff2', 'eff3', 'eff4'] as const)[slot];
+      if (!hit && s && s.noteOffset !== s.offset && slot >= 0 && cell[key] >= 2) hit = { pi, voice, row, src: s.offset, key, count: cell[key] };
+    })));
+    if (!hit) throw new Error('no arpeggio with two or more note numbers in the file');
+    const { pi, voice, row, src, key, count } = hit;
+    const cellOf = (s: TrackerSong): Record<string, number> => s.patterns[pi].channels[voice].rows[row] as unknown as Record<string, number>;
+
+    cellOf(song)[key] = count + 1;
+    const up = await exportOf(song);
+    expect(up.warnings.join('\n')).toMatch(/only drop note numbers/);
+    expect(Array.from(up.data)).toEqual(Array.from(raw));
+
+    cellOf(song)[key] = count - 1;
+    const res = await exportOf(song);
+    expect(res.warnings.join('\n')).toBe('');
+    expect(res.data.length).toBe(raw.length);
+    expect((res.data[src + 4] << 8) | res.data[src + 5]).toBe(count - 1);
+    // the code hunk's relocations: same count, any in the moved bytes two lower
+    const be = (b: Uint8Array, o: number): number => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
+    const relocs = (b: Uint8Array): number[] => {
+      const out: number[] = [];
+      let ro = 0x20 + be(b, 28) * 4;
+      if (be(b, ro) !== 0x3ec) return out;
+      for (ro += 4; be(b, ro) !== 0; ro += 8 + 4 * be(b, ro)) for (let i = 0; i < be(b, ro); i++) out.push(be(b, ro + 8 + 4 * i));
+      return out;
+    };
+    const stream = grid.streams[grid.rowSources[pi][voice][row]!.stream];
+    const moved = relocs(raw).map((r) => (r + 0x20 >= src + 2 * count + 6 && r + 0x20 < stream.offset + stream.size + 2 ? r - 2 : r));
+    expect(relocs(res.data)).toEqual(moved);
+
+    const again = await load(res.data);
+    expect(cellOf(again.song)[key]).toBe(count - 1);
+    grid.patterns.forEach((p, i) => p.channels.forEach((ch, c) => ch.rows.forEach((was, r) => {
+      if (grid.rowSources[i][c][r]?.offset === src) return; // plays the edited command
+      const now = again.song.patterns[i].channels[c].rows[r];
+      expect([now.note, now.instrument, now.effTyp, now.eff]).toEqual([was.note, was.instrument, was.effTyp, was.eff]);
+    })));
+  }, 240000);
 });
