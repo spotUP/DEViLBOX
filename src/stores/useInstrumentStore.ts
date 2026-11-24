@@ -271,19 +271,19 @@ function getUniqueNotesForInstrument(patterns: Array<{ channels: Array<{ rows: A
 }
 
 /**
- * Helper to find next available instrument ID (1-128)
+ * Next instrument ID (1-128): one past the highest used slot, so a new
+ * instrument is appended last. Only when 128 is taken does it fall back to
+ * the lowest free gap.
  */
 function findNextId(existingIds: number[]): number {
-
-
+  const next = existingIds.reduce((m, id) => Math.max(m, id), 0) + 1;
+  if (next <= 128) return next;
   for (let id = 1; id <= 128; id++) {
-    if (!existingIds.includes(id)) {
-      return id;
-    }
+    if (!existingIds.includes(id)) return id;
   }
   console.warn('Maximum number of instruments reached (128)');
   return 1; // Return 1 as fallback (not 0, which means "no instrument")
-};
+}
 
 /** Every instrument that is monophonic by nature (auto-sets `monophonic`). */
 const MONO_SYNTH_TYPES = new Set([
