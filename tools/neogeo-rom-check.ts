@@ -1,7 +1,7 @@
 // Headless check, Neo Geo route as ~/Code/ArcadeGame builds it: .fur -> furtool.py/nsstool (ngdevkit) -> nullsound Z80 driver (M1) + V ROM
 // -> MAME neogeo (write tap on the YM2610 io ports, tools/neogeo-rom-check.lua) vs the Furnace CLI -vgmout stream of the same .fur.
 // Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/neogeo-rom-check.ts [--only <name>] [--failed] [--seconds N] [--detail]
-// Songs: the YM2610 .fur under public/data/songs/furnace plus the Neo Geo songs of tools/neogeo-compose (built through its run.ts).
+// Songs: the YM2610 .fur under public/data/songs (devilbox/ironwing, devilbox/afterburn-run) plus the Neo Geo songs of tools/neogeo-compose (built through its run.ts).
 // Pipeline = the game's own: a copy of ~/Code/ArcadeGame (ARCADEGAME overrides) with its music-map.yaml pointing at the song, built with its
 // Makefile rules (patched SSG noise lib + nullsound.lib), the game's 68k ROM unchanged. The game sends its title-music command (id 4 = the song)
 // at boot; commands the Z80 acked are recorded in the verdict. Scoring: key-on (FM key-on, SSG volume 0 -> on, ADPCM-A/B start) within 30 ms of
@@ -21,7 +21,8 @@ const FURNACE = process.env.FURNACE_CLI ?? '/Applications/Furnace.app/Contents/M
 const HARNESS = path.join(tmpdir(), 'neogeo-rom-check-harness');
 const MVS_CLK = 8_000_000;
 const SONGS: { name: string; fur?: string; compose?: string }[] = [
-  { name: 'Inner Machinations YM2610B', fur: path.join(ROOT, 'public/data/songs/furnace/misc/Inner Machinations YM2610B.fur') },
+  // Only YM2610 (0xa5/0xa6) modules: a YM2610B (0x9e) song has 6 FM channels, the Neo Geo 4, and furtool refuses it.
+  ...['ironwing', 'afterburn-run'].map((n) => ({ name: n, fur: path.join(ROOT, `public/data/songs/devilbox/${n}.fur`) })),
   ...['gumbirds-title', 'gumbirds-arena', 'gumbirds-game-over', 'gumbirds-round-clear'].map((n) => ({ name: n, compose: n })),
 ];
 
@@ -86,7 +87,7 @@ function readTap(file: string): { w: W[]; cmds: string[] } {
   return { w, cmds };
 }
 
-function readVgm(file: string): { w: W[]; clk: number } {
+function readVgm(file: string): { w: W[]; clk: number; end: number } {
   const b = readFileSync(file); let p = 0x34 + b.readUInt32LE(0x34), s = 0; const w: W[] = [];
   const clk = b.readUInt32LE(0x4c) & 0x3fffffff;
   while (p < b.length) {
@@ -99,7 +100,7 @@ function readVgm(file: string): { w: W[]; clk: number } {
     else if (c === 0x4f || c === 0x50) p += 1; else if (c >= 0x51 && c <= 0x5f) p += 2; else if (c >= 0xa0 && c <= 0xbf) p += 2; else if (c >= 0xc0 && c <= 0xdf) p += 3;
     else if (c === 0x90 || c === 0x91 || c === 0xe0) p += 4; else throw new Error(`vgm command ${c.toString(16)}`);
   }
-  return { w, clk };
+  return { w, clk, end: s / 44100 };
 }
 
 const run = (cmd: string, a: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeout?: number } = {}) =>
@@ -167,8 +168,10 @@ for (const song of SONGS) {
     v.stage = 'furnace';
     run(FURNACE, ['-console', '-nostatus', '-nocontrols', '-noreport', '-loglevel', 'error', '-loops', '0', '-vgmout', path.join(dir, 'f.vgm'), fur!], { timeout: 120000 });
     const vgm = readVgm(path.join(dir, 'f.vgm'));
-    const want = starts(vgm.w, vgm.clk).filter((e) => e.t < SECONDS - 2);
-    const wantT0 = lastT0;
+    // Furnace ends the render after the first tick of the loop-back row, so the key-ons it writes at the very end are the
+    // song restarting; a song without 0B stops in nullsound (lint: will not loop), so those are not part of the song
+    const all = starts(vgm.w, vgm.clk), wantT0 = lastT0;
+    const want = all.filter((e) => e.t < SECONDS - 2 && e.t + wantT0 < vgm.end - 1e-6);
     const pairs = want.map((w) => [w, got.find((g) => g.ch === w.ch && Math.abs(g.t - w.t) < 0.03)] as const);
     const hit = pairs.filter(([, g]) => g);
     // miss analysis: signed delta (MAME - Furnace) to the nearest same-channel MAME key-on; late = driver timing, none = lost row
