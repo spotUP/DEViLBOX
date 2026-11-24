@@ -96,3 +96,17 @@ describe('neoGeoCompose', () => {
     expect(adpcmBSampleBytes(s.build())).toEqual([{ name: 'kick', samples: 3330, bytes: 1792 }]);
   });
 });
+
+// nullsound runs a macro step one tick after Furnace does, so a volume macro as long as the gap to the next hat row
+// has its closing 0 land on the new row's tick, where the note retriggers it: the 0 -> on edge is lost. 13 steps at
+// speed 7 (14 ticks between the open hat and the next row) keep the 0 one tick ahead of the row.
+describe('Gumbirds open hat volume macro', () => {
+  it.each(['gumbirds-title', 'gumbirds-arena'])('%s: open hat ends at 0 before the next row on nullsound', async (name) => {
+    const { default: build } = await import(`../../../../../tools/neogeo-compose/songs/${name}.ts`);
+    const b = build(process.cwd()) as NeoGeoSongBuilder;
+    const ohat = b.instruments.find((i) => i.name === 'Hat open')!;
+    const vol = ohat.furnace!.macros.find((m: FurnaceMacro) => m.code === 0)!.data;
+    expect(vol[vol.length - 1]).toBe(0);
+    expect(vol.length).toBeLessThanOrEqual(2 * 7 - 1);
+  });
+});

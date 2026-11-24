@@ -82,7 +82,7 @@ export default function gumbirdsArena(repoRoot: string): NeoGeoSongBuilder {
   // Run pluck: one-tick octave-up sparkle, decay over 6 ticks = one row at speed 6.
   const RUN = s.addInstrument('SSG run pluck', ssg([seqMacro(0, [14, 13, 12, 10, 9, 8]), seqMacro(1, [12, 0])]));
   const HAT = s.addInstrument('Hat closed', ssg([seqMacro(0, [12, 8, 5, 3, 1, 0]), seqMacro(3, [2])]));
-  const OHAT = s.addInstrument('Hat open', ssg([seqMacro(0, [11, 10, 9, 8, 7, 6, 5, 4, 3, 3, 2, 2, 1, 0]), seqMacro(3, [2])]));
+  const OHAT = s.addInstrument('Hat open', ssg([seqMacro(0, [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 2, 1, 0]), seqMacro(3, [2])]));
   const SNARE = s.addInstrument('Snare', ssg([
     seqMacro(0, [15, 14, 12, 10, 9, 7, 6, 4, 3, 2, 1, 0]), seqMacro(1, [12, 5, 0]), seqMacro(3, [3, 3, 2]),
   ]));

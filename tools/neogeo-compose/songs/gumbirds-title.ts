@@ -93,7 +93,7 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
   ]));
   // Hats: noise only. Closed = 5-tick snap; open = 14-tick ring.
   const HAT = s.addInstrument('Hat closed', ssg([seqMacro(0, [12, 8, 5, 3, 1, 0]), seqMacro(3, [2])]));
-  const OHAT = s.addInstrument('Hat open', ssg([seqMacro(0, [11, 10, 9, 8, 7, 6, 5, 4, 3, 3, 2, 2, 1, 0]), seqMacro(3, [2])]));
+  const OHAT = s.addInstrument('Hat open', ssg([seqMacro(0, [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 2, 1, 0]), seqMacro(3, [2])]));
   // Snare: two ticks of tone + noise with a falling tone blip (arp 12 -> 5 -> 0), then noise tail.
   const SNARE = s.addInstrument('Snare', ssg([
     seqMacro(0, [15, 14, 12, 10, 9, 7, 6, 4, 3, 2, 1, 0]),
