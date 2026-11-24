@@ -2770,14 +2770,14 @@ export async function tryRouteFormat(
   }
 
   // ── Jason Brooke (jcbo.* / jcb.* / jb.* prefix) ─────────────────────────
-  // UADE enhanced scan reconstructs patterns from Paula register captures.
+  // Native grid (versions A and B, byte-exact tick grid); UADE plays. A module the
+  // decoder cannot read returns the stub grid and UADE's enhanced scan builds the grid.
   if (matchesExt(filename, ['jcbo', 'jcb', 'jb'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const jbFile = toUADEPrefixName(originalFileName, ['jcbo', 'jcb', 'jb']);
-    const song = await parseUADEFile(buffer, jbFile, 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = jbFile;
-    return song;
+    const jbCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['jcbo', 'jcb', 'jb']) };
+    const { parseJasonBrookeFile } = await import('@lib/import/formats/JasonBrookeParser');
+    return withNativeThenUADE('jasonBrooke', jbCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseJasonBrookeFile(buf as ArrayBuffer, name),
+      'JasonBrookeParser', { injectUADE: true });
   }
 
   // ── Laxity (powt.* / pt.* prefix) ────────────────────────────────────────

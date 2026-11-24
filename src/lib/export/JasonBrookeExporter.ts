@@ -20,8 +20,8 @@ export async function exportJasonBrooke(song: TrackerSong): Promise<JasonBrookeE
   const layout = song.uadeVariableLayout;
   const name = (song.uadeEditableFileName ?? 'module.jb').split('/').pop() ?? 'module.scn';
   if (!layout || layout.formatId !== 'jasonBrooke') {
-    // Version B (early game driver) is imported as a placeholder pattern: no grid decoder exists, so no edit has a byte to land in.
-    return { data: new Uint8Array(src), filename: name, warnings: ['Jason Brooke version B edits are refused: this driver version has no decoded pattern grid (jb_b.c is not mapped to rows), so the module is exported byte-identical; edits were not written'] };
+    // No grid decoded (not a version A or B driver module): the placeholder pattern has no byte for an edit to land in.
+    return { data: new Uint8Array(src), filename: name, warnings: ['Jason Brooke edits are refused: no pattern grid was decoded from this module (not a version A or B driver module), so it is exported byte-identical; edits were not written'] };
   }
   const out = new Uint8Array(src.byteLength);
   out.set(new Uint8Array(src));

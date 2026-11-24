@@ -8,7 +8,11 @@
  * command ends a row; the row lasts row_length steps, a step is 256/tempo ticks.
  * Each stream (from its first byte to its NextTrack/Stop) is a file block whose `blockRows` carry its bytes; `noteBytes`
  * name the note byte of the event that plays each grid cell (docs/FORMAT_COMMAND_STREAM_GRID.md).
- * shortcut: version A only (the early version B driver keeps the placeholder grid); each voice plays to its first track
+ * Version B (the early driver: Feud, Pac-Land, World Darts; jb_b.c): song record 10 bytes (tempo at +1, one track list
+ * word per voice at +2), a track list of word stream offsets ended by a zero word; stream bytes <$80 note, $80..$89
+ * command (KeyOff ends a row), $90..$9F pitch sequence, $A0..$B7 block, $B8..$DF envelope, $E0.. row length; a step is
+ * `tempo` ticks. Same carrier and exporter as version A.
+ * shortcut: each voice plays to its first track
  * list wrap; the pitch sequence (arpeggio) and the slide/vibrato are not in the grid note; a stream played again shows on
  * every play but only the first play writes back; the grid row is the gcd of the row lengths in steps.
  */
@@ -204,16 +208,77 @@ function walkVoice(b: Uint8Array, t: JbTables, voice: number): JbWalk | null {
   return blocks.length ? { events, blocks, steps } : null;
 }
 
+/** jb_b_locate: the tables of a version B module (is_version_b: the interrupt routine starts at byte 0). */
+export function jasonBrookeBTables(b: Uint8Array): { songs: number; periods: number } | null {
+  if (u16(b, 0) !== 0x48e7 || u16(b, 2) !== 0xf0f0 || u16(b, 4) !== 0x4240 || u16(b, 6) !== 0x47fa) return null;
+  const start = find(b, 0, SEARCH, '103b 00xx');
+  const per = start < 0 ? -1 : find(b, start, SEARCH, '323b 00xx');
+  const song = find(b, 0, SEARCH, '137b 00xx');
+  if (find(b, 0, SEARCH, '43fa xxxx') < 0 || per < 0 || song < 0 || find(b, 0, SEARCH, 'ef40 45fa xxxx d4c0') < 0
+    || find(b, 0, SEARCH, 'd4fb 00xx 4ed2') < 0) return null;
+  return { songs: pc8(b, song + 2) - 1, periods: pc8(b, per + 2) };
+}
+
+/** jb_b.c sequence_step for one voice of subsong 0, to its first track list wrap or Stop. */
+function walkVoiceB(b: Uint8Array, t: { songs: number; periods: number }, voice: number): JbWalk | null {
+  const off = (v: number) => (v << 16) >> 16;
+  const list = off(u16(b, t.songs + 2 + 2 * voice));
+  let position = 2;
+  let p = off(u16(b, list));
+  let rowLength = 0;
+  let block = 0;
+  let transpose = 0;
+  let step = 0;
+  const events: JbEvent[] = [];
+  const blocks: Array<{ start: number; end: number }> = [];
+  let blockStart = p;
+  for (let guard = 0; guard < MAX_STEPS; guard++) {
+    let ended = false;
+    for (let n = 0; n < 4096 && !ended; n++) {
+      if (p < 0 || p >= b.length) return null;
+      const byte = u8(b, p++);
+      if (byte < 0x80) {
+        const period = u16(b, t.periods + (((byte + transpose) << 1) & 0x1fe));
+        events.push({ step, at: p - 1, period, sample: block });
+        ended = true;
+      } else if (byte < 0x90) {
+        switch (byte - 0x80) {
+          case 0: ended = true; break; // KeyOff
+          case 2: case 6: p += 2; break; // Slide, Vibrato
+          case 8: transpose = u8(b, p++); break;
+          case 9: p++; break; // AdkCon
+          case 7: blocks.push({ start: blockStart, end: p }); return { events, blocks, steps: step };
+          case 5: { // NextTrack: a zero word ends the list
+            blocks.push({ start: blockStart, end: p });
+            if (u16(b, list + position) === 0) return { events, blocks, steps: step + (rowLength || 256) };
+            p = off(u16(b, list + position));
+            position += 2;
+            blockStart = p;
+            break;
+          }
+          default: break;
+        }
+      } else if (byte >= 0xe0) rowLength = byte - 0xdf;
+      else if (byte >= 0xa0 && byte < 0xb8) block = byte - 0xa0;
+    }
+    if (!ended) return null;
+    step += rowLength || 256;
+  }
+  return blocks.length ? { events, blocks, steps: step } : null;
+}
+
 export interface JbGrid { pattern: Pattern; layout: UADEVariablePatternLayout; rowTicks: number }
 
-/** The grid and layout of subsong 0 of a version A module, or null when it is not one or leaves the file. */
+/** The grid and layout of subsong 0 of a version A or B module, or null when it is neither or leaves the file. */
 export function buildJasonBrookeGrid(buf: Uint8Array): JbGrid | null {
-  const t = jasonBrookeATables(buf);
-  if (!t) return null;
+  const a = jasonBrookeATables(buf);
+  const bt = a ? null : jasonBrookeBTables(buf);
+  const walk = a ? (v: number) => walkVoice(buf, a, v) : bt ? (v: number) => walkVoiceB(buf, bt, v) : null;
+  if (!walk) return null;
   const voices: JbEvent[][] = [];
   const spans = new Map<number, number>();
   for (let v = 0; v < NUM_CHANNELS; v++) {
-    const w = walkVoice(buf, t, v);
+    const w = walk(v);
     if (!w) return null;
     voices.push(w.events);
     for (const x of w.blocks) spans.set(x.start, Math.max(spans.get(x.start) ?? 0, x.end));
@@ -254,8 +319,9 @@ export function buildJasonBrookeGrid(buf: Uint8Array): JbGrid | null {
       if (!written.has(e.at)) { written.add(e.at); noteBytes.push({ pattern: 0, channel, row, offset: e.at, note }); }
     }
   });
-  const tempo = Math.max(1, u8(buf, t.songs));
-  const rowTicks = Math.max(1, Math.round(((256 + tempo / 2) >> 0) / tempo * rowSteps));
+  // A: a step is 256/tempo ticks; B: the tempo counter reloads with the tempo byte (0 counts 256)
+  const tempo = a ? Math.max(1, u8(buf, a.songs)) : u8(buf, (bt?.songs ?? 0) + 1) || 256;
+  const rowTicks = a ? Math.max(1, Math.round(((256 + tempo / 2) >> 0) / tempo * rowSteps)) : tempo * rowSteps;
   const layout: UADEVariablePatternLayout = {
     formatId: 'jasonBrooke', numChannels: NUM_CHANNELS, numFilePatterns: blocks.length, rowsPerPattern: rowCount,
     moduleSize: buf.length, encoder: jasonBrookeEncoder,
