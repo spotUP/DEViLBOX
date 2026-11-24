@@ -66,6 +66,12 @@ export function useGTKeyboardHandler(active: boolean) {
       return;
     }
 
+    if (e.key === '?') {
+      e.preventDefault();
+      state.setKeyHelpOpen(!state.keyHelpOpen);
+      return;
+    }
+
     // F1 = play from start, F2 = play from cursor, F3 = stop
     if (e.key === 'F1') {
       e.preventDefault();

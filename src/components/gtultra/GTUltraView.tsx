@@ -22,6 +22,7 @@ import { useGTKeyboardHandler } from './GTKeyboardHandler';
 import { useGTDAWKeyboardHandler } from '../../hooks/useGTDAWKeyboardHandler';
 import { useGTUltraEngineInit } from '../../engine/gtultra/useGTUltraEngineInit';
 import { useGTUltraFormatData } from './useGTUltraFormatData';
+import { GTKeyHelp } from './GTKeyHelp';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 import { useUIStore } from '../../stores/useUIStore';
 
@@ -93,6 +94,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = () => 
         </>
       )}
 
+      <GTKeyHelp />
       <div
         className={`flex-shrink-0 px-2 text-[10px] font-mono border-b ${recordMode
           ? 'bg-accent-error/20 text-accent-error border-accent-error/50'

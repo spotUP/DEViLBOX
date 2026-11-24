@@ -8,6 +8,7 @@ import { CustomSelect } from '@components/common/CustomSelect';
 import { useGTUltraStore, type GTSidModel, type GTViewMode } from '../../stores/useGTUltraStore';
 import { getGTUltraASIDBridge } from '../../engine/gtultra/GTUltraASIDBridge';
 import { SIDHardwareToggle } from '../common/SIDHardwareToggle';
+import { withKey } from './gtKeyTable';
 import { notify } from '@stores/useNotificationStore';
 import { validateGtExportOptions, GT_DEFAULT_LOAD_ADDRESS, GT_DEFAULT_ZERO_PAGE } from '../../lib/export/c64/gtExportOptions';
 
@@ -130,7 +131,7 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
       <button
         onClick={() => setRecordMode(!recordMode)}
         className={`${BTN} border-transparent font-bold ${recordMode ? 'bg-red-500 text-text-primary' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}
-        title="Record mode: typed notes and digits edit the pattern (Esc toggles)"
+        title={withKey('Record mode: typed notes and digits edit the pattern', 'Escape')}
       >
         Record
       </button>
@@ -142,6 +143,14 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
         title="Jam mode: play notes on the keyboard without editing the pattern"
       >
         Jam
+      </button>
+
+      <button
+        onClick={() => useGTUltraStore.getState().setKeyHelpOpen(true)}
+        className={BTN_DEFAULT}
+        title={withKey('Show all keyboard shortcuts', '?')}
+      >
+        Keys
       </button>
 
       <div className="w-px h-5 bg-ft2-border mx-0.5" />

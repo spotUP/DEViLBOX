@@ -117,6 +117,7 @@ export interface GTUltraState {
   // Edit settings
   editStep: number;    // rows to advance after note entry
   recordMode: boolean;
+  keyHelpOpen: boolean;
   jamMode: boolean;
   clipboardInstrument: number; // for instrument copy/paste
   mutedChannels: Set<number>;  // muted channel indices
@@ -175,6 +176,7 @@ export interface GTUltraState {
   setFollowPlay: (follow: boolean) => void;
   updatePlaybackPos: (pos: Partial<GTPlaybackPosition>) => void;
   setRecordMode: (record: boolean) => void;
+  setKeyHelpOpen: (open: boolean) => void;
   setJamMode: (jam: boolean) => void;
   setClipboardInstrument: (inst: number) => void;
   toggleChannelMute: (ch: number) => void;
@@ -272,6 +274,7 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   // Edit settings
   editStep: 1,
   recordMode: false,
+  keyHelpOpen: false,
   jamMode: false,
   clipboardInstrument: 0,
   mutedChannels: new Set<number>(),
@@ -400,6 +403,7 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
     },
   })),
   setRecordMode: (recordMode) => set({ recordMode }),
+  setKeyHelpOpen: (keyHelpOpen) => set({ keyHelpOpen }),
   setJamMode: (jamMode) => set({ jamMode }),
   setClipboardInstrument: (clipboardInstrument) => set({ clipboardInstrument }),
   toggleChannelMute: (ch) => set((s) => {
