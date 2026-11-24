@@ -105,17 +105,24 @@ describe.each(FILES)('Howie Davies native export: $name', (file) => {
     })));
   }, 240000);
 
-  it('refuses a removed note and a volume edit, writing nothing', async () => {
+  it('writes a removed note as the Delay command over the note byte (same two bytes), refuses a volume edit', async () => {
     const { raw, song } = await load(file);
+    const grid = buildHowieDaviesGrid(raw) as HowieDaviesGrid;
     const rows = song.patterns[0].channels[0].rows;
-    const played = rows.findIndex((c) => c.note > 0 && c.note < 97);
+    // a row with no effect shown: a Speed or Maximum Volume command shows on the next note's row, so removing its note would move it
+    const played = rows.findIndex((c) => c.note > 0 && c.note < 97 && !c.effTyp && !c.effTyp2);
     expect(played).toBeGreaterThanOrEqual(0);
+    const src = grid.sources[0][played]!;
     rows[played].note = 0;
     song.patterns[0].channels[1].rows[0].volume = 30;
     const res = await exportOf(song);
-    expect(res.warnings.length).toBeGreaterThanOrEqual(2);
-    expect(res.warnings.join('\n')).toMatch(/not written/);
-    expect(Array.from(res.data)).toEqual(Array.from(raw));
+    expect(res.warnings.join('\n')).toMatch(/volume column/);
+    expect(res.warnings.join('\n')).not.toMatch(/removed/);
+    expect(res.data.length).toBe(raw.length);
+    expect(diffCount(raw, res.data)).toBe(1);
+    expect(res.data[src.noteAt]).toBe(grid.delayByte);
+    const again = await load(file, res.data);
+    expect(again.song.patterns[0].channels[0].rows[played].note).toBe(0);
   }, 240000);
 
   it('writes a note on a blank row, growing the pattern, and reloads it there with the length of the song kept', async () => {

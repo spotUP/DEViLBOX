@@ -5,7 +5,7 @@
  * lands on the new note. An edited instrument cell patches the argument byte of the Instrument command that chose it,
  * and only when the stream holds one (an instrument that is the voice's start state has no byte to patch). A pattern is
  * shared by every place that plays it, so an edit shows wherever the pattern byte plays. Edits the stream cannot hold
- * at its length - a note on a row inside a held note that is not in the start pattern, a note removed or turned into a note off, a rest change,
+ * at its length - a note on a row inside a held note that is not in the start pattern, a note turned into a note off (a removed note becomes the Delay command, same two bytes), a rest change,
  * the volume column (not stored per row), a stream command added, removed or retyped - are refused with a warning and nothing is written for them.
  * After patching, the grid is decoded again: every edited cell must read back as edited, and every cell that does not
  * share an edited byte must be unchanged, otherwise the edit is taken out again.
@@ -104,7 +104,10 @@ export function applyHowieDaviesGridEdits(original: Uint8Array, patterns: readon
       return;
     }
     let noteByte = original[src.noteAt];
-    if (noteChanged) {
+    // Removal: the driver's Delay command is [command][ticks], the same two bytes as a note and its rest byte, and sets the same rest.
+    const removal = noteChanged && cell.note === 0 && base.delayByte >= 0;
+    if (removal) noteByte = base.delayByte;
+    else if (noteChanged) {
       if (cell.note < 1 || cell.note >= NOTE_OFF) {
         warnings.push(`${PREFIX} ${where(at)}: a note cannot be removed or turned into a note off without changing the stream length; the edit was not written.`);
         return;
@@ -148,7 +151,7 @@ export function applyHowieDaviesGridEdits(original: Uint8Array, patterns: readon
       }
     }
     for (const [offset, value] of fxPatches) claimed.set(offset, value);
-    accepted.push({ ...at, note: cell.note, instrument: cell.instrument, noteAt: src.noteAt, noteByte, instrumentAt: instChanged ? src.instrumentAt : -1, instrumentByte, fxPatches, fx: cellEffects(cell) });
+    accepted.push({ ...at, note: cell.note, instrument: removal ? 0 : cell.instrument, noteAt: src.noteAt, noteByte, instrumentAt: instChanged ? src.instrumentAt : -1, instrumentByte, fxPatches, fx: cellEffects(cell) });
   })));
 
   const writeAll = (edits: Edit[]): void => {
