@@ -6,7 +6,8 @@
 // Per tick (state after the tick's writes) and channel: sounding = control bit 7 set and volume > 0. Both sides start at their own first sounding tick.
 // keyOnMatch = share of Furnace note starts (silent -> sounding, or a period jump >= 80 cents on a sounding tone channel) with a ROM start on the same channel
 // within 2 ticks (~30 ms). pitchMatch = share of ticks where both sound a tone (noise off) within 50 cents. volumeMatch = same ticks, control volume
-// within 1 step. pass = the ROM sounded and keyOnMatch and pitchMatch are both at least 90 %. Needs Mesen2 and the Furnace CLI (FURNACE_CLI overrides).
+// within 1 step. DDA ticks (control bits 7+6: sample stream, period unused) are not tone ticks; ddaMatch = share of Furnace DDA ticks the ROM
+// also plays in DDA. pass = the ROM sounded and keyOnMatch and pitchMatch (and ddaMatch when Furnace uses DDA) are all at least 90 %. Needs Mesen2 and the Furnace CLI (FURNACE_CLI overrides).
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -24,11 +25,11 @@ const MESEN = path.join(homedir(), 'Applications/Mesen.app/Contents/MacOS/Mesen'
 const FURNACE = process.env.FURNACE_CLI ?? '/Applications/Furnace.app/Contents/MacOS/furnace';
 const PSG_CLOCK = 3579545, VGM_RATE = 44100, CH = 6;
 
-interface Verdict { inputHash: string; file: string; pass: boolean; seconds: number; hz?: number; romBytes?: number; lossy?: string[]; romStarts?: number; furnaceStarts?: number; keyOnMatch?: number; pitchMatch?: number; volumeMatch?: number; volumeExact?: number; panMatch?: number; waveMatch?: number; noiseMatch?: number; error?: string }
+interface Verdict { inputHash: string; file: string; pass: boolean; seconds: number; hz?: number; romBytes?: number; lossy?: string[]; romStarts?: number; furnaceStarts?: number; keyOnMatch?: number; pitchMatch?: number; volumeMatch?: number; volumeExact?: number; panMatch?: number; waveMatch?: number; noiseMatch?: number; ddaMatch?: number; error?: string }
 /** One register write; tick = 60 Hz tick it belongs to. */
 type W = { tick: number; reg: number; val: number; cy?: number };
 /** Channel state after a tick: period 0 = silent. */
-type St = { on: boolean; per: number; vol: number; noise: boolean; nfreq: number; pan: number };
+type St = { on: boolean; dda: boolean; per: number; vol: number; noise: boolean; nfreq: number; pan: number };
 
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : undefined;
@@ -91,7 +92,7 @@ emu.addMemoryCallback(function(a,v) v=v&0xFF if (a&15)==0 then if v==0 and last~
 function states(ws: W[]): St[][] {
   const pan = new Array<number>(CH).fill(255), per = new Array<number>(CH).fill(0), ctl = new Array<number>(CH).fill(0), nz = new Array<number>(CH).fill(0);
   let sel = 0, i = 0;
-  const snap = () => Array.from({ length: CH }, (_, c) => ({ on: (ctl[c] & 0x80) !== 0 && (ctl[c] & 31) > 0, per: per[c], vol: ctl[c] & 31, noise: c >= 4 && (nz[c] & 0x80) !== 0, nfreq: nz[c] & 31, pan: pan[c] }));
+  const snap = () => Array.from({ length: CH }, (_, c) => ({ on: (ctl[c] & 0x80) !== 0 && (ctl[c] & 31) > 0, dda: (ctl[c] & 0xc0) === 0xc0, per: per[c], vol: ctl[c] & 31, noise: c >= 4 && (nz[c] & 0x80) !== 0, nfreq: nz[c] & 31, pan: pan[c] }));
   const all: St[][] = [];
   const last = ws.length ? ws[ws.length - 1].tick : 0;
   for (let t = 0; t <= last; t++) {
@@ -178,9 +179,11 @@ for (const file of walk(SONGS)) {
     const hits = wantStarts.map((w) => romStarts.some((g) => g.ch === w.ch && Math.abs(g.t - w.t) <= 2));
     const hit = hits.filter(Boolean).length;
     if (detail) wantStarts.forEach((w, i) => { if (!hits[i]) console.log(`  missed start tick ${w.t} ch${w.ch}${want[w.t][w.ch].noise ? ' (noise)' : ''}`); });
-    let tone = 0, inTune = 0, volOk = 0, volEq = 0, panOk = 0;
+    let tone = 0, inTune = 0, volOk = 0, volEq = 0, panOk = 0, dda = 0, ddaEq = 0;
     for (let t = 0; t < Math.min(want.length, got.length); t++) for (let ch = 0; ch < CH; ch++) {
       const a = want[t][ch], b = got[t][ch];
+      if (a.on && a.dda) { dda++; if (b.on && b.dda) ddaEq++; }
+      if (a.dda || b.dda) continue;
       if (!a.on || !b.on || a.noise || b.noise || !a.per || !b.per) continue;
       tone++;
       const cents = Math.round(1200 * Math.log2(a.per / b.per));
@@ -202,10 +205,11 @@ for (const file of walk(SONGS)) {
       else if (process.env.PCE_VOLDIFF) console.log(`  noise tick ${t} ch${ch} fur on=${a.on} noise=${a.noise} f=${a.nfreq} rom on=${b.on} noise=${b.noise} f=${b.nfreq}`);
     }
     v.noiseMatch = pct(nzEq, nz);
+    if (dda) v.ddaMatch = pct(ddaEq, dda);
     Object.assign(v, { furnaceStarts: wantStarts.length, keyOnMatch: pct(hit, wantStarts.length), pitchMatch: pct(inTune, tone), volumeMatch: pct(volOk, tone), volumeExact: pct(volEq, tone), panMatch: pct(panOk, tone) });
     const fw = waves(furW), rw = waves(romW);
     v.waveMatch = pct([...rw].filter((x) => fw.has(x)).length, rw.size); // ROM waves that Furnace also writes (it writes extra ones at start-up)
-    v.pass = romStarts.length > 0 && (v.keyOnMatch ?? 0) >= 90 && (v.pitchMatch ?? 0) >= 90;
+    v.pass = romStarts.length > 0 && (v.keyOnMatch ?? 0) >= 90 && (v.pitchMatch ?? 0) >= 90 && (v.ddaMatch ?? 100) >= 90;
   } catch (e) {
     v = { inputHash, file: rel, pass: false, seconds: SECONDS, error: e instanceof Error ? e.message.split('\n')[0] : String(e) };
   } finally { rmSync(dir, { recursive: true, force: true }); }

@@ -18,7 +18,7 @@ export interface HusicSong { rom: Uint8Array; lossy: string[]; frames: number; l
 
 export const PCE_SYSTEM_ID = 0x05;
 const CHANNELS = 6, FRAME_HZ = 60, BANK = 0x2000, WINDOW = 0x4000, MAX_ROWS = 20000, PSG_CLOCK = 3579545;
-const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PITCH = 4, NONE = 0xff;
+const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PITCH = 4, NONE = 0xff, INS_AMIGA = 4; // INS_AMIGA = DIV_INS_AMIGA
 const FREQ_TABLE = 0x2d; // `_freq` sits after LL0's strings (25 bytes) and the 20-byte author field in the const bank; asserted below
 const NOISE_FREQ = [4, 13, 15, 18, 21, 23, 25, 27, 29, 31, 0, 2]; // Furnace pce.cpp noiseFreq (old noise layout)
 // HuSIC track commands (hmckc output / hus.c SEQ_xx)
@@ -304,6 +304,9 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       } else if (nv >= 0 && nv < 253) {
         curNv = nv; toneOn = !(ch >= 4 && noiseFx); noteFrame = at;
         const insIdx = Math.max(0, ins);
+        // Furnace pce.cpp: an Amiga-type or useSample instrument plays its sample through DDA; the driver has no DDA route here yet
+        const fi = m.instruments[insIdx];
+        if (fi && (fi.type === INS_AMIGA || fi.amiga?.useSample)) lossy.add('sample instrument (DDA) played as a wavetable tone');
         const wf = framesOf(insIdx, MACRO_WAVE, 'wave');
         const wave = wf && new Set(wf.vals).size > 1 ? -1 - waveEnv.level(wf) : wf ? wf.vals[0] : waveFx;
         const af0 = arpFrames(insIdx, arpFx);
