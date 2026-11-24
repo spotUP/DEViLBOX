@@ -901,6 +901,9 @@ endpoint:
 
         set_vol(ch, ch_vol[ch]);
 
+        /* DEViLBOX: clear the slur flag here too, as the tone path does below */
+        ch_efx[ch] &= ~(EFX_SLAR);
+
 				/* バンクを戻して */
 				chg_cbank(ch_nowbank);
 				return;

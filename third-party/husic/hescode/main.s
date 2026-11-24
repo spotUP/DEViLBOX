@@ -2025,6 +2025,17 @@ LL90:
 	__addw_s	12
 	__ldb_p
 	  call	_set_vol
+; DEViLBOX: a noise key-on clears the slur flag too (the tone path does at LL96); else one slurred
+; noise note leaves EFX_SLAR set and every later key-on on the channel skips its envelope resets.
+	__ldwi	_ch_efx
+	__addw_s	10
+	__pushw
+	__ldb_p
+	__pushw
+	__ldwi	1
+	__comw
+	__andws
+	__stbps
 	__ldb	_ch_nowbank
 	  call	_chg_cbank
 	__lbra	LL60
