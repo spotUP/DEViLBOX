@@ -17,7 +17,8 @@
  * as edited and every cell that does not share an edited word must be unchanged, otherwise the edit is taken out again.
  *
  * A note on an empty row inside a held plain note splits that note ([num][dur] -> [num][d][new][dur - d]); the stream
- * grows by 4 bytes, moves to the end of the code hunk (hunk size words and file grow, relocations stay valid) and every
+ * grows by 4 bytes, moves to the end of the code hunk (hunk size words and file grow; the copy's relocated words get
+ * their own HUNK_RELOC32 entries, the old ones stay) and every
  * track-list entry naming it is repointed (addNote).
  *
  * A lower arpeggio count drops note numbers from the end of the Arpeggio command [0x81|0x84][dur][count][n1..nk]
@@ -56,6 +57,15 @@ const be32 = (d: Uint8Array, o: number): number => ((d[o] << 24) | (d[o + 1] << 
 const put32 = (d: Uint8Array, o: number, v: number): void => { d[o] = v >>> 24; d[o + 1] = (v >>> 16) & 0xff; d[o + 2] = (v >>> 8) & 0xff; d[o + 3] = v & 0xff; };
 const rd16 = (d: Uint8Array, o: number): number => (d[o] << 8) | d[o + 1];
 const CODE = 0x20;
+
+/** HUNK_RELOC32 after the code hunk: [0x3ec] then ([n][hunk][n offsets])* [0]; offsets are code-relative. File offsets of each group's n word. */
+function relocGroups(file: Uint8Array): number[] {
+  const out: number[] = [];
+  let ro = CODE + be32(file, 28) * 4;
+  if (be32(file, ro) !== 0x3ec) return out;
+  for (ro += 4; ro + 4 <= file.length && be32(file, ro) !== 0; ro += 8 + 4 * be32(file, ro)) out.push(ro);
+  return out;
+}
 
 /** File offsets of every track-list entry (8 bytes: stream, note base) reachable from the four voices. */
 function trackEntryOffsets(buf: Uint8Array, prm: BthParams): number[] {
@@ -99,6 +109,34 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
   const cut = src.offset - stream.offset;
   const hunk = be32(file, 28) * 4;
   const added = Math.ceil((stream.size + 4) / 4) * 4;
+  const lo = stream.offset - CODE;
+  // The copy's relocated words (Instrument record addresses) get their own HUNK_RELOC32 entries in the same group:
+  // the loader relocates only listed offsets. Words past the split sit 4 bytes later in the copy.
+  const withCopyRelocs = (m: Uint8Array): Uint8Array => {
+    const groups = relocGroups(m);
+    const extra = groups.map((ro) => {
+      const xs: number[] = [];
+      for (let i = 0; i < be32(m, ro); i++) {
+        const r = be32(m, ro + 8 + 4 * i);
+        if (r >= lo && r < lo + stream.size) xs.push(hunk + r - lo + (r - lo >= cut + 4 ? 4 : 0));
+      }
+      return xs;
+    });
+    const total = extra.reduce((s, xs) => s + xs.length, 0);
+    if (total === 0) return m;
+    const out = new Uint8Array(m.length + 4 * total);
+    let w = 0, r = 0;
+    groups.forEach((ro, gi) => {
+      const end = ro + 8 + 4 * be32(m, ro);
+      out.set(m.subarray(r, end), w);
+      w += end - r;
+      put32(out, w - (end - ro), be32(m, ro) + extra[gi].length);
+      for (const x of extra[gi]) { put32(out, w, x); w += 4; }
+      r = end;
+    });
+    out.set(m.subarray(r), w);
+    return out;
+  };
   for (let d = 1; d < dur; d++) {
     if (ticks(d) !== want || ticks(dur - d) !== ticks(dur) - want) continue;
     const grown = new Uint8Array(added);
@@ -106,13 +144,14 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
     grown[cut + 2] = d >> 8; grown[cut + 3] = d & 0xff;
     grown.set([num >> 8, num & 0xff, (dur - d) >> 8, (dur - d) & 0xff], cut + 4);
     grown.set(file.subarray(stream.offset + cut + 4, stream.offset + stream.size), cut + 8);
-    const moved = new Uint8Array(file.length + added);
-    moved.set(file.subarray(0, CODE + hunk));
-    moved.set(grown, CODE + hunk);
-    moved.set(file.subarray(CODE + hunk), CODE + hunk + added);
-    put32(moved, 28, hunk / 4 + added / 4);
-    put32(moved, 20, be32(file, 20) + added / 4); // the size word keeps its memory flag bits
-    for (const e of entries) put32(moved, e, hunk);
+    const base = new Uint8Array(file.length + added);
+    base.set(file.subarray(0, CODE + hunk));
+    base.set(grown, CODE + hunk);
+    base.set(file.subarray(CODE + hunk), CODE + hunk + added);
+    put32(base, 28, hunk / 4 + added / 4);
+    put32(base, 20, be32(file, 20) + added / 4); // the size word keeps its memory flag bits
+    for (const e of entries) put32(base, e, hunk);
+    const moved = withCopyRelocs(base);
     const again = buildBthGrid(moved);
     if (typeof again === 'string' || again.rows !== g.rows || cellAt(again, a.channel, row)?.note !== a.note) continue;
     let clean = true;
@@ -155,17 +194,11 @@ function shrinkArpeggio(file: Uint8Array, a: Arp, warnings: string[]): Uint8Arra
   out.copyWithin(cut, cut + delta, end);
   out.fill(0, end - delta, end);
   out[src.offset + 4] = a.count >> 8; out[src.offset + 5] = a.count & 0xff;
-  // HUNK_RELOC32 after the code hunk: [0x3ec] then ([n][hunk][n offsets])* [0]; offsets are code-relative
-  let ro = CODE + be32(file, 28) * 4;
-  if (be32(file, ro) === 0x3ec) {
-    for (ro += 4; ro + 4 <= file.length && be32(file, ro) !== 0;) {
-      const n = be32(file, ro);
-      for (let i = 0, at = ro + 8; i < n; i++, at += 4) {
-        const r = be32(file, at) + CODE;
-        if (r >= cut && r < cut + delta) return refuse('a relocated address sits among the dropped note numbers');
-        if (r >= cut + delta && r < end) put32(out, at, r - delta - CODE);
-      }
-      ro += 8 + 4 * n;
+  for (const ro of relocGroups(file)) {
+    for (let i = 0, at = ro + 8; i < be32(file, ro); i++, at += 4) {
+      const r = be32(file, at) + CODE;
+      if (r >= cut && r < cut + delta) return refuse('a relocated address sits among the dropped note numbers');
+      if (r >= cut + delta && r < end) put32(out, at, r - delta - CODE);
     }
   }
   const again = buildBthGrid(out);
