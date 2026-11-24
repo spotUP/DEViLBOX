@@ -6,7 +6,7 @@
  * lands on the new note. An edited instrument cell patches the argument byte of the Set Sample command that chose it,
  * and only when the stream holds one (an instrument that is the voice's start state has no byte to patch). A pattern is
  * shared by every place that plays it, so an edit shows wherever the pattern byte plays. Edits the stream cannot hold
- * at its length - a note on a row inside a held event that the rate table cannot split in two or in the start pattern, a note removed or turned into a note off, a duration or rate change,
+ * at its length - a note on a row inside a held event that the rate table cannot split in two or in the start pattern, a duration or rate change,
  * the volume column (not stored per row), a stream command added, removed or retyped - are refused with a warning and nothing is written for them.
  * After patching, the grid is decoded again: every edited cell must read back as edited, and every cell that does not
  * share an edited byte must be unchanged, otherwise the edit is taken out again.
@@ -108,16 +108,19 @@ export function applyRiffRaffGridEdits(original: Uint8Array, patterns: readonly 
     let noteByte = original[src.noteAt];
     if (noteChanged) {
       if (cell.note < 1 || cell.note >= NOTE_OFF) {
-        warnings.push(`${PREFIX} ${where(at)}: a note cannot be removed or turned into a note off without changing the stream length; the edit was not written.`);
-        return;
+        // a removed note or note off becomes a Rest / Rest Silence command: same two bytes (command + the note's rate byte)
+        const rest = base.restByte(cell.note >= NOTE_OFF);
+        if (rest < 0) { warnings.push(`${PREFIX} ${where(at)}: this driver has no rest command to replace the note with; the edit was not written.`); return; }
+        noteByte = rest;
+      } else {
+        let found = -1;
+        for (let b = 0; b < COMMAND_BASE && found < 0; b++) if (base.noteForByte(b, src.transpose) === cell.note) found = b;
+        if (found < 0) {
+          warnings.push(`${PREFIX} ${where(at)}: note ${cell.note} is not in the module's period table for this voice; the note was not written.`);
+          return;
+        }
+        noteByte = found;
       }
-      let found = -1;
-      for (let b = 0; b < COMMAND_BASE && found < 0; b++) if (base.noteForByte(b, src.transpose) === cell.note) found = b;
-      if (found < 0) {
-        warnings.push(`${PREFIX} ${where(at)}: note ${cell.note} is not in the module's period table for this voice; the note was not written.`);
-        return;
-      }
-      noteByte = found;
     }
     let instrumentByte = -1;
     if (instChanged) {
@@ -150,7 +153,7 @@ export function applyRiffRaffGridEdits(original: Uint8Array, patterns: readonly 
       }
     }
     for (const [offset, value] of fxPatches) claimed.set(offset, value);
-    accepted.push({ ...at, note: cell.note, instrument: cell.instrument, noteAt: src.noteAt, noteByte, instrumentAt: instChanged ? src.instrumentAt : -1, instrumentByte, fxPatches, fx: cellEffects(cell) });
+    accepted.push({ ...at, note: cell.note, instrument: cell.note >= 1 && cell.note < NOTE_OFF ? cell.instrument : 0, noteAt: src.noteAt, noteByte, instrumentAt: instChanged ? src.instrumentAt : -1, instrumentByte, fxPatches, fx: cellEffects(cell) });
   })));
 
   const writeAll = (edits: Edit[]): void => {

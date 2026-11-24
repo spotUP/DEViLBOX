@@ -105,17 +105,28 @@ describe.each(FILES)('Riff Raff native export: $name', (file) => {
     })));
   }, 240000);
 
-  it('refuses a removed note and a volume edit, writing nothing', async () => {
+  it('refuses a volume edit, writing nothing', async () => {
     const { raw, song } = await load(file);
-    const rows = song.patterns[0].channels[0].rows;
-    const played = rows.findIndex((c) => c.note > 0 && c.note < 97);
-    expect(played).toBeGreaterThanOrEqual(0);
-    rows[played].note = 0;
     song.patterns[0].channels[1].rows[0].volume = 30;
     const res = await exportOf(song);
-    expect(res.warnings.length).toBeGreaterThanOrEqual(2);
     expect(res.warnings.join('\n')).toMatch(/not written/);
     expect(Array.from(res.data)).toEqual(Array.from(raw));
+  }, 240000);
+
+  it('writes a removed note and a note off as a Rest command over the note byte, one byte each, and reloads them', async () => {
+    for (const [value, kind] of [[0, 'rest'], [97, 'silence']] as const) {
+      const { raw, song } = await load(file);
+      const rows = song.patterns[0].channels[0].rows;
+      const played = rows.findIndex((c) => c.note > 0 && c.note < 97);
+      expect(played).toBeGreaterThanOrEqual(0);
+      rows[played].note = value;
+      const res = await exportOf(song);
+      expect(res.warnings, kind).toEqual([]);
+      expect(res.data.length).toBe(raw.length);
+      expect(diffCount(res.data, raw)).toBe(1);
+      const again = await load(file, res.data);
+      expect(again.song.patterns[0].channels[0].rows[played].note).toBe(value);
+    }
   }, 240000);
 
   it('writes a note on a blank row, growing the pattern, and reloads it there with the length of the song kept', async () => {

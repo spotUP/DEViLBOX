@@ -216,6 +216,8 @@ export interface RiffRaffGrid {
   patternPointerAts: (address: number) => number[];
   /** The tracker note a pattern note byte plays under a transposition (the grid's own period lookup). */
   noteForByte: (byte: number, transpose: number) => number;
+  /** The driver's Rest (or Rest Silence) command byte; it takes the same one rate argument a note does, so it replaces a note byte in place. -1 for none. */
+  restByte: (silence: boolean) => number;
 }
 
 /** Where a note event's bytes live in the file, and the transposition its period lookup used. */
@@ -490,5 +492,6 @@ export function buildRiffRaffGrid(file: Uint8Array): RiffRaffGrid | string {
     patterns, songPositions: patterns.map((_, i) => i), rows, ticksPerRow: step, streams, blockRows,
     streamAtStart: firstStream, notesPerVoice, samples, enabled, fileOffsetBase: HUNK_BYTES, sources, effectSources,
     noteForByte: (byte, transpose) => periodToNote(u16(m, (base.periods ?? 0) + 2 * ((byte + transpose) & 0xffff))),
+    restByte: (silence) => { const i = (version.driver === 'oneShot' ? ONE_SHOT_COMMANDS : LOOPING_COMMANDS).indexOf(silence ? 'restSilence' : 'rest'); return i < 0 ? -1 : COMMAND_BASE + i; },
   };
 }
