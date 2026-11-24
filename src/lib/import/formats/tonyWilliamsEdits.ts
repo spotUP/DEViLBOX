@@ -10,7 +10,7 @@
 import type { Pattern } from '@/types';
 import { buildTwGrid, TW_NOTE_BASE, TW_ROWS_PER_PATTERN, type TwSource } from './tonyWilliamsGrid';
 import { TW_FX } from './tonyWilliamsEffectGlyphs';
-import { TW_VOICES, twEndsBlock, walkTonyWilliams, type TwWalk } from './tonyWilliamsWalk';
+import { twEndsBlock, walkTonyWilliams, type TwWalk } from './tonyWilliamsWalk';
 import { relocateTonyWilliams, type TwSplice } from './tonyWilliamsRelocate';
 
 type Cell = Record<string, number | undefined>;
@@ -26,7 +26,7 @@ export function applyTwGridEdits(original: Uint8Array, walk: TwWalk, patterns: P
   if (patterns.length !== grid.patterns.length) return r;
   const hasNote = new Set(grid.sources.filter((s) => s.kind === 'note').map((s) => `${s.pattern}/${s.channel}/${s.row}`));
   patterns.forEach((pat, p) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, row) => {
-    if (c >= TW_VOICES || (cell.note ?? 0) < 1 || (cell.note ?? 0) >= 97 || hasNote.has(`${p}/${c}/${row}`)) return;
+    if (c >= walk.channels || (cell.note ?? 0) < 1 || (cell.note ?? 0) >= 97 || hasNote.has(`${p}/${c}/${row}`)) return;
     if ((grid.patterns[p]?.channels[c]?.rows[row]?.note ?? 0) !== 0) return;
     r.data = addNote(r.data, { pattern: p, channel: c, row, note: cell.note, instrument: cell.instrument ?? 0 }, r.warnings);
   })));
@@ -46,6 +46,7 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
   const refuse = (why: string): Uint8Array => { warnings.push(`${where}: ${why}; the note was not written.`); return file; };
   const walk = walkTonyWilliams(file, 0);
   if (!walk) return refuse('the stream could not be walked');
+  if (walk.info.dialect === 2) return refuse('the Generation 2 driver has no relocation');
   const tick = a.pattern * TW_ROWS_PER_PATTERN + a.row;
   let dur = 1;
   let instrument = 0;
@@ -128,14 +129,15 @@ function applyTwStreamEdits(original: Uint8Array, walk: TwWalk, patterns: Patter
     } else if (s.kind === 'instrument') {
       const i = cell.instrument ?? 0;
       if (i === s.value) continue;
-      if (i < 1 || i > 16) warnings.push(`${where}: instrument ${i} is outside 1..16.`);
-      else put(s.offset, 0xd0 + i - 1, where);
+      const lo = walk.info.dialect === 2 ? 0xc0 : 0xd0;
+      if (i < 1 || i > 0xe0 - lo) warnings.push(`${where}: instrument ${i} is outside 1..${0xe0 - lo}.`);
+      else put(s.offset, lo + i - 1, where);
     } else {
       const key = SLOT[s.slot];
       if (!key) continue;
       if ((cell[key[0]] ?? 0) === 0 && (cell[key[1]] ?? 0) === 0) {
         const cmd = walk.events.find((e) => e.cmd.offset === s.offset)?.cmd;
-        if (!cmd || cmd.op < 0x80 || cmd.op === 0x85 || cmd.op === 0x86 || twEndsBlock(cmd.op)) warnings.push(`${where}: this command cannot be removed.`);
+        if (!cmd || cmd.op < 0x80 || cmd.op === 0x85 || cmd.op === 0x86 || twEndsBlock(cmd.op, walk.info.dialect)) warnings.push(`${where}: this command cannot be removed.`);
         else splices.push({ at: cmd.offset, remove: cmd.length, insert: new Uint8Array(0) });
         continue;
       }
@@ -146,9 +148,8 @@ function applyTwStreamEdits(original: Uint8Array, walk: TwWalk, patterns: Patter
         case TW_FX.duration:
           if (v < 1 || v > 32) warnings.push(`${where}: duration ${v} is outside 1..32.`); else put(s.offset, 0xdf + v, where);
           break;
-        case TW_FX.volume: put(s.offset, 0xb0 | (v & 15), where); break;
-        case TW_FX.envelope: put(s.offset, 0xc0 | (v & 15), where); break;
-        case TW_FX.arpeggio: put(s.offset, 0xa0 | (v & 15), where); break;
+        // keep the command's high nibble: generation 2 has two volume forms (A0 bare, B0 with envelope operands)
+        case TW_FX.volume: case TW_FX.envelope: case TW_FX.arpeggio: put(s.offset, (s.op & 0xf0) | (v & 15), where); break;
         case TW_FX.envelopeParams: case TW_FX.transpose: case TW_FX.slide: case TW_FX.vibrato:
           put(s.offset + 1, v, where); break;
         default: warnings.push(`${where}: this command is shown read-only.`);

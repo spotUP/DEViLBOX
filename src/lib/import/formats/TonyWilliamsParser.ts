@@ -7,7 +7,7 @@ import type { InstrumentConfig } from '@/types';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import type { TrackerCell } from '@/types';
 import { tonyWilliamsEncoder } from '@/engine/uade/encoders/TonyWilliamsEncoder';
-import { walkTonyWilliams, twSongInfo, readTwBlock, TW_VOICES } from './tonyWilliamsWalk';
+import { walkTonyWilliams, twSongInfo, readTwBlock } from './tonyWilliamsWalk';
 import { buildTwGrid } from './tonyWilliamsGrid';
 import { createSamplerInstrument } from './AmigaUtils';
 
@@ -77,7 +77,7 @@ export async function parseTonyWilliamsFile(buffer: ArrayBuffer, filename: strin
   const blockRawBytes: Uint8Array[] = [];
   const sizes: number[] = [];
   for (const a of addrs) {
-    const cmds = readTwBlock(bytes, a) ?? [];
+    const cmds = readTwBlock(bytes, a, walk.info.dialect) ?? [];
     blockRows.push(cmds.map((c) => carrier(c.op, c.args, c.length)));
     const last = cmds[cmds.length - 1];
     const end = last ? last.offset + last.length : a;
@@ -91,14 +91,14 @@ export async function parseTonyWilliamsFile(buffer: ArrayBuffer, filename: strin
     // the sibling command-stream parsers name it, so typing octave, key periods and replayer mode follow the periods.
     name: baseName, format: 'MOD' as TrackerFormat,
     patterns: grid.patterns, instruments, songPositions: grid.songPositions, songLength: grid.songPositions.length,
-    restartPosition: 0, numChannels: TW_VOICES, initialSpeed: walk.info.speed, initialBPM: 125,
+    restartPosition: 0, numChannels: walk.channels, initialSpeed: walk.info.speed, initialBPM: walk.info.bpm,
     // The player steps on its 50 Hz vertical-blank interrupt, not CIA-A Timer A (which stays 0 for TW), so the
     // playhead must follow UADE's player-interrupt count; without this the cursor never got an engine row.
     uadePlayerTickGrid: true,
     uadeEditableFileData: buffer.slice(0), uadeEditableFileName: filename,
   };
   const layout: UADEVariablePatternLayout = {
-    formatId: 'tonyWilliams', numChannels: TW_VOICES, numFilePatterns: addrs.length,
+    formatId: 'tonyWilliams', numChannels: walk.channels, numFilePatterns: addrs.length,
     rowsPerPattern: grid.patterns.map((p) => p.length), moduleSize: buffer.byteLength,
     encoder: tonyWilliamsEncoder, filePatternAddrs: addrs, filePatternSizes: sizes,
     trackMap: grid.blockAtStart.map((row) => row.map((a) => addrs.indexOf(a))),

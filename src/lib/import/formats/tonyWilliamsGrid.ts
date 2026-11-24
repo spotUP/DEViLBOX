@@ -6,7 +6,7 @@
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { TW_FX } from './tonyWilliamsEffectGlyphs';
-import { TW_VOICES, type TwEvent, type TwWalk } from './tonyWilliamsWalk';
+import type { TwDialect, TwEvent, TwWalk } from './tonyWilliamsWalk';
 
 export const TW_ROWS_PER_PATTERN = 64;
 const EFFECT_SLOTS = 5;
@@ -16,10 +16,23 @@ export const TW_NOTE_BASE = 13;
 type Fx = [effTyp: number, eff: number];
 
 /** The effect-column entry a command shows, or null (notes, instrument and end-of-block are not effects). */
-export function twCommandEffect(e: TwEvent): Fx | null {
+export function twCommandEffect(e: TwEvent, dialect: TwDialect = 1): Fx | null {
   const { op, args } = e.cmd;
   const a0 = args[0] ?? 0;
   if (op >= 0xe0) return [TW_FX.duration, op - 0xdf];
+  if (dialect === 2) {
+    if (op >= 0xa0 && op <= 0xbf) return [TW_FX.volume, op & 15];
+    switch (op) {
+      case 0x83: return [TW_FX.tie, 0];
+      case 0x84: return [TW_FX.rest, 4];
+      case 0x85: return [TW_FX.transpose, a0];
+      case 0x86: return [TW_FX.slide, a0];
+      case 0x87: case 0x88: case 0x89: case 0x8a: return [TW_FX.flag, op];
+      case 0x8c: return [TW_FX.fade, 0];
+      case 0x80: case 0x81: case 0x82: case 0x8b: return [TW_FX.stop, op];
+      default: return null;
+    }
+  }
   if (op >= 0xb0 && op <= 0xbf) return [TW_FX.volume, op & 15];
   if (op >= 0xc0 && op <= 0xcf) return [TW_FX.envelope, op & 15];
   if (op >= 0xa0 && op <= 0xaf) return [TW_FX.arpeggio, op & 15];
@@ -75,12 +88,16 @@ function emptyCell(): TrackerCell {
 
 export function buildTwGrid(walk: TwWalk): TwGrid {
   const rows = walk.ticks;
-  const grid: TrackerCell[][] = Array.from({ length: TW_VOICES }, () => Array.from({ length: rows }, emptyCell));
-  const used: number[][] = Array.from({ length: TW_VOICES }, () => new Array<number>(rows).fill(0));
-  const blockAt: number[][] = Array.from({ length: TW_VOICES }, () => new Array<number>(rows).fill(-1));
+  const voices = walk.channels;
+  const dialect = walk.info.dialect;
+  // instrument select: D0-DF in generation 1, C0-DF in generation 2
+  const instrLo = dialect === 2 ? 0xc0 : 0xd0;
+  const grid: TrackerCell[][] = Array.from({ length: voices }, () => Array.from({ length: rows }, emptyCell));
+  const used: number[][] = Array.from({ length: voices }, () => new Array<number>(rows).fill(0));
+  const blockAt: number[][] = Array.from({ length: voices }, () => new Array<number>(rows).fill(-1));
   const raw: Array<Omit<TwSource, 'pattern' | 'row'> & { tick: number }> = [];
-  const pendingInstr: Array<{ offset: number; value: number } | null> = new Array(TW_VOICES).fill(null);
-  const curBlock = new Array<number>(TW_VOICES).fill(-1);
+  const pendingInstr: Array<{ offset: number; value: number } | null> = new Array(voices).fill(null);
+  const curBlock = new Array<number>(voices).fill(-1);
   // The walk emits one voice after another; the row sweep below needs tick order (stable: voice order within a tick).
   const ev = walk.events.map((e, i) => ({ e, i })).sort((a, b) => a.e.tick - b.e.tick || a.i - b.i).map((x) => x.e);
   let ei = 0;
@@ -99,13 +116,13 @@ export function buildTwGrid(walk: TwWalk): TwGrid {
         const pi = pendingInstr[ch];
         if (pi) {
           cell.instrument = pi.value;
-          raw.push({ tick: e.tick, channel: ch, kind: 'instrument', offset: pi.offset, op: 0xd0, slot: -1, effTyp: 0, transpose: 0, value: pi.value });
+          raw.push({ tick: e.tick, channel: ch, kind: 'instrument', offset: pi.offset, op: instrLo, slot: -1, effTyp: 0, transpose: 0, value: pi.value });
           pendingInstr[ch] = null;
         }
-      } else if (op >= 0xd0 && op <= 0xdf) {
-        pendingInstr[ch] = { offset: e.cmd.offset, value: (op & 15) + 1 };
+      } else if (op >= instrLo && op <= 0xdf) {
+        pendingInstr[ch] = { offset: e.cmd.offset, value: op - instrLo + 1 };
       } else {
-        const fx = twCommandEffect(e);
+        const fx = twCommandEffect(e, dialect);
         const slot = used[ch]?.[e.tick] ?? 0;
         if (fx && slot < EFFECT_SLOTS) {
           const c = cell as unknown as Record<string, number>;
@@ -116,7 +133,7 @@ export function buildTwGrid(walk: TwWalk): TwGrid {
         }
       }
     }
-    for (let ch = 0; ch < TW_VOICES; ch++) blockAt[ch]![t] = curBlock[ch] ?? -1;
+    for (let ch = 0; ch < voices; ch++) blockAt[ch]![t] = curBlock[ch] ?? -1;
   }
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
