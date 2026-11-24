@@ -47,7 +47,7 @@ const NOTE_OFF = 0x01, INSTRUMENT_CHANGE = 0x02, SN_NOISE_MODE = 0x05, SLIDE_UP 
 const FLAG_VOLUME_MACRO = 0x08, FLAG_ARP_MACRO = 0x04, FLAG_EX_MACRO = 0x80;
 const MACRO_VOLUME = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_PITCH = 4;
 const EX_TYPE: Record<number, number> = { 0: 0x02, 1: 0x40, 2: 0x20, 3: 0x10, 4: 0x01, 5: 0 };
-const HANDLED_EFFECTS = new Set([0x20, 0x00, 0x01, 0x02, 0x03, 0x04, 0xea, 0x80, 0x08, 0x0b, 0x0d, 0x09, 0x0f, 0xed, 0xec]);
+const HANDLED_EFFECTS = new Set([0x20, 0x00, 0x01, 0x02, 0x03, 0x04, 0xe1, 0xe2, 0xea, 0x80, 0x08, 0x0b, 0x0d, 0x09, 0x0f, 0xed, 0xec]);
 const NONE = 0xff;
 
 interface Seq { code: number; data: number[]; length: number; loop: number; release: number; speed: number; delay: number }
@@ -154,12 +154,13 @@ export function pitchedNoiseNote(m: FurnaceModule, linear: boolean, tuneSemis: n
 interface NoiseState { mode: number; note: (nv: number) => number }
 
 /** One channel pattern as Banjo commands (json2sms pattern loop, SN76489 channel). */
-function convertPattern(
+export function convertPattern(
   cellAt: (r: number) => { note: number; octave: number; instrument: number; volume: number; effects: { type: number; value: number }[] } | undefined,
   rows: number, sub: number, tb1: number, nIns: number, transpose: number, lossy: Lossy, noise?: NoiseState,
 ): number[] {
   const out: number[] = [];
-  let curIns = -1, curVol = -1, lastWasEnd = false;
+  // curNote: the Banjo note the channel last keyed or slid to (-1 = none yet in this pattern); legato: EAxx state in this pattern.
+  let curIns = -1, curVol = -1, lastWasEnd = false, curNote = -1, legato = false;
   const push = (...b: number[]) => { out.push(...b.map((x) => x & 0xff)); lastWasEnd = false; };
   for (let r = 0; r < rows; r++) {
     const cell = cellAt(r);
@@ -179,7 +180,7 @@ function convertPattern(
       else if (t === 0x04) {
         const speed = v >> 4, amount = v & 0x0f;
         if (speed && amount) push(VIBRATO, speed | (amount << 4)); else push(VIBRATO_OFF);
-      } else if (t === 0xea) push(v > 0 ? LEGATO_ON : LEGATO_OFF);
+      } else if (t === 0xea) { legato = v > 0; push(legato ? LEGATO_ON : LEGATO_OFF); }
       else if (t === 0x80 || t === 0x08) {
         const left = t === 0x80 ? (v > 0x80 ? 0 : 1) << (sub + 4) : (v & 0xf0 ? 1 : 0) << (sub + 4);
         // json2sms compares the whole 08xy byte with 0x0f for the right side; kept as written so the driver hears what Banjo's own tool emits.
@@ -195,10 +196,24 @@ function convertPattern(
     }
     if (cell && cell.volume !== -1 && cell.volume !== curVol) { push(VOLUME_CHANGE | Math.min(15, cell.volume)); curVol = cell.volume; }
     const nv = cell ? convertFurnaceNoteValue(cell) : -1;
-    if (nv >= 0 && nv < 253) push(NOTE_ON | (Math.max(0, noise ? (noise.mode & 2 ? noise.note(nv) : nv) : nv + transpose) & 0x7f));
+    if (nv >= 0 && nv < 253) { curNote = Math.max(0, noise ? (noise.mode & 2 ? noise.note(nv) : nv) : nv + transpose) & 0x7f; push(NOTE_ON | curNote); }
     else if (nv === 253) push(NOTE_OFF);
     else if (nv === 254 || nv === 255) push(NOTE_RELEASE);
-    for (const { type: t, value: v } of fx) if (t === 0xec) push(NOTE_DELAY, v, NOTE_OFF);
+    for (const { type: t, value: v } of fx) {
+      if (t === 0xec) push(NOTE_DELAY, v, NOTE_OFF);
+      // E1xy / E2xy (Furnace playback.cpp): portamento at speed x*4 (03xx units) from the current note to y semitones up / down,
+      // after this row's note. Banjo has no shorthand slide: SLIDE_PORTA plus a legato note-on that only sets the porta target.
+      else if (t === 0xe1 || t === 0xe2) {
+        if (!(v & 0x0f) || !(v >> 4)) { push(SLIDE_OFF); continue; }
+        if (curNote < 0 || noise) { lossy.add(`effect ${t.toString(16).toUpperCase()}xx ${noise ? 'on the noise channel' : 'before any note in its pattern'}`); continue; }
+        // shortcut: the next E1/E2 slides from this target even if the slide has not arrived yet (Furnace uses the old note then).
+        curNote = Math.min(0x7f, Math.max(0, curNote + (t === 0xe1 ? 1 : -1) * (v & 0x0f)));
+        push(SLIDE_PORTA, (v >> 4) * 4);
+        if (!legato) push(LEGATO_ON);
+        push(NOTE_ON | curNote);
+        if (!legato) push(LEGATO_OFF);
+      }
+    }
     // End of line: merge with a directly preceding end-line while its wait fits in 6 bits.
     if (lastWasEnd && (out[out.length - 1] & 0x3f) < 0x3f) out[out.length - 1]++;
     else { out.push(END_LINE); lastWasEnd = true; }
