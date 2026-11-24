@@ -21,8 +21,8 @@ describe('Furnace C64 effects in GoatTracker song data', () => {
     expect(cmds.has(0x0c)).toBe(true);
     expect(cmds.has(0x07)).toBe(true);
     expect(lossy).not.toMatch(/effect e[12]/); // slide on a row with a note runs as a wave-table slide program
-    // wave table slide commands ($E1 up / $E2 down) followed by the stop command ($E0)
+    // wave table slide commands ($F1 up / $F2 down; $E1/$E2 would be silent waveforms) followed by the stop command ($F0)
     const wl = g.song.tables[0].left;
-    expect(wl.some((l, i) => (l === 0xe1 || l === 0xe2) && wl[i + 1] !== 0xe0 && wl.slice(i + 1).includes(0xe0))).toBe(true);
+    expect(wl.some((l, i) => (l === 0xf1 || l === 0xf2) && wl.slice(i + 1).includes(0xf0))).toBe(true);
   });
 });

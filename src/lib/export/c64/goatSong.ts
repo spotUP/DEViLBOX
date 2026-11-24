@@ -286,9 +286,10 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
     const tb = tables[0], pos = tb.left.length + 1;
     const ticks = slideTicks(x, Math.abs(dest - note)), spd = Math.max(1, Math.round(Math.abs(sidFreq(dest) - sidFreq(note)) / ticks));
     tb.left.push(w >= 0x10 ? w : 0xe0 | w); tb.right.push(0);
-    tb.left.push(0xe0 | (dest > note ? 1 : 2)); tb.right.push(speedRow(spd));
+    // Wave-table commands are $F0+cmd ($E0-$EF is a silent waveform, which left the pitch constant).
+    tb.left.push(0xf0 | (dest > note ? 1 : 2)); tb.right.push(speedRow(spd));
     for (let left = ticks - 1; left > 0; left -= 15) { tb.left.push(Math.min(15, left)); tb.right.push(0); }
-    tb.left.push(0xe0); tb.right.push(0);
+    tb.left.push(0xf0); tb.right.push(0);
     tb.left.push(0xff); tb.right.push(0);
     slideProgs.set(key, pos);
     return pos;
