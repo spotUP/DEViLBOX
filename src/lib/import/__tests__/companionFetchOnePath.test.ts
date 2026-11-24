@@ -49,3 +49,52 @@ describe('companionFetch: the file browser and the jukebox read the same partner
     expect(found.size).toBe(0);
   });
 });
+
+/**
+ * Server listing for a folder the song index does not cover. It read
+ * `<parent>/Samples/` blind, so every EdLib .d00 load fired a 404 to
+ * /api/demo/songs/Ad Lib/EdLib D00/Samples/ (2026-11-24).
+ */
+describe('companionFetch: server listing asks only for folders that exist', () => {
+  const tree: Record<string, { name: string; isDirectory: boolean }[]> = {
+    '': [{ name: 'Ad Lib', isDirectory: true }, { name: 'zm', isDirectory: true }, { name: 'sx', isDirectory: true }],
+    'Ad Lib/': [{ name: 'EdLib D00', isDirectory: true }],
+    'Ad Lib/EdLib D00/': [{ name: 'JCH', isDirectory: true }],
+    'Ad Lib/EdLib D00/JCH/': [{ name: 'colgatbo.d00', isDirectory: false }],
+    'zm/': [{ name: 'Songs', isDirectory: true }, { name: 'Samples', isDirectory: true }],
+    'zm/Songs/': [{ name: 'tune.sng', isDirectory: false }],
+    'zm/Samples/': [{ name: 'electom', isDirectory: false }],
+    'sx/': [{ name: 'song.smus', isDirectory: false }, { name: 'Instruments', isDirectory: true }],
+    'sx/Instruments/': [{ name: 'bass.instr', isDirectory: false }],
+  };
+  let requested: string[] = [];
+
+  beforeEach(() => {
+    resetCompanionIndexCache();
+    requested = [];
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      const url = decodeURIComponent(String(input));
+      const m = url.match(/\/demo\/songs\/(.*)$/);
+      if (!m) return new Response('not found', { status: 404 }); // index.json: not covered
+      requested.push(m[1]);
+      const entries = tree[m[1]];
+      return entries ? Response.json(entries) : new Response('not found', { status: 404 });
+    });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('never asks for Samples/ beside an EdLib song', async () => {
+    await appCompanionIO.listing('songs/Ad Lib/EdLib D00/JCH/');
+    expect(requested.filter((p) => !(p in tree))).toEqual([]);
+  });
+
+  it('still finds a ZoundMonitor song\'s Samples/ beside its directory', async () => {
+    const listing = await appCompanionIO.listing('songs/zm/Songs/');
+    expect(listing?.parentSamples).toEqual(['electom']);
+  });
+
+  it('still finds a Sonix song\'s Instruments/ subfolder', async () => {
+    const listing = await appCompanionIO.listing('songs/sx/');
+    expect(listing?.subdirs?.Instruments).toEqual(['bass.instr']);
+  });
+});

@@ -118,9 +118,13 @@ async function serverListing(dir: string): Promise<CompanionListing | null> {
     subdirs[e.name] = (await list(`${dir}${e.name}/`)).filter((f) => !f.isDirectory).map((f) => f.name);
   }
   if (Object.keys(subdirs).length) listing.subdirs = subdirs;
+  // List the parent before reading its Samples/: a blind request 404s for every
+  // song whose parent has none (every EdLib .d00, 2026-11-24).
   const parent = dir.replace(/[^/]+\/$/, '');
-  const parentSamples = (await list(`${parent}Samples/`)).filter((f) => !f.isDirectory).map((f) => f.name);
-  if (parentSamples.length) listing.parentSamples = parentSamples;
+  if ((await list(parent)).some((e) => e.isDirectory && e.name === 'Samples')) {
+    const parentSamples = (await list(`${parent}Samples/`)).filter((f) => !f.isDirectory).map((f) => f.name);
+    if (parentSamples.length) listing.parentSamples = parentSamples;
+  }
   return listing;
 }
 
