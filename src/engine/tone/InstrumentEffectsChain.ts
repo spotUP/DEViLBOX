@@ -9,6 +9,7 @@ import { connectAudio } from './connectAudio';
 import { getNativeAudioNode } from '@utils/audio-context';
 import type { VoiceState } from './ChannelRouting';
 import { LIVE_VOICE_BASE_CHANNEL } from '../furnace-dispatch/chipChannel';
+import { tapWhileSounding } from '../audio/signalPresence';
 
 // Channel indices 1000+ are reserved for native synth global filters,
 // avoiding collision with per-channel voice indices (0-63).
@@ -130,6 +131,46 @@ export function connectChainOutput(
 
 const rebuildQueues = new WeakMap<object, Map<number, Promise<void>>>();
 
+type EffectTap = { pre: AnalyserNode; post: AnalyserNode; untap: () => void };
+// Pre/post scope taps per instrument effect, keyed like instrumentEffectNodes (a stable Map, so it owns the lookup).
+const effectTaps = new WeakMap<object, Map<string, EffectTap>>();
+
+/** Pre/post AnalyserNodes of an instrument effect (any instance chain of its instrument), or null. */
+export function getInstrumentEffectAnalysers(
+  instrumentEffectNodes: Map<string, unknown>,
+  effectId: string
+): { pre: AnalyserNode; post: AnalyserNode } | null {
+  for (const [registryKey, tap] of effectTaps.get(instrumentEffectNodes) ?? []) {
+    if (registryKey.endsWith(`:${effectId}`)) return tap;
+  }
+  return null;
+}
+
+/** Side-branch pre/post taps for effect i of a built chain (same shape as the master chain taps). */
+function tapInstrumentEffect(
+  nodes: Tone.ToneAudioNode[],
+  i: number,
+  source: Tone.ToneAudioNode | DevilboxSynth
+): EffectTap {
+  const rawCtx = Tone.getContext().rawContext as AudioContext;
+  const pre = rawCtx.createAnalyser();
+  const post = rawCtx.createAnalyser();
+  pre.fftSize = post.fftSize = 2048;
+  pre.smoothingTimeConstant = post.smoothingTimeConstant = 0.8;
+  const nativeOf = (n: unknown) => {
+    const out = (n as { output?: unknown }).output;
+    return out ? getNativeAudioNode(out as never) : getNativeAudioNode(n as never);
+  };
+  const preNative = i === 0
+    ? (isDevilboxSynth(source) ? source.output : nativeOf(source))
+    : nativeOf(nodes[i - 1]);
+  const postNative = nativeOf(nodes[i]);
+  const untaps: Array<() => void> = [];
+  if (preNative) untaps.push(tapWhileSounding(() => preNative.connect(pre), () => preNative.disconnect(pre)));
+  if (postNative) untaps.push(tapWhileSounding(() => postNative.connect(post), () => postNative.disconnect(post)));
+  return { pre, post, untap: () => untaps.forEach((u) => u()) };
+}
+
 /** Run builds of one instrument key strictly one after another (two quick adds must not leak a chain). */
 export function buildInstrumentEffectChain(
   ctx: InstrumentEffectsContext,
@@ -137,8 +178,9 @@ export function buildInstrumentEffectChain(
   effects: EffectConfig[],
   instrument: Tone.ToneAudioNode | DevilboxSynth
 ): Promise<void> {
-  let queues = rebuildQueues.get(ctx);
-  if (!queues) { queues = new Map(); rebuildQueues.set(ctx, queues); }
+  // ctx is a fresh object per call (ToneEngine getter); its chain map is the stable owner.
+  let queues = rebuildQueues.get(ctx.instrumentEffectChains);
+  if (!queues) { queues = new Map(); rebuildQueues.set(ctx.instrumentEffectChains, queues); }
   const run = (queues.get(key) ?? Promise.resolve()).then(() => buildChainNow(ctx, key, effects, instrument));
   const tail = run.catch(() => undefined);
   queues.set(key, tail);
@@ -259,7 +301,12 @@ async function buildChainNow(
   // Keyed by chain key and effect id: one instrument may own one chain per
   // tracker channel, and every chain carries its own copy of each effect.
   enabledEffects.forEach((config, i) => {
-    ctx.instrumentEffectNodes.set(instrumentEffectNodeKey(key, config.id), { node: effectNodes[i] as Tone.ToneAudioNode, config });
+    const registryKey = instrumentEffectNodeKey(key, config.id);
+    ctx.instrumentEffectNodes.set(registryKey, { node: effectNodes[i] as Tone.ToneAudioNode, config });
+    let taps = effectTaps.get(ctx.instrumentEffectNodes);
+    if (!taps) { taps = new Map(); effectTaps.set(ctx.instrumentEffectNodes, taps); }
+    taps.get(registryKey)?.untap();
+    taps.set(registryKey, tapInstrumentEffect(effectNodes, i, bridge ?? instrument));
   });
 }
 
@@ -383,6 +430,9 @@ function releaseEffectChain(
   for (const [effectId, entry] of ctx.instrumentEffectNodes) {
     if (chain.effects.includes(entry.node)) {
       ctx.instrumentEffectNodes.delete(effectId);
+      const taps = effectTaps.get(ctx.instrumentEffectNodes);
+      taps?.get(effectId)?.untap();
+      taps?.delete(effectId);
     }
   }
   chain.effects.forEach((fx) => {

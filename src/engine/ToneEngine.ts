@@ -175,6 +175,7 @@ import {
   disposeInstrumentEffectChain as _disposeInstrumentEffectChain,
   clearConnectedNativeOutputs,
   attachVoiceSource,
+  getInstrumentEffectAnalysers,
 } from './tone/InstrumentEffectsChain';
 import { connectAudio } from './tone/connectAudio';
 import { xmNoteToNoteName } from './replayer/PeriodTables';
@@ -5523,7 +5524,7 @@ export class ToneEngine {
   }
 
   public getMasterEffectAnalysers(id: string): { pre: AnalyserNode; post: AnalyserNode } | null {
-    return _getMasterEffectAnalysers(this._masterFxCtx, id);
+    return _getMasterEffectAnalysers(this._masterFxCtx, id) ?? getInstrumentEffectAnalysers(this.instrumentEffectNodes, id);
   }
 
   public updateMasterEffectParams(effectId: string, config: EffectConfig): void {
