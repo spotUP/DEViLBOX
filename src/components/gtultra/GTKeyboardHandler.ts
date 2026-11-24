@@ -37,6 +37,9 @@ function hexVal(char: string): number | null {
 
 let lastIgnoredAt = 0;
 /** An edit key was pressed while Record is off: say why nothing changed (at most once per 2 s). */
+const hex2 = (n: number): string => n.toString(16).toUpperCase().padStart(2, '0');
+export const AUTO_ADVANCE_LABEL = { note: 'cursor moves after a note', all: 'cursor moves after every entry', off: 'cursor stays' } as const;
+
 function notifyEditIgnored(): void {
   const now = Date.now();
   if (now - lastIgnoredAt < 2000) return;
@@ -380,6 +383,7 @@ export function useGTKeyboardHandler(active: boolean) {
     if (e.shiftKey && e.key === 'Z') {
       e.preventDefault();
       state.cycleAutoAdvanceMode();
+      notify.info(`After entry: ${AUTO_ADVANCE_LABEL[useGTUltraStore.getState().autoAdvanceMode]}`, 1500);
       return;
     }
 
@@ -407,6 +411,7 @@ export function useGTKeyboardHandler(active: boolean) {
     if (e.shiftKey && e.key === 'C') {
       e.preventDefault();
       state.setClipboardInstrument(currentInstrument);
+      notify.info(`Copied instrument ${hex2(currentInstrument)}`, 1500);
       return;
     }
     if (e.shiftKey && e.key === 'V') {
@@ -415,7 +420,8 @@ export function useGTKeyboardHandler(active: boolean) {
       if (clipInst > 0 && clipInst !== currentInstrument) {
         engine?.copyInstrument(clipInst, currentInstrument);
         engine?.checkpointUndo();
-      }
+        notify.info(`Pasted instrument ${hex2(clipInst)} into ${hex2(currentInstrument)}`, 1500);
+      } else notify.warning(clipInst > 0 ? 'Nothing to paste: the copied instrument is the current one' : 'Nothing to paste: copy an instrument first (Shift+C)', 2000);
       return;
     }
 
@@ -426,7 +432,8 @@ export function useGTKeyboardHandler(active: boolean) {
       if (clipInst > 0 && clipInst !== currentInstrument) {
         engine?.swapInstruments(clipInst, currentInstrument);
         engine?.checkpointUndo();
-      }
+        notify.info(`Swapped instruments ${hex2(clipInst)} and ${hex2(currentInstrument)}`, 1500);
+      } else notify.warning(clipInst > 0 ? 'Nothing to swap: the copied instrument is the current one' : 'Nothing to swap: copy an instrument first (Shift+C)', 2000);
       return;
     }
 
@@ -434,7 +441,10 @@ export function useGTKeyboardHandler(active: boolean) {
     if (e.shiftKey && e.key === 'F5') {
       e.preventDefault();
       const orderData = state.orderData[cursor.channel];
-      if (orderData) state.setOrderClipboard(new Uint8Array(orderData));
+      if (orderData) {
+        state.setOrderClipboard(new Uint8Array(orderData));
+        notify.info(`Copied order list of channel ${cursor.channel + 1}`, 1500);
+      }
       return;
     }
     if (e.shiftKey && e.key === 'F6') {
@@ -445,7 +455,8 @@ export function useGTKeyboardHandler(active: boolean) {
           engine.setOrderEntry(cursor.channel, i, clip[i]);
         }
         engine.checkpointUndo();
-      }
+        notify.info(`Pasted order list into channel ${cursor.channel + 1}`, 1500);
+      } else notify.warning('Nothing to paste: copy an order list first (Shift+F5)', 2000);
       return;
     }
 

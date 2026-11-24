@@ -3,12 +3,14 @@
  * Uses FT2 theme classes for visual consistency with the rest of DEViLBOX.
  */
 
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { AnchoredPopover } from '../ui/AnchoredPopover';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useGTUltraStore, type GTSidModel, type GTViewMode } from '../../stores/useGTUltraStore';
 import { getGTUltraASIDBridge } from '../../engine/gtultra/GTUltraASIDBridge';
 import { SIDHardwareToggle } from '../common/SIDHardwareToggle';
 import { withKey } from './gtKeyTable';
+import { AUTO_ADVANCE_LABEL } from './GTKeyboardHandler';
 import { notify } from '@stores/useNotificationStore';
 import { validateGtExportOptions, GT_DEFAULT_LOAD_ADDRESS, GT_DEFAULT_ZERO_PAGE } from '../../lib/export/c64/gtExportOptions';
 
@@ -84,6 +86,15 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
   const handleExportPrg = useCallback(() => exportWith((o) => engine?.exportPrg(o)), [engine, exportWith]);
   const handleExportSid = useCallback(() => exportWith((o) => engine?.exportSid(o)), [engine, exportWith]);
   const handleExportBin = useCallback(() => exportWith((o) => engine?.exportBin(o)), [engine, exportWith]);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLButtonElement>(null);
+  const autoAdvanceMode = useGTUltraStore((s) => s.autoAdvanceMode);
+  const cycleAutoAdvanceMode = useGTUltraStore((s) => s.cycleAutoAdvanceMode);
+  const exportItems = [
+    { label: 'C64 Program (.prg)', hint: 'Runs on a C64: load address header, player and song', run: handleExportPrg },
+    { label: 'SID Music File (.sid)', hint: 'For SID players and emulators', run: handleExportSid },
+    { label: 'Raw Binary (.bin)', hint: 'Same data as the program, without the load address header', run: handleExportBin },
+  ];
 
   // Wire save/export callbacks
   useEffect(() => {
@@ -113,9 +124,15 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
     <div className={`flex items-center gap-1.5 px-2 bg-ft2-header border-b border-ft2-border font-mono text-xs h-9 ${recordMode ? 'ring-1 ring-inset ring-red-500/60' : ''}`}>
       {/* GT-specific file ops */}
       <button onClick={handleSave} className={BTN_DEFAULT} title="Save .sng">Save</button>
-      <button onClick={handleExportPrg} className={BTN_DEFAULT} title="Export a C64 program (.prg): load address header plus player and song">Export Program</button>
-      <button onClick={handleExportSid} className={BTN_DEFAULT} title="Export a SID music file (.sid) for SID players and emulators">Export SID</button>
-      <button onClick={handleExportBin} className={BTN_DEFAULT} title="Export raw binary: same data as the program export without the load address header">Export Raw Binary</button>
+      <button ref={exportRef} onClick={() => setExportOpen((o) => !o)} className={BTN_DEFAULT} title="Export the song for a C64, a SID player or as raw data">Export</button>
+      <AnchoredPopover open={exportOpen} onClose={() => setExportOpen(false)} anchorRef={exportRef} className="w-72 bg-dark-bgSecondary border border-dark-border p-1 font-mono text-[10px]">
+        {exportItems.map((it) => (
+          <button key={it.label} onClick={() => { setExportOpen(false); it.run(); }} className="block w-full text-left px-2 py-1 hover:bg-dark-bgHover">
+            <span className="text-text-primary">{it.label}</span>
+            <span className="block text-text-muted">{it.hint}</span>
+          </button>
+        ))}
+      </AnchoredPopover>
       <label className="text-ft2-textDim" title="Player load address in hex, page aligned, at least 0400, not overlapping D000-DFFF">
         Load Address $
         <input value={loadAddressText} onChange={(e) => setLoadAddressText(e.target.value)} maxLength={4} className={`${SEL} w-12 ml-0.5`} />
@@ -191,6 +208,12 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
         <CustomSelect value={String(editStep)} onChange={(v) => setEditStep(Number(v))} className={SEL}
           options={Array.from({ length: 17 }, (_, i) => ({ value: String(i), label: String(i) }))}
         />
+      </label>
+
+      {/* After entry */}
+      <label className="flex items-center gap-1 text-ft2-textDim" title={withKey(`After entry: ${AUTO_ADVANCE_LABEL[autoAdvanceMode]}`, 'Shift+Z')}>
+        After Entry:
+        <button onClick={cycleAutoAdvanceMode} className={BTN_DEFAULT}>{autoAdvanceMode === 'note' ? 'Note' : autoAdvanceMode === 'all' ? 'All' : 'Off'}</button>
       </label>
 
       {/* Pattern length */}
