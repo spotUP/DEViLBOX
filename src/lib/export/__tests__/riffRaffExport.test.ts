@@ -152,6 +152,37 @@ describe.each(FILES)('Riff Raff native export: $name', (file) => {
     expect(g1.patterns[0].channels[0].rows[at].note).toBe(note);
   }, 240000);
 
+  it('writes a note with another instrument on a blank row through Set Sample commands, every older note keeping its own', async () => {
+    const { raw, song } = await load(file);
+    const g0 = buildRiffRaffGrid(raw);
+    if (typeof g0 === 'string') throw new Error(g0);
+    const rows = song.patterns[0].channels[0].rows;
+    const note = rows.find((c) => c.note > 0 && c.note < 97)?.note ?? 40;
+    let written: Uint8Array | null = null;
+    let at = -1;
+    let inst = 0;
+    for (let r = 1; r < rows.length && !written; r++) {
+      const cov = g0.covers[0][r];
+      if (rows[r].note !== 0 || !cov) continue;
+      const want = cov.instrument === 0 ? 2 : 1; // not the instrument in force on the row
+      const { song: s } = await load(file);
+      Object.assign(s.patterns[0].channels[0].rows[r], { note, instrument: want });
+      const res = await exportOf(s);
+      if (res.warnings.length === 0 && res.data.length > raw.length) { written = res.data; at = r; inst = want; }
+    }
+    expect(written, 'some blank row of voice 1 takes a note with another instrument').not.toBeNull();
+    const g1 = buildRiffRaffGrid(written as Uint8Array);
+    if (typeof g1 === 'string') throw new Error(g1);
+    expect(g1.rows).toBe(g0.rows);
+    const got = g1.patterns[0].channels[0].rows[at];
+    expect([got.note, got.instrument]).toEqual([note, inst]);
+    g0.patterns.forEach((p, pi) => p.channels.forEach((ch, c) => ch.rows.forEach((was, r) => {
+      if (was.note < 1 || was.note >= 97) return;
+      const now = g1.patterns[pi].channels[c].rows[r];
+      expect([now.note, now.instrument]).toEqual([was.note, was.instrument]);
+    })));
+  }, 240000);
+
   it('writes a note off on a blank row as a Rest Silence, then clears it back to a Rest in one byte', async () => {
     const { raw, song } = await load(file);
     const rows = song.patterns[0].channels[0].rows;

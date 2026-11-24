@@ -240,6 +240,8 @@ const put32 = (d: Uint8Array, o: number, v: number): void => { d[o] = v >>> 24; 
  * (the song keeps its length). The pattern stream grows by two bytes, so the whole stream moves to the end of the code
  * hunk (hunk size words and the file grow with it) and every address-table long that named it is repointed. The grid is
  * decoded again; unless the cell reads back as the note and the song length is unchanged, nothing is written.
+ * A note with another instrument than the one in force also gets a Set Sample command in front of it, and one giving the
+ * old instrument back in front of the stream's next note (the stream grows by those bytes too).
  */
 function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
   const g = buildRiffRaffGrid(file);
@@ -250,48 +252,74 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
   if (!cov) return refuse('no event sounds on this row');
   // a note off is the Rest Silence command, which takes one rate argument like a note
   const off = a.note === NOTE_OFF;
-  if (!off && a.instrument !== 0 && a.instrument !== cov.instrument + 1) return refuse('a different instrument would need a Set Sample command');
+  // a different instrument: a Set Sample command in front of the note, and one naming the old instrument again in front
+  // of the next note of the stream, so every later note keeps the instrument it had (the read-back below checks that)
+  const setSample = !off && a.instrument !== 0 && a.instrument !== cov.instrument + 1;
+  if (setSample && (a.instrument - 1 > 0xff || (g.samples.length > 0 && a.instrument - 1 >= g.samples.length))) return refuse(`instrument ${a.instrument} is not in the module's sample table`);
   let byte = off ? g.restByte(true) : -1;
   if (off && byte < 0) return refuse('this driver has no Rest Silence command');
   for (let b = 0; b < COMMAND_BASE && byte < 0; b++) if (g.noteForByte(b, cov.transpose) === a.note) byte = b;
   if (byte < 0) return refuse(`note ${a.note} is not in the module's period table for this voice`);
   const out = new Uint8Array(file);
   const offset = row * g.ticksPerRow - cov.tick;
-  if (offset === 0) {
-    if (cov.kind === 'note' || (off && cov.kind === 'silence')) return refuse('an event already starts here');
+  if (offset === 0 && (cov.kind === 'note' || (off && cov.kind === 'silence'))) return refuse('an event already starts here');
+  if (offset === 0 && !setSample) {
     out[cov.at] = byte; // Rest and Rest Silence carry the same one rate argument a note does
-  } else {
-    const stream = g.streams[cov.stream];
-    if (!stream || stream.id < 0) return refuse("the start pattern lives inside the replayer's data and cannot grow");
+    return verify(out, g, a, byte, warnings, file, where(a));
+  }
+  const stream = g.streams[cov.stream];
+  if (!stream || stream.id < 0) return refuse("the start pattern lives inside the replayer's data and cannot grow");
+  const cut = cov.at - stream.offset;
+  // splices of the stream: [stream offset, bytes replaced, bytes put there], in stream order
+  const splices: Array<[number, number, number[]]> = [];
+  const pick = setSample ? [COMMAND_BASE, a.instrument - 1] : []; // Set Sample is command 0 in both drivers' tables
+  if (offset === 0) splices.push([cut, 1, [...pick, byte]]); // the rest's command byte becomes the note, its rate stays
+  else {
     const ra = g.rateIndexFor(offset);
     const rb = g.rateIndexFor(cov.wait - offset);
     if (ra < 0 || rb < 0) return refuse('the rate table has no entry for the two halves of the held event');
-    const cut = cov.at - stream.offset;
-    const old = file.subarray(stream.offset, stream.offset + stream.size);
-    const grown = new Uint8Array(stream.size + 2);
-    grown.set(old.subarray(0, cut + 2));
-    grown.set([ra, byte, rb], cut + 1);
-    grown.set(old.subarray(cut + 2), cut + 4);
-    const pointers = g.patternPointerAts(stream.offset - HUNK_BYTES);
-    if (pointers.length === 0) return refuse('no address table entry names this pattern');
-    const hunk = be32(file, 28) * 4;
-    const added = Math.ceil(grown.length / 4) * 4;
-    const moved = new Uint8Array(file.length + added);
-    moved.set(file.subarray(0, HUNK_BYTES + hunk));
-    moved.set(grown, HUNK_BYTES + hunk);
-    moved.set(file.subarray(HUNK_BYTES + hunk), HUNK_BYTES + hunk + added);
-    put32(moved, 28, hunk / 4 + added / 4);
-    put32(moved, 20, be32(file, 20) + added / 4); // the hunk table size word keeps its memory flag bits
-    for (const at of pointers) put32(moved, at, hunk);
-    return verify(moved, g.rows, a, byte, warnings, file, where(a));
+    splices.push([cut + 1, 1, [ra, ...pick, byte, rb]]);
   }
-  return verify(out, g.rows, a, byte, warnings, file, where(a));
+  if (setSample) {
+    const col = g.covers[a.channel] ?? [];
+    let next: (typeof cov) | undefined;
+    let nextSetAt = -1;
+    for (let r = row + 1; r < col.length && !next; r++) { const e = col[r]; if (e && e.kind === 'note' && e.stream === cov.stream && e.at > cov.at) { next = e; nextSetAt = g.sources[a.channel]?.[r]?.instrumentAt ?? -1; } }
+    if (!next) return refuse('no later note in this pattern to give the old instrument back to, a different instrument would leak into the next pattern');
+    // a later note that has its own Set Sample after the cut needs nothing put back
+    if (!(nextSetAt > cov.at && nextSetAt < next.at)) splices.push([next.at - stream.offset, 0, [COMMAND_BASE, cov.instrument]]);
+  }
+  const old = file.subarray(stream.offset, stream.offset + stream.size);
+  const parts: number[] = [];
+  let from = 0;
+  for (const [at, cutLen, put] of splices) { parts.push(...old.subarray(from, at), ...put); from = at + cutLen; }
+  parts.push(...old.subarray(from));
+  const grown = Uint8Array.from(parts);
+  const pointers = g.patternPointerAts(stream.offset - HUNK_BYTES);
+  if (pointers.length === 0) return refuse('no address table entry names this pattern');
+  const hunk = be32(file, 28) * 4;
+  const added = Math.ceil(grown.length / 4) * 4;
+  const moved = new Uint8Array(file.length + added);
+  moved.set(file.subarray(0, HUNK_BYTES + hunk));
+  moved.set(grown, HUNK_BYTES + hunk);
+  moved.set(file.subarray(HUNK_BYTES + hunk), HUNK_BYTES + hunk + added);
+  put32(moved, 28, hunk / 4 + added / 4);
+  put32(moved, 20, be32(file, 20) + added / 4); // the hunk table size word keeps its memory flag bits
+  for (const at of pointers) put32(moved, at, hunk);
+  return verify(moved, g, a, byte, warnings, file, where(a));
 }
 
-function verify(candidate: Uint8Array, rows: number, a: Add, byte: number, warnings: string[], fallback: Uint8Array, at: string): Uint8Array {
+/** The new cell reads back (note, and the instrument when one was asked for), the song keeps its length, and every note
+ * the module played before still plays with its own instrument. */
+function verify(candidate: Uint8Array, g: RiffRaffGrid, a: Add, byte: number, warnings: string[], fallback: Uint8Array, at: string): Uint8Array {
   const again = buildRiffRaffGrid(candidate);
   const got = typeof again === 'string' ? undefined : cellAt(again, a.channel, a.pattern * ROWS_PER_PATTERN + a.row);
-  if (typeof again !== 'string' && again.rows === rows && got?.note === a.note) return candidate;
+  const notesKept = (n: RiffRaffGrid): boolean => g.patterns.every((p, pi) => p.channels.every((ch, c) => ch.rows.every((was, r) => {
+    if (was.note < 1 || was.note >= NOTE_OFF) return true;
+    const now = n.patterns[pi]?.channels[c]?.rows[r];
+    return now?.note === was.note && now.instrument === was.instrument;
+  })));
+  if (typeof again !== 'string' && again.rows === g.rows && got?.note === a.note && (a.instrument === 0 || a.note === NOTE_OFF || got.instrument === a.instrument) && notesKept(again)) return candidate;
   warnings.push(`${PREFIX} ${at}: the replayer would not play the new note (${byte}) on this row; it was not written.`);
   return fallback;
 }
