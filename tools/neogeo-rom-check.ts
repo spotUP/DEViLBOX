@@ -37,6 +37,7 @@ const detail = args.includes('--detail');
 const SECONDS = Number(opt('--seconds') ?? 20);
 
 /** Decode YM2610 register writes (port 0 = A, 1 = B) to key-on starts with the channel's Hz at key-on (freq written within 50 ms after counts; the Z80 driver writes it up to ~40 ms after key-on). */
+let lastT0 = 0;
 function starts(w: W[], clk: number): Start[] {
   const fnum: Record<string, number> = {}, hi: Record<string, number> = {}, vol: Record<string, number> = {}, per: Record<string, number> = {};
   const out: (Start & { fix?: () => void })[] = [];
@@ -69,7 +70,7 @@ function starts(w: W[], clk: number): Start[] {
   }
   settle(1e9);
   out.sort((p, q) => p.t - q.t);
-  const t0 = out[0]?.t ?? 0;
+  const t0 = out[0]?.t ?? 0; lastT0 = t0;
   return out.map(({ t, ch, hz }) => ({ t: t - t0, ch, hz }));
 }
 
@@ -161,17 +162,24 @@ for (const song of SONGS) {
       { env: { ...process.env, SDL_VIDEODRIVER: 'dummy', TAP_OUT: path.join(dir, 'tap') }, timeout: (SECONDS + 120) * 1000 });
     const tap = readTap(path.join(dir, 'tap'));
     const got = starts(tap.w, MVS_CLK).filter((g) => g.t < SECONDS - 1);
+    const gotT0 = lastT0;
     v = { ...v, commands: tap.cmds.slice(0, 8), mameStarts: got.length, pass: got.length > 0 };
     v.stage = 'furnace';
     run(FURNACE, ['-console', '-nostatus', '-nocontrols', '-noreport', '-loglevel', 'error', '-loops', '0', '-vgmout', path.join(dir, 'f.vgm'), fur!], { timeout: 120000 });
     const vgm = readVgm(path.join(dir, 'f.vgm'));
     const want = starts(vgm.w, vgm.clk).filter((e) => e.t < SECONDS - 2);
+    const wantT0 = lastT0;
     const pairs = want.map((w) => [w, got.find((g) => g.ch === w.ch && Math.abs(g.t - w.t) < 0.03)] as const);
     const hit = pairs.filter(([, g]) => g);
     // miss analysis: signed delta (MAME - Furnace) to the nearest same-channel MAME key-on; late = driver timing, none = lost row
     const nearest = (w: Start) => got.filter((g) => g.ch === w.ch).reduce<number | undefined>((b, g) => (b === undefined || Math.abs(g.t - w.t) < Math.abs(b) ? g.t - w.t : b), undefined);
     const missD = pairs.filter(([, g]) => !g).map(([w]) => ({ w, d: nearest(w) }));
     const loose = pairs.filter(([w, g]) => g || (nearest(w) !== undefined && Math.abs(nearest(w)!) < 0.15)).length;
+    if (detail) for (const { w } of missD.filter((m) => m.w.ch.startsWith('S') && m.d !== undefined && Math.abs(m.d) > 0.15)) {
+      // raw SSG volume writes (reg 8-10) of the missed channel around the miss, both streams, times relative to their own first key-on
+      const reg = 7 + Number(w.ch[1]), dump = (x: W[], t0: number) => x.filter((e) => e.port === 0 && e.reg === reg && e.t - t0 > w.t - 0.3 && e.t - t0 < w.t + 0.1).map((e) => `${((e.t - t0) * 1000).toFixed(0)}:${e.val}`).join(' ');
+      console.log(`  VOLW ${w.t.toFixed(3)} ${w.ch} furnace [${dump(vgm.w, wantT0)}] mame [${dump(tap.w, gotT0)}]`);
+    }
     if (detail) {
       const bins = [0.03, 0.06, 0.1, 0.15, 0.3, 1, 1e9], h: Record<string, number> = {};
       for (const { w, d } of missD) { const k = d === undefined ? 'none' : `${d < 0 ? '-' : '+'}${bins.find((x) => Math.abs(d) < x)}`; h[`${w.ch} ${k}`] = (h[`${w.ch} ${k}`] ?? 0) + 1; console.log(`  MISS ${w.t.toFixed(3)} ${w.ch} nearest ${d === undefined ? 'none' : `${(d * 1000).toFixed(0)} ms`}`); }
