@@ -7,3 +7,13 @@ export function cyclePitch(sampleRate: number, cycleLength: number): { baseNote:
   const nearest = Math.round(midi);
   return { baseNote: Tone.Frequency(nearest, 'midi').toNote(), detune: Math.round((midi - nearest) * 100) };
 }
+
+/** Playback-rate factor for a sample's fine tune in cents (0 / undefined = 1). */
+export function centsRatio(cents: number | undefined): number {
+  return 2 ** ((cents || 0) / 1200);
+}
+
+/** Note shifted by `cents`, as Hz for Tone.Sampler (it honours the sub-semitone remainder); unchanged when cents is 0. */
+export function detunedNote(note: string, cents: number | undefined): string | number {
+  return cents ? Tone.Frequency(note).toFrequency() * centsRatio(cents) : note;
+}

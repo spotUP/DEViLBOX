@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as Tone from 'tone';
-import { cyclePitch } from '../cyclePitch';
+import { cyclePitch, centsRatio, detunedNote } from '../cyclePitch';
 
 const freqOf = (p: { baseNote: string; detune: number }) => Tone.Frequency(p.baseNote).toFrequency() * 2 ** (p.detune / 1200);
 
@@ -19,5 +19,17 @@ describe('cyclePitch', () => {
     const p = cyclePitch(48000, 64);
     const rate = Tone.Frequency('C4').toFrequency() / Tone.Frequency(p.baseNote).toFrequency();
     expect(rate * 2 ** (-p.detune / 1200)).toBeCloseTo(Tone.Frequency('C4').toFrequency() / 750, 3);
+  });
+});
+
+describe('sample detune playback', () => {
+  it('centsRatio: 0 and undefined are unity, 1200 cents is an octave', () => {
+    expect(centsRatio(undefined)).toBe(1);
+    expect(centsRatio(0)).toBe(1);
+    expect(centsRatio(1200)).toBeCloseTo(2, 10);
+  });
+  it('detunedNote leaves the note alone at 0 cents and shifts Hz otherwise', () => {
+    expect(detunedNote('C4', 0)).toBe('C4');
+    expect(detunedNote('A4', 1200)).toBeCloseTo(880, 3);
   });
 });

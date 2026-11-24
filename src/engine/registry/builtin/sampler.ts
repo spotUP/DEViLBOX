@@ -10,6 +10,7 @@ import type { SynthDescriptor } from '../SynthDescriptor';
 import { getNormalizedVolume } from '../../factories/volumeNormalization';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { DEFAULT_SAMPLE_BASE_NOTE } from '@typedefs/instrument';
+import { centsRatio } from '../../../utils/audio/cyclePitch';
 import { periodToNoteIndex, getPeriodExtended } from '../../effects/PeriodTables';
 
 /**
@@ -50,7 +51,7 @@ function handlePeriodPlayback(
     const baseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
     const baseFreq = Tone.Frequency(baseNote).toFrequency();
     const targetFreq = Tone.Frequency(note).toFrequency();
-    player.playbackRate = targetFreq / baseFreq;
+    player.playbackRate = (targetFreq / baseFreq) * centsRatio(config.sample?.detune);
   }
 
   player.start(time);

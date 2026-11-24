@@ -12,6 +12,7 @@ import { EngineGainDuck } from './engineGainDuck';
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import { DEFAULT_SAMPLE_BASE_NOTE } from '@typedefs/instrument';
+import { centsRatio, detunedNote } from '../utils/audio/cyclePitch';
 import type { DevilboxSynth } from '@typedefs/synth';
 import { isDevilboxSynth } from '@typedefs/synth';
 import { DB303Synth, DB303Synth as JC303Synth } from './db303';
@@ -3296,7 +3297,7 @@ export class ToneEngine {
             const baseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
             const baseFreq = cachedFrequency(baseNote);
             const targetFreq = cachedFrequency(note);
-            const playbackRate = targetFreq / baseFreq;
+            const playbackRate = (targetFreq / baseFreq) * centsRatio(config.sample?.detune);
 
             // Apply global playback rate multiplier for pitch shifting
             (player as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
@@ -3341,7 +3342,7 @@ export class ToneEngine {
                 // Calculate pitch adjustment for the note (relative to base note)
                 const baseFreq = cachedFrequency(baseNote);
                 const targetFreq = cachedFrequency(note);
-                const playbackRate = targetFreq / baseFreq;
+                const playbackRate = (targetFreq / baseFreq) * centsRatio(config.sample?.detune);
 
                 // Apply global playback rate multiplier for pitch shifting
                 (slicePlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
@@ -3354,14 +3355,14 @@ export class ToneEngine {
 
               } catch (e) {
                 console.warn('[ToneEngine] Slice triggerAttack failed, falling back:', e);
-                sampler.triggerAttack(note, safeTime, velocity);
+                sampler.triggerAttack(detunedNote(note, config.sample?.detune), safeTime, velocity);
               }
             } else {
-              sampler.triggerAttack(note, safeTime, velocity);
+              sampler.triggerAttack(detunedNote(note, config.sample?.detune), safeTime, velocity);
             }
           } else {
             try {
-              sampler.triggerAttack(note, safeTime, velocity);
+              sampler.triggerAttack(detunedNote(note, config.sample?.detune), safeTime, velocity);
             } catch {
               // Sampler may throw "No available buffers" if async loading hasn't completed
             }
@@ -3406,7 +3407,7 @@ export class ToneEngine {
           const baseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
           const baseFreq = cachedFrequency(baseNote);
           const targetFreq = cachedFrequency(note);
-          const playbackRate = targetFreq / baseFreq;
+          const playbackRate = (targetFreq / baseFreq) * centsRatio(config.sample?.detune);
           player.playbackRate = playbackRate;
         }
 
@@ -4153,7 +4154,7 @@ export class ToneEngine {
             const baseNote = config.sample?.baseNote || DEFAULT_SAMPLE_BASE_NOTE;
             const baseFreq = cachedFrequency(baseNote);
             const targetFreq = cachedFrequency(note);
-            const playbackRate = targetFreq / baseFreq;
+            const playbackRate = (targetFreq / baseFreq) * centsRatio(config.sample?.detune);
             // Apply global playback rate multiplier for pitch shifting
             (voiceNode as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
           }
@@ -4412,7 +4413,7 @@ export class ToneEngine {
                 // Calculate pitch adjustment for the note (relative to base note)
                 const baseFreq = cachedFrequency(baseNote);
                 const targetFreq = cachedFrequency(note);
-                const playbackRate = targetFreq / baseFreq;
+                const playbackRate = (targetFreq / baseFreq) * centsRatio(config.sample?.detune);
 
                 // Apply global playback rate multiplier for pitch shifting
                 (slicePlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
@@ -4428,11 +4429,11 @@ export class ToneEngine {
 
               } catch (e) {
                 console.warn('[ToneEngine] Slice playback failed, falling back:', e);
-                sampler.triggerAttackRelease(note, duration, safeTime, velocity);
+                sampler.triggerAttackRelease(detunedNote(note, config.sample?.detune), duration, safeTime, velocity);
               }
             } else {
               console.warn('[ToneEngine] Cannot play slice - no buffer found');
-              sampler.triggerAttackRelease(note, duration, safeTime, velocity);
+              sampler.triggerAttackRelease(detunedNote(note, config.sample?.detune), duration, safeTime, velocity);
             }
           } else if (sampleOffset && sampleOffset > 0) {
             // 9xx Sample offset: Use Player for offset support
@@ -4463,7 +4464,7 @@ export class ToneEngine {
                 // Calculate pitch adjustment for the note (relative to base note)
                 const baseFreq = cachedFrequency(baseNote);
                 const targetFreq = cachedFrequency(note);
-                const playbackRate = targetFreq / baseFreq;
+                const playbackRate = (targetFreq / baseFreq) * centsRatio(config.sample?.detune);
 
                 // Apply global playback rate multiplier for pitch shifting
                 (offsetPlayer as unknown as { playbackRate: number }).playbackRate = playbackRate * this.globalPlaybackRate;
@@ -4479,15 +4480,15 @@ export class ToneEngine {
 
               } catch (e) {
                 console.warn('[ToneEngine] Sample offset Player creation failed, falling back:', e);
-                sampler.triggerAttackRelease(note, duration, safeTime, velocity);
+                sampler.triggerAttackRelease(detunedNote(note, config.sample?.detune), duration, safeTime, velocity);
               }
             } else {
               console.warn('[ToneEngine] Cannot apply sample offset - no buffer found');
-              sampler.triggerAttackRelease(note, duration, safeTime, velocity);
+              sampler.triggerAttackRelease(detunedNote(note, config.sample?.detune), duration, safeTime, velocity);
             }
           } else {
             // Normal playback without offset
-            sampler.triggerAttackRelease(note, duration, safeTime, velocity);
+            sampler.triggerAttackRelease(detunedNote(note, config.sample?.detune), duration, safeTime, velocity);
           }
         } else {
           console.warn('[ToneEngine] Sampler not loaded yet');
