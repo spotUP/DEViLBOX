@@ -15,6 +15,11 @@ export type ChipTargetId =
   | 'gameboy'
   | 'fds'
   | 'n163'
+  | 'pce'
+  | 'namco-wsg'
+  | 'scc'
+  | 'wonderswan'
+  | 'virtualboy'
   | 'gtultra';
 
 export interface ChipTarget {
@@ -124,6 +129,71 @@ export const CHIP_TARGETS: Record<ChipTargetId, ChipTarget> = {
     bitDepth: 4,
     description: 'N163: variable length, 4-byte aligned, 4-bit',
   },
+  'pce': {
+    id: 'pce',
+    name: 'PC Engine',
+    maxValue: 31,
+    defaultLen: 32,
+    minLen: 32,
+    maxLen: 32,
+    lenStep: 32,
+    lockedLen: true,
+    lockedDepth: true,
+    bitDepth: 5,
+    description: 'PC Engine: 32 × 5-bit (fixed)',
+  },
+  'namco-wsg': {
+    id: 'namco-wsg',
+    name: 'Namco WSG',
+    maxValue: 15,
+    defaultLen: 32,
+    minLen: 32,
+    maxLen: 32,
+    lenStep: 32,
+    lockedLen: true,
+    lockedDepth: true,
+    bitDepth: 4,
+    description: 'Namco WSG: 32 × 4-bit (fixed)',
+  },
+  'scc': {
+    id: 'scc',
+    name: 'Konami SCC',
+    maxValue: 255,
+    defaultLen: 32,
+    minLen: 32,
+    maxLen: 32,
+    lenStep: 32,
+    lockedLen: true,
+    lockedDepth: true,
+    bitDepth: 8,
+    description: 'Konami SCC: 32 × 8-bit signed (fixed; stored 0-255, 128 is silence)',
+  },
+  'wonderswan': {
+    id: 'wonderswan',
+    name: 'WonderSwan',
+    maxValue: 15,
+    defaultLen: 32,
+    minLen: 32,
+    maxLen: 32,
+    lenStep: 32,
+    lockedLen: true,
+    lockedDepth: true,
+    bitDepth: 4,
+    description: 'WonderSwan: 32 × 4-bit (fixed)',
+  },
+  'virtualboy': {
+    id: 'virtualboy',
+    name: 'Virtual Boy',
+    maxValue: 63,
+    defaultLen: 32,
+    minLen: 32,
+    maxLen: 32,
+    lenStep: 32,
+    lockedLen: true,
+    lockedDepth: true,
+    bitDepth: 6,
+    description: 'Virtual Boy: 32 × 6-bit (fixed)',
+  },
   gtultra: {
     id: 'gtultra',
     name: 'GT Ultra (C64 SID)',
@@ -146,6 +216,11 @@ export const CHIP_TARGET_ORDER: ChipTargetId[] = [
   'gameboy',
   'fds',
   'n163',
+  'pce',
+  'namco-wsg',
+  'scc',
+  'wonderswan',
+  'virtualboy',
   'gtultra',
 ];
 
