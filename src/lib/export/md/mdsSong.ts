@@ -43,7 +43,22 @@ const KIND: Kind[] = ['fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'psg', 'psg', 'psg', '
 const EXT_CHAN: number[] = [0, 1, 2, 0x0a, 0x0b, 0x0c, 3, 4, 5, 6, 7, 8, 9];
 const EXT_KIND: Kind[] = ['fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'psg', 'psg', 'psg', 'noise'];
 const EXT_OP: number[] = [0, 0, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0];
-const isExt = (sys: readonly number[]) => sys[0] === 0xa0 || sys[0] === 0x42;
+/**
+ * YM2612 DualPCM (0xbe: FM1-FM5, FM6/PCM1, PCM2) and DualPCM Extended (0xbd: FM1, FM2, FM3 OP1-OP4, FM4, FM5, FM6/PCM1, PCM2, CSM)
+ * (sysDef.cpp). PCM2 rides MDSDRV id 0a (mds_pcm2_ch_update; the Z80 mixes 2 channels by default, mdssub.z80 DEFAULT_MODE 2), so the
+ * 0xbd OP2-OP4 tracks move to ids 0b-0d (mds_pcm3_ch_update / mds_dummy_update run FM3 operator tracks too). CSM gets no track (-1).
+ */
+const DUAL_CHAN: number[] = [0, 1, 2, 3, 4, 5, 0x0a, 6, 7, 8, 9];
+const DUAL_KIND: Kind[] = ['fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'psg', 'psg', 'psg', 'noise'];
+const DUAL_EXT_CHAN: number[] = [0, 1, 2, 0x0b, 0x0c, 0x0d, 3, 4, 5, 0x0a, -1, 6, 7, 8, 9];
+const DUAL_EXT_KIND: Kind[] = ['fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'fm', 'psg', 'psg', 'psg', 'noise'];
+const DUAL_EXT_OP: number[] = [0, 0, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+/** Channel layout per first system id; fm = channel count without the SN76489 (a lone YM2612 system). */
+const LAYOUT: Record<number, { ids: number[]; kinds: Kind[]; ops?: number[]; fm: number }> = {
+  0x02: { ids: MDS_CHAN, kinds: KIND, fm: 6 }, 0x83: { ids: MDS_CHAN, kinds: KIND, fm: 6 },
+  0x42: { ids: EXT_CHAN, kinds: EXT_KIND, ops: EXT_OP, fm: 9 }, 0xa0: { ids: EXT_CHAN, kinds: EXT_KIND, ops: EXT_OP, fm: 9 },
+  0xbe: { ids: DUAL_CHAN, kinds: DUAL_KIND, fm: 7 }, 0xbd: { ids: DUAL_EXT_CHAN, kinds: DUAL_EXT_KIND, ops: DUAL_EXT_OP, fm: 11 },
+};
 /**
  * With voice transpose $30 the FM note equals the Furnace note value. PSG key k writes period PSG_TAB[k%12] >> (k/12)
  * (key 0 = 1710), the period Furnace 0.6.8.3 writes for note value k truncated instead of rounded: Furnace writes
@@ -473,28 +488,24 @@ export function encodeTempos(v: number[]): number[] {
 }
 
 /**
- * File-format system ids the converter accepts: Genesis (0x02) or Genesis Extended (0x42), YM2612 (0x83) or YM2612 Extended
- * Channel 3 (0xa0) alone or followed by SN76489 (0x03).
+ * File-format system ids the converter accepts: Genesis (0x02) or Genesis Extended (0x42), YM2612 (0x83), YM2612 Extended
+ * Channel 3 (0xa0), YM2612 DualPCM (0xbe) or DualPCM Extended (0xbd) alone or followed by SN76489 (0x03).
  */
+const YM2612_IDS = [0x83, 0xa0, 0xbd, 0xbe];
 export function mdsSystemsSupported(sys: readonly number[]): boolean {
-  return (sys.length === 1 && [0x02, 0x42, 0x83, 0xa0].includes(sys[0])) || (sys.length === 2 && (sys[0] === 0x83 || sys[0] === 0xa0) && sys[1] === 0x03);
+  return (sys.length === 1 && [0x02, 0x42, ...YM2612_IDS].includes(sys[0])) || (sys.length === 2 && YM2612_IDS.includes(sys[0]) && sys[1] === 0x03);
 }
 
 export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const lossy = new Lossy();
   const sys = m.systems;
-  const fmOnly = sys.length === 1 && (sys[0] === 0x83 || sys[0] === 0xa0);
-  const ext = isExt(sys);
-  const kinds = ext ? EXT_KIND : KIND, ids = ext ? EXT_CHAN : MDS_CHAN;
-  // MDSDRV can mix a second PCM channel (f2 02, 17.5 kHz), but the converter only models the fm6 DAC.
-  if (sys.some((x) => x === 0xbd || x === 0xbe)) {
-    throw new Error('MDSDRV export: YM2612 DualPCM (second PCM channel) is not converted yet; MDSDRV PCM mixing mode (f2 02) could play it');
-  }
   if (!mdsSystemsSupported(sys)) {
     throw new Error(`MDSDRV export needs a Genesis song (YM2612 + SN76489); systems are ${sys.map((x) => x.toString(16)).join(',')}`);
   }
+  const { ids, kinds, ops: opOf, fm: fmCh } = LAYOUT[sys[0]];
+  const dual = sys[0] === 0xbd || sys[0] === 0xbe;
   const s = m.subsongs[subsong];
-  const nCh = fmOnly ? (ext ? 9 : 6) : kinds.length;
+  const nCh = sys.length === 1 && YM2612_IDS.includes(sys[0]) ? fmCh : kinds.length;
   // Driver: each NTSC VINT adds tempo+1 to a counter and steps one tick per 128 (Phase 0), so ticks/s = (dd+1)*NTSC/128.
   // F0xx on the first row sets the tick rate before the first tick (playback.cpp: divider = xx*2/5, at least 1).
   const f0 = Array.from({ length: kinds.length }, (_, ch) => m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[0]}`)?.rows[0]?.effects ?? [])
@@ -582,7 +593,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     while (pcm.length & 31) pcm.push(0);
     if (data.length <= 0x8000 && (pcm.length & 0x7fff) + data.length > 0x8000) while (pcm.length & 0x7fff) pcm.push(0);
     const at = pcm.length;
-    pcm.push(...data, ...new Array(32).fill(0)); // the driver reads a few bytes past the end
+    for (const b of data) pcm.push(b); // no spread: a long sample overflows the argument stack
+    pcm.push(...new Array(32).fill(0)); // the driver reads a few bytes past the end
     const i = item([8, (at >> 16) & 0xff, (at >> 8) & 0xff, at & 0xff, ...be16(data.length >>> 16), ...be16(data.length & 0xffff)]);
     pcmItems.set(k, i);
     return i;
@@ -695,7 +707,11 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   const songLfo = m.instruments.some((_, n) => lfoOf(n) !== 0);
   const tracks: Array<{ ch: number; op: number; chunks: Array<{ bytes: number[]; tieStart: boolean; head: number }>; wrap: number[] }> = [];
   for (let ch = 0; ch < nCh; ch++) {
-    const kind = kinds[ch], op = ext ? EXT_OP[ch] : 0, fm6 = ids[ch] === 5;
+    if (ids[ch] < 0) { // CSM timer: no MDSDRV track
+      if (chunks.some((c) => c.rows.some((r) => (cellAt(ch, c.o, r)?.note ?? -1) >= 0))) lossy.add('CSM timer channel notes (no MDSDRV track)');
+      continue;
+    }
+    const kind = kinds[ch], op = opOf?.[ch] ?? 0, pcm2 = dual && ids[ch] === 0x0a, fm6 = ids[ch] === 5 || pcm2;
     let envPh: HitPhase | undefined, trs = 0, ins = 0, vol = kind === 'fm' ? 127 : 15, pan = 0xc0, dtn = 0, noise = 3, sounding = false, any = false, tick = 0, slideEnd = 0, prevKey = -1, pegDirty = false, portaXx = 0, legato = 0;
     // 01xx/02xx (linear pitch): rate in 1/128 semitone per Furnace tick, poff = offset after the last tick so far. Furnace keeps the slide
     // running across notes and note offs (playback.cpp 0x01/0x02 leave inPorta false; NOTE_ON resets baseFreq, the slide goes on), so each
@@ -719,7 +735,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     // all: restate every overridden TL (E1 reloads t_fm_tl from the voice); only: the one operator a 12xx-15xx just set.
     const kvsCmd = (v: number, all = false, only = -1): number[] => {
       const ops = kind === 'fm' ? m.instruments[kvsIns]?.fm?.operators : undefined;
-      if (!ops || ops.length < 4 || (fm6 && m.instruments[ins]?.type === 4)) return [];
+      if (!ops || ops.length < 4 || pcm2 || (fm6 && m.instruments[ins]?.type === 4)) return [];
       const alg = m.instruments[kvsIns]!.fm!.algorithm & 7, att = 127 - v, out: number[] = [];
       for (let i = 0; i < 4; i++) {
         if (only >= 0 && i !== only) continue;
@@ -951,7 +967,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
       let curPcm = -1, pcmOn = false;
       baked = arpHold !== undefined; arpT0 = tick; // insCmd(true) restates EB, which restarts the instrument's arp table
       // Chunk head: the channel state a chunk starts from. The loop chunk's head plays once; the wrap restates it from the song-end state.
-      const head = (): number[] => [...(isDac(ins) ? [] : insCmd(true)), ...(vDepth && any ? vibCmd(tick) : []), ...volCmd(outV), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...((sA || rOn || pm) && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
+      const head = (): number[] => [...(isDac(ins) || pcm2 ? [] : insCmd(true)), ...(vDepth && any ? vibCmd(tick) : []), ...volCmd(outV), ...(kind === 'fm' ? [0xe9, pan] : []), ...(kind === 'noise' ? [0xea, NOISE_EA[noise]] : []), ...((sA || rOn || pm) && sounding ? (trsOut = dtnOut = NaN, slideCmd(tick)) : kind === 'psg' ? [0xe6, (dtnOut = effDtn()) & 0xff] : dtn ? [0xe6, (dtnOut = dtn) & 0xff] : (dtnOut = 0, []))];
       const bytes = head(), headLen = bytes.length;
       // One sequence tick's mid-row commands: 0Axy volume step and the per-tick slide.
       const tickPre = (t: number): number[] | null => { const v = [...(volStep() ?? []), ...(macStep(t) ?? [])], sl = (sA && (sounding || fTick(t) <= sTail)) || ((rOn || pm) && sounding) ? slideCmd(t) : []; return v.length || sl.length ? [...v, ...sl] : null; };
@@ -987,6 +1003,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         const cell = cellAt(ch, c.o, r);
         let nv = cell ? convertFurnaceNoteValue(cell) : -1, shY = 0, shX = 0, shFrom = NaN;
         if (cell && cell.instrument >= 0) ins = cell.instrument;
+        // PCM2 only plays sample instruments (sysDef.cpp: DIV_INS_AMIGA); MDSDRV id 0a has no FM voice.
+        if (pcm2 && nv >= 0 && nv < 253 && !isDac(ins)) { lossy.add('DualPCM PCM2: non-sample instrument note dropped'); nv = -1; }
         // shortcut: the FM3 voice is OP1's instrument (channel 2 E1); an OP2-OP4 instrument only brings its own operator in Furnace.
         if (op === 1 && nv >= 0) op1Ins.add(ins);
         else if (op > 1 && nv >= 0 && !op1Ins.has(ins)) lossy.add('extended channel 3: OP2-OP4 instrument other than OP1\'s (FM3 plays OP1\'s voice)');
