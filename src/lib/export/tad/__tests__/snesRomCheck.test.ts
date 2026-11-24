@@ -25,6 +25,8 @@ const FURNACE = process.env.FURNACE_CLI ?? '/Applications/Furnace.app/Contents/M
 const SECONDS = Number(process.env.SNES_SECONDS ?? 20);
 const ONLY = process.env.SNES_ONLY;
 const FAILED = process.env.SNES_FAILED === '1';
+// The player ROM boots for a few seconds before its first KON; the emulated window gets this margin so the compared SECONDS of song are all covered.
+const BOOT_MARGIN = 8;
 const SPC_HZ = 2048000; // Mesen2 spc.cycle rate (measured: 409126 cycles over 12 NTSC frames)
 
 interface Verdict { inputHash: string; pass: boolean; seconds: number; warnings?: string[]; konEvents?: number; furnaceNoteOns?: number; keyOnMatch?: number; perChannel?: string; error?: string }
@@ -32,13 +34,13 @@ type Ev = { t: number; ch: number };
 
 function mesenKeyOns(rom: Uint8Array, dir: string): Ev[] {
   writeFileSync(path.join(dir, 'p.sfc'), rom);
-  const frames = Math.ceil(SECONDS * 60.1);
+  const frames = Math.ceil((SECONDS + BOOT_MARGIN) * 60.1);
   writeFileSync(path.join(dir, 'tap.lua'), `local f=0 local a=0
 emu.addEventCallback(function() f=f+1 if f>=${frames} then print("DONE") emu.stop(0) end end, emu.eventType.endFrame)
 emu.addMemoryCallback(function(ad,v) if ad==0xF2 then a=v elseif a==0x4C and v~=0 then print(string.format("K %d %d",emu.getState()["spc.cycle"],v)) end end, emu.callbackType.write, 0xF2, 0xF3, emu.cpuType.spc, emu.memType.spcMemory)
 `);
-  const out = execFileSync(MESEN, ['--testRunner', `--timeout=${SECONDS * 3 + 30}`, '--doNotSaveSettings', '--enableStdout', path.join(dir, 'tap.lua'), path.join(dir, 'p.sfc')],
-    { encoding: 'utf8', timeout: (SECONDS * 3 + 60) * 1000, maxBuffer: 1 << 26 });
+  const out = execFileSync(MESEN, ['--testRunner', `--timeout=${(SECONDS + BOOT_MARGIN) * 3 + 30}`, '--doNotSaveSettings', '--enableStdout', path.join(dir, 'tap.lua'), path.join(dir, 'p.sfc')],
+    { encoding: 'utf8', timeout: ((SECONDS + BOOT_MARGIN) * 3 + 60) * 1000, maxBuffer: 1 << 26 });
   if (!out.includes('DONE')) throw new Error('Mesen2 stopped before the requested frames');
   const ev: Ev[] = [];
   for (const l of out.split('\n')) {
@@ -91,6 +93,7 @@ describe.runIf(process.env.SNES_ROM_CHECK === '1')('snes-rom-check', () => {
           const hit = want.filter(hitOf).length;
           const per = Array.from({ length: 8 }, (_, c) => { const w = want.filter((e) => e.ch === c); return w.length ? `${c}:${w.filter(hitOf).length}/${w.length}` : ''; }).filter(Boolean).join(' ');
           Object.assign(v, { furnaceNoteOns: want.length, keyOnMatch: want.length ? Math.round((hit / want.length) * 10000) / 100 : 0, perChannel: per });
+          if (process.env.SNES_DIAG) console.log(`[ROM] ${name} ${g.slice(0, 40).map((e) => `${e.ch}@${e.t.toFixed(2)}`).join(' ')} | FUR ${want.slice(0, 40).map((e) => `${e.ch}@${e.t.toFixed(2)}`).join(' ')}`);
           if (process.env.SNES_DIAG) for (const w of want) if (!hitOf(w)) console.log(`[MISS] ${name} ch${w.ch} ${w.t.toFixed(3)} nearest ${g.filter((x) => x.ch === w.ch).map((x) => x.t - w.t).sort((a, b) => Math.abs(a) - Math.abs(b))[0]?.toFixed(3) ?? 'none'}`);
         }
       } catch (e) {
