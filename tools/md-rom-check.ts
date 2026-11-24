@@ -59,13 +59,16 @@ for (const name of names) {
     const all = starts(runMame(rom, dir, SECONDS));
     const got = all.filter((e) => e.ev === 'KEYON');
     v = { inputHash, pass: got.length > 0, seconds: SECONDS, romBytes: rom.length, lossy: song.lossy, mameKeyOns: got.length };
-    if (existsSync(FURNACE)) {
+    if (existsSync(FURNACE)) try {
       execFileSync(FURNACE, ['-console', '-nostatus', '-nocontrols', '-noreport', '-loglevel', 'error', '-loops', '0', '-vgmout', path.join(dir, 'f.vgm'), path.join(SONGS, `${name}.fur`)], { stdio: 'ignore', timeout: 120000 });
       const want = starts(decode(path.join(dir, 'f.vgm'))).filter((e) => e.t < SECONDS - 1);
       const hit = want.filter((w) => all.some((g) => g.ch === w.ch && Math.abs(g.t - w.t) < 0.03)).length;
       if (process.env.MD_DIAG_CH) { const f = (e: Ev[], w: string) => e.filter((x) => x.ch === process.env.MD_DIAG_CH && x.ev !== 'FREQ' && x.t < 1.5).map((x) => `${x.t.toFixed(3)}:${x.ev}:${x.v}`).join(' '); console.log(`[EV-F] ${f(decode(path.join(dir, 'f.vgm')), 'f')}`); console.log(`[EV-M] ${f(all, 'm')}`); }
       if (process.env.MD_DIAG) for (const w of want) if (!all.some((g) => g.ch === w.ch && Math.abs(g.t - w.t) < 0.03)) console.log(`[MISS] ${name} ${w.ch} ${w.t.toFixed(3)} ${w.ev} ${w.v} nearest ${all.filter((g) => g.ch === w.ch).map((g) => g.t - w.t).sort((x, y) => Math.abs(x) - Math.abs(y))[0]?.toFixed(3) ?? 'none'}`);
       Object.assign(v, { furnaceKeyOns: want.length, keyOnMatch: want.length ? Math.round((hit / want.length) * 10000) / 100 : 0 });
+    } catch (e) {
+      // The ROM ran; only the reference is missing (e.g. the Furnace CLI is older than the .fur format version): keep the ROM verdict.
+      v.error = `no reference: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`;
     }
   } catch (e) {
     v = { inputHash, pass: false, seconds: SECONDS, error: e instanceof Error ? e.message : String(e) };
