@@ -97,4 +97,14 @@ describe('hUGEDriver Game Boy export', () => {
     // The variants that no longer fit fall back to the plain instrument and report the dropped volume.
     expect(lossy.some((l) => l.includes('no free instrument slot'))).toBe(true);
   });
+
+  it('noise arpeggios past the noise table or with fixed steps export as absolute-note instrument variants', async () => {
+    // puggs_in_space: C-0 noise notes with fixed-note arp macros; lagtrain: arps that run past either end of
+    // gb.cpp noiseTable (NR43 0x00). Each such note gets a variant whose table holds the exact hUGE noise notes.
+    for (const name of ['puggs_in_space.fur', 'lagtrain.fur']) {
+      const fur = readFileSync(join(ROOT, `public/data/songs/furnace/gameboy/${name}`));
+      const lossy = furnaceToHuge(await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length))).lossy;
+      expect(lossy.filter((l) => l.includes('note outside') || l.includes('fixed-note arpeggio'))).toEqual([]);
+    }
+  });
 });

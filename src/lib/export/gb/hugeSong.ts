@@ -49,6 +49,24 @@ const NOISE_SHORT = 1000;
 const VOL_STEP = 2000;
 /** A start-volume variant of a macro-less duty instrument also carries the channel's duty: + DUTY_STEP * (duty + 1). */
 const DUTY_STEP = 40000;
+/** Noise instrument variant for one Furnace note (key + NOTE_STEP * (note + 1)): its table holds absolute noise targets. */
+const NOTE_STEP = 200000;
+/** Row note of a noise note variant: table notes 36 + (A - 31) reach every get_note_poly input A in -4..63. */
+const NOISE_ABS_ROW = 31;
+
+/** gb.cpp noise: baseFreq = calcArp(note, arp, 24) clamped to 0..255, NR43 = noiseTable[clamp(baseFreq - 60)]. Returns the
+ * get_note_poly input A with get_note_poly(A) = that NR43 (noiseTable[A + 5] for A in -4..63; entries 0 and 68+ are 0x00). */
+function noisePolyNote(nv: number, a: number): number {
+  const fixed = (a < 0) !== !!(a & 0x40000000);
+  const bf = Math.max(0, Math.min(255, fixed ? (a < 0 ? a | 0x40000000 : a & ~0x40000000) + 84 : nv + 60 + a));
+  const nt = bf - 60;
+  return nt <= 0 || nt >= 68 ? 63 : nt - 5;
+}
+
+/** True when the plain relative arp table plays this noise note wrong (fixed step, or a step past either table end). */
+function noiseNeedsAbs(arp: FurnaceMacro, nv: number): boolean {
+  return arp.data.slice(0, arp.length).some((a) => noisePolyNote(nv, a) !== nv - 5 + a);
+}
 const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PAN = 12;
 const MACRO_NAMES: Record<number, string> = { 4: 'pitch', 5: 'ex1', 6: 'ex2', 7: 'ex3', 13: 'pan right', 14: 'phase reset' };
 const FX_NAMES: Record<number, string> = { 0x08: 'panning', 0x10: 'wave select', 0x11: 'noise length', 0x13: 'sweep time', 0x14: 'sweep direction', 0xe1: 'note slide up', 0xe2: 'note slide down', 0xe5: 'finetune', 0xff: 'stop song' };
@@ -72,7 +90,7 @@ function macro(ins: FurnaceInstrument, code: number): FurnaceMacro | undefined {
 }
 
 /** Per-tick table (arp in the note column, volume or duty in the effect column), max 32 rows. */
-function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy, waveNo: (w: number) => number, synth?: number[]): number[] | undefined {
+function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy, waveNo: (w: number) => number, synth?: number[], noiseNote?: number): number[] | undefined {
   const arp = macro(ins, MACRO_ARP);
   const vol = kind === 'wave' ? undefined : macro(ins, MACRO_VOL);
   const duty = kind === 'duty' ? macro(ins, MACRO_DUTY) : undefined;
@@ -165,7 +183,8 @@ function buildTable(ins: FurnaceInstrument, kind: Kind, lossy: Lossy, waveNo: (w
     if (arp) {
       const a = at(arpRows, i);
       // Furnace calcArp: fixed when bit 30 differs from the sign bit
-      if ((a < 0) !== !!(a & 0x40000000)) { lossy.add('fixed-note arpeggio macro'); } else note = Math.max(0, Math.min(71, 36 + (a | 0)));
+      if (noiseNote !== undefined) note = 36 + noisePolyNote(noiseNote, a) - NOISE_ABS_ROW;
+      else if ((a < 0) !== !!(a & 0x40000000)) { lossy.add('fixed-note arpeggio macro'); } else note = Math.max(0, Math.min(71, 36 + (a | 0)));
     }
     let effect = 0;
     if (fx && (!extra || looped)) {
@@ -367,7 +386,7 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
         const kind = KIND[ch];
         for (let r = 0; r < ROWS; r++) {
           const cell = r < rows ? cellAt(ch, o, c0 + r) : undefined;
-          let note = NO_NOTE, instr = 0, effect = -1, baseKey = -1, plainRepeat = false;
+          let note = NO_NOTE, instr = 0, effect = -1, baseKey = -1, plainRepeat = false, noiseAbs = -1;
           if (cell) {
             const nv = convertFurnaceNoteValue(cell);
             if (nv === 253 || nv === 254) effect = 0xe00; // note off / release -> note cut now
@@ -375,9 +394,15 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
             else if (nv >= 0) {
               // Noise: gb.cpp NR43 = noiseTable[note - 60] and hUGE get_note_poly(n) equals noiseTable[n + 5],
               // so the noise note sits 19 semitones above the tone mapping.
-              const hn = nv - NOTE_OFFSET + (kind === 'noise' ? 19 : 0);
-              if (hn < 0 || hn > 71) lossy.add('note outside hUGE range C-2..B-7 (clamped)');
-              note = Math.max(0, Math.min(71, hn));
+              let hn = nv - NOTE_OFFSET + (kind === 'noise' ? 19 : 0);
+              // gb.cpp clamps ntPos to 0..255; noiseTable[0] and noiseTable[68..255] are all NR43 0x00 = get_note_poly(63);
+              // hUGE notes 64..71 compute garbage there. A noise arp macro is handled below by a note variant.
+              const arpI = cell.instrument >= 0 ? macro(m.instruments[cell.instrument], MACRO_ARP) : undefined;
+              if (kind === 'noise' && arpI && noiseNeedsAbs(arpI, nv)) { noiseAbs = nv; hn = NOISE_ABS_ROW; }
+              if (kind === 'noise' && (nv === 0 || hn > 63) && !arpI) hn = 63;
+              const top = kind === 'noise' ? 63 : 71;
+              if (hn < 0 || hn > top) lossy.add('note outside hUGE range C-2..B-7 (clamped)');
+              note = Math.max(0, Math.min(top, hn));
             }
             // E1xy / E2xy (playback.cpp): porta to note +- y at speed x*4, the 03xx units -> hUGE 3xx with that note.
             // With a note in the same row Furnace plays the note first and slides on from it; hUGE cannot (one note, one effect).
@@ -398,6 +423,12 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
             if (ci >= 0 && note !== NO_NOTE) {
               const plain = !m.instruments[ci]?.macros.some((x) => x.length > 0);
               baseKey = kind === 'noise' && noiseDuty[ch] ? ci + NOISE_SHORT : ci;
+              if (noiseAbs >= 0) {
+                // The note's arp crosses an end of noiseTable (or is fixed): a variant table carries the absolute targets.
+                const nk = baseKey + NOTE_STEP * (noiseAbs + 1);
+                if (insMap.noise.has(nk) || variants.noise < room.noise) baseKey = nk;
+                else { lossy.add('noise arpeggio past the noise table (no free instrument slot)'); note = Math.max(0, Math.min(63, noiseAbs - 5)); }
+              }
               plainRepeat = kind === 'duty' && plain && ci === lastIns[ch];
               if (kind === 'duty' && macro(m.instruments[ci], MACRO_DUTY)) dutyNow[ch] = -1;
               instr = plainRepeat ? 0 : insNo(kind, baseKey);
@@ -479,7 +510,7 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
       const { len, enable } = lengthBits(ins);
       const high = 0x80 | (enable ? 0x40 : 0);
       const synth = kind === 'wave' ? waveSynthFrames(ins, m.wavetables, lossy)?.map((f) => waveSlot(packWave(f, invert))) : undefined;
-      const table = buildTable(ins, kind, lossy, waveNo, synth);
+      const table = buildTable(ins, kind, lossy, waveNo, synth, key >= NOTE_STEP ? Math.floor(key / NOTE_STEP) - 1 : undefined);
       if (table) tableRefs.push({ kind, slot: hi - 1, table: tables.push(table) - 1 });
       const duty0 = key >= DUTY_STEP ? Math.floor(key / DUTY_STEP) - 1 : macro(ins, MACRO_DUTY)?.data[0] ?? 2;
       if (kind === 'duty') instrBytes.duty[hi - 1] = [0x00, ((duty0 & 3) << 6) | len, startVol >= 0 ? (startVol << 4) | (envelope(ins, lossy) & 15) : envelope(ins, lossy), 0, 0, high];
