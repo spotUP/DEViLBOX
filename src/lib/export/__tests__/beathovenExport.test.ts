@@ -81,7 +81,7 @@ describe('Beathoven native export: beathoven_smallest.bss', () => {
     })));
   }, 240000);
 
-  it('refuses a note on an empty row, a removed note, an instrument and a volume edit, writing nothing', async () => {
+  it('refuses a note on an empty row, a note off, an instrument and a volume edit, writing nothing', async () => {
     const { raw, song } = await load();
     const find = (voice: number, pred: (c: { note: number }) => boolean): { rows: TrackerSong['patterns'][0]['channels'][0]['rows']; at: number } => {
       for (const p of song.patterns) {
@@ -93,7 +93,7 @@ describe('Beathoven native export: beathoven_smallest.bss', () => {
     const empty = find(0, (c) => c.note === 0);
     empty.rows[empty.at].note = 40;
     const played = find(1, (c) => c.note > 0 && c.note < 97);
-    played.rows[played.at].note = 0;
+    played.rows[played.at].note = 97;
     const other = find(3, (c) => c.note > 0);
     (other.rows[other.at] as { instrument: number }).instrument += 1;
     song.patterns[0].channels[2].rows[0].volume = 30;
@@ -101,5 +101,30 @@ describe('Beathoven native export: beathoven_smallest.bss', () => {
     expect(res.warnings.length).toBeGreaterThanOrEqual(4);
     expect(res.warnings.join('\n')).toMatch(/not written/);
     expect(Array.from(res.data)).toEqual(Array.from(raw));
+  }, 240000);
+
+  it('writes a removed note as the legacy Rest command: same four bytes, the row reads back empty', async () => {
+    const { raw, song } = await load();
+    // a plain note command (not the legacy arpeggio, whose note word is not the command word)
+    const grid = buildBthGrid(raw);
+    if (typeof grid === 'string') throw new Error(grid);
+    let hit: { rows: TrackerSong['patterns'][0]['channels'][0]['rows']; at: number } | undefined;
+    grid.rowSources.forEach((pat, pi) => pat.forEach((voice, c) => voice.forEach((src, r) => {
+      if (!hit && src && src.noteOffset === src.offset) hit = { rows: song.patterns[pi].channels[c].rows, at: r };
+    })));
+    if (!hit) throw new Error('no plain note in the file');
+    hit.rows[hit.at].note = 0;
+    const res = await exportOf(song);
+    const changed = diffAt(raw, res.data);
+    expect(res.data.length).toBe(raw.length);
+    expect(res.warnings.join('\n')).toBe('');
+    expect(changed.length).toBeGreaterThanOrEqual(1);
+    expect(changed.length).toBeLessThanOrEqual(2);
+    const word = (at: number): number => (res.data[at] << 8) | res.data[at + 1];
+    expect(word(changed[0] & ~1)).toBe(0x82);
+    const notes = (x: TrackerSong): number => x.patterns.flatMap((p) => p.channels.flatMap((c) => c.rows)).filter((c) => c.note > 0 && c.note < 97).length;
+    const before = notes((await load()).song);
+    const again = await load(res.data);
+    expect(notes(again.song)).toBeLessThan(before); // a stream is shared by every place that plays it
   }, 240000);
 });
