@@ -112,9 +112,9 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
     <div className={`flex items-center gap-1.5 px-2 bg-ft2-header border-b border-ft2-border font-mono text-xs h-9 ${recordMode ? 'ring-1 ring-inset ring-red-500/60' : ''}`}>
       {/* GT-specific file ops */}
       <button onClick={handleSave} className={BTN_DEFAULT} title="Save .sng">Save</button>
-      <button onClick={handleExportPrg} className={BTN_DEFAULT} title="Export C64 .prg">PRG</button>
-      <button onClick={handleExportSid} className={BTN_DEFAULT} title="Export .sid">SID</button>
-      <button onClick={handleExportBin} className={BTN_DEFAULT} title="Export raw binary (no load address header)">Raw Binary</button>
+      <button onClick={handleExportPrg} className={BTN_DEFAULT} title="Export a C64 program (.prg): load address header plus player and song">Export Program</button>
+      <button onClick={handleExportSid} className={BTN_DEFAULT} title="Export a SID music file (.sid) for SID players and emulators">Export SID</button>
+      <button onClick={handleExportBin} className={BTN_DEFAULT} title="Export raw binary: same data as the program export without the load address header">Export Raw Binary</button>
       <label className="text-ft2-textDim" title="Player load address in hex, page aligned, at least 0400, not overlapping D000-DFFF">
         Load Address $
         <input value={loadAddressText} onChange={(e) => setLoadAddressText(e.target.value)} maxLength={4} className={`${SEL} w-12 ml-0.5`} />
@@ -130,18 +130,18 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
       <button
         onClick={() => setRecordMode(!recordMode)}
         className={`${BTN} border-transparent font-bold ${recordMode ? 'bg-red-500 text-text-primary' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}
-        title="Record mode (edit pattern)"
+        title="Record mode: typed notes and digits edit the pattern (Esc toggles)"
       >
-        REC
+        Record
       </button>
 
       {/* Jam */}
       <button
         onClick={() => setJamMode(!jamMode)}
         className={`${BTN} ${jamMode ? 'bg-amber-600/30 text-amber-400 border-amber-500/50' : BTN_DEFAULT}`}
-        title="Jam mode"
+        title="Jam mode: play notes on the keyboard without editing the pattern"
       >
-        JAM
+        Jam
       </button>
 
       <div className="w-px h-5 bg-ft2-border mx-0.5" />
@@ -162,30 +162,30 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
 
       {/* Song selector */}
       <label className="flex items-center gap-1 text-ft2-textDim" title="Song/subtune (0-31)">
-        Song:
+        Subtune:
         <CustomSelect value={String(currentSong)} onChange={(v) => setCurrentSong(Number(v))} className={SEL}
           options={Array.from({ length: 32 }, (_, i) => ({ value: String(i), label: String(i) }))}
         />
       </label>
 
       {/* Octave */}
-      <label className="flex items-center gap-1 text-ft2-textDim" title="Octave (F9/F10)">
-        Oct:
+      <label className="flex items-center gap-1 text-ft2-textDim" title="Octave (F9 lower, F10 higher)">
+        Octave:
         <CustomSelect value={String(currentOctave)} onChange={(v) => setCurrentOctave(Number(v))} className={SEL}
           options={Array.from({ length: 8 }, (_, i) => ({ value: String(i), label: String(i) }))}
         />
       </label>
 
       {/* Edit step */}
-      <label className="flex items-center gap-1 text-ft2-textDim" title="Edit step (rows to advance)">
-        Stp:
+      <label className="flex items-center gap-1 text-ft2-textDim" title="Edit step: rows the cursor advances after entering a note (F5-F8 set 0, 1, 2, 4)">
+        Edit Step:
         <CustomSelect value={String(editStep)} onChange={(v) => setEditStep(Number(v))} className={SEL}
           options={Array.from({ length: 17 }, (_, i) => ({ value: String(i), label: String(i) }))}
         />
       </label>
 
       {/* Pattern length */}
-      <span className="text-ft2-textDim" title="Pattern length">Len:{patternLength}</span>
+      <span className="text-ft2-textDim" title="Pattern length in rows (Shift+O shrinks, Shift+P expands)">Length:{patternLength}</span>
 
       <div className="w-px h-5 bg-ft2-border mx-0.5" />
 

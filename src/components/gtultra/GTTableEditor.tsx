@@ -28,8 +28,8 @@ const TABLE_COLORS: Record<TableType, string> = {
 
 // Wave table left-column special value annotations
 const WAVE_LEFT_ANNOTATIONS: Record<number, string> = {
-  0x00: 'nop', 0x01: 'set', 0x10: 'del+gateoff', 0x11: 'del+gateon',
-  0xE0: 'inaudible', 0xE1: 'noise+', 0xFE: 'rst', 0xFF: 'end',
+  0x00: 'no change', 0x01: 'set waveform', 0x10: 'delay, gate off', 0x11: 'delay, gate on',
+  0xE0: 'inaudible', 0xE1: 'noise plus', 0xFE: 'restart', 0xFF: 'end',
 };
 
 const ROW_H = 14;
@@ -75,14 +75,14 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
     ctx.fillStyle = 'var(--color-bg-tertiary)';
     ctx.fillRect(0, 0, width, headerHeight);
     ctx.fillStyle = '#888';
-    ctx.fillText(' IDX', 4, 2);
+    ctx.fillText(' Index', 4, 2);
     ctx.fillStyle = activeCol === 0 ? '#e0e0e0' : '#555';
-    ctx.fillText('LEFT', 40, 2);
+    ctx.fillText('Left', 40, 2);
     ctx.fillStyle = activeCol === 1 ? '#e0e0e0' : '#555';
-    ctx.fillText('RIGHT', 80, 2);
+    ctx.fillText('Right', 80, 2);
     if (activeTable === 'wave') {
       ctx.fillStyle = '#444';
-      ctx.fillText('INFO', 126, 2);
+      ctx.fillText('Info', 126, 2);
     }
 
     const scrollTop = Math.max(0, tableCursor - Math.floor(visibleRows / 2));

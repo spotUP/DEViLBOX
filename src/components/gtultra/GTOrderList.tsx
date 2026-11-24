@@ -56,7 +56,7 @@ export const GTOrderList: React.FC<{
     ctx.fillStyle = 'var(--color-bg-tertiary)';
     ctx.fillRect(0, 0, width, HEADER_H - 2);
     ctx.fillStyle = '#888';
-    ctx.fillText('ORD', 4, 3);
+    ctx.fillText('Order', 4, 3);
     const colW = Math.floor((width - 30) / channelCount);
     for (let ch = 0; ch < channelCount; ch++) {
       ctx.fillStyle = ch === channelCol ? '#e0e0e0' : '#555';
@@ -96,7 +96,7 @@ export const GTOrderList: React.FC<{
 
         if (val === 0xFF) {
           ctx.fillStyle = '#e94560';
-          ctx.fillText('EN', x, y + 2);
+          ctx.fillText('End', x, y + 2);
         } else if (val >= 0xD0 && val <= 0xDF) {
           ctx.fillStyle = '#ffcc00';
           ctx.fillText(`R${(val & 0x0F).toString(16).toUpperCase()}`, x, y + 2);

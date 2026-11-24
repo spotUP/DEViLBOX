@@ -94,7 +94,7 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-        <span style={{ color: 'var(--color-text-muted)', fontWeight: 'bold', marginRight: 8, fontSize: 10 }}>INSTRUMENT</span>
+        <span style={{ color: 'var(--color-text-muted)', fontWeight: 'bold', marginRight: 8, fontSize: 10 }}>Instrument</span>
         <CustomSelect
           value={String(currentInstrument)}
           onChange={(v) => setCurrentInstrument(Number(v))}
@@ -124,13 +124,13 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
       />
 
       {/* ADSR knobs */}
-      <div style={{ color: 'var(--color-text-muted)', fontWeight: 'bold', fontSize: 10, marginBottom: 2 }}>ENVELOPE</div>
+      <div style={{ color: 'var(--color-text-muted)', fontWeight: 'bold', fontSize: 10, marginBottom: 2 }}>Envelope</div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
         {[
-          { label: 'ATK', value: atk, param: 'atk' as const },
-          { label: 'DEC', value: dec, param: 'dec' as const },
-          { label: 'SUS', value: sus, param: 'sus' as const },
-          { label: 'REL', value: rel, param: 'rel' as const },
+          { label: 'Attack', value: atk, param: 'atk' as const },
+          { label: 'Decay', value: dec, param: 'dec' as const },
+          { label: 'Sustain', value: sus, param: 'sus' as const },
+          { label: 'Release', value: rel, param: 'rel' as const },
         ].map(({ label, value, param }) => (
           <div key={param} style={{ textAlign: 'center' }}>
             <div style={{ color: 'var(--color-text-muted)', fontSize: 9 }}>{label}</div>
@@ -143,7 +143,7 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px 12px', marginBottom: 4 }}>
         {/* Row 1: Section headers */}
         <div style={{ gridColumn: '1 / 3', color: 'var(--color-text-muted)', fontWeight: 'bold', fontSize: 10 }}>TABLE POINTERS</div>
-        <div style={{ gridColumn: '3 / 5', color: 'var(--color-text-muted)', fontWeight: 'bold', fontSize: 10 }}>SETTINGS</div>
+        <div style={{ gridColumn: '3 / 5', color: 'var(--color-text-muted)', fontWeight: 'bold', fontSize: 10 }}>Settings</div>
 
         {/* Row 2 */}
         <div style={{ display: 'flex', alignItems: 'center', height: 20 }}>
@@ -155,7 +155,7 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
           <HexInput value={instr?.pulsePtr ?? 0} max={255} onChange={(v) => setTablePtr(1, v)} color="#ffcc00" />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', height: 20 }}>
-          <span style={{ color: 'var(--color-text-muted)', fontSize: 10, marginRight: 4 }}>VibDly</span>
+          <span style={{ color: 'var(--color-text-muted)', fontSize: 10, marginRight: 4 }}>Vibrato Delay</span>
           <span style={{ background: 'var(--color-bg-secondary)', color: '#60e060', border: '1px solid var(--color-border)', padding: '1px 4px', width: 36, textAlign: 'center', fontSize: 11 }}>
             {(instr?.vibdelay ?? 0).toString(16).toUpperCase().padStart(2, '0')}
           </span>
