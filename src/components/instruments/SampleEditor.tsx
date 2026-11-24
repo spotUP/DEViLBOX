@@ -1780,14 +1780,15 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
             <div className="w-px h-6 bg-dark-border mx-1" />
 
             {/* Export */}
-            <button
+            <Button
+              variant="primary"
+              size="sm"
               onClick={doExportWav}
               title="Export the sample as a WAV file to your disk"
-              className="flex items-center gap-1 px-2 h-7 rounded border border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary text-[10px] font-mono"
+              icon={<Download size={13} />}
             >
-              <Download size={13} />
               Export WAV
-            </button>
+            </Button>
           </div>
 
           {/* ─── Parameters Panel ────────────────────────────────── */}
