@@ -681,4 +681,10 @@ describe('furnaceToMds', () => {
     expect(on.lossy.filter((l) => /^effect EA/.test(l))).toEqual([]);
     expect(on.s).toBeGreaterThan(off.s);
   });
+  it('01xx/02xx slide past the driver key range: down to key 0 (below 16 Hz, inaudible) is not lossy, up past the top key still is', async () => {
+    const down = await convert('golden_shit.fur'); // FM1 kick 02 c0 runs below key 0
+    expect(down.lossy.filter((l) => l.includes('driver key range') || l.includes('driver top key'))).toEqual([]);
+    const up = await convert('Kobito_of_the_Shining_Needle.fur');
+    expect(up.lossy.some((l) => l.startsWith('01xx/02xx past the driver top key'))).toBe(true);
+  });
 });

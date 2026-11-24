@@ -1164,7 +1164,8 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
           const lim = pLimit();
           poff += prate * c.ticks[i] * fpt;
           if (prate > 0 ? poff >= lim : poff <= lim) {
-            if (lim !== (prate > 0 ? 119 - curNv : -(curNv + 60)) * 128) lossy.add('01xx/02xx past the driver key range (held at the end key)');
+            // Down: the driver's key 0 is Furnace note 60 (C-0, ~16 Hz), Furnace goes on to note 0 (~0.5 Hz): both inaudible, so only an up slide is lossy.
+            if (prate > 0 && lim !== (119 - curNv) * 128) lossy.add('01xx/02xx past the driver top key (held at the end key)');
             poff = lim; if (m.compatFlags.targetResetsSlides) prate = 0;
           }
         }
