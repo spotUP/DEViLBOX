@@ -55,4 +55,18 @@ describe('hUGEDriver Game Boy export', () => {
     expect(cell(0x35) && cell(0x3d)).toBe(true);
     expect(b.join(',')).toContain('192,121,224,16,201'); // routine: ret nz; ld a,c; ldh [$10],a; ret
   });
+
+  it('lagtrain.fur: a note with a volume beside an effect carries the volume in an instrument variant', async () => {
+    const fur = readFileSync(join(ROOT, 'public/data/songs/furnace/gameboy/lagtrain.fur'));
+    const m = await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
+    // Drop every other volume column so only the cell below can raise the item.
+    for (const p of m.patterns.values()) for (const r of p.rows) r.volume = -1;
+    // A fresh note + instrument + volume + effect cell on the noise channel (instrument 0 has no volume macro here).
+    const rows = m.patterns.get(`0_3_${m.subsongs[0].orders[3][0]}`)!.rows;
+    const noMacro = m.instruments.findIndex((i) => !i.macros.some((x) => x.code === 0 && x.length > 0));
+    Object.assign(rows[1], { note: 5, octave: 4, instrument: noMacro, volume: 7, effects: [{ type: 0x0f, value: 3 }] });
+    const song = furnaceToHuge(m);
+    expect(song.lossy.filter((l) => l.startsWith('volume column beside an effect'))).toEqual([]);
+    expect(song.lossy.filter((l) => l.includes('instrument repeat'))).toEqual([]);
+  });
 });

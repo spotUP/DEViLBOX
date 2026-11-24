@@ -45,6 +45,8 @@ const BASE = HUGE_SONG_BASE;
 const NOTE_OFFSET = 24;
 const VBLANK_HZ = 59.7275;
 const NOISE_SHORT = 1000;
+/** Start-volume instrument variants: key = Furnace index + NOISE_SHORT (short noise) + VOL_STEP * (volume + 1). */
+const VOL_STEP = 2000;
 const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PAN = 12;
 const MACRO_NAMES: Record<number, string> = { 4: 'pitch', 5: 'ex1', 6: 'ex2', 7: 'ex3', 13: 'pan right', 14: 'phase reset' };
 const FX_NAMES: Record<number, string> = { 0x08: 'panning', 0x10: 'wave select', 0x11: 'noise length', 0x13: 'sweep time', 0x14: 'sweep direction', 0xe1: 'note slide up', 0xe2: 'note slide down', 0xe5: 'finetune', 0xff: 'stop song' };
@@ -347,7 +349,7 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
         const kind = KIND[ch];
         for (let r = 0; r < ROWS; r++) {
           const cell = r < rows ? cellAt(ch, o, c0 + r) : undefined;
-          let note = NO_NOTE, instr = 0, effect = -1;
+          let note = NO_NOTE, instr = 0, effect = -1, baseKey = -1, plainRepeat = false;
           if (cell) {
             const nv = convertFurnaceNoteValue(cell);
             if (nv === 253 || nv === 254) effect = 0xe00; // note off / release -> note cut now
@@ -377,7 +379,9 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
             }
             if (ci >= 0 && note !== NO_NOTE) {
               const plain = !m.instruments[ci]?.macros.some((x) => x.length > 0);
-              instr = kind === 'duty' && plain && ci === lastIns[ch] ? 0 : insNo(kind, kind === 'noise' && noiseDuty[ch] ? ci + NOISE_SHORT : ci);
+              baseKey = kind === 'noise' && noiseDuty[ch] ? ci + NOISE_SHORT : ci;
+              plainRepeat = kind === 'duty' && plain && ci === lastIns[ch];
+              instr = plainRepeat ? 0 : insNo(kind, baseKey);
               lastIns[ch] = ci;
             }
             const fxs = cell.effects.filter((e) => e.type >= 0 && e !== slide);
@@ -397,7 +401,12 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
             }
             if (cell.volume >= 0) {
               if (effect < 0) effect = 0xc00 | (kind === 'wave' ? waveVol(cell.volume & 15) : cell.volume & 15);
-              else lossy.add('volume column beside an effect');
+              else if (baseKey >= 0 && !macro(m.instruments[ci], MACRO_VOL) && (effect & 0xf00) !== 0x300) {
+                // A note's volume rides in a start-volume variant of its instrument, which frees the Cxy slot for the effect.
+                // A repeat of a macro-less duty instrument kept Furnace's 12xx duty; the reload resets it.
+                if (plainRepeat) lossy.add('volume column beside an effect on an instrument repeat (duty reset)');
+                instr = insNo(kind, baseKey + VOL_STEP * ((kind === 'wave' ? waveVol(cell.volume & 15) : cell.volume & 15) + 1));
+              } else lossy.add('volume column beside an effect');
             }
             // A pan in a busy cell moves to a free slot of the row as a channel-pair pan (driver fx_set_pan param bit 7).
             if (pan >= 0) { if (effect < 0) effect = pan; else spill.push({ r, ch, lr: (pan & 0x10 ? 2 : 0) | (pan & 1) }); }
@@ -440,7 +449,8 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
   const tableRefs: Array<{ kind: Kind; slot: number; table: number }> = [];
   for (const kind of ['duty', 'wave', 'noise'] as Kind[]) {
     for (const [key, hi] of insMap[kind]) {
-      const fi = key % NOISE_SHORT, short = key >= NOISE_SHORT;
+      const fi = key % NOISE_SHORT, short = key % VOL_STEP >= NOISE_SHORT;
+      const startVol = key >= VOL_STEP ? Math.floor(key / VOL_STEP) - 1 : -1;
       const ins = m.instruments[fi];
       if (!ins) continue;
       const { len, enable } = lengthBits(ins);
@@ -449,9 +459,9 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
       const table = buildTable(ins, kind, lossy, waveNo, synth);
       if (table) tableRefs.push({ kind, slot: hi - 1, table: tables.push(table) - 1 });
       const duty0 = macro(ins, MACRO_DUTY)?.data[0] ?? 2;
-      if (kind === 'duty') instrBytes.duty[hi - 1] = [0x00, ((duty0 & 3) << 6) | len, envelope(ins, lossy), 0, 0, high];
-      else if (kind === 'wave') instrBytes.wave[hi - 1] = [len, 0x20, synth?.[0] ?? waveNo(macro(ins, MACRO_WAVE)?.data[0] ?? 0), 0, 0, high];
-      else instrBytes.noise[hi - 1] = [envelope(ins, lossy), 0, 0, (short ? 0x80 : 0) | (enable ? 0x40 : 0) | (len & 0x3f), 0, 0];
+      if (kind === 'duty') instrBytes.duty[hi - 1] = [0x00, ((duty0 & 3) << 6) | len, startVol >= 0 ? (startVol << 4) | (envelope(ins, lossy) & 15) : envelope(ins, lossy), 0, 0, high];
+      else if (kind === 'wave') instrBytes.wave[hi - 1] = [len, startVol < 0 ? 0x20 : startVol >= 10 ? 0x20 : startVol >= 5 ? 0x40 : startVol > 0 ? 0x60 : 0, synth?.[0] ?? waveNo(macro(ins, MACRO_WAVE)?.data[0] ?? 0), 0, 0, high];
+      else instrBytes.noise[hi - 1] = [startVol >= 0 ? (startVol << 4) | (envelope(ins, lossy) & 15) : envelope(ins, lossy), 0, 0, (short ? 0x80 : 0) | (enable ? 0x40 : 0) | (len & 0x3f), 0, 0];
     }
   }
 
