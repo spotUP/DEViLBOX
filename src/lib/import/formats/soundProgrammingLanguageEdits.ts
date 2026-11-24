@@ -8,7 +8,7 @@
  * with the bytes of another instrument's record (same length, no relocations inside), and only when every note the record
  * covers is changed to that instrument and still reads back at the same pitch. A stream
  * run is shared by every place that calls it, so an edit shows wherever the run plays. Edits the stream cannot hold
- * at its length - a note on a row without one splits the held note ahead of it (addNote, using the 0xF4 padding after it), a note removed, length or volume / effect changes - are refused with a
+ * at its length - a note on a row without one splits the held note ahead of it (addNote, using the 0xF4 padding after it), a note removed when it and the note before it each carry their own length byte (their lengths merge into the held note, 0xF4 fills the freed byte), length or volume / effect changes, note off - are refused with a
  * warning and nothing is written for them. After patching the grid is decoded again: every edited cell must read back
  * as edited and every cell that does not share an edited byte must be unchanged, otherwise the edit is taken out again.
  */
@@ -130,6 +130,20 @@ export function applySplGridEdits(original: Uint8Array, patterns: readonly Patte
     const src = base.rowSources[pi]?.[c]?.[r];
     if (!src || was.note < 1 || was.note >= NOTE_OFF) {
       warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one would change the length of the stream; the edit was not written.`);
+      return;
+    }
+    if (cell.note === 0) {
+      // [Ca][A][Cb][B] -> [C(a+b)][A][Cb][F4]: the held note A absorbs B's length, Cb stays in force for the notes after B
+      let prev: NonNullable<typeof src> | null = null;
+      for (let t = pi * ROWS_PER_PATTERN + r - 1; t >= 0 && !prev; t--) prev = base.rowSources[Math.floor(t / ROWS_PER_PATTERN)]?.[c]?.[t % ROWS_PER_PATTERN] ?? null;
+      const isLen = (o: number): boolean => original[o] >= 0xc0 && original[o] <= 0xef;
+      if (!prev || prev.length !== 1 || src.length !== 1 || prev.stream !== src.stream || prev.offset + 2 !== src.offset || !isLen(prev.offset - 1) || !isLen(src.offset - 1)
+        || original[prev.offset - 1] - 0xc0 + original[src.offset - 1] - 0xc0 > 0x2f || claimed.has(src.offset)) {
+        warnings.push(`${PREFIX} ${where(at)}: a note can only be removed when the note before it directly precedes it in the stream, both have their own length byte and the lengths add up to at most 47; the edit was not written.`);
+        return;
+      }
+      claimed.set(src.offset, 0xf4);
+      accepted.push({ ...at, note: 0, at: src.offset, byte: 0xf4, fx: cellEffects(cell), fxPatches: [[prev.offset - 1, original[prev.offset - 1] + original[src.offset - 1] - 0xc0]] });
       return;
     }
     if (cell.note < 1 || cell.note >= NOTE_OFF) {

@@ -10,7 +10,7 @@
  * addresses and Call/Jump address longs at or after the cut are raised by 2. Written only if the reloaded song has the same
  * tick length, the cell reads back as the note and nothing else changed (repeats of the stream show the note too).
  * A stream run by several voices or loops is shared by every place that plays it. Edits the stream cannot hold at its
- * length - a note removed or turned into a note off, the volume and effect columns (not stored per row) - are refused
+ * length - a note turned into a note off, a removal that is not [A][la][B][lb] back to back, the volume and effect columns (not stored per row) - are refused
  * with a warning and nothing is written for them. An instrument edit rewrites the operand byte of the Instrument command
  * [0x81][number] in force for the note (same length), to an instrument another note of the song already plays; that
  * command sets every note until the next one, so every row it covers must carry the same new instrument or the edit is
@@ -35,7 +35,7 @@ export interface TimFollinEditResult {
 
 interface AddNote { pattern: number; channel: number; row: number; note: number; instrument: number }
 /** A note byte edit, or (instrument set) an Instrument command operand edit. */
-interface Edit { pattern: number; channel: number; row: number; col: number; note: number; instrument?: number; offset: number; value: number }
+interface Edit { pattern: number; channel: number; row: number; col: number; note: number; instrument?: number; offset: number; value: number; /** more same-length byte patches written with this edit (a note removal) */ extra?: Array<[number, number]> }
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
 
@@ -131,6 +131,22 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
         warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one, or changing a rest or note off, would change the length of the stream; the edit was not written.`);
         continue;
       }
+      if (now === 0 && col === 0) {
+        // [A][la][B][lb] -> [A][la+lb][Nop][Nop]: the held note A absorbs the removed note's length (Nop = byte 0, no arguments)
+        let prev: NonNullable<typeof src> | null = null;
+        for (let t = pi * ROWS_PER_PATTERN + r - 1; t >= 0 && !prev; t--) prev = base.rowSources[Math.floor(t / ROWS_PER_PATTERN)]?.[c]?.[t % ROWS_PER_PATTERN] ?? null;
+        const la = prev ? original[prev.offset + 1] : 0;
+        const lb = original[src.offset + 1];
+        if (!prev || prev.length !== 2 || src.length !== 2 || prev.offset + 2 !== src.offset || la + lb > 0xff || la === 0 || lb === 0) {
+          warnings.push(`${PREFIX} ${where(at)}: a note can only be removed when the note before it directly precedes it in the stream, both carry their own length byte and the lengths add up to at most 255; the edit was not written.`);
+          continue;
+        }
+        const other = claimed.get(src.offset);
+        if (other !== undefined) { warnings.push(`${PREFIX} ${where(at)}: another edited row shares a stream byte with this one; this edit was not written.`); continue; }
+        claimed.set(src.offset, 0);
+        accepted.push({ ...at, col, note: 0, offset: src.offset, value: 0, extra: [[src.offset + 1, 0], [prev.offset + 1, la + lb]] });
+        continue;
+      }
       if (now < 1 || now >= NOTE_OFF) {
         warnings.push(`${PREFIX} ${where(at)}: a note cannot be removed or turned into a note off without changing the stream length; the edit was not written.`);
         continue;
@@ -152,7 +168,7 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
 
   const writeAll = (edits: Edit[]): void => {
     data.set(original);
-    for (const e of edits) data[e.offset] = e.value;
+    for (const e of edits) { data[e.offset] = e.value; for (const [o, v] of e.extra ?? []) data[o] = v; }
   };
 
   // cells that share an edited byte legitimately change with it
