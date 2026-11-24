@@ -60,7 +60,7 @@ export const GTOrderList: React.FC<{
     const colW = Math.floor((width - 30) / channelCount);
     for (let ch = 0; ch < channelCount; ch++) {
       ctx.fillStyle = ch === channelCol ? '#e0e0e0' : '#555';
-      ctx.fillText(`CH${ch + 1}`, 30 + ch * colW, 3);
+      ctx.fillText(`Channel ${ch + 1}`, 30 + ch * colW, 3);
     }
 
     const scrollTop = Math.max(0, orderCursor - Math.floor(visibleRows / 2));

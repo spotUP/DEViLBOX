@@ -15,13 +15,13 @@ export const GT_ORDER_MATRIX_COLLAPSED_HEIGHT = 28;
 
 /** Display value of a row past the end of a channel's order list: drawn blank. */
 export const ORDER_PAST_END = 0x1ff;
-/** Display flag on the row after RST: the restart position it jumps to. */
+/** Display flag on the row after Restart: the restart position it jumps to. */
 const ORDER_RESTART = 0x100;
 
 function formatOrderVal(val: number): string {
   if (val === ORDER_PAST_END) return '';
   if (val & ORDER_RESTART) return `>${(val & 0xff).toString(16).toUpperCase().padStart(2, '0')}`;
-  if (val === 0xFF) return 'RST';
+  if (val === 0xFF) return 'Restart';
   if (val >= 0xD0 && val <= 0xDF) return `R${(val & 0x0F).toString(16).toUpperCase()}`;
   if (val >= 0xE0 && val <= 0xEF) return `-${(val & 0x0F).toString(16).toUpperCase()}`;
   if (val >= 0xF0 && val <= 0xFE) return `+${(val & 0x0F).toString(16).toUpperCase()}`;
@@ -30,7 +30,7 @@ function formatOrderVal(val: number): string {
 
 /**
  * A channel's order list as the matrix shows it. GoatTracker ends each list
- * with FF (RST) followed by the restart position; the 256-byte buffer after
+ * with FF (Restart) followed by the restart position; the 256-byte buffer after
  * that is unused. Showing it drew every channel as hundreds of "00" rows -
  * pattern 0 over and over - after a song that has four positions (owner
  * 2026-10-08: "the matrix ... makes no sense"). Rows past the end are blank.
@@ -53,8 +53,8 @@ export function gtOrderDisplayRows(list: ArrayLike<number>): number[] {
 function makeOrderColumn(chIdx: number): ColumnDef {
   return {
     key: 'order',
-    label: `C${chIdx + 1}`,
-    charWidth: 3,
+    label: `Channel ${chIdx + 1}`,
+    charWidth: 9,
     type: 'hex',
     hexDigits: 2,
     color: '#e0e0e0',
@@ -66,8 +66,8 @@ function makeOrderColumn(chIdx: number): ColumnDef {
 
 const ORDER_COLUMN: ColumnDef = {
   key: 'order',
-  label: 'Val',
-  charWidth: 3,
+  label: 'Order',
+  charWidth: 9,
   type: 'hex',
   hexDigits: 2,
   color: '#e0e0e0',
@@ -117,7 +117,7 @@ export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = React.memo(({ width, 
         rows.push({ order: displayRows[ch][row] ?? ORDER_PAST_END });
       }
       channels.push({
-        label: `C${ch + 1}`,
+        label: `Channel ${ch + 1}`,
         patternLength: totalLen,
         rows,
         columns: [col],
@@ -135,7 +135,7 @@ export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = React.memo(({ width, 
 
   return (
     <SongOrderMatrix
-      label="ORDERS"
+      label="Orders"
       width={width}
       height={height}
       formatColumns={formatColumns}
