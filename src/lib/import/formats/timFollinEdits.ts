@@ -10,9 +10,11 @@
  * addresses and Call/Jump address longs at or after the cut are raised by 2. Written only if the reloaded song has the same
  * tick length, the cell reads back as the note and nothing else changed (repeats of the stream show the note too).
  * A stream run by several voices or loops is shared by every place that plays it. Edits the stream cannot hold at its
- * length - a note on a row without one, a note removed or turned into a note off, the instrument, volume and
- * effect columns (instruments are chosen by commands, volume and effects are not stored per row) - are refused with a
- * warning and nothing is written for them. After patching, the grid is decoded again: every edited cell must read back
+ * length - a note removed or turned into a note off, the volume and effect columns (not stored per row) - are refused
+ * with a warning and nothing is written for them. An instrument edit rewrites the operand byte of the Instrument command
+ * [0x81][number] in force for the note (same length), to an instrument another note of the song already plays; that
+ * command sets every note until the next one, so every row it covers must carry the same new instrument or the edit is
+ * refused. After patching, the grid is decoded again: every edited cell must read back
  * as edited and every cell that does not share an edited byte must be unchanged, otherwise the edit is taken out again.
  */
 import type { Pattern, TrackerCell } from '@/types';
@@ -32,7 +34,8 @@ export interface TimFollinEditResult {
 }
 
 interface AddNote { pattern: number; channel: number; row: number; note: number; instrument: number }
-interface Edit { pattern: number; channel: number; row: number; col: number; note: number; offset: number; value: number }
+/** A note byte edit, or (instrument set) an Instrument command operand edit. */
+interface Edit { pattern: number; channel: number; row: number; col: number; note: number; instrument?: number; offset: number; value: number }
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
 
@@ -79,6 +82,17 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
   }
 
   const claimed = new Map<number, number>();
+  // rows (voice:row:col) each Instrument command operand covers, and the instruments the song plays
+  const covered = new Map<number, Array<{ c: number; row: number; col: number }>>();
+  const used = new Set<number>();
+  [base.rowSources, ...base.rowSourcesExtra].forEach((srcs, col) => srcs.forEach((pat, pi) => pat.forEach((voice, c) => voice.forEach((s, r) => {
+    if (!s) return;
+    if (s.instrument > 0) used.add(s.instrument);
+    if (s.instrumentAt < 0) return;
+    const list = covered.get(s.instrumentAt) ?? [];
+    list.push({ c, row: pi * ROWS_PER_PATTERN + r, col });
+    covered.set(s.instrumentAt, list);
+  }))));
   const accepted: Edit[] = [];
   const adds: AddNote[] = [];
 
@@ -87,7 +101,22 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
     if (!was) return;
     const otherChanged = otherFieldsDiffer(cell, was);
     const at = { pattern: pi, channel: c, row: r };
-    if (Array.from({ length: maxNoteColumns([cell, was]) }, (_, col) => col).some((col) => getColumnField(cell, col, 'instrument') !== getColumnField(was, col, 'instrument'))) warnings.push(`${PREFIX} ${where(at)}: the instrument is chosen by an Instrument command shared by many notes; that change was not written.`);
+    for (let col = 0; col < maxNoteColumns([cell, was]); col++) {
+      const want = getColumnField(cell, col, 'instrument') ?? 0;
+      if (want === (getColumnField(was, col, 'instrument') ?? 0)) continue;
+      const src = (col === 0 ? base.rowSources : base.rowSourcesExtra[col - 1])?.[pi]?.[c]?.[r];
+      if (!src) continue; // a new note's instrument is checked by addNote
+      if (src.instrumentAt < 0) { warnings.push(`${PREFIX} ${where(at)}: no Instrument command sets this note's instrument; the instrument was not written.`); continue; }
+      if (!used.has(want)) { warnings.push(`${PREFIX} ${where(at)}: instrument ${want} is not played anywhere in this song; the instrument was not written.`); continue; }
+      const rows = covered.get(src.instrumentAt) ?? [];
+      const unmatched = rows.filter((x) => getColumnField(patterns[Math.floor(x.row / ROWS_PER_PATTERN)]?.channels[x.c]?.rows[x.row % ROWS_PER_PATTERN] ?? cell, x.col, 'instrument') !== want).length;
+      if (unmatched > 0) { warnings.push(`${PREFIX} ${where(at)}: the Instrument command of this note also sets ${unmatched} other note(s); give them all instrument ${want} to write it. The instrument was not written.`); continue; }
+      const value = want - 1;
+      const other = claimed.get(src.instrumentAt);
+      if (other !== undefined && other !== value) { warnings.push(`${PREFIX} ${where(at)}: another edited row shares this Instrument command and wants a different value; this edit was not written.`); continue; }
+      claimed.set(src.instrumentAt, value);
+      accepted.push({ ...at, col, note: noteIn(cell, col), instrument: want, offset: src.instrumentAt, value });
+    }
     if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect columns are not stored per row in this format; that change was not written.`);
     for (let col = 0; col < base.noteCols[c]; col++) {
       const now = noteIn(cell, col);
@@ -130,14 +159,17 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
   const touched = new Set(accepted.map((e) => e.offset));
   const shared = new Set<string>();
   for (const srcs of [base.rowSources, ...base.rowSourcesExtra]) srcs.forEach((pat, pi) => pat.forEach((voice, c) => voice.forEach((s, r) => {
-    if (s && touched.has(s.offset)) shared.add(`${c}:${pi * ROWS_PER_PATTERN + r}`);
+    if (s && (touched.has(s.offset) || touched.has(s.instrumentAt))) shared.add(`${c}:${pi * ROWS_PER_PATTERN + r}`);
   })));
 
   const failing = (edits: Edit[]): Edit[] => {
     writeAll(edits);
     const again = buildTimFollinGrid(data, subsong);
     if (!again || again.rows !== base.rows) return edits;
-    const bad = edits.filter((e) => noteIn(cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row), e.col) !== e.note);
+    const bad = edits.filter((e) => {
+      const now = cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row);
+      return e.instrument !== undefined ? (now ? getColumnField(now, e.col, 'instrument') : undefined) !== e.instrument : noteIn(now, e.col) !== e.note;
+    });
     if (bad.length > 0) return bad;
     for (let c = 0; c < 4; c++) {
       for (let row = 0; row < base.rows; row++) {

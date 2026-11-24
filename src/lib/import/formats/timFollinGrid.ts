@@ -163,7 +163,7 @@ export function timFollinShownNote(noteByte: number): number {
 export interface TfolRegion { offset: number; size: number }
 
 /** The event a row's note was read from. */
-export type TfolRowSource = { region: number; offset: number; length: number; noteByte: number; base: number; tick: number; hold: number; nextBase: number; instrument: number } | null;
+export type TfolRowSource = { region: number; offset: number; length: number; noteByte: number; base: number; tick: number; hold: number; nextBase: number; instrument: number; instrumentAt: number } | null;
 
 export interface TfolGrid {
   patterns: Pattern[];
@@ -194,7 +194,8 @@ export interface TfolGrid {
   links: number[];
 }
 
-interface PlacedNote { tick: number; hold: number; nextBase: number; offset: number; length: number; noteByte: number; base: number; shown: number; instrument: number }
+/** instrumentAt: file offset of the operand byte of the Instrument command in force (-1: none ran). */
+interface PlacedNote { tick: number; hold: number; nextBase: number; offset: number; length: number; noteByte: number; base: number; shown: number; instrument: number; instrumentAt: number }
 
 interface VoiceRun { notes: PlacedNote[]; pass: number; spans: Array<[number, number]>; links: number[] }
 
@@ -205,7 +206,7 @@ function runVoice(b: Uint8Array, m: TfolModuleInfo, stream: number, active: bool
   const stack: number[] = [];
   let pc = stream;
   let noteLength = 0, transpose = 0, skipTranspose = false, portamentoRate = 0, curNote = 0;
-  let loopCount = 0, loopStart = 0, instrument = -1;
+  let loopCount = 0, loopStart = 0, instrument = -1, instrumentAt = -1;
   let tick = 0;
   const seen = new Set<string>();
   let pass = -1;
@@ -227,7 +228,7 @@ function runVoice(b: Uint8Array, m: TfolModuleInfo, stream: number, active: bool
         const length = noteLength !== 0 ? noteLength : ev.args[0] ?? 0;
         run.notes.push({
           tick, hold: length === 0 ? NOTE_COUNTER_ZERO : length, nextBase: transpose, offset: ev.start, length: ev.next - ev.start, noteByte: ev.note, base,
-          shown: timFollinShownNote(note), instrument: instrument + 1,
+          shown: timFollinShownNote(note), instrument: instrument + 1, instrumentAt,
         });
         tick += length === 0 ? NOTE_COUNTER_ZERO : length;
         started = true;
@@ -235,7 +236,7 @@ function runVoice(b: Uint8Array, m: TfolModuleInfo, stream: number, active: bool
       }
       const a = ev.args;
       switch (ev.command) {
-        case Cmd.Instrument: instrument = a[0]; break;
+        case Cmd.Instrument: instrument = a[0]; instrumentAt = ev.next - 1; break;
         case Cmd.Call:
           run.links.push(ev.next - 4);
           if (stack.length >= STACK_PER_VOICE) { stopped = true; break; }
@@ -324,7 +325,7 @@ export function buildTimFollinGrid(b: Uint8Array, subsong = 0): TfolGrid | null 
       count++;
       const cell = grid[v][pl.row];
       const region = regionOf(n.offset);
-      const src = { region, offset: n.offset, length: n.length, noteByte: n.noteByte, base: n.base, tick: n.tick, hold: n.hold, nextBase: n.nextBase, instrument: n.instrument };
+      const src = { region, offset: n.offset, length: n.length, noteByte: n.noteByte, base: n.base, tick: n.tick, hold: n.hold, nextBase: n.nextBase, instrument: n.instrument, instrumentAt: n.instrumentAt };
       if (pl.col === 0) {
         cell.note = n.shown;
         cell.instrument = n.instrument;

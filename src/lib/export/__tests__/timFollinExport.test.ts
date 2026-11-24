@@ -76,6 +76,50 @@ describe('Tim Follin native export: follin_smallest.tf', () => {
     })));
   }, 240000);
 
+  it('writes an instrument edit as the Instrument command operand when every note it covers gets it', async () => {
+    const { raw, song } = await load();
+    const grid = buildTimFollinGrid(raw) as TfolGrid;
+    const covered = new Map<number, Array<[number, number, number]>>();
+    const used = new Set<number>();
+    grid.rowSources.forEach((p, pi) => p.forEach((v, voice) => v.forEach((s, row) => {
+      if (!s) return;
+      used.add(s.instrument);
+      if (s.instrumentAt >= 0) covered.set(s.instrumentAt, [...(covered.get(s.instrumentAt) ?? []), [pi, voice, row]]);
+    })));
+    // the command covering the fewest first-column notes, and only first-column notes
+    const extra = new Set<number>();
+    grid.rowSourcesExtra.forEach((t) => t.forEach((p) => p.forEach((v) => v.forEach((s) => { if (s) extra.add(s.instrumentAt); }))));
+    const commands = [...covered].filter(([o]) => !extra.has(o)).sort((a, b) => a[1].length - b[1].length);
+    const [at, rows] = commands[0];
+    const shared = commands.find(([, r]) => r.length > 1)![1];
+    const was = grid.rowSources[rows[0][0]][rows[0][1]][rows[0][2]]!.instrument;
+    const target = [...used].find((i) => i > 0 && i !== was)!;
+    expect(target).toBeDefined();
+
+    // one row of a command that sets several notes: refused, nothing written
+    const lone = await load();
+    const [sp, sv, sr] = shared[0];
+    const sharedWas = grid.rowSources[sp][sv][sr]!.instrument;
+    lone.song.patterns[sp].channels[sv].rows[sr].instrument = [...used].find((i) => i > 0 && i !== sharedWas)!;
+    const res = await exportOf(lone.song);
+    expect(res.warnings.join('\n')).toMatch(/also sets/);
+    expect(Array.from(res.data)).toEqual(Array.from(raw));
+
+    for (const [pi, voice, row] of rows) song.patterns[pi].channels[voice].rows[row].instrument = target;
+    const edited = await exportOf(song);
+    expect(edited.warnings).toEqual([]);
+    expect(edited.data.length).toBe(raw.length);
+    expect(diffCount(raw, edited.data)).toBe(1);
+    expect(edited.data[at]).toBe(target - 1);
+
+    const key = new Set(rows.map(([pi, v, r]) => `${pi}:${v}:${r}`));
+    const again = await load(edited.data);
+    grid.patterns.forEach((p, i) => p.channels.forEach((ch, c) => ch.rows.forEach((w, r) => {
+      const now = again.song.patterns[i].channels[c].rows[r];
+      expect([now.note, now.instrument]).toEqual([w.note, key.has(`${i}:${c}:${r}`) ? target : w.instrument]);
+    })));
+  }, 240000);
+
   it('refuses a removed note, an instrument and a volume edit, writing nothing', async () => {
     const { raw, song } = await load();
     const rows = song.patterns[0].channels[0].rows;
@@ -83,7 +127,7 @@ describe('Tim Follin native export: follin_smallest.tf', () => {
     expect(played).toBeGreaterThanOrEqual(0);
     rows[played].note = 0;
     const other = song.patterns[0].channels[1].rows.findIndex((c) => c.note > 0);
-    song.patterns[0].channels[1].rows[other].instrument += 1;
+    song.patterns[0].channels[1].rows[other].instrument = 99; // an instrument the song never plays
     song.patterns[0].channels[2].rows[0].volume = 30;
     const res = await exportOf(song);
     expect(res.warnings.length).toBeGreaterThanOrEqual(3);
