@@ -103,6 +103,42 @@ describe('Beathoven native export: beathoven_smallest.bss', () => {
     expect(Array.from(res.data)).toEqual(Array.from(raw));
   }, 240000);
 
+  it.each([
+    FILE,
+    { path: 'public/data/songs/formats/tristar_cracktro.bss', name: 'tristar_cracktro.bss' },
+  ])('writes an instrument edit as the Instrument command record address another command names ($name)', async (file) => {
+    const { applyBeathovenGridEdits } = await import('@lib/import/formats/beathovenEdits');
+    const { raw, song } = await load(undefined, file);
+    const grid = buildBthGrid(raw) as BthGrid;
+    expect(grid.instrumentRecords.length).toBeGreaterThan(1);
+    // the first note whose Instrument command can name another instrument without renumbering the instruments
+    let pick: { pi: number; voice: number; row: number; at: number; to: number } | null = null;
+    grid.rowSources.forEach((p, pi) => p.forEach((v, voice) => v.forEach((s, row) => {
+      if (pick || !s || s.instrumentAt < 0) return;
+      const cur = grid.patterns[pi].channels[voice].rows[row].instrument;
+      for (let to = 1; to <= grid.instrumentRecords.length && !pick; to++) {
+        if (to === cur) continue;
+        const pats = grid.patterns.map((x) => ({ ...x, channels: x.channels.map((c) => ({ ...c, rows: c.rows.map((r) => ({ ...r })) })) }));
+        pats[pi].channels[voice].rows[row].instrument = to;
+        const probe = applyBeathovenGridEdits(raw, pats);
+        if (probe.warnings.length === 0 && probe.patched > 0) pick = { pi, voice, row, at: s.instrumentAt, to };
+      }
+    })));
+    if (!pick) throw new Error('no Instrument command can be re-pointed in this file');
+    const { pi, voice, row, at, to } = pick;
+    song.patterns[pi].channels[voice].rows[row].instrument = to;
+    const res = await exportOf(song);
+    expect(res.warnings.join('\n')).toBe('');
+    expect(res.data.length).toBe(raw.length);
+    const changed = diffAt(raw, res.data);
+    expect(changed.length).toBeGreaterThanOrEqual(1);
+    expect(changed.every((i) => i >= at + 2 && i < at + 6)).toBe(true);
+    const rec = ((res.data[at + 2] << 24) | (res.data[at + 3] << 16) | (res.data[at + 4] << 8) | res.data[at + 5]) >>> 0;
+    expect(rec).toBe(grid.instrumentRecords[to - 1]);
+    const again = await load(res.data, file);
+    expect(again.song.patterns[pi].channels[voice].rows[row].instrument).toBe(to);
+  }, 240000);
+
   it('writes a removed note as the legacy Rest command: same four bytes, the row reads back empty', async () => {
     const { raw, song } = await load();
     // a plain note command (not the legacy arpeggio, whose note word is not the command word)

@@ -91,7 +91,8 @@ export function bthIsExtended(buf: Uint8Array): boolean {
 
 export interface BthStream { offset: number; size: number; broken: boolean }
 /** The event a row's note was read from: the 16-bit note number sits at `noteOffset`, played under `base`. */
-export type BthRowSource = { stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number } | null;
+/** instrumentAt: file offset of the Instrument command [0x80][record address] that chose the note's instrument, -1 when none did. */
+export type BthRowSource = { stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number; instrumentAt: number } | null;
 
 export interface BthGrid {
   patterns: Pattern[];
@@ -100,6 +101,8 @@ export interface BthGrid {
   streams: BthStream[];
   blockRows: TrackerCell[][];
   rowSources: BthRowSource[][][];
+  /** Record address of instrument n + 1 (instruments are numbered in the order their Instrument commands are first read). */
+  instrumentRecords: number[];
   streamAtStart: number[][];
   /** Ticks per row: the exact GCD of every onset gap (plan R4/R7). */
   step: number;
@@ -108,7 +111,7 @@ export interface BthGrid {
   onsets: number[][];
 }
 
-interface Placed { tick: number; note: number; instrument: number; stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number; fx: Array<[number, number]> }
+interface Placed { tick: number; note: number; instrument: number; instrumentAt: number; stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number; fx: Array<[number, number]> }
 
 /** The tracker note a note number shows under `base` (0 when the table holds no period there). */
 export function bthShownNote(buf: Uint8Array, prm: BthParams, num: number, base: number): number {
@@ -166,6 +169,7 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
     const placed: Placed[] = [];
     let row = 0;
     let instrument = 0;
+    let instrumentAt = -1;
     /** Commands read since the last note: they set the voice's state for the next note, so they show on its row. */
     let pending: Array<[number, number]> = [];
     let ei = list.track;
@@ -195,7 +199,7 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
           const fx = pending;
           pending = [];
           if (arpeggio) fx.push([BTH_FX.arpeggio, u16(buf, o + 4)]);
-          placed.push({ tick: row, note: bthShownNote(buf, prm, num, base), instrument, stream: si, offset: o, length: sz, noteOffset: numAt, noteNum: num, base, fx });
+          placed.push({ tick: row, note: bthShownNote(buf, prm, num, base), instrument, instrumentAt, stream: si, offset: o, length: sz, noteOffset: numAt, noteNum: num, base, fx });
           row += len * rowUnit;
         };
         const dur = (v: number): number => (prm.legacy ? (prm.scaled ? (v >> 2) * 5 : v) : v);
@@ -203,6 +207,7 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
           const rec = u32(buf, o + 2);
           if (!instruments.has(rec)) instruments.set(rec, instruments.size + 1);
           instrument = instruments.get(rec) ?? 0;
+          instrumentAt = o;
         } else if (prm.legacy) {
           if (w === 0x81) place(u16(buf, o + 6), o + 6, dur(op), true);
           else if (w === 0x82) { row += dur(op); }
@@ -244,7 +249,7 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
       cell.note = p.note || NOTE_OFF_UNUSED;
       if (p.note > 0) cell.instrument = p.instrument;
       for (const [typ, val] of p.fx) addCellEffect(cell, typ, val);
-      sources[v][row] = { stream: p.stream, offset: p.offset, length: p.length, noteOffset: p.noteOffset, noteNum: p.noteNum, base: p.base };
+      sources[v][row] = { stream: p.stream, offset: p.offset, length: p.length, noteOffset: p.noteOffset, noteNum: p.noteNum, base: p.base, instrumentAt: p.instrumentAt };
       const endRow = Math.min(rows, i + 1 < placed.length ? clock.tickToRow(placed[i + 1].tick).row : rows);
       for (let t = row; t < endRow; t++) streamAtTick[v][t] = p.stream;
     }
@@ -276,5 +281,5 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
     rowSources.push(sources.map((s) => s.slice(start, start + len)));
     streamAtStart.push(streamAtTick.map((s) => s[start]));
   }
-  return { patterns, songPositions, rows, streams, blockRows, rowSources, streamAtStart, step, clock, onsets };
+  return { patterns, songPositions, rows, streams, blockRows, rowSources, instrumentRecords: [...instruments.keys()], streamAtStart, step, clock, onsets };
 }

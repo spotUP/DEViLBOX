@@ -5,8 +5,12 @@
  * player looks the number up in its period table at (number + the entry's note base - origin [+ bias]), so an edited note
  * cell is a same-length patch of that one word, chosen so the table entry lands on the new note under the base in force
  * for the row (recorded per row by the grid). A stream played by several voices or track entries is shared by every
- * place that plays it. A note removed becomes the replayer's Rest command (legacy) or Hold command (extended engine, bthIsExtended), same four bytes. Edits the stream cannot hold at its length - a note on a row without one, a note removed in the basic replayer (no Rest or Hold), a note off, the
- * instrument (chosen by an instrument command), volume and effect columns (not stored per row) - are refused with a
+ * place that plays it. A note removed becomes the replayer's Rest command (legacy) or Hold command (extended engine, bthIsExtended), same four bytes.
+ * An instrument edit rewrites the record address of the Instrument command [0x80][address] that chose the note's
+ * instrument to the address another Instrument command of the module already names (same four bytes); every note that
+ * command reaches changes with it, and an edit that renumbers the instruments (their order of first use) does not read
+ * back and is refused. Edits the stream cannot hold at its length - a note on a row without one, a note removed in the basic replayer (no Rest or Hold), a note off, an
+ * instrument on a note no Instrument command reaches, volume and effect columns (not stored per row) - are refused with a
  * warning and nothing is written for them. After patching, the grid is decoded again: every edited cell must read back
  * as edited and every cell that does not share an edited word must be unchanged, otherwise the edit is taken out again.
  *
@@ -115,7 +119,8 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
   return refuse('no split of the held note reads back as the new note on this row');
 }
 
-interface Edit { pattern: number; channel: number; row: number; note: number; offset: number; value: number }
+/** A same-length patch of `size` bytes (a note word, or an Instrument command's record address when `instrument` is set). */
+interface Edit { pattern: number; channel: number; row: number; note: number; instrument?: number; offset: number; value: number; size: 2 | 4 }
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
 
@@ -166,7 +171,24 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
       adds.push({ ...at, note: cell.note, instrument: cell.instrument });
       return;
     }
-    if (instChanged) warnings.push(`${PREFIX} ${where(at)}: the instrument is chosen by an Instrument command shared by many notes; that change was not written.`);
+    if (instChanged) {
+      const record = base.instrumentRecords[cell.instrument - 1];
+      if (!src || was.note < 1 || was.note >= NOTE_OFF || cell.note < 1 || cell.note >= NOTE_OFF) {
+        warnings.push(`${PREFIX} ${where(at)}: an instrument needs a note on its row; that change was not written.`);
+      } else if (src.instrumentAt < 0) {
+        warnings.push(`${PREFIX} ${where(at)}: no Instrument command chose this note's instrument; that change was not written.`);
+      } else if (record === undefined) {
+        warnings.push(`${PREFIX} ${where(at)}: instrument ${cell.instrument} is not one the module's Instrument commands name; that change was not written.`);
+      } else {
+        const other = claimed.get(src.instrumentAt + 2);
+        if (other !== undefined && other !== record) {
+          warnings.push(`${PREFIX} ${where(at)}: another edited row shares an Instrument command with this one and wants a different instrument; that change was not written.`);
+        } else {
+          claimed.set(src.instrumentAt + 2, record);
+          accepted.push({ ...at, note: cell.note, instrument: cell.instrument, offset: src.instrumentAt + 2, value: record, size: 4 });
+        }
+      }
+    }
     if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect columns are not stored per row in this format; that change was not written.`);
     if (!noteChanged) return;
     if (!src || was.note < 1 || was.note >= NOTE_OFF) {
@@ -181,7 +203,7 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
         return;
       }
       claimed.set(src.offset, restWord);
-      accepted.push({ ...at, note: 0, offset: src.offset, value: restWord });
+      accepted.push({ ...at, note: 0, offset: src.offset, value: restWord, size: 2 });
       return;
     }
     if (cell.note < 1 || cell.note >= NOTE_OFF) {
@@ -199,26 +221,29 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
       return;
     }
     claimed.set(src.noteOffset, value);
-    accepted.push({ ...at, note: cell.note, offset: src.noteOffset, value });
+    accepted.push({ ...at, note: cell.note, offset: src.noteOffset, value, size: 2 });
   })));
 
   const writeAll = (edits: Edit[]): void => {
     data.set(original);
-    for (const e of edits) { data[e.offset] = (e.value >> 8) & 0xff; data[e.offset + 1] = e.value & 0xff; }
+    for (const e of edits) for (let i = 0; i < e.size; i++) data[e.offset + i] = (e.value >>> (8 * (e.size - 1 - i))) & 0xff;
   };
 
   // cells that share an edited word legitimately change with it
   const touched = new Set(accepted.map((e) => e.offset));
   const shared = new Set<string>();
   base.rowSources.forEach((pat, pi) => pat.forEach((voice, c) => voice.forEach((s, r) => {
-    if (s && touched.has(s.noteOffset)) shared.add(`${c}:${pi * ROWS_PER_PATTERN + r}`);
+    if (s && (touched.has(s.noteOffset) || touched.has(s.instrumentAt + 2))) shared.add(`${c}:${pi * ROWS_PER_PATTERN + r}`);
   })));
 
   const failing = (edits: Edit[]): Edit[] => {
     writeAll(edits);
     const again = buildBthGrid(data);
     if (typeof again === 'string' || again.rows !== base.rows) return edits;
-    const bad = edits.filter((e) => cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row)?.note !== e.note);
+    const bad = edits.filter((e) => {
+      const got = cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row);
+      return got?.note !== e.note || (e.instrument !== undefined && got.instrument !== e.instrument);
+    });
     if (bad.length > 0) return bad;
     for (let c = 0; c < VOICES; c++) {
       for (let row = 0; row < base.rows; row++) {
