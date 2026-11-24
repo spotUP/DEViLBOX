@@ -324,6 +324,8 @@ export interface TrackerSong {
   sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>;
   /** Raw PxTone Collage binary for loading into the PxtoneEngine WASM */
   pxtoneFileData?: ArrayBuffer;
+  /** pxtone EVERECORD carrier: 4 int32 per event (clock, unit, kind, value); the grid is derived from it */
+  pxtoneEvents?: Int32Array;
   /** Raw Organya (.org) binary for loading into the OrganyaEngine WASM */
   organyaFileData?: ArrayBuffer;
   /** Raw Sawteeth (.st) binary for loading into the SawteethEngine WASM */
