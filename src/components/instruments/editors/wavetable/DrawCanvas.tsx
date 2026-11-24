@@ -23,6 +23,8 @@ interface DrawCanvasProps {
   height?: number;
   chipTarget?: ChipTarget;
   compareData?: number[] | null;
+  /** The wave as the chip target would play it (already at this canvas's maxValue). */
+  chipPreviewData?: number[] | null;
   showSymmetryOverlay?: boolean;
   showZeroCrossings?: boolean;
   onChange: (data: number[]) => void;
@@ -32,6 +34,7 @@ export const DrawCanvas: React.FC<DrawCanvasProps> = ({
   data, maxValue, height = 220,
   chipTarget,
   compareData,
+  chipPreviewData,
   showSymmetryOverlay = false,
   showZeroCrossings = false,
   onChange,
@@ -198,6 +201,23 @@ export const DrawCanvas: React.FC<DrawCanvasProps> = ({
     });
     ctx.stroke();
 
+    // ── Chip preview: stepped dashed line of what the chip plays ──
+    if (chipPreviewData && chipPreviewData.length > 0) {
+      ctx.strokeStyle = warnColor;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      const pLen = chipPreviewData.length;
+      for (let i = 0; i < pLen; i++) {
+        const y = h - (chipPreviewData[i] / maxValue) * h;
+        const x0 = (i / pLen) * w;
+        if (i === 0) ctx.moveTo(x0, y); else ctx.lineTo(x0, y);
+        ctx.lineTo(((i + 1) / pLen) * w, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
     // ── Nyquist warning: shade samples above Nyquist freq ──
     // If the waveform has a harmonic component above length/2, tint the
     // top-right corner to warn the user.
@@ -214,7 +234,7 @@ export const DrawCanvas: React.FC<DrawCanvasProps> = ({
         ctx.globalAlpha = 1;
       }
     }
-  }, [data, maxValue, length, height, chipTarget, compareData, showSymmetryOverlay, showZeroCrossings]);
+  }, [data, maxValue, length, height, chipTarget, compareData, chipPreviewData, showSymmetryOverlay, showZeroCrossings]);
 
   useEffect(() => {
     drawAll();

@@ -18,11 +18,13 @@ import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react'
 import { Waves, Plus, Trash2, Copy, Wand2, FileUp } from 'lucide-react';
 import { WaveformThumbnail } from '@components/instruments/shared';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { Button } from '@components/ui/Button';
 import {
   StudioToolbar, DrawCanvas, HarmonicPanel, MathPanel, PresetBrowser, LivePanels,
   type StudioMode, type StudioLayout,
   CHIP_TARGETS, detectChipTarget, type ChipTargetId,
-  applyChipTarget, dcRemove, normalize, invert as invertOp, reverse as reverseOp,
+  chipLimitsLabel, fitsChipTarget, snapLength,
+  applyChipTarget, requantize, dcRemove, normalize, invert as invertOp, reverse as reverseOp,
   mirrorLeftToRight, quarterWaveReflect, phaseAlignToPeak,
 } from './wavetable';
 
@@ -147,15 +149,22 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
   const maxValue = wavetable.max ?? 15;
   const length = wavetable.data.length || 32;
   const targetConfig = CHIP_TARGETS[chipTarget];
+  const fitsChip = fitsChipTarget(targetConfig, length, maxValue);
+  // What the chip would play, drawn back at the editor's own scale for the overlay
+  const chipPreview = useMemo(() => {
+    if (fitsChip) return null;
+    const onChip = applyChipTarget(wavetable.data, maxValue, snapLength(targetConfig, length), targetConfig.maxValue);
+    return requantize(onChip.data, onChip.max, maxValue);
+  }, [fitsChip, wavetable.data, maxValue, targetConfig, length]);
 
   // When chip target changes, resample/requantize the wavetable to match.
   const handleChipTargetChange = useCallback(
     (newTargetId: ChipTargetId) => {
       const newTarget = CHIP_TARGETS[newTargetId];
       setChipTarget(newTargetId);
-      // Only transform if the dimensions actually differ
-      if (length === newTarget.defaultLen && maxValue === newTarget.maxValue) return;
-      const result = applyChipTarget(wavetable.data, maxValue, newTarget.defaultLen, newTarget.maxValue);
+      // Only transform if the wave does not already fit
+      if (fitsChipTarget(newTarget, length, maxValue)) return;
+      const result = applyChipTarget(wavetable.data, maxValue, snapLength(newTarget, length), newTarget.maxValue);
       onChange({ ...wavetable, data: result.data, len: result.len, max: result.max });
     },
     [length, maxValue, wavetable, onChange],
@@ -409,6 +418,7 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
             height={height}
             chipTarget={targetConfig}
             compareData={compareBuffer}
+            chipPreviewData={chipPreview}
             onChange={updateData}
           />
 
@@ -453,6 +463,23 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
             <div className="text-text-muted text-[9px]">
               {targetConfig.description}
             </div>
+          </div>
+
+          {/* Chip limits: what the selected chip accepts, and whether this wave fits */}
+          <div className="flex items-center flex-wrap gap-2 px-2 py-1.5 bg-dark-bg rounded border border-dark-border text-[10px] font-mono">
+            <span className="text-text-muted">Chip limit:</span>
+            <span className="text-text-primary">{chipLimitsLabel(targetConfig)}</span>
+            <span className="text-text-muted">This wave: {length} x {maxValue + 1}</span>
+            {fitsChip ? (
+              <span className="text-accent-success">Fits the chip</span>
+            ) : (
+              <>
+                <span className="text-accent-warning">Does not fit: dashed line shows what the chip plays</span>
+                <Button variant="default" size="sm" onClick={() => handleChipTargetChange(chipTarget)}>
+                  Fit to Chip
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mode panel (studio layout only) */}

@@ -33,6 +33,7 @@ export interface ChipTarget {
   lockedLen?: boolean; // disables length controls
   lockedDepth?: boolean; // disables height controls
   bitDepth: number;   // for display
+  signed?: boolean;   // chip reads the stored value as signed (offset by half range)
   description: string;
 }
 
@@ -166,6 +167,7 @@ export const CHIP_TARGETS: Record<ChipTargetId, ChipTarget> = {
     lockedLen: true,
     lockedDepth: true,
     bitDepth: 8,
+    signed: true,
     description: 'Konami SCC: 32 × 8-bit signed (fixed; stored 0-255, 128 is silence)',
   },
   'wonderswan': {
@@ -251,4 +253,17 @@ export function detectChipTarget(length: number, maxValue: number): ChipTargetId
     return 'generic-256x256';
   }
   return 'generic-32x16';
+}
+
+/** Plain-words chip limits, e.g. "32 samples x 16 levels, 4-bit unsigned". */
+export function chipLimitsLabel(target: ChipTarget): string {
+  const len = target.minLen === target.maxLen
+    ? `${target.maxLen} samples`
+    : `${target.minLen}-${target.maxLen} samples${target.lenStep > 1 ? ` (step ${target.lenStep})` : ''}`;
+  return `${len} x ${target.maxValue + 1} levels, ${target.bitDepth}-bit ${target.signed ? 'signed' : 'unsigned'}`;
+}
+
+/** True when a wave of this length and depth plays on the chip unchanged. */
+export function fitsChipTarget(target: ChipTarget, len: number, maxValue: number): boolean {
+  return maxValue === target.maxValue && snapLength(target, len) === len;
 }
