@@ -40,6 +40,34 @@ describe.each(FILES)('Tim Follin note on an empty row: %s', (file) => {
     expect(changed).toBeGreaterThanOrEqual(1);
   });
 
+  it('writes a note with another instrument through Instrument commands, every other cell keeping its instrument', () => {
+    const g = buildTimFollinGrid(raw)!;
+    const used = new Set<number>();
+    g.rowSources.forEach((p) => p.forEach((v) => v.forEach((s) => { if (s && s.instrument > 0) used.add(s.instrument); })));
+    let done = 0;
+    g.patterns.forEach((pat, p) => pat.channels.forEach((ch, c) => ch.rows.forEach((row, r) => {
+      if (done || r === 0 || row.note !== 0 || ch.rows[r - 1].note === 0) return;
+      const was = g.rowSources[p][c][r - 1]?.instrument ?? 0;
+      const want = [...used].find((i) => i !== was);
+      if (!want || was === 0) return;
+      const patterns = clone(g.patterns);
+      patterns[p].channels[c].rows[r].note = 40;
+      patterns[p].channels[c].rows[r].instrument = want;
+      const res = applyTimFollinGridEdits(raw, patterns);
+      if (res.data.length !== raw.length + 6) return;
+      done++;
+      const again = buildTimFollinGrid(res.data)!;
+      expect(again.rows).toBe(g.rows);
+      const cell = again.patterns[p].channels[c].rows[r];
+      expect([cell.note, cell.instrument]).toEqual([40, want]);
+      g.patterns.forEach((pt, pi) => pt.channels.forEach((ch2, ci) => ch2.rows.forEach((w, ri) => {
+        const now = again.patterns[pi].channels[ci].rows[ri];
+        if (now.note === w.note) expect(now.instrument).toBe(w.instrument);
+      })));
+    })));
+    expect(done).toBeGreaterThanOrEqual(1);
+  });
+
   it('refuses a different instrument and a note outside the table, writing nothing', () => {
     const g = buildTimFollinGrid(raw)!;
     const patterns = clone(g.patterns);

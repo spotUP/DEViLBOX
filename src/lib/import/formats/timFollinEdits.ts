@@ -5,8 +5,8 @@
  * (transpose + byte) & 0x7F, so an edited note cell is a same-length patch of that one byte, chosen so the table
  * entry lands on the new note given the transpose in force when the note starts (recorded per row by the grid).
  * A note typed on an empty row inside a held note splits that note: [note][length] becomes [note][d][new][length - d]
- * (2 bytes inserted; the new note plays with the instrument and transpose in force, so a different cell instrument is
- * refused). The module's voice streams are its last data, so every later byte moves by 2 and the song table stream
+ * (2 bytes inserted; the new note plays with the instrument and transpose in force). A different cell instrument that the
+ * song already plays adds [0x81][new] before the new note and [0x81][old] behind it (6 bytes), so later notes keep theirs. The module's voice streams are its last data, so every later byte moves by 2 and the song table stream
  * addresses and Call/Jump address longs at or after the cut are raised by 2. Written only if the reloaded song has the same
  * tick length, the cell reads back as the note and nothing else changed (repeats of the stream show the note too).
  * A stream run by several voices or loops is shared by every place that plays it. Edits the stream cannot hold at its
@@ -233,7 +233,15 @@ function addNote(data: Uint8Array, subsong: number, a: AddNote): Uint8Array | st
   if (d < 1 || d >= A.hold) return 'the row is not inside the held note';
   if (A.length !== 2) return 'the voice uses a fixed note length command, so a note has no length byte to split';
   const ins = A.instrument;
-  if (a.instrument !== 0 && a.instrument !== ins) return 'the instrument is chosen by an Instrument command, and this note would play with the one in force';
+  // another instrument: [0x81][n] in front of the new note, [0x81][old] behind it so later notes keep theirs
+  const swap = a.instrument !== 0 && a.instrument !== ins;
+  if (swap) {
+    if (ins === 0) return 'no Instrument command is in force to restore after the new note';
+    const played = new Set<number>();
+    [g.rowSources, ...g.rowSourcesExtra].forEach((t) => t.forEach((p) => p.forEach((v) => v.forEach((s) => { if (s && s.instrument > 0) played.add(s.instrument); }))));
+    if (!played.has(a.instrument)) return `instrument ${a.instrument} is not played anywhere in this song`;
+  }
+  const grow = swap ? 6 : 2;
   const value = byteFor(a.note, A.nextBase, A.noteByte);
   if (value < 0) return `note ${a.note} is not in the player's period table`;
   const cut = A.offset + 2;
@@ -241,17 +249,20 @@ function addNote(data: Uint8Array, subsong: number, a: AddNote): Uint8Array | st
   const off = (v: number): number => (v + m.delta) >>> 0;
   if (m.table + 0x194 + 4 > cut || (u32(data, m.table + 0x194) >>> 16) !== 0) return 'the module has a relocation list';
   for (let i = 0; i < 16; i++) { const t = off(u32(data, m.table + 0x104 + i * 4)); if (t >= cut && t < len) return 'an instrument table lies after the streams'; }
-  const out = new Uint8Array(len + 2);
+  const out = new Uint8Array(len + grow);
   out.set(data.subarray(0, cut));
-  out.set(data.subarray(cut), cut + 2);
-  if (tos) put32(out, 2, u32(data, 2) + 2);
+  out.set(data.subarray(cut), cut + grow);
+  if (tos) put32(out, 2, u32(data, 2) + grow);
   out[A.offset + 1] = d;
-  out[cut] = value;
-  out[cut + 1] = A.hold - d;
+  let w = cut;
+  if (swap) { out[w++] = 0x81; out[w++] = a.instrument - 1; }
+  out[w++] = value;
+  out[w++] = A.hold - d;
+  if (swap) { out[w++] = 0x81; out[w++] = ins - 1; }
   const bump = (site: number): void => {
     const v = u32(data, site);
     const t = off(v);
-    if (t >= cut && t < len) put32(out, site >= cut ? site + 2 : site, v + 2);
+    if (t >= cut && t < len) put32(out, site >= cut ? site + grow : site, v + grow);
   };
   for (let i = 0; i < 64; i++) bump(m.table + 4 + i * 4);
   for (let s = 0; s < m.subsongCount; s++) for (const site of buildTimFollinGrid(data, s)?.links ?? []) bump(site);
@@ -276,13 +287,14 @@ function addNote(data: Uint8Array, subsong: number, a: AddNote): Uint8Array | st
         const nn = noteIn(now, k);
         if (wn === nn && getColumnField(was, k, 'instrument') === getColumnField(now, k, 'instrument')) continue;
         // an empty column that gained the new note: the target row, or a repeat of the same stream
-        if (wn === 0 && nn === a.note && getColumnField(now, k, 'instrument') === ins) { changed++; continue; }
+        if (wn === 0 && nn === a.note && getColumnField(now, k, 'instrument') === (swap ? a.instrument : ins)) { changed++; continue; }
         same = false;
       }
       if (same) continue;
       return 'other rows would change';
     }
   }
+  if (swap && cellAt(again, a.channel, at)?.instrument !== a.instrument) return 'the instrument does not read back on this row';
   if (cellAt(again, a.channel, at)?.note !== a.note || changed < 1) return 'the note does not read back on this row';
   return out;
 }
