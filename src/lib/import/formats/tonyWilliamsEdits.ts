@@ -59,7 +59,8 @@ function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
   }
   if (!cover) return refuse('no note or rest is held across this row');
   const swap = a.instrument !== 0 && a.instrument !== instrument;
-  if (swap && (a.instrument > 16 || instrument === 0)) return refuse(instrument === 0 ? 'no Instrument command is in force to restore after the note' : `instrument ${a.instrument} is outside 1..16`);
+  if (swap && a.instrument > 16) return refuse(`instrument ${a.instrument} is outside 1..16`);
+  if (swap && instrument === 0) return refuse("no Instrument command is in force before this row, so the instrument the player starts the voice with (set in its compiled code, not named by any stream byte) cannot be restored after the new instrument; the corpus has no voice with a later Instrument command ahead of its next note either");
   // The next note start of the voice plays whatever Instrument command was last seen: restore the old one unless one already sits before it.
   let restore = swap;
   if (swap) {
