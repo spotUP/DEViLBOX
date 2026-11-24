@@ -28,6 +28,7 @@ export async function exportAshleyHogg(song: TrackerSong): Promise<AshleyHoggExp
   const written = new Map<number, number>();
   for (const { pattern, row, channel, cell } of editedCells(song.patterns)) {
     const where = `pattern ${pattern} voice ${channel + 1} row ${row}`;
+    if (cell.volume || cell.effTyp || cell.eff || cell.effTyp2 || cell.eff2) warnings.push(`${where}: volume and effect edits are refused: the old Ashley Hogg pattern byte stream has no per-note volume or effect byte (a note is followed only by its instrument; sustain, slide, speed and wait are separate commands), so a row cannot carry its own; not written`);
     const n = at.get(`${pattern}:${channel}:${row}`);
     if (!n) {
       if (cell.note !== 0) warnings.push(`${where}: a note where the player plays none is not written`);
