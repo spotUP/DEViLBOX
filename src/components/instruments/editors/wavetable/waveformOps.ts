@@ -218,3 +218,13 @@ export function applyChipTarget(
   const requantized = requantize(resampled, currentMax, targetMax);
   return { data: requantized, len: targetLen, max: targetMax };
 }
+
+/** Loop params every studio-produced sample gets: the whole rendered buffer
+ *  (normalised 0..1, the sample editor's own form) loops forward, so a held
+ *  key sustains the chip waveform. */
+export const STUDIO_LOOP_PARAMS = {
+  loopStart: 0,
+  loopEnd: 1,
+  loopEnabled: true,
+  loopType: 'forward',
+} as const;
