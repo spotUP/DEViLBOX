@@ -70,6 +70,25 @@ describe('hUGEDriver Game Boy export', () => {
     expect(song.lossy.filter((l) => l.includes('instrument repeat'))).toEqual([]);
   });
 
+  it("You're_Doing_Well!.fur: a start-volume variant on a 12xx-set channel carries that duty (no duty reset)", async () => {
+    const fur = readFileSync(join(ROOT, "public/data/songs/furnace/gameboy/You're_Doing_Well!.fur"));
+    const m = await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
+    // Song as is: the instrument-4 arpeggio on channel 2 repeats with volume + 12xx; none of it is a duty reset now.
+    expect(furnaceToHuge(m).lossy.filter((l) => l.includes('duty reset'))).toEqual([]);
+    // Only these cells keep a volume: 12x1 sets duty 1, then a repeat of macro-less instrument 4 with volume 7 beside a
+    // speed effect must reload as a variant whose NR11 duty is 1 (Furnace keeps chan.duty), not the default 2.
+    for (const p of m.patterns.values()) for (const r of p.rows) r.volume = -1;
+    expect(m.instruments[4].macros.some((x) => x.length > 0)).toBe(false);
+    const rows = m.patterns.get(`0_1_${m.subsongs[0].orders[1][2]}`)!.rows;
+    Object.assign(rows[0], { note: 5, octave: 4, instrument: 4, volume: -1, effects: [{ type: 0x12, value: 1 }] });
+    Object.assign(rows[1], { note: 7, octave: 4, instrument: 4, volume: 7, effects: [{ type: 0x0f, value: 3 }] });
+    const song = furnaceToHuge(m);
+    expect(song.lossy.filter((l) => l.includes('duty reset') || l.startsWith('volume column beside an effect'))).toEqual([]);
+    const dutyAt = (song.blob[11] | (song.blob[12] << 8)) - HUGE_SONG_BASE;
+    const slots = Array.from({ length: 15 }, (_, i) => song.blob.slice(dutyAt + i * 6, dutyAt + i * 6 + 6));
+    expect(slots.some((b) => b[1] >> 6 === 1 && b[2] >> 4 === 7)).toBe(true);
+  });
+
   it('lagtrain.fur: start-volume variants never push a plain instrument past the 15 hUGE slots', async () => {
     const fur = readFileSync(join(ROOT, 'public/data/songs/furnace/gameboy/lagtrain.fur'));
     const m = await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
