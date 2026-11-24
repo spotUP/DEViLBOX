@@ -129,6 +129,8 @@ export interface SampleEditorState {
   // Params
   params: SampleEditorParams;
   updateParam: (key: string, value: string | number | boolean | null) => void;
+  /** Several keys in one write (separate writes would each spread the same stale sample). */
+  updateParams: (updates: Record<string, unknown>) => void;
 }
 
 interface UseSampleEditorStateOptions {
@@ -168,10 +170,9 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
       if ((LOOP_VIEW_KEYS as readonly string[]).includes(k)) (loopChange as Record<string, unknown>)[k] = v;
       else rest[k] = v;
     }
-    if (audioBuffer) {
-      const fields = viewLoopToSample(loopChange, sample, audioBuffer.duration, audioBuffer.sampleRate);
-      if (fields) onUpdateSample(fields);
-    }
+    // Without a decoded buffer positions can not convert (total 0), but enable and type still write.
+    const fields = viewLoopToSample(loopChange, sample, audioBuffer?.duration ?? 0, audioBuffer?.sampleRate ?? 0);
+    if (fields) onUpdateSample(fields);
     if (Object.keys(rest).length) onUpdateOtherParams(rest);
   }, [audioBuffer, sample, onUpdateSample, onUpdateOtherParams]);
 
@@ -519,6 +520,6 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     doReverse, doNormalize, doDcRemoval,
     doPasteReplace, doPasteMix, doAmplify, doResize, doInsertSilence, doResample,
     doUndo, doRedo, doExportWav, doFindLoop, doSnapLoopToZero,
-    params, updateParam,
+    params, updateParam, updateParams: onUpdateParams,
   };
 }

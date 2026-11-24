@@ -70,3 +70,12 @@ describe('sample editor state', () => {
     expect(onUpdateSample).toHaveBeenCalledWith({ loop: false });
   });
 });
+
+describe('loop write without a decoded buffer or sample record', () => {
+  it('enable and type convert without a duration; positions are left alone', async () => {
+    const { viewLoopToSample, newSampleConfig } = await import('../sampleLoopView');
+    expect(viewLoopToSample({ loopEnabled: true, loopStart: 0.25, loopEnd: 0.75 }, undefined, 0, 0)).toEqual({ loop: true });
+    const seeded = { ...newSampleConfig('x'), ...viewLoopToSample({ loopEnabled: true, loopStart: 0, loopEnd: 1 }, undefined, 1, 8000) };
+    expect(seeded).toMatchObject({ url: 'x', loop: true, loopStart: 0, loopEnd: 8000, sampleRate: 8000 });
+  });
+});

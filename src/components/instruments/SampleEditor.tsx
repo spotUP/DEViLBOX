@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { WavetableEditor } from './editors/WavetableEditor';
 import { STUDIO_LOOP_PARAMS } from './editors/wavetable/waveformOps';
+import { viewLoopToSample, newSampleConfig, type SampleLoopView } from '../../utils/audio/sampleLoopView';
 import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { StemSeparatorPanel } from '@components/common/StemSeparatorPanel';
@@ -238,10 +239,9 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   // ─── State hook ──────────────────────────────────────────────────
   const onUpdateSample = useCallback(
     (updates: Partial<SampleConfig>) => {
-      if (!instrument.sample) return;
-      updateInstrument(instrument.id, { sample: { ...instrument.sample, ...updates } });
+      updateInstrument(instrument.id, { sample: { ...(instrument.sample ?? newSampleConfig(sampleUrl)), ...updates } });
     },
-    [instrument.id, instrument.sample, updateInstrument],
+    [instrument.id, instrument.sample, sampleUrl, updateInstrument],
   );
 
   const s = useSampleEditorState({
@@ -331,6 +331,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     doSnapLoopToZero,
     params: editorParams,
     updateParam,
+    updateParams,
   } = s;
 
   const {
@@ -1300,13 +1301,15 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
 
   // ─── Buffer processed (enhancer / resampler / beat sync / filter) ─
   const handleBufferProcessed = useCallback(
-    async (result: ProcessedResult, prefix: string, extraParams?: Record<string, unknown>) => {
+    async (result: ProcessedResult, prefix: string, loop?: Partial<SampleLoopView>) => {
       const { buffer: newBuf, dataUrl } = result;
       setAudioBuffer(newBuf);
+      // The loop lives on the sample (see useSampleEditorState); sample.url wins over parameters.sampleUrl.
+      const loopFields = loop ? viewLoopToSample(loop, instrument.sample, newBuf.duration, newBuf.sampleRate) : null;
       updateInstrument(instrument.id, {
+        ...(loopFields ? { sample: { ...(instrument.sample ?? newSampleConfig(dataUrl)), ...loopFields, url: dataUrl, audioBuffer: undefined } } : {}),
         parameters: {
           ...instrument.parameters,
-          ...extraParams,
           sampleUrl: dataUrl,
           sampleInfo: {
             name: sampleInfo?.name
@@ -1327,7 +1330,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         getToneEngine().invalidateInstrument(instrument.id);
       } catch { /* ToneEngine not active */ }
     },
-    [instrument.id, instrument.parameters, sampleInfo, updateInstrument, setAudioBuffer],
+    [instrument.id, instrument.parameters, instrument.sample, sampleInfo, updateInstrument, setAudioBuffer],
   );
 
   // ─── Stem separation handlers ────────────────────────────────────
@@ -1858,6 +1861,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
               loopEnd={loopEnd}
               loopType={loopType}
               updateParam={updateParam}
+              updateParams={updateParams}
               doFindLoop={doFindLoop}
               doSnapLoopToZero={doSnapLoopToZero}
             />

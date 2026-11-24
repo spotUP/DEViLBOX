@@ -74,3 +74,8 @@ export function viewLoopToSample(
   }
   return Object.keys(out).length ? out : null;
 }
+
+/** A sample record for an instrument that has only `parameters.sampleUrl`, so a loop edit has somewhere to live. */
+export function newSampleConfig(url: string | null): SampleConfig {
+  return { url: url ?? '', baseNote: 'C4', detune: 0, loop: false, loopStart: 0, loopEnd: 0, reverse: false, playbackRate: 1 };
+}

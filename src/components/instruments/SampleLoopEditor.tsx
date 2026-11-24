@@ -15,12 +15,13 @@ interface SampleLoopEditorProps {
   loopEnd: number;
   loopType: LoopType;
   updateParam: (key: string, value: string | number | boolean | null) => void;
+  updateParams: (updates: Record<string, unknown>) => void;
   doFindLoop: () => void;
   doSnapLoopToZero: () => void;
 }
 
 export const SampleLoopEditor: React.FC<SampleLoopEditorProps> = ({
-  loopEnabled, loopStart, loopEnd, loopType, updateParam, doFindLoop, doSnapLoopToZero,
+  loopEnabled, loopStart, loopEnd, loopType, updateParam, updateParams, doFindLoop, doSnapLoopToZero,
 }) => (
   <div className="border-t border-dark-border pt-3">
     <div className="flex items-center gap-3 mb-2">
@@ -35,10 +36,10 @@ export const SampleLoopEditor: React.FC<SampleLoopEditorProps> = ({
             // the loop handles are obvious and draggable instead of being
             // hidden behind the start/end handles at the canvas corners.
             if (enabled && loopStart === 0 && loopEnd === 1) {
-              updateParam('loopStart', 0.25);
-              updateParam('loopEnd', 0.75);
+              updateParams({ loopStart: 0.25, loopEnd: 0.75, loopEnabled: true });
+            } else {
+              updateParam('loopEnabled', enabled);
             }
-            updateParam('loopEnabled', enabled);
             e.target.blur();
           }}
           className="w-4 h-4 rounded"
