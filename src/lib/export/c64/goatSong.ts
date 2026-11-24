@@ -120,6 +120,14 @@ export function pulseRows(vals: number[], loop: number, tol = 0): { rows: Array<
 const PULSE_TOL = 8;
 const s12 = (v: number) => (((v & 4095) << 20) >> 20);
 
+type C64Ins = NonNullable<FurnaceInstrument['c64']>;
+const waveCtl = (c: C64Ins) => (c.ringMod ? 0x04 : 0) | (c.oscSync ? 0x02 : 0) | 0x01;
+const baseWaveOf = (c: C64Ins) => (c.noiseOn ? 8 : 0) | (c.pulseOn ? 4 : 0) | (c.sawOn ? 2 : 0) | (c.triOn ? 1 : 0);
+
+/** Furnace c64.cpp coarse cutoff (11xx) and fine cutoff (4xxx) as the GT cutoff byte ($D416); the low 3 bits ($D415) are dropped like the cutoff macro's. */
+export const coarseCutoffByte = (v: number): number => (((Math.min(v, 100) + 2) * 2047 / 102) | 0) >> 3;
+export const fineCutoffByte = (type: number, v: number): number => ((((type & 7) << 8) | v) >> 3) & 0xff;
+
 /** One instrument: ADSR, wave program (waveform + gate, arpeggio), pulse program, filter program, from the
  * instrument and its arp / wave / duty / cutoff / filter mode / resonance macros. */
 function instrumentOf(ins: FurnaceInstrument | undefined, idx: number, tables: GTSongData['tables'], lossy: Lossy,
@@ -133,8 +141,8 @@ function instrumentOf(ins: FurnaceInstrument | undefined, idx: number, tables: G
   // GT's default hard restart: 2 frames gate off before the note, test bit + gate on its first frame.
   g.gatetimer = 2;
   g.firstwave = c.noTest ? 0x01 : 0x09;
-  const ctl = (c.ringMod ? 0x04 : 0) | (c.oscSync ? 0x02 : 0) | 0x01;
-  const baseWave = (c.noiseOn ? 8 : 0) | (c.pulseOn ? 4 : 0) | (c.sawOn ? 2 : 0) | (c.triOn ? 1 : 0);
+  const ctl = waveCtl(c);
+  const baseWave = baseWaveOf(c);
   const mac = (code: number) => macroOf(ins, code);
   const program = (t: number, rows: Array<[number, number]>, loopRow: number): number => {
     const tb = tables[t];
@@ -238,43 +246,87 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
   const patterns: number[][][] = [];
   const byKey = new Map<string, number>();
   const orderlists: number[][] = [[], [], []];
+  // Per channel: last played GT note (slide start), instrument, and the arpeggio (0xy) that stays on until 0000.
+  const lastNote = [-1, -1, -1], curIns = [-1, -1, -1];
+  const arpOn: Array<[number, number] | null> = [null, null, null];
+  const arpProgs = new Map<string, number>();
+  const speedRow = (spd: number): number => {
+    const t = tables[3];
+    for (let i = 0; i < t.left.length; i++) if (t.left[i] === (spd >> 8) && t.right[i] === (spd & 255) && i + 1 !== funk) return i + 1;
+    t.left.push(spd >> 8); t.right.push(spd & 255);
+    return t.left.length;
+  };
+  // Wave program for `ins` playing arpeggio 0xy: base, +x, +y offsets of the instrument's own waveform, one per tick (Furnace arp effect).
+  const arpProgram = (ins: number, x: number, y: number): number => {
+    const key = `${ins}_${x}_${y}`;
+    const have = arpProgs.get(key);
+    if (have) return have;
+    const c = m.instruments[ins]?.c64;
+    const w = ((c ? baseWaveOf(c) : 1) << 4) | (c ? waveCtl(c) : 1);
+    const tb = tables[0], pos = tb.left.length + 1;
+    for (const off of [0, x, y]) { tb.left.push(w >= 0x10 ? w : 0xe0 | w); tb.right.push(off); }
+    tb.left.push(0xff); tb.right.push(pos);
+    arpProgs.set(key, pos);
+    return pos;
+  };
   const slices = Math.ceil(s.patLen / GT_MAX_ROWS);
   for (let ch = 0; ch < 3; ch++) {
     for (let o = 0; o < s.ordersLen; o++) {
       const pat = s.orders[ch]?.[o] ?? 0;
       for (let sl = 0; sl < slices; sl++) {
         const first = ch === 0 && o === 0 && sl === 0;
-        const key = first ? 'tempo' : `${ch}_${pat}_${sl}`;
-        let gi = byKey.get(key);
-        if (gi === undefined) {
-          const rows: number[][] = [];
-          const src = m.patterns.get(`${subsong}_${ch}_${pat}`);
-          for (let r = sl * GT_MAX_ROWS; r < Math.min(s.patLen, (sl + 1) * GT_MAX_ROWS); r++) {
-            const cell = src?.rows[r];
-            let note = GT_REST, ins = 0, cmd = 0, data = 0;
-            if (cell) {
-              const nv = convertFurnaceNoteValue(cell);
-              if (nv === 253 || nv === 254) note = GT_KEYOFF;
-              else if (nv === 255) lossy.add('macro release');
-              else if (nv >= 0) {
-                const gt = nv; // both count C-0 = 0 (measured: Furnace nv 19 = G-1 plays $032D at NTSC, GT note 19 too)
-                if (gt < 0 || gt > 95) lossy.add('note outside GT range');
-                else note = GT_FIRSTNOTE + gt;
-              }
-              if (cell.instrument >= 0) {
-                if (cell.instrument < GT_MAX_INSTR - 1) ins = cell.instrument + 1;
-                else lossy.add('instrument past 63');
-              }
-              if (cell.volume >= 0) lossy.add('volume column');
-              for (const e of cell.effects) if (e.type >= 0) lossy.add(`effect ${e.type.toString(16).padStart(2, '0')}`);
+        // Effects carry state (last note, arpeggio), so every play is built and patterns are shared by their rows.
+        const rows: number[][] = [];
+        const src = m.patterns.get(`${subsong}_${ch}_${pat}`);
+        for (let r = sl * GT_MAX_ROWS; r < Math.min(s.patLen, (sl + 1) * GT_MAX_ROWS); r++) {
+          const cell = src?.rows[r];
+          let note = GT_REST, ins = 0, cmd = 0, data = 0;
+          if (cell) {
+            const nv = convertFurnaceNoteValue(cell);
+            if (nv === 253 || nv === 254) note = GT_KEYOFF;
+            else if (nv === 255) lossy.add('macro release');
+            else if (nv >= 0) {
+              const gt = nv; // both count C-0 = 0 (measured: Furnace nv 19 = G-1 plays $032D at NTSC, GT note 19 too)
+              if (gt < 0 || gt > 95) lossy.add('note outside GT range');
+              else { note = GT_FIRSTNOTE + gt; lastNote[ch] = gt; }
             }
-            if (first && r === 0) { cmd = funk ? CMD_FUNKTEMPO : CMD_SETTEMPO; data = funk || tempo; }
-            rows.push([note, ins, cmd, data]);
+            if (cell.instrument >= 0) {
+              curIns[ch] = cell.instrument;
+              if (cell.instrument < GT_MAX_INSTR - 1) ins = cell.instrument + 1;
+              else lossy.add('instrument past 63');
+            }
+            if (cell.volume >= 0) lossy.add('volume column');
+            let arpSeen = false;
+            for (const e of cell.effects) {
+              if (e.type < 0) continue;
+              const t = e.type, v = Math.max(0, e.value), name = t.toString(16).padStart(2, '0');
+              let c = 0, d = 0;
+              if (t === 0x00) {
+                if (!v && !arpOn[ch]) continue; // 0000 with no arpeggio running is no effect
+                arpSeen = true; arpOn[ch] = v ? [v >> 4, v & 15] : null;
+                if (curIns[ch] < 0 || !m.instruments[curIns[ch]]?.c64 || curIns[ch] >= GT_MAX_INSTR - 1) lossy.add('effect 00 (arpeggio without an SID instrument)');
+                else { c = 7; d = v ? arpProgram(curIns[ch], v >> 4, v & 15) : instruments[curIns[ch] + 1].ptr[0]; }
+              } else if (t === 0x11) { c = 0x0c; d = coarseCutoffByte(v); }
+              else if (t >= 0x40 && t <= 0x47) { c = 0x0c; d = fineCutoffByte(t, v); }
+              else if ((t === 0xe1 || t === 0xe2) && note === GT_REST && lastNote[ch] >= 0 && v >> 4) {
+                // Slide without a note on the row: GT toneportamento to the note y semitones away at Furnace's speed x*4 (SID frequency units per tick).
+                const dest = lastNote[ch] + (t === 0xe1 ? 1 : -1) * (v & 15);
+                if (dest < 0 || dest > 95) lossy.add(`effect ${name} (target outside GT range)`);
+                else { note = GT_FIRSTNOTE + dest; lastNote[ch] = dest; c = 3; d = speedRow((v >> 4) * 4); }
+              } else if (t === 0x14) lossy.add('effect 14 (filter mode; GT sets it in a filter program only)');
+              else lossy.add(`effect ${name}`);
+              if (c) { if (cmd) lossy.add(`effect ${name} (second command on the row)`); else { cmd = c; data = d; } }
+            }
+            // Furnace keeps an arpeggio on until 0000; a new note restarts the instrument's own wave program in GT, so re-arm it.
+            const ar = arpOn[ch];
+            if (!arpSeen && !cmd && ar && note !== GT_REST && note !== GT_KEYOFF && curIns[ch] >= 0 && curIns[ch] < GT_MAX_INSTR - 1) { cmd = 7; data = arpProgram(curIns[ch], ar[0], ar[1]); }
           }
-          gi = patterns.length;
-          patterns.push(rows);
-          byKey.set(key, gi);
+          if (first && r === 0) { cmd = funk ? CMD_FUNKTEMPO : CMD_SETTEMPO; data = funk || tempo; }
+          rows.push([note, ins, cmd, data]);
         }
+        const key = first ? 'tempo' : JSON.stringify(rows);
+        let gi = byKey.get(key);
+        if (gi === undefined) { gi = patterns.length; patterns.push(rows); byKey.set(key, gi); }
         orderlists[ch].push(gi);
       }
     }
