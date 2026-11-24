@@ -69,14 +69,28 @@ describe.each(FILES)('SynthDream native export: %s', (name) => {
     expect(again.song.patterns[p].channels[0].rows[r].note).toBe(old + 2);
   });
 
-  it('refuses a removed note, writing nothing for it', async () => {
+  it('writes a removed note as a rest command (duration, rest), the stream moving to the file end; reload reads the note off, other cells unmoved', async () => {
     const { raw, song } = await load(name);
-    const { p, r } = firstNote(song);
-    song.patterns[p].channels[0].rows[r].note = 0;
-    const res = await exportOf(song);
-    expect(res.warnings.length).toBe(1);
-    expect(res.warnings.join('\n')).toMatch(/not written|was not written/);
-    expect(Array.from(res.data)).toEqual(Array.from(raw));
+    // first plain note of any voice whose removal the module can hold (shared streams and other command forms refuse)
+    let hit: { p: number; c: number; r: number; res: Awaited<ReturnType<typeof exportOf>> } | null = null;
+    outer: for (let p = 0; p < song.patterns.length; p++) for (let c = 0; c < song.patterns[p].channels.length; c++) {
+      const rows = song.patterns[p].channels[c].rows;
+      for (let r = 0; r < rows.length; r++) {
+        if (rows[r].note < 13 || rows[r].note > 96) continue;
+        const s = (await load(name)).song;
+        s.patterns[p].channels[c].rows[r].note = 0;
+        const res = await exportOf(s);
+        if (res.warnings.length === 0) { hit = { p, c, r, res }; break outer; }
+      }
+    }
+    if (!hit) { expect(name).toBe('sdr.monsterbusiness_5'); return; } // its first notes sit in shared streams: refused whole, as any removal that would move other rows
+    expect(hit.res.data.length).toBeGreaterThan(raw.length);
+    const again = await load(name, hit.res.data);
+    expect(again.song.patterns[hit.p].channels[hit.c].rows[hit.r].note).toBe(97);
+    again.song.patterns.forEach((pat, pi) => pat.channels.forEach((ch, ci) => ch.rows.forEach((cell, ri) => {
+      if (pi === hit!.p && ci === hit!.c && ri === hit!.r) return;
+      expect(cell.note).toBe(song.patterns[pi].channels[ci].rows[ri].note);
+    })));
   });
 
   it('puts a note on a row inside a held command by cutting it: the stream moves to the file end and reloads with the note', async () => {

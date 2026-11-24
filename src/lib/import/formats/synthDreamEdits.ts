@@ -33,10 +33,12 @@ export interface SdrEditResult {
 interface Edit {
   pattern: number; channel: number; row: number;
   note: number; instrument: number;
+  /** The note shown after reading back (a removal reads back as the note off). */
+  expectNote?: number;
   /** Word offsets this edit wrote, with the bytes they held before. */
   words: Map<number, number>;
   /** A note on a row the covering command holds: that command is cut short and a note command inserted after it (the stream grows). */
-  grow?: { stream: number; cmdEnd: number; durationAt: number; keep: number; insert: number[] };
+  grow?: { stream: number; cmdEnd: number; durationAt: number; keep: number; insert: number[]; drop?: number };
 }
 
 const getWord = (b: Uint8Array, o: number): number => ((b[o] ?? 0) << 8) | (b[o + 1] ?? 0);
@@ -46,6 +48,8 @@ const ROWS_PER_PATTERN = 64;
 const CMD_DURATION_NOTE = 0x0a;
 /** command_forms[11]: duration, note, instrument. */
 const CMD_DURATION_NOTE_INSTRUMENT = 0x16;
+/** command_forms[15]: duration, rest (DMA off for the duration); 4 bytes against the 6 of 'duration, note'. */
+const CMD_DURATION_REST = 0x1e;
 
 /**
  * The module with each grown stream copied to the file end (cut command shortened, new command inserted) and every track
@@ -64,7 +68,7 @@ function growStreams(out: Uint8Array, base: SdrGrid, edits: Edit[]): Uint8Array 
       const g = e.grow!;
       bytes[g.durationAt - stream] = (g.keep >> 8) & 0xff;
       bytes[g.durationAt - stream + 1] = g.keep & 0xff;
-      bytes.splice(g.cmdEnd - stream, 0, ...g.insert);
+      bytes.splice(g.cmdEnd - stream, g.drop ?? 0, ...g.insert);
     }
     const newAt = (data.length + 1) & ~1;
     const next = new Uint8Array(newAt + bytes.length);
@@ -160,6 +164,21 @@ export function applySdrGridEdits(original: Uint8Array, patterns: readonly Patte
       accepted.push({ ...at, note: cell.note, instrument: newInst >= 0 ? cell.instrument : inForce, words: new Map(), grow });
       return;
     }
+    if (noteChanged && src && was.note >= 1 && was.note < NOTE_OFF && (cell.note === 0 || cell.note === NOTE_OFF)) {
+      // note removed: the whole command (word, parameters, modifiers) becomes 'duration, rest' (4 B) with the same duration; the stream is re-laid at the file end and the read-back check refuses it when a later command inherited from the dropped one
+      const length = src.length;
+      if (src.durationAt < 0 || src.duration > 0xffff || instChanged) {
+        warnings.push(`SynthDream ${where(at)}: only a command with its own duration word can become a rest; the note was not removed.`);
+        return;
+      }
+      if (accepted.some((a) => a.grow?.stream === base.streams[src.stream].offset && a.grow.cmdEnd === src.offset)) return;
+      const grow = {
+        stream: base.streams[src.stream].offset, cmdEnd: src.offset, durationAt: src.durationAt, keep: getWord(original, src.durationAt),
+        insert: [0, CMD_DURATION_REST, (src.duration >> 8) & 0xff, src.duration & 0xff], drop: length,
+      };
+      accepted.push({ ...at, note: cell.note, expectNote: NOTE_OFF, instrument: was.instrument, words: new Map(), grow });
+      return;
+    }
     if (noteChanged) {
       if (!src || was.note < 1 || was.note >= NOTE_OFF) {
         warnings.push(`SynthDream ${where(at)}: no note command plays on this row, and adding one would lengthen the stream; the note was not written.`);
@@ -221,7 +240,7 @@ export function applySdrGridEdits(original: Uint8Array, patterns: readonly Patte
     const failed = live.filter((e) => {
       const got = again?.patterns[e.pattern]?.channels[e.channel]?.rows[e.row];
       const was = base.patterns[e.pattern].channels[e.channel].rows[e.row];
-      const noteOk = got?.note === e.note;
+      const noteOk = got?.note === (e.expectNote ?? e.note);
       const instOk = e.instrument === was.instrument || got?.instrument === e.instrument;
       return !(noteOk && instOk);
     });
