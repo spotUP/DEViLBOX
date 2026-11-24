@@ -3091,6 +3091,22 @@ export class ToneEngine {
    */
   public amigaPeriodSong = true;
 
+  /** First key after an instrument (re)creation hits an unloaded buffer: wait for the load once, then play the note instead of dropping it. */
+  private retryingAttack = new Set<number>();
+  private retryAfterLoad(
+    key: number, instrumentId: number, note: string, velocity: number, config: InstrumentConfig,
+    period?: number, accent?: boolean, slide?: boolean, channelIndex?: number, hammer?: boolean,
+  ): boolean {
+    if (period !== undefined || this.retryingAttack.has(key)) return false;
+    this.retryingAttack.add(key);
+    const pending = this.instrumentLoadingPromises.get(key) ?? Promise.resolve();
+    void Promise.all([pending, Tone.loaded()]).catch(() => {}).then(() => {
+      this.retryingAttack.delete(key);
+      this.triggerNoteAttack(instrumentId, note, Tone.now(), velocity, config, undefined, accent, slide, channelIndex, hammer);
+    });
+    return true;
+  }
+
   public triggerNoteAttack(
     instrumentId: number,
     note: string,
@@ -3241,6 +3257,7 @@ export class ToneEngine {
           const player = instrument as Tone.Player;
 
           if (!player.buffer || !player.buffer.loaded) {
+            if (this.retryAfterLoad(key, instrumentId, note, velocity, config, period, accent, slide, channelIndex, hammer)) return;
             console.warn('[ToneEngine] Player buffer not loaded, skipping');
             return;
           }
@@ -3290,6 +3307,7 @@ export class ToneEngine {
           if (actualType === 'EmptySampler') return; // No sample data, skip silently
           const sampler = instrument as Tone.Sampler;
           if (!sampler.loaded) {
+            this.retryAfterLoad(key, instrumentId, note, velocity, config, period, accent, slide, channelIndex, hammer);
             return;
           }
 
