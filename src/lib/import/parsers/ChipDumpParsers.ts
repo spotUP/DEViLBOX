@@ -156,6 +156,18 @@ export async function tryChipDumpParse(
     throw new Error(`T0AST file did not decode: ${originalFileName}`);
   }
 
+  // ── BeRoTracker — .brt ('BRTF' signature check), BeRoTrackerEngine plays the file ──
+  if (/\.brt$/.test(filename)) {
+    const { isBeRoTrackerFormat, isBeRoTrackerZip, parseBeRoTrackerFile } = await import('@lib/import/formats/BeRoTrackerParser');
+    const bytes = new Uint8Array(buffer);
+    if (isBeRoTrackerZip(bytes)) throw new Error(`BeRoTracker song in the newer ZIP form is not supported: ${originalFileName}`);
+    if (isBeRoTrackerFormat(bytes)) {
+      const song = parseBeRoTrackerFile(bytes, originalFileName);
+      if (song) return song;
+    }
+    throw new Error(`BeRoTracker file did not decode: ${originalFileName}`);
+  }
+
   // ── TFM Music Maker — ZX Spectrum TurboFM .tfe (2x YM2203), TFMEngine plays the file ──
   if (/\.tfe$/.test(filename)) {
     const { parseTfmMusicMakerFile } = await import('@lib/import/formats/TFMMusicMakerParser');

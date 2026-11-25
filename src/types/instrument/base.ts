@@ -316,6 +316,7 @@ export type SynthType =
   | 'ActionamicsWasmSynth'     // Actionamics (WASM replayer)
   | 'JxsSynth'                // JayTrax (keyboard voice on the WASM replayer)
   | 'JxsWasmSynth'            // JayTrax (WASM replayer)
+  | 'BeRoTrackerWasmSynth'    // BeRoTracker .brt (WASM replayer)
   | 'BuzWasmSynth'            // Buzzic 1 / Buzzic 2 (WASM replayer)
   | 'KdmWasmSynth'            // Ken Silverman KDM (WASM replayer)
   | 'PieceWasmSynth'          // Aquaplus P/ECE music driver (WASM replayer)

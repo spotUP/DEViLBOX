@@ -2048,6 +2048,17 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     nativeParser: { module: '@lib/import/formats/T0astParser', parseFn: 'parseT0astFile', detectFn: 'isT0astFormat' },
   },
   {
+    key: 'beRoTracker',
+    label: 'BeRoTracker',
+    description: "BeRoTracker (.brt, 'BRTF' chunk container; the newer ZIP form is refused) - own WASM player (bbmp berotracker).",
+    family: 'pc-tracker',
+    matchMode: 'extension',
+    extRegex: /\.brt$/i,
+    nativeOnly: true,
+    customDispatch: true,
+    nativeParser: { module: '@lib/import/formats/BeRoTrackerParser', parseFn: 'parseBeRoTrackerFile', detectFn: 'isBeRoTrackerFormat' },
+  },
+  {
     key: 'stoneTracker',
     label: 'StoneTracker',
     description: "StoneTracker (.spm + .sps sample bank, 'SPM' magic) — the authors' player on a 68020 core in wasm",

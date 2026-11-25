@@ -143,6 +143,7 @@ export interface FormatStore {
   pieceFileData: ArrayBuffer | null;
   t0astFileData: ArrayBuffer | null;
   jxsFileData: ArrayBuffer | null;
+  beRoTrackerFileData: ArrayBuffer | null;
   buzFileData: ArrayBuffer | null;
   activisionProFileData: ArrayBuffer | null;
   activisionProSubsongCount: number;
@@ -758,6 +759,7 @@ export const useFormatStore = create<FormatStore>()(
     kdmFileData: null,
     kdmBankData: null,
     jxsFileData: null,
+    beRoTrackerFileData: null,
     pieceFileData: null,
     buzFileData: null,
     activisionProFileData: null,
@@ -1499,6 +1501,7 @@ export const useFormatStore = create<FormatStore>()(
         state.kdmFileData = (song as any).kdmFileData ?? null;
         state.kdmBankData = (song as any).kdmBankData ?? null;
         state.jxsFileData = (song as any).jxsFileData ?? null;
+        state.beRoTrackerFileData = (song as any).beRoTrackerFileData ?? null;
         state.buzFileData = (song as any).buzFileData ?? null;
         state.pieceFileData = (song as any).pieceFileData ?? null;
         state.activisionProFileData = (song as any).activisionProFileData ?? null;
@@ -1888,6 +1891,7 @@ export const useFormatStore = create<FormatStore>()(
       state.kdmFileData = null;
       state.kdmBankData = null;
       state.jxsFileData = null;
+      state.beRoTrackerFileData = null;
       state.buzFileData = null;
       state.activisionProFileData = null;
       state.pieceFileData = null;

@@ -945,6 +945,18 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/t0ast/T0astEngine')).T0astEngine as unknown as WASMSingletonStatic,
   },
   {
+    key: 'BeRoTrackerReplayer',
+    synthType: 'BeRoTrackerWasmSynth',
+    suppressNotes: true,
+    fileDataKey: 'beRoTrackerFileData',
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/berotracker/BeRoTrackerEngine')).BeRoTrackerEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'ActivisionProReplayer',
     synthType: 'ActivisionProWasmSynth',
     suppressNotes: true,

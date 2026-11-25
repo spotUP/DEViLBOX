@@ -103,6 +103,7 @@ export const FILE_DATA_FIELDS = [
   'pieceFileData',
   't0astFileData',
   'jxsFileData',
+  'beRoTrackerFileData',
   'buzFileData',
   'activisionProFileData',
   'synthesisFileData',
