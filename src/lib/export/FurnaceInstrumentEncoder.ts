@@ -249,7 +249,7 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
         writer.writeUint8(boolToU8(op.vib));      // [18] vib
         writer.writeUint8(op.ws || 0);            // [19] ws
         writer.writeUint8(boolToU8(op.ksr));      // [20] ksr
-        writer.writeUint8(op.kvs || 0);           // [21] kvs
+        writer.writeUint8(op.kvs ?? 2);           // [21] kvs (Furnace default 2: carriers scale with volume)
         writer.writeUint8(0);                     // [22] pad
         writer.writeUint8(0);                     // [23] pad
       } else {

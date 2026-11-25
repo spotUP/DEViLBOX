@@ -1437,25 +1437,25 @@ export const DEFAULT_FURNACE: FurnaceConfig = {
     {
       enabled: true, mult: 2, tl: 40, ar: 31, dr: 8, d2r: 2, sl: 4, rr: 6,
       dt: 0, dt2: 0, rs: 0, am: false, ksr: false, ksl: 0, sus: false,
-      vib: false, ws: 0, ssg: 0, dam: 0, dvb: 0, egt: false, kvs: 0,
+      vib: false, ws: 0, ssg: 0, dam: 0, dvb: 0, egt: false, kvs: 2,
     },
     // OP2 - Modulator
     {
       enabled: true, mult: 1, tl: 50, ar: 28, dr: 6, d2r: 2, sl: 4, rr: 6,
       dt: 0, dt2: 0, rs: 0, am: false, ksr: false, ksl: 0, sus: false,
-      vib: false, ws: 0, ssg: 0, dam: 0, dvb: 0, egt: false, kvs: 0,
+      vib: false, ws: 0, ssg: 0, dam: 0, dvb: 0, egt: false, kvs: 2,
     },
     // OP3 - Carrier
     {
       enabled: true, mult: 1, tl: 0, ar: 31, dr: 10, d2r: 4, sl: 2, rr: 6,
       dt: 0, dt2: 0, rs: 0, am: false, ksr: false, ksl: 0, sus: false,
-      vib: false, ws: 0, ssg: 0, dam: 0, dvb: 0, egt: false, kvs: 0,
+      vib: false, ws: 0, ssg: 0, dam: 0, dvb: 0, egt: false, kvs: 2,
     },
     // OP4 - Carrier
     {
       enabled: true, mult: 1, tl: 0, ar: 31, dr: 8, d2r: 3, sl: 3, rr: 5,
       dt: 0, dt2: 0, rs: 0, am: false, ksr: false, ksl: 0, sus: false,
-      vib: false, ws: 0, ssg: 0, dam: 0, dvb: 0, egt: false, kvs: 0,
+      vib: false, ws: 0, ssg: 0, dam: 0, dvb: 0, egt: false, kvs: 2,
     },
   ],
   macros: [],

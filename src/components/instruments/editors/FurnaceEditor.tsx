@@ -1089,7 +1089,7 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
             <OperatorSwitch parameter="egt" value={op.egt ?? false} onUpdate={onUpdate} />
             <OperatorKnob {...knob} parameter="dam" value={op.dam ?? 0} min={0} max={7} tone="neutral" />
             <OperatorKnob {...knob} parameter="dvb" value={op.dvb ?? 0} min={0} max={7} tone="neutral" />
-            <OperatorKnob {...knob} parameter="kvs" value={op.kvs ?? 0} min={0} max={3} tone="neutral" />
+            <OperatorKnob {...knob} parameter="kvs" value={op.kvs ?? 2} min={0} max={3} tone="neutral" />
           </>
         )}
         {ranges.hasSSG && (
