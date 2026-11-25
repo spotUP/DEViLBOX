@@ -38,7 +38,8 @@ const VOL_MAX: Record<NeoChannelKind, number> = { fm: 0x7f, op: 0x7f, ssg: 0x0f,
 
 // Effects furtool converts (furtool.py fx table). Everything else is fatal or dropped.
 const FX_ANY = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0f, 0x80, 0xff,
-  0xe0, 0xe1, 0xe2, 0xe5, 0xe6, 0xe8, 0xe9, 0xea, 0xec, 0xed]);
+  0xe0, 0xe1, 0xe2, 0xe5, 0xe6, 0xe8, 0xe9, 0xea, 0xec, 0xed,
+  0xf8, 0xf9]); // F8/F9 volume step: ArcadeGame tools/nsstool_fx.py + nullsound vol_step_u/d
 const FX_FM_ONLY = new Set([0x12, 0x13, 0x14, 0x15]);
 // FM 2 operator channels: furtool's op-channel table has only these (others raise KeyError).
 const FX_OP = new Set([0x03, 0x04, 0x0a, 0xea, 0xed]);
@@ -127,6 +128,8 @@ export class NeoGeoSongBuilder {
   readonly name: string;
   readonly speed: number;
   readonly rows: number;
+  /** Initial BPM; the exporter writes it as Furnace virtual tempo N (D 150), nsstool_fx.py turns it into a timer B value. */
+  bpm = 150;
   constructor(name: string, speed: number, rows: number) { this.name = name; this.speed = speed; this.rows = rows; }
 
   addInstrument(name: string, furnace: FurnaceConfig): number {
@@ -151,9 +154,15 @@ export class NeoGeoSongBuilder {
   build(): FurnaceModuleSong {
     return {
       name: this.name, patterns: this.patterns, instruments: this.instruments, songPositions: this.order,
-      initialSpeed: this.speed, initialBPM: 150, hz: ym2610TimerBHz(60), extendedFm: true,
+      initialSpeed: this.speed, initialBPM: this.bpm, hz: ym2610TimerBHz(60), extendedFm: true,
     };
   }
+}
+
+/** nsstool_fx.py: timer B tb = round(256 - 4e6 / (1152 * hz * N / D)) must fit 0..255 (D is the exporter's 150). */
+function tempoProblem(song: FurnaceModuleSong, n: number): string | null {
+  const rate = ((song.hz ?? 60) * n) / 150, tb = Math.round(256 - 4e6 / (1152 * rate));
+  return tb < 0 || tb > 255 ? `tick rate ${rate.toFixed(1)} Hz needs YM2610 timer B ${tb}, outside 0..255` : null;
 }
 
 function cellFx(cell: TrackerCell): Array<[number, number]> {
@@ -237,7 +246,9 @@ export function lintNeoGeoSong(song: FurnaceModuleSong): string[] {
         const volCmd = cell.volume && xmVolToFurnace(cell.volume) < 0 ? volumeColumnEffect(cell.volume, VOL_MAX[kind]) : null;
         for (const [t, v] of volCmd ? [...cellFx(cell), [volCmd.type, volCmd.val] as [number, number]] : cellFx(cell)) {
           const fx = `${hex(t)}${hex(v)}`;
-          if (t === 0x0f && v >= 0x20) { out.push(`${where}: BPM change F${hex(v)} is not supported by furtool (it is written as Furnace FD${hex(v)})`); continue; }
+          // Neo Geo channels use Furnace notation: FDxx is the BPM change (virtual tempo N), 0Fxx stays a speed.
+          if (t === 0xfd) { const e = v ? tempoProblem(song, v) : null; if (e) out.push(`${where}: BPM change FD${hex(v)}: ${e}`); continue; }
+          if (t === 0x0f && v >= 0x20) { out.push(`${where}: 0F${hex(v)} sets speed ${v} (Furnace notation); a BPM change is FD${hex(v)}`); continue; }
           if (kind === 'op') {
             if (!FX_OP.has(t)) out.push(`${where}: effect ${fx} crashes furtool on an FM 2 operator channel (only 03, 04, 0A, EA, ED)`);
             continue;
@@ -252,6 +263,8 @@ export function lintNeoGeoSong(song: FurnaceModuleSong): string[] {
       });
     });
   });
+  const e0 = tempoProblem(song, Math.round(song.initialBPM ?? 150));
+  if (e0) out.push(`Initial BPM ${song.initialBPM}: ${e0}`);
   if (opPatches.size > 1) out.push(`FM 2 operator channels use different algorithm/feedback (${[...opPatches].join('; ')}); the chip has one per channel`);
 
   const last = song.patterns[song.songPositions[song.songPositions.length - 1]];

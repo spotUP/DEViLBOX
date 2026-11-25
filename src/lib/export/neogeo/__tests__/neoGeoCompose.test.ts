@@ -81,17 +81,28 @@ describe('neoGeoCompose', () => {
     expect(lintNeoGeoSong(s.build()).join('\n')).toMatch(/crashes furtool on an FM 2 operator channel/);
   });
 
-  it('lints a volume-column command as the effect the exporter writes, and BPM changes', () => {
+  it('lints a volume-column command as the effect the exporter writes, and BPM changes by timer B range', () => {
     const { s } = song();
     const b = s.build();
     const rows = b.patterns[0].channels[NEO.SSG1].rows;
-    rows[6] = { ...rows[6], volume: 0x88 }; // fine slide down -> F9xx, furtool has no F9
+    rows[6] = { ...rows[6], volume: 0x88 }; // fine slide down -> F902, nsstool_fx.py vol_step_d
     rows[7] = { ...rows[7], volume: 0x64 }; // slide down -> 0A04, furtool converts it
-    rows[8] = { ...rows[8], effTyp: 0x0f, eff: 0x78 }; // BPM 120 -> FD78
+    rows[8] = { ...rows[8], effTyp: 0xfd, eff: 0x91 }; // BPM 145 -> timer B 196
+    rows[9] = { ...rows[9], effTyp: 0xfd, eff: 0x20 }; // BPM 32 -> 12.8 Hz, timer B below 0
+    rows[10] = { ...rows[10], effTyp: 0x0f, eff: 0x78 }; // Furnace 0F78 is speed 120, not BPM
     const out = lintNeoGeoSong(b).join('\n');
-    expect(out).toMatch(/row 6: effect F902 is not supported by furtool/);
-    expect(out).not.toMatch(/row 7:/);
-    expect(out).toMatch(/row 8: BPM change F78/);
+    expect(out).not.toMatch(/row [678]:/);
+    expect(out).toMatch(/row 9: BPM change FD20: .*outside 0\.\.255/);
+    expect(out).toMatch(/row 10: 0F78 sets speed 120/);
+  });
+
+  it('rejects F8/F9 on FM 2 operator channels and an initial BPM timer B cannot reach', () => {
+    const { s, p } = song();
+    p.put(NEO.OP2, 4, { fx: [[0xf8, 0x02]] });
+    s.bpm = 30;
+    const out = lintNeoGeoSong(s.build()).join('\n');
+    expect(out).toMatch(/effect F802 crashes furtool on an FM 2 operator channel/);
+    expect(out).toMatch(/Initial BPM 30: .*outside 0\.\.255/);
   });
 
   it('rejects 00xy, which runs until a 0000 the editor cell cannot hold', () => {

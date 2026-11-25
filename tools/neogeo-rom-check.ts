@@ -23,7 +23,7 @@ const MVS_CLK = 8_000_000;
 const SONGS: { name: string; fur?: string; compose?: string }[] = [
   // Only YM2610 (0xa5/0xa6) modules: a YM2610B (0x9e) song has 6 FM channels, the Neo Geo 4, and furtool refuses it.
   ...['ironwing', 'afterburn-run'].map((n) => ({ name: n, fur: path.join(ROOT, `public/data/songs/devilbox/${n}.fur`) })),
-  ...['gumbirds-title', 'gumbirds-arena', 'gumbirds-game-over', 'gumbirds-round-clear'].map((n) => ({ name: n, compose: n })),
+  ...['gumbirds-title', 'gumbirds-arena', 'gumbirds-game-over', 'gumbirds-round-clear', 'neogeo-fx-tempo'].map((n) => ({ name: n, compose: n })),
 ];
 
 interface Verdict { inputHash: string; pass: boolean; seconds: number; stage?: string; error?: string; commands?: string[]; mameStarts?: number; furnaceStarts?: number; keyOnMatch?: number; keyOnWithin150ms?: number; pitchMatch?: number; byChannel?: Record<string, string>; lint?: string[] }
@@ -127,12 +127,21 @@ function buildRom(fur: string): string {
   copyFileSync(fur, path.join(HARNESS, 'assets/sound/music/inner.fur'));
   rmSync(path.join(HARNESS, 'build/nss'), { recursive: true, force: true });
   rmSync(path.join(HARNESS, 'build/sound/driver.ihx'), { force: true });
+  // build/samples.inc names the ADPCM samples vromtool pulls out of inner.fur (INNER_00_<SAMPLE>_START_LSB ...), but the
+  // game's Makefile makes it depend on the sample/music YAML maps only, which never change here. A kept copy held the
+  // previous song's sample names, so a .fur with other sample names (ironwing_kick) linked with undefined globals.
+  rmSync(path.join(HARNESS, 'build/samples.inc'), { force: true });
   const R = path.join(HARNESS, 'build/rom'), q = path.join(homedir(), '.claude/bin/buildq');
   const mk = ['nice', '-n', '19', 'gmake', '-j3', 'build/rom/gumbirds-v1.v1', 'build/rom/gumbirds-m1.m1'];
   rmSync(path.join(R, 'gumbirds-m1.m1'), { force: true }); rmSync(path.join(R, 'gumbirds-v1.v1'), { force: true });
-  // V ROM first: it writes build/samples.inc, which the M1 instruments file includes (parallel -j races on it)
-  try { for (const t of [mk.slice(0, -1), mk.slice(0, -2).concat(mk.at(-1)!)]) run(existsSync(q) ? q : t[0], existsSync(q) ? ['--purpose', 'neogeo agent: rom check', '--', ...t] : t.slice(1), { cwd: HARNESS }); }
-  catch (e) { const m = String((e as { stderr?: string }).stderr ?? e); throw new Error(`build: ${(m.match(/(AssertionError|Error)[^\n]*/g) ?? [m.slice(-300)]).slice(-2).join(' | ')}`); }
+  // V ROM + sample map first: the M1 instruments file .includes build/samples.inc, but no rule makes its .rel depend on
+  // it, so under -j3 the M1 make assembled it while vromtool was still writing it (".include/.incbin file error").
+  try { for (const t of [mk.slice(0, -1).concat('build/samples.inc'), mk.slice(0, -2).concat(mk.at(-1)!)]) run(existsSync(q) ? q : t[0], existsSync(q) ? ['--purpose', 'neogeo agent: rom check', '--', ...t] : t.slice(1), { cwd: HARNESS, timeout: 0 }); }  // no timeout: buildq queue waits can exceed 10 min
+  catch (e) {
+    const x = e as { stdout?: string; stderr?: string }, m = `${x.stdout ?? ''}\n${x.stderr ?? e}`;
+    // keep the cause lines (linker undefined globals, assembler errors), not only make's closing "Error 2"
+    throw new Error(`build: ${(m.match(/(AssertionError|Undefined Global|Error)[^\n]*/g) ?? [m.slice(-300)]).slice(-3).join(' | ')}`);
+  }
   const rom = ['-p', `${R}/gumbirds-p1.p1`, '-c', `${R}/gumbirds-c1.c1`, `${R}/gumbirds-c2.c2`, '-v', `${R}/gumbirds-v1.v1`, '-s', `${R}/gumbirds-s1.s1`, '-m', `${R}/gumbirds-m1.m1`, '-n', 'gumbirds'];
   run('romtool.py', ['-b', 'cartridge', '-f', 'zip', ...rom, '-o', `${R}/gumbirds.zip`]);
   run('romtool.py', ['-b', 'hash', '-f', 'mame', ...rom, '-l', 'Gumbirds', '-o', `${R}/neogeo.xml`]);
