@@ -172,7 +172,7 @@ export async function tryChipDumpParse(
     const bytes = new Uint8Array(buffer);
     if (isBeRoTrackerZip(bytes)) throw new Error(`BeRoTracker song in the newer ZIP form is not supported: ${originalFileName}`);
     if (isBeRoTrackerFormat(bytes)) {
-      const song = parseBeRoTrackerFile(bytes, originalFileName);
+      const song = await parseBeRoTrackerFile(bytes, originalFileName);
       if (song) return song;
     }
     throw new Error(`BeRoTracker file did not decode: ${originalFileName}`);

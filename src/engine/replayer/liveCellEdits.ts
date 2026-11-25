@@ -53,7 +53,7 @@ export function playingDescriptor(song: TrackerSong): NativeEngineDescriptor | n
 
 /** Where a grid edit of a song goes (one per branch of sendCellEditsToEngine). */
 export type LiveEditRoute =
-  | 'fred-module' | 'actionamics-module' | 'monotone-module' | 'kdm-module' | 'piece-module' | 'buz-module' | 't0ast-module' | 'organya-module' | 'pxtone-module' | 'aon-module' | 'piyopiyo-module' | 'jxs-module' | 'activisionPro-module'
+  | 'fred-module' | 'actionamics-module' | 'monotone-module' | 'kdm-module' | 'piece-module' | 'buz-module' | 't0ast-module' | 'berotracker-module' | 'organya-module' | 'pxtone-module' | 'aon-module' | 'piyopiyo-module' | 'pt3-module' | 'jxs-module' | 'activisionPro-module'
   | 'track-index' | 'grid-cell' | 'engine-swap' | 'eagleplayer-module' | 'hippelst-module' | 'med-module' | 'chip-ram' | 'uade-module' | 'none';
 
 /**
@@ -72,10 +72,12 @@ export function liveEditRoute(song: TrackerSong): { route: LiveEditRoute; engine
   if (desc?.key === 'PieceReplayer') return at('piece-module');
   if (desc?.key === 'BuzReplayer') return at('buz-module');
   if (desc?.key === 'T0astReplayer') return at('t0ast-module');
+  if (desc?.key === 'BeRoTrackerReplayer') return at('berotracker-module');
   if (desc?.key === 'Organya') return at('organya-module');
   if (desc?.key === 'Pxtone') return at('pxtone-module');
   if (desc?.key === 'ArtOfNoise') return at('aon-module');
   if (desc?.key === 'PiyoPiyo') return at('piyopiyo-module');
+  if (desc?.key === 'Aylet' && song.pt3NoteOffsets) return at('pt3-module');
   if (desc?.key === 'JxsReplayer') return at('jxs-module');
   if (desc?.key === 'ActivisionProReplayer') return at('activisionPro-module');
   if (desc && isTrackIndexEngine(desc.key)) return at('track-index');
@@ -128,6 +130,11 @@ export async function sendCellEditsToEngine(
       await applyT0astModuleEdits(song, edits);
       break;
     }
+    case 'berotracker-module': {
+      const { applyBeRoTrackerModuleEdits } = await import('../berotracker/beRoTrackerModuleEdits');
+      await applyBeRoTrackerModuleEdits(song, edits);
+      break;
+    }
     case 'buz-module': {
       const { applyBuzModuleEdits } = await import('../buz/buzModuleEdits');
       await applyBuzModuleEdits(song, edits);
@@ -152,6 +159,12 @@ export async function sendCellEditsToEngine(
       const { applyPiyoPiyoModuleEdits } = await import('../piyopiyo/piyoPiyoModuleEdits');
       await applyPiyoPiyoModuleEdits(song, edits);
       break;
+    }
+    // PT3 on aylet: a grid note is one byte of the module; the byte goes into the running Z80 memory and the song's files.
+    case 'pt3-module': {
+      const { applyPt3ModuleEdits } = await import('../pt3/pt3ModuleEdits');
+      await applyPt3ModuleEdits(song, edits);
+      return;
     }
     case 'monotone-module': {
       const { applyMonotoneModuleEdits } = await import('../monotone/monotoneModuleEdits');

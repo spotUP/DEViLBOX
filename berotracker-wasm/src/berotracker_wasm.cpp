@@ -150,3 +150,87 @@ EMSCRIPTEN_KEEPALIVE int brt_render(float* out, int frames) {
 EMSCRIPTEN_KEEPALIVE void brt_close(void) { g_open.reset(); }
 
 }
+
+/* ---- Editor grid (BeRoTrackerEdit build): load()'s decoded cells as tracker cells, and back. ----
+ * Grid cell = 7 int32 (note, instrument, volume, effTyp, eff, effTyp2, eff2), row-major
+ * (row * channels + channel). note 1..120 as stored (1 = C-0, DEViLBOX's own numbering), key off
+ * 255 and note cut 254 shown as 97 (note off). volume 0x10 + vol only where the engine reads it
+ * (volcmd 1, vol <= 64, rowWork). effTyp/eff = fx/param as stored (16 bit). effTyp2/eff2 = 0:
+ * the cell's pan byte is never read by the engine and filter stays as stored (pokes skip it). */
+namespace {
+std::unique_ptr<Song> g_grid;
+std::vector<int32_t> g_gridOut;
+uint8_t g_cellOut[sizeof(Cell)];
+
+int32_t* gridPattern(const Song* song, int p) {
+  g_gridOut.clear();
+  if (!song || p < 0 || p >= 240 || !song->pat[p].present) { g_gridOut.resize(7); return g_gridOut.data(); }
+  const Pattern& pt = song->pat[p];
+  const int ch = song->channels;
+  g_gridOut.assign(size_t(pt.rows) * size_t(ch) * 7 + 7, 0);
+  for (int c = 0; c < ch; ++c)
+    for (int r = 0; r < pt.rows; ++r) {
+      const Cell& x = pt.cells[size_t(c) * size_t(pt.rows) + size_t(r)];
+      int32_t* o = g_gridOut.data() + (size_t(r) * size_t(ch) + size_t(c)) * 7;
+      o[0] = (x.note == 254 || x.note == 255) ? 97 : (x.note <= 120 ? x.note : 0);
+      o[1] = x.ins;
+      o[2] = (x.volcmd == 1 && x.vol <= 64) ? 0x10 + x.vol : 0;
+      o[3] = x.fx;
+      o[4] = x.param;
+    }
+  return g_gridOut.data();
+}
+}  // namespace
+
+extern "C" {
+EMSCRIPTEN_KEEPALIVE int brt_grid_open(const uint8_t* data, int size) {
+  g_grid.reset(new Song());
+  g_error.clear();
+  if (size <= 0 || (size_t)size > MAX_FILE) { g_error = "the file is too big for a BeRoTracker song"; return 0; }
+  g_error = load(std::vector<uint8_t>(data, data + size), *g_grid);
+  return g_error.empty() ? 1 : 0;
+}
+EMSCRIPTEN_KEEPALIVE int brt_grid_channels(void) { return g_grid ? g_grid->channels : 0; }
+EMSCRIPTEN_KEEPALIVE int brt_grid_speed(void) { return g_grid ? (g_grid->speed < 1 ? 1 : g_grid->speed) : 6; }
+EMSCRIPTEN_KEEPALIVE int brt_grid_bpm(void) { return g_grid ? (g_grid->bpm < 1 ? 1 : g_grid->bpm > 255 ? 255 : g_grid->bpm) : 125; }
+/* Order positions up to the 255 end mark (advanceRow stops there). */
+EMSCRIPTEN_KEEPALIVE int brt_grid_order_length(void) {
+  if (!g_grid) return 0;
+  int k = 0;
+  while (k <= g_grid->orderCount && k < 257 && g_grid->order[k] != 255) ++k;
+  return k;
+}
+/* A skip marker (240..254) shows the pattern advanceRow moves on to, so order index = curOrder. */
+EMSCRIPTEN_KEEPALIVE int brt_grid_order(int k) {
+  if (!g_grid || k < 0 || k >= 257) return 0;
+  for (int i = k; i < 257; ++i) {
+    const int p = g_grid->order[i];
+    if (p == 255) break;
+    if (p < 240) return p;
+  }
+  return 0;
+}
+EMSCRIPTEN_KEEPALIVE int brt_grid_pattern_rows(int p) {
+  return g_grid && p >= 0 && p < 240 && g_grid->pat[p].present ? g_grid->pat[p].rows : 0;
+}
+EMSCRIPTEN_KEEPALIVE const int32_t* brt_grid_pattern(int p) { return gridPattern(g_grid.get(), p); }
+EMSCRIPTEN_KEEPALIVE void brt_grid_close(void) { g_grid.reset(); }
+
+/* The playing song's cells (pokes included) and the pattern the sequencer is in, for tests. */
+EMSCRIPTEN_KEEPALIVE const int32_t* brt_play_pattern(int p) { return gridPattern(g_open ? g_open->song.get() : nullptr, p); }
+EMSCRIPTEN_KEEPALIVE int brt_play_pattern_index(void) { return g_open ? g_open->engine->curPat : -1; }
+
+/* One tracker cell back to the stored Cell bytes (struct order note, ins, volcmd, vol, pan, filter,
+ * fx u16, param u16); the inverse of gridPattern, note off stored as 255 (key off). Callers poke
+ * bytes 0..3 and 6..9 only, so the stored pan/filter bytes stay. */
+EMSCRIPTEN_KEEPALIVE const uint8_t* brt_encode_cell(int note, int ins, int volume, int effTyp, int eff) {
+  Cell c;
+  c.note = uint8_t(note == 97 ? 255 : (note >= 1 && note <= 120 ? note : 0));
+  c.ins = uint8_t(ins >= 0 && ins <= 255 ? ins : 0);
+  if (volume >= 0x10 && volume <= 0x50) c.volcmd = 1, c.vol = uint8_t(volume - 0x10);
+  c.fx = uint16_t(effTyp);
+  c.param = uint16_t(eff);
+  std::memcpy(g_cellOut, &c, sizeof(Cell));
+  return g_cellOut;
+}
+}  // extern "C"
