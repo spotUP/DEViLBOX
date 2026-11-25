@@ -1,0 +1,119 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * WebAssembly front for piece.cpp (Aquaplus P/ECE music driver replayer, clean-room by creep,
+ * bbmp-replayers/piece). piece.cpp and piece.h are kept byte-identical to the bbmp source;
+ * piece.cpp is included here so the play position and live edits reach Song::d, the command
+ * bytes the sequencer reads (step() reads d[p.pos] for every command).
+ *
+ * Output follows bbmp-piece.cpp (the reference recordings were made with it): 16 kHz mono
+ * from render16k, to the context rate by straight lines between samples, rounded to 16 bits,
+ * the same sample on both sides; a song that starts over plays to where every part has
+ * started over once, then 8 seconds more, fading out. */
+#include "piece.cpp"
+
+#include <emscripten.h>
+
+#include <memory>
+#include <string>
+#include <vector>
+
+namespace {
+constexpr double FADE = 8.0;  // bbmp-piece.cpp
+
+struct Open {
+  piece::Song* song = nullptr;
+  int rate = 48000;
+  long long k = 0, end = 0, fadeFrom = 0;  // output frames: done, total, where the fade starts
+  double stepIn = 1, pos = 0;              // input samples per output frame; position after in[at]
+  std::vector<float> in = std::vector<float>(4096);
+  size_t have = 0, at = 0;
+  bool ended = false;
+  float prev = 0;
+  ~Open() { piece::destroy(song); }
+};
+std::unique_ptr<Open> g_open;
+std::string g_error;
+}  // namespace
+
+extern "C" {
+
+/* 1 when the song is ready to play at <rate> Hz. */
+EMSCRIPTEN_KEEPALIVE int piece_open(const uint8_t* data, int size, int rate) {
+  g_open.reset();
+  g_error.clear();
+  if (size <= 0) { g_error = "empty file"; return 0; }
+  if (rate < 8000 || rate > 192000) rate = 48000;
+  const std::vector<uint8_t> file(data, data + size);
+  std::unique_ptr<Open> o(new Open);
+  o->song = piece::load(file, g_error);
+  if (!o->song) return 0;
+  const piece::Length len = piece::measure(file);
+  const double total = len.seconds + (len.loops ? FADE : 0);
+  o->end = static_cast<long long>(total * rate);
+  o->fadeFrom = len.loops ? static_cast<long long>(len.seconds * rate) : o->end;
+  o->stepIn = 16000.0 / rate;
+  o->rate = rate;
+  g_open = std::move(o);
+  return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE const char* piece_error(void) { return g_error.c_str(); }
+EMSCRIPTEN_KEEPALIVE int piece_parts(void) { return g_open ? piece::parts(g_open->song) : 0; }
+EMSCRIPTEN_KEEPALIVE int piece_duration_ms(void) {
+  if (!g_open) return 0;
+  return static_cast<int>(g_open->end * 1000 / g_open->rate);
+}
+
+/* Where the sequencer is: driver ticks since the start (24 a quarter note at the song's tempo). */
+EMSCRIPTEN_KEEPALIVE int piece_ticks(void) { return g_open ? static_cast<int>(g_open->song->ticks) : 0; }
+/* The byte offset part <i> reads its next command from (0 when the part is unused). */
+EMSCRIPTEN_KEEPALIVE int piece_part_pos(int i) {
+  if (!g_open || i < 0 || i >= piece::PARTS || !g_open->song->part[i].used) return 0;
+  return static_cast<int>(g_open->song->part[i].pos);
+}
+
+/* Live edit: overwrite <count> bytes of the song file at <offset> (Song::d is the file as loaded,
+ * so a file offset is a Song::d offset). Heard when a part next reads those bytes. */
+EMSCRIPTEN_KEEPALIVE int piece_poke(int offset, const uint8_t* bytes, int count) {
+  if (!g_open || offset < 0 || count < 0) return 0;
+  std::vector<uint8_t>& d = g_open->song->d;
+  if ((size_t)offset + (size_t)count > d.size()) return 0;
+  std::memcpy(d.data() + offset, bytes, (size_t)count);
+  return 1;
+}
+
+/* Stereo float frames in -1..1; returns how many were written, fewer than asked at the end.
+ * The loop of bbmp-piece.cpp main(), made resumable. */
+EMSCRIPTEN_KEEPALIVE int piece_render(float* out, int frames) {
+  if (!g_open || frames <= 0) return 0;
+  Open& o = *g_open;
+  int got = 0;
+  for (; got < frames && o.k < o.end; o.k++) {
+    while (o.pos >= 1.0 || o.at >= o.have) {
+      if (o.at < o.have && o.pos >= 1.0) {
+        o.prev = o.in[o.at];
+        o.at++;
+        o.pos -= 1.0;
+        continue;
+      }
+      if (o.ended) break;
+      const int n = piece::render16k(o.song, o.in.data(), static_cast<int>(o.in.size()));
+      o.have = static_cast<size_t>(n);
+      o.at = 0;
+      if (n < static_cast<int>(o.in.size())) o.ended = true;
+      if (n == 0) break;
+    }
+    if (o.at >= o.have) { o.end = o.k; break; }  // the song has ended
+    double v = o.prev + (o.in[o.at] - o.prev) * o.pos;
+    o.pos += o.stepIn;
+    if (o.k > o.fadeFrom) v *= 1.0 - double(o.k - o.fadeFrom) / (o.end - o.fadeFrom);
+    const long s = std::lround(std::fmax(-1.0, std::fmin(1.0, v)) * 32767.0);
+    out[2 * got] = out[2 * got + 1] = s / 32768.0f;
+    ++got;
+  }
+  return got;
+}
+
+EMSCRIPTEN_KEEPALIVE void piece_close(void) { g_open.reset(); }
+
+}
