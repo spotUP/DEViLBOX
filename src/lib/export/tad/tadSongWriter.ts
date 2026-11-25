@@ -182,18 +182,20 @@ function snesEchoFlags(raw: string | undefined) {
  * tempo; each row keeps at least 1 tick, so only speed-1 runs lag. A timer clamped at 256 keeps the Furnace tick count.
  */
 export function tadRowTicks(rows: Array<{ ticks: number; rate: number; timer?: number; row?: number }>, timer: number, k: number, sfx: boolean): void {
-  let acc = 0, prev = 0, t = timer;
+  let acc = 0, pacc = 0, prev = 0, t = timer;
   rows.forEach((r, i) => {
     if (r.timer) t = r.timer;
     // Songs round per pattern, carrying only the sub-tick remainder into the next pattern: dropping it lost up to
     // 0.5 tick per pattern (192-tick patterns at 60 Hz: 192.48 -> 192, 32 ms early by the 4th pattern).
-    if (!sfx && r.row === 0) { acc -= prev; prev = 0; }
+    if (!sfx && r.row === 0) { acc -= prev; prev = 0; pacc = 0; }
     const f = sfx ? SFX_TICK_HZ / (r.rate * k) : 8000 / (r.rate * k * t);
     const fast = !sfx && 8000 / (r.rate * k) < 63.5; // timer would be under 64
-    acc += r.ticks * (sfx || fast || Math.abs(f - 1) <= 0.005 ? f : 1);
-    // Songs correct only on the last row of a pattern, so repeated patterns stay identical for subroutine dedup
-    // (the error stays under about one tick at any pattern start).
-    if (!sfx && !fast && rows[i + 1]?.row !== 0 && i < rows.length - 1) { prev += r.ticks; return; }
+    const d = r.ticks * (sfx || fast || Math.abs(f - 1) <= 0.005 ? f : 1);
+    acc += d; pacc += d;
+    // Inside a pattern, songs round the pattern-relative time (no carry), so repeated patterns stay identical for
+    // subroutine dedup; the last row takes the carried remainder. Unscaled rows drifted 0.25% per 60 Hz pattern
+    // (576-tick pattern: 1.4 ticks by mid-pattern, Sadness notes 31 ms early); now the error stays about one tick.
+    if (!sfx && !fast && rows[i + 1]?.row !== 0 && i < rows.length - 1) { const m = Math.max(prev + 1, Math.round(pacc)); r.ticks = m - prev; prev = m; return; }
     const n = sfx ? Math.round(acc) : Math.max(prev + 1, Math.round(acc));
     r.ticks = n - prev; prev = n;
   });

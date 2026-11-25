@@ -334,7 +334,7 @@ describe('tadRowTicks', () => {
     tadRowTicks(rows, 133, 1, false);
     const sum = rows.reduce((s, r) => s + r.ticks, 0);
     expect(sum).toBe(Math.round(2400 * (8000 / 60) / 133)); // 2406 TAD ticks = 40 s at 16.625 ms
-    expect(rows.every((r, i) => r.ticks === 6 || (r.ticks === 7 && i % 64 === 63))).toBe(true);
+    expect(rows.every((r) => r.ticks === 6 || r.ticks === 7)).toBe(true);
     const fast = Array.from({ length: 10 }, (_, i) => ({ ticks: 6, rate: 200, row: i }));
     tadRowTicks(fast, 64, 1, false); // 200 Hz needs timer 40: clamped to 64, rows rescaled to 125 Hz (6 -> 3.75 ticks)
     expect(fast.reduce((s, r) => s + r.ticks, 0)).toBe(38); // 60 Furnace ticks = 37.5 TAD ticks
@@ -361,5 +361,19 @@ describe('tadRowTicks', () => {
       // every pattern start stays within half a TAD tick of absolute time (was 2 ticks = 32 ms late by pattern 4)
       expect(Math.abs(end - (p + 1) * 192 * (8000 / 60) / 133)).toBeLessThanOrEqual(0.5);
     }
+  });
+
+  it('keeps every row of a long pattern near absolute time, repeated patterns identical (Sadness.fur: 576-tick patterns, notes 31 ms early)', () => {
+    const rows = Array.from({ length: 64 * 8 }, (_, i) => ({ ticks: 9, rate: 60, row: i % 64 }));
+    tadRowTicks(rows, 133, 1, false);
+    let at = 0;
+    rows.forEach((r, i) => {
+      // row start in TAD ticks vs exact Furnace time: was 1.85 ticks early at pattern 4 row 30
+      expect(Math.abs(at - i * 9 * (8000 / 60) / 133)).toBeLessThanOrEqual(1);
+      at += r.ticks;
+    });
+    // rows before the last one depend only on the pattern itself, so subroutine dedup still sees equal patterns
+    const body = (p: number) => rows.slice(p * 64, p * 64 + 63).map((r) => r.ticks).join();
+    for (let p = 1; p < 8; p++) expect(body(p)).toBe(body(0));
   });
 });
