@@ -5,7 +5,8 @@
 // Pipeline = the game's own: a copy of ~/Code/ArcadeGame (ARCADEGAME overrides) with its music-map.yaml pointing at the song, built with its
 // Makefile rules (patched SSG noise lib + nullsound.lib), the game's 68k ROM unchanged. The game sends its title-music command (id 4 = the song)
 // at boot; commands the Z80 acked are recorded in the verdict. Scoring: key-on (FM key-on, SSG volume 0 -> on, ADPCM-A/B start) within 30 ms of
-// Furnace's, same channel; pitch = Hz at key-on within 50 cents (FM, SSG, ADPCM-B rate). Both streams start at their own first key-on.
+// Furnace's, same channel; pitch = Hz at key-on within 50 cents (FM, SSG, ADPCM-B rate); vol = each Furnace volume-register change
+// (FM carrier TL, SSG 08-0A, ADPCM-B 1B) seen on the same channel in MAME within 30 ms. Both streams start at their own first key-on.
 // Results: test-data/neogeo-rom-check.json (resumable; skips songs whose input hash matches). Needs mame, ngdevkit, the Furnace CLI.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -26,7 +27,7 @@ const SONGS: { name: string; fur?: string; compose?: string }[] = [
   ...['gumbirds-title', 'gumbirds-arena', 'gumbirds-game-over', 'gumbirds-round-clear', 'neogeo-fx-tempo'].map((n) => ({ name: n, compose: n })),
 ];
 
-interface Verdict { inputHash: string; pass: boolean; seconds: number; stage?: string; error?: string; commands?: string[]; mameStarts?: number; furnaceStarts?: number; keyOnMatch?: number; keyOnWithin150ms?: number; pitchMatch?: number; byChannel?: Record<string, string>; lint?: string[] }
+interface Verdict { inputHash: string; pass: boolean; seconds: number; stage?: string; error?: string; commands?: string[]; mameStarts?: number; furnaceStarts?: number; keyOnMatch?: number; keyOnWithin150ms?: number; pitchMatch?: number; volMatch?: number; byChannel?: Record<string, string>; lint?: string[] }
 type Start = { t: number; ch: string; hz: number };
 type W = { t: number; port: number; reg: number; val: number };
 
@@ -73,6 +74,40 @@ function starts(w: W[], clk: number): Start[] {
   out.sort((p, q) => p.t - q.t);
   const t0 = out[0]?.t ?? 0; lastT0 = t0;
   return out.map(({ t, ch, hz }) => ({ t: t - t0, ch, hz }));
+}
+
+/** Volume-register level per channel, relative to t0: FM = carrier TLs (0x40-0x4f; carriers by the algorithm in 0xb0-0xb2),
+ * SSG = 08-0A (16 = envelope mode), ADPCM-B = 1B. Writes at one timestamp collapse to the last state (a write burst is one change). */
+type Lv = { t: number; v: number[] };
+const CARRIERS = [[3], [3], [3], [3], [1, 3], [1, 2, 3], [1, 2, 3], [0, 1, 2, 3]]; // slot index: 0 = S1 (+0), 1 = S2 (+8), 2 = S3 (+4), 3 = S4 (+c)
+function levels(w: W[], t0: number): Record<string, Lv[]> {
+  const tl: Record<string, number[]> = {}, alg: Record<string, number> = {}, out: Record<string, Lv[]> = {};
+  const put = (ch: string, t: number, v: number[]) => {
+    const l = (out[ch] ??= []), last = l.at(-1);
+    if (last && last.t === t - t0) last.v = v; else if (!last || last.v.join() !== v.join()) l.push({ t: t - t0, v });
+  };
+  const fmV = (ch: string) => CARRIERS[alg[ch] ?? 7].map((i) => tl[ch]?.[i] ?? 127);
+  for (const { port, reg, val, t } of w) {
+    const c = reg & 3, ch = c === 0 || c === 3 ? undefined : `F${port * 2 + c}`;
+    if (ch && reg >= 0x40 && reg <= 0x4f) { (tl[ch] ??= [127, 127, 127, 127])[[0, 2, 1, 3][(reg >> 2) & 3]] = val & 0x7f; put(ch, t, fmV(ch)); }
+    else if (ch && reg >= 0xb0 && reg <= 0xb2) { alg[ch] = val & 7; put(ch, t, fmV(ch)); }
+    else if (port === 0 && reg >= 8 && reg <= 10) put(`S${reg - 7}`, t, [val & 0x10 ? 16 : val & 0xf]);
+    else if (port === 0 && reg === 0x1b) put('B', t, [val]);
+  }
+  return out;
+}
+/** Each Furnace level change counts as matched when the MAME level of that channel equals it (every value within `tol`) at some point in t +- 30 ms. */
+function volScore(want: Record<string, Lv[]>, got: Record<string, Lv[]>, end: number) {
+  const by: Record<string, [number, number]> = {}, miss: string[] = [];
+  const eq = (a: number[], b: number[], tol: number) => a.length === b.length && a.every((x, i) => Math.abs(x - b[i]) <= tol);
+  for (const [ch, l] of Object.entries(want)) for (const e of l) {
+    if (e.t < 0 || e.t > end) continue;
+    const g = got[ch] ?? [], before = g.filter((x) => x.t <= e.t - 0.03).at(-1);
+    const seen = [...(before ? [before] : []), ...g.filter((x) => x.t > e.t - 0.03 && x.t < e.t + 0.03)];
+    const ok = seen.some((x) => eq(x.v, e.v, ch.startsWith('F') ? 1 : 0)); // FM TL tolerance 1 step (0.75 dB): volume scaling rounds
+    const b = (by[ch] ??= [0, 0]); b[1]++; if (ok) b[0]++; else miss.push(`${e.t.toFixed(3)} ${ch} want [${e.v}] got ${seen.map((x) => `[${x.v}]`).join(' ') || 'none'}`);
+  }
+  return { by, miss };
 }
 
 function readTap(file: string): { w: W[]; cmds: string[] } {
@@ -197,13 +232,18 @@ for (const song of SONGS) {
       for (const { w, d } of missD) { const k = d === undefined ? 'none' : `${d < 0 ? '-' : '+'}${bins.find((x) => Math.abs(d) < x)}`; h[`${w.ch} ${k}`] = (h[`${w.ch} ${k}`] ?? 0) + 1; console.log(`  MISS ${w.t.toFixed(3)} ${w.ch} nearest ${d === undefined ? 'none' : `${(d * 1000).toFixed(0)} ms`}`); }
       console.log('  miss histogram (channel, sign, |delta| < s):', JSON.stringify(h));
     }
+    const vs = volScore(levels(vgm.w, wantT0), levels(tap.w, gotT0), Math.min(SECONDS - 2, vgm.end - wantT0));
+    if (detail) for (const m of vs.miss) console.log(`  VOLMISS ${m}`);
     const tone = hit.filter(([w]) => w.hz > 0);
     const cents = (a: Start, b: Start) => Math.round(1200 * Math.log2(b.hz / a.hz));
     const ok = (w: Start, g: Start) => g.hz > 0 && Math.abs(cents(w, g)) < 50;
-    if (detail) for (const [w, g] of tone) if (!ok(w, g!)) console.log(`  ${w.t.toFixed(3)} ${w.ch} want ${w.hz.toFixed(1)} got ${g!.hz.toFixed(1)} Hz`);
+    // SSG pitch miss: raw period writes (reg 2n, 2n+1) of the channel from 0.1 s before to 0.1 s after the key-on, both streams
+    const perW = (x: W[], t0: number, ch: string, t: number) => x.filter((e) => e.port === 0 && e.reg >> 1 === Number(ch[1]) - 1 && e.reg < 6 && e.t - t0 > t - 0.1 && e.t - t0 < t + 0.1).map((e) => `${((e.t - t0) * 1000).toFixed(0)}:${e.reg}=${e.val}`).join(' ');
+    if (detail) for (const [w, g] of tone) if (!ok(w, g!)) console.log(`  ${w.t.toFixed(3)} ${w.ch} want ${w.hz.toFixed(1)} got ${g!.hz.toFixed(1)} Hz${w.ch.startsWith('S') ? ` furnace [${perW(vgm.w, wantT0, w.ch, w.t)}] mame [${perW(tap.w, gotT0, w.ch, w.t)}]` : ''}`);
     const pct = (a: number, b: number) => (b ? Math.round((a / b) * 10000) / 100 : 0);
     const chs = [...new Set(want.map((w) => w.ch))].sort();
-    v.byChannel = Object.fromEntries(chs.map((c) => { const p = pairs.filter(([w]) => w.ch === c); const h = p.filter(([, g]) => g); return [c, `${h.length}/${p.length} key-on, ${h.filter(([w, g]) => w.hz > 0 && ok(w, g!)).length}/${h.filter(([w]) => w.hz > 0).length} pitch`]; }));
+    v.byChannel = Object.fromEntries(chs.map((c) => { const p = pairs.filter(([w]) => w.ch === c); const h = p.filter(([, g]) => g); return [c, `${h.length}/${p.length} key-on, ${h.filter(([w, g]) => w.hz > 0 && ok(w, g!)).length}/${h.filter(([w]) => w.hz > 0).length} pitch, ${vs.by[c]?.[0] ?? 0}/${vs.by[c]?.[1] ?? 0} vol`]; }));
+    const vt = Object.values(vs.by).reduce((a, b) => [a[0] + b[0], a[1] + b[1]], [0, 0]); v.volMatch = pct(vt[0], vt[1]);
     Object.assign(v, { furnaceStarts: want.length, keyOnMatch: pct(hit.length, want.length), keyOnWithin150ms: pct(loose, want.length), pitchMatch: pct(tone.filter(([w, g]) => ok(w, g!)).length, tone.length) });
     v.stage = undefined;
   } catch (e) {

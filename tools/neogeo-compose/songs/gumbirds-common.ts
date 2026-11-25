@@ -11,9 +11,11 @@ export const OPNB = 14;
 export type Op = Partial<FurnaceOperatorConfig>;
 
 /** FM patch from operators named as on the chip (OP1-OP4); stored in register-slot order OP1, OP3, OP2, OP4. */
+// kvs 2 = Furnace's own default (volume scales the carriers); DEFAULT_FURNACE has kvs 0, which leaves TL fixed in Furnace while nullsound
+// always scales the carriers, so F8/F9 and the volume column moved the ROM level but not Furnace's
 export function fm(algorithm: number, feedback: number, ops: { op1: Op; op2: Op; op3: Op; op4: Op }): FurnaceConfig {
   const make = (o: Op): FurnaceOperatorConfig =>
-    ({ ...DEFAULT_FURNACE.operators[0], dt: 3, rs: 0, ssg: 0, am: false, d2r: 0, ...o, enabled: true }) as FurnaceOperatorConfig;
+    ({ ...DEFAULT_FURNACE.operators[0], dt: 3, rs: 0, ssg: 0, am: false, d2r: 0, kvs: 2, ...o, enabled: true }) as FurnaceOperatorConfig;
   return {
     ...DEFAULT_FURNACE, chipType: OPNB, algorithm, feedback, fms: 0, ams: 0,
     operators: [make(ops.op1), make(ops.op3), make(ops.op2), make(ops.op4)],
