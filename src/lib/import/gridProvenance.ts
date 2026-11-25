@@ -419,13 +419,14 @@ export const WALK_GRIDS: Record<string, string> = {
   musicAssembler: 'src/engine/__tests__/musicAssemblerWalkMatchesPlayer.test.ts',
   // C++ unroll (piece-wasm/src/piece_grid.h); the test runs piece_grid_test.cpp against the driver's tick().
   piece: 'src/lib/import/__tests__/pieceGridMatchesPlayer.test.ts',
+  // C++ cell decode (t0ast_wasm.cpp grid exports); the test plays the engine and checks each row's pattern and cells.
+  t0ast: 'src/lib/import/__tests__/t0astGridMatchesPlayer.test.ts',
 };
 
 /** Scope view by design: no pattern grid exists or can exist. */
 export const SCOPE_GRIDS: Record<string, string> = {
   cinter4: 'Cinter4Parser: sequence data left to the WASM replayer (Cinter4Parser.ts header); no corpus song',
   buz: 'BuzParser: block shell, the WASM replayer plays the bytes (BuzParser.ts header); grid decode is the open buz ledger row',
-  t0ast: 'T0astParser: empty 64-row shell per pattern, the WASM replayer plays the bytes (T0astParser.ts header); cell decode is the open t0ast ledger row',
   c64sid: 'SIDParser runs 6502 and intercepts SID writes (player program, register log) [h: 39p/7488r/5796n]',
   vgm: 'VGMParser rebuilds notes from chip register writes (register log) [h: 1p/768r/298n]',
   ym: 'ZxtuneParser shell; engine plays [h: 17th.ym THROW fileName.replace]',

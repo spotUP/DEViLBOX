@@ -39,6 +39,39 @@ struct Open {
   ~Open() { if (player) delete player->engine; }
 };
 std::unique_ptr<Open> g_open;
+
+/* Engine::block renders a whole 2048-frame BLOCK in one go, so Player would do all that work in
+ * one 128-frame worklet call out of 16. This runs the same loop as Engine::block (tickStep when
+ * the tick runs out, then samples) at most PIECE frames at a time into Player's buffer, ahead of
+ * the frame Player::frame reads next, so Player::frame still does the output step unchanged. */
+const int PIECE = 128;
+int g_made = 0;  // frames of the current BLOCK already in Player::buf
+
+void fill(Player& p) {
+  if (p.at == BLOCK) {  // what Player::frame does at a BLOCK edge, minus the whole-block render
+    p.at = 0;
+    g_made = 0;
+    if (p.left <= 0) { std::fill(p.buf.begin(), p.buf.end(), 0.0f); g_made = BLOCK; }
+    p.left -= BLOCK;
+  }
+  if (p.at < g_made) return;
+  Engine& e = *p.engine;
+  TowardZero tz;
+  const int end = g_made + PIECE < BLOCK ? g_made + PIECE : BLOCK;
+  while (g_made < end) {
+    if (e.left_ == 0) e.tickStep();
+    const int n = e.left_ < end - g_made ? e.left_ : end - g_made;
+    for (int k = 0; k < n; ++k) e.sample(p.buf.data() + 2 * (g_made + k));
+    e.left_ -= n;
+    g_made += n;
+  }
+}
+
+void pieceSource(void* user, int16_t* frame) {
+  Player& p = *static_cast<Player*>(user);
+  fill(p);
+  p.frame(frame);
+}
 std::string g_error;
 std::vector<int16_t> g_pcm;
 bool g_constants = false;
@@ -60,8 +93,9 @@ EMSCRIPTEN_KEEPALIVE int t0ast_open(const uint8_t* data, int size, int rate) {
   if (o->total < 0) { g_error = "the song does not end within 30 minutes"; return 0; }
   o->player.reset(new Player{makeEngine(o->song, true), o->total});
   o->left = o->total;
+  g_made = 0;
   if (rate != RATE) {
-    o->rs.reset(new Resampler(RATE, rate, source, o->player.get()));
+    o->rs.reset(new Resampler(RATE, rate, pieceSource, o->player.get()));
     o->left = (long long)((unsigned long long)o->total * (unsigned long long)rate / RATE);
   }
   g_open = std::move(o);
@@ -91,6 +125,70 @@ EMSCRIPTEN_KEEPALIVE int t0ast_poke(int offset, const uint8_t* bytes, int count)
   return 1;
 }
 
+}  // extern "C"
+
+namespace {
+/* ---- grid: the cells as tracker cells, decoded here so TypeScript only copies numbers out.
+ * Seven int32 a cell (note, instrument, volume, effTyp, eff, effTyp2, eff2), 64 rows x 16
+ * channels a pattern, row-major. Note: 1..127 as stored (the engine plays note n - 1), 97 for a
+ * key off (stored 254, 255 or 129). Volume: 0x10 + vol (0..64), 0 when the cell keeps it (0xFF).
+ * Effects: T0AST's own numbers as stored (playRow, rowEffect). Instrument 0: a T0AST cell has
+ * none, each channel plays its own instrument. */
+Song g_grid;
+int32_t g_gridOut[64 * 16 * 7];
+uint8_t g_cellOut[6];
+
+const int32_t* gridPattern(const Song& song, int p) {
+  std::memset(g_gridOut, 0, sizeof g_gridOut);
+  if (p < 0 || p > 255 || song.cells.empty()) return g_gridOut;
+  for (int r = 0; r < 64; ++r)
+    for (int c = 0; c < 16; ++c) {
+      const Cell& x = song.cells[(size_t(p) * 64 + size_t(r)) * 16 + size_t(c)];
+      int32_t* o = g_gridOut + (r * 16 + c) * 7;
+      o[0] = (x.note == 254 || x.note == 255 || x.note == 129) ? 97 : x.note;
+      o[2] = x.vol <= 64 ? 0x10 + x.vol : 0;
+      o[3] = x.fx[0]; o[4] = x.par[0]; o[5] = x.fx[1]; o[6] = x.par[1];
+    }
+  return g_gridOut;
+}
+}  // namespace
+
+extern "C" {
+EMSCRIPTEN_KEEPALIVE int t0ast_grid_open(const uint8_t* data, int size) {
+  g_grid = Song();
+  g_error.clear();
+  if (size <= 0 || (size_t)size > MAX_FILE) { g_error = "the file is too big for a T0AST song"; return 0; }
+  g_error = load(std::vector<uint8_t>(data, data + size), g_grid);
+  return g_error.empty() ? 1 : 0;
+}
+EMSCRIPTEN_KEEPALIVE int t0ast_grid_channels(void) { return g_grid.channels; }
+EMSCRIPTEN_KEEPALIVE int t0ast_grid_order_length(void) { return g_grid.orderLength; }
+EMSCRIPTEN_KEEPALIVE int t0ast_grid_order(int k) { return k >= 0 && k < 256 ? g_grid.order[k] : 0xFF; }
+EMSCRIPTEN_KEEPALIVE const int32_t* t0ast_grid_pattern(int p) { return gridPattern(g_grid, p); }
+EMSCRIPTEN_KEEPALIVE void t0ast_grid_close(void) { g_grid = Song(); }
+
+/* The playing song's cells (pokes included) and the pattern the sequencer is in, for tests. */
+EMSCRIPTEN_KEEPALIVE const int32_t* t0ast_play_pattern(int p) {
+  static const Song none{};
+  return gridPattern(g_open ? g_open->song : none, p);
+}
+EMSCRIPTEN_KEEPALIVE int t0ast_play_pattern_index(void) {
+  if (!g_open) return -1;
+  return g_open->song.order[g_open->player->engine->curOrder_ & 255];
+}
+
+/* One tracker cell back to the six stored bytes (poke order note, vol, fx[0], fx[1], par[0],
+ * par[1]); the inverse of gridPattern, key off stored as 255. */
+EMSCRIPTEN_KEEPALIVE const uint8_t* t0ast_encode_cell(int note, int volume, int effTyp, int eff, int effTyp2, int eff2) {
+  g_cellOut[0] = uint8_t(note == 97 ? 255 : (note >= 0 && note <= 127 ? note : 0));
+  g_cellOut[1] = uint8_t(volume >= 0x10 && volume <= 0x50 ? volume - 0x10 : 0xFF);
+  g_cellOut[2] = uint8_t(effTyp); g_cellOut[3] = uint8_t(effTyp2);
+  g_cellOut[4] = uint8_t(eff); g_cellOut[5] = uint8_t(eff2);
+  return g_cellOut;
+}
+}  // extern "C"
+
+extern "C" {
 /* Stereo float frames in -1..1; returns how many were written, fewer than asked at the end. */
 EMSCRIPTEN_KEEPALIVE int t0ast_render(float* out, int frames) {
   if (!g_open || frames <= 0) return 0;
@@ -99,7 +197,7 @@ EMSCRIPTEN_KEEPALIVE int t0ast_render(float* out, int frames) {
   int got = 0;
   while (got < frames && o.left > 0) {
     if (o.rs) o.rs->frame(&g_pcm[2 * got]);
-    else o.player->frame(&g_pcm[2 * got]);
+    else pieceSource(o.player.get(), &g_pcm[2 * got]);
     ++got;
     --o.left;
   }

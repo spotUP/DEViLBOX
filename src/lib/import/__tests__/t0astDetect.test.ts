@@ -4,25 +4,27 @@
  */
 import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { isT0astFormat, parseT0astFile } from '@/lib/import/formats/T0astParser';
 
-const DIR = join(__dirname, '../../../../test-data/t0ast');
+const ROOT = resolve(__dirname, '../../../..');
+const DIR = join(ROOT, 'test-data/t0ast');
+const create = async () => (await import('../../../../public/t0ast/T0astEdit.js')).default({ locateFile: (f: string) => join(ROOT, 'public/t0ast', f) });
 const songs = existsSync(DIR) ? readdirSync(DIR).filter((f) => f.endsWith('.t0ast')).map((f) => join(DIR, f)) : [];
 
 describe('T0AST detection', () => {
-  it('rejects a wrong signature', () => {
+  it('rejects a wrong signature', async () => {
     const bad = new Uint8Array(64); bad.set([0x54, 0x30, 0x41, 0x53, 0x54, 0x02, 0x00, 0x01]);
     expect(isT0astFormat(bad)).toBe(false);
-    expect(parseT0astFile(bad, 'a.t0ast')).toBeNull();
+    expect(await parseT0astFile(bad, 'a.t0ast', create)).toBeNull();
   });
 
-  it.skipIf(songs.length === 0)('claims every Modland song, keeps the bytes and reads the order list', () => {
+  it.skipIf(songs.length === 0)('claims every Modland song, keeps the bytes and reads the order list', async () => {
     expect(songs.length).toBe(8);
     for (const path of songs) {
       const bytes = new Uint8Array(readFileSync(path));
       expect(isT0astFormat(bytes), path).toBe(true);
-      const song = parseT0astFile(bytes, 'a.t0ast')!;
+      const song = (await parseT0astFile(bytes, 'a.t0ast', create))!;
       expect(song.format).toBe('T0AST');
       expect(new Uint8Array(song.t0astFileData!)).toEqual(bytes);
       expect(song.songPositions.length, path).toBeGreaterThan(0);

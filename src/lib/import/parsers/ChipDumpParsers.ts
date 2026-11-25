@@ -150,7 +150,7 @@ export async function tryChipDumpParse(
     const { isT0astFormat, parseT0astFile } = await import('@lib/import/formats/T0astParser');
     const bytes = new Uint8Array(buffer);
     if (isT0astFormat(bytes)) {
-      const song = parseT0astFile(bytes, originalFileName);
+      const song = await parseT0astFile(bytes, originalFileName);
       if (song) return song;
     }
     throw new Error(`T0AST file did not decode: ${originalFileName}`);
