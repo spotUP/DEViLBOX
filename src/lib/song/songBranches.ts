@@ -129,6 +129,8 @@ async function importTrackerModuleUnloaded(
   throwIfSongLoadCancelled();
   setSongLoadPhase('parse');
   const song = await parseModuleToSong(file, options.subsong, options.uadeMetadata, options.midiOptions, options.companionFiles);
+  // The song keeps the companions it was opened with (a parser that does not store them, KDM): a reparse of the edited module needs them.
+  if (options.companionFiles?.size && !song.uadeCompanionFiles) song.uadeCompanionFiles = options.companionFiles;
   if (!song.patterns.length) {
     notify.error(`Module "${song.name || filename}" contains no patterns to import.`);
     return;

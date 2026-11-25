@@ -90,7 +90,8 @@ export async function editedModuleForPlay(
         const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
         const name = song.uadeEditableFileName ?? out.filename;
         const copy = new Uint8Array(out.data).buffer as ArrayBuffer;
-        const reloaded = await parseModuleToSong(new File([copy], name), 0) as unknown as Partial<TrackerSong>;
+        // The reload a user makes opens the song with its companions (KDM waves.kwv, SMUS/Sonix instruments): so does this one.
+        const reloaded = await parseModuleToSong(new File([copy], name), 0, undefined, undefined, song.uadeCompanionFiles) as unknown as Partial<TrackerSong>;
         const data = reloaded[desc.fileDataKey] as ArrayBuffer | Uint8Array | undefined;
         if (carriesEdit(data)) return data;
       }
