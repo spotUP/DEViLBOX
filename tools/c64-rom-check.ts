@@ -35,10 +35,12 @@ const SECONDS = Number(opt('--seconds') ?? 10), FRAMES = SECONDS * 50;
 function viceFrames(prg: string, dir: string, ntsc: boolean): number[][] {
   const cpu = c64CpuClock(ntsc), frame = cpu / 50;
   const dump = path.join(dir, 'sid.dump');
+  // +autostart-delay-random: VICE's default random boot delay shifted the player's phase against the 50 Hz frame bins, so the same
+  // .prg scored differently per run (PICOHOTCREDITS voice 1 pitch 59 vs 78).
   // Boot (autostart types RUN) takes about 3 s of emulated time; run long enough to cover it and FRAMES after the first note.
   const cycles = Math.round((SECONDS + 8) * cpu);
   try {
-    execFileSync(VICE, ['-default', ntsc ? '-ntsc' : '-pal', '-console', '-silent', '-warp', '-sounddev', 'dump', '-soundarg', dump, '-autostartprgmode', '1', '-limitcycles', String(cycles), '-autostart', prg],
+    execFileSync(VICE, ['-default', ntsc ? '-ntsc' : '-pal', '-console', '-silent', '-warp', '-sounddev', 'dump', '-soundarg', dump, '-autostartprgmode', '1', '+autostart-delay-random', '-limitcycles', String(cycles), '-autostart', prg],
       { stdio: 'ignore', timeout: 120000, cwd: dir });
   } catch { /* -limitcycles ends VICE with exit 1 */ }
   if (!existsSync(dump)) throw new Error('VICE wrote no SID dump');

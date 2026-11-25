@@ -38,8 +38,9 @@ export function goatSystemsSupported(sys: readonly number[]): boolean {
 }
 
 // Furnace macro codes (instrument.h DIV_MACRO_*): alg is the SID cutoff, ex1 the filter mode, ex2 the resonance.
-const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_EX1 = 5, MACRO_EX2 = 6, MACRO_ALG = 8;
-const MACROS_DONE = new Set([MACRO_VOL, MACRO_ARP, MACRO_DUTY, MACRO_WAVE, MACRO_EX1, MACRO_EX2, MACRO_ALG]);
+const MACRO_VOL = 0, MACRO_ARP = 1, MACRO_DUTY = 2, MACRO_WAVE = 3, MACRO_PITCH = 4, MACRO_EX1 = 5, MACRO_EX2 = 6, MACRO_ALG = 8;
+// The pitch macro is exported per note (furnaceToGoatTracker pitchProgram), not in the instrument.
+const MACROS_DONE = new Set([MACRO_VOL, MACRO_ARP, MACRO_DUTY, MACRO_WAVE, MACRO_PITCH, MACRO_EX1, MACRO_EX2, MACRO_ALG]);
 const MAX_PROGRAM_TICKS = 64;
 const s8 = (v: number) => (v << 24) >> 24;
 
@@ -273,11 +274,32 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
     arpProgs.set(key, pos);
     return pos;
   };
-  // Wave program for E1xy/E2xy on a row WITH a note (toneporta would not retrigger): waveform, then one wave-table slide command per tick
-  // until the slide has covered y semitones (player.s mt_execwavecmd runs a wave-table portamento for that one frame only; delay rows do not repeat it).
-  // shortcut: replaces the instrument's own wave/arpeggio program for that note; ticks are rounded to whole frames.
-  const slideProgs = new Map<string, number>();
   const sidFreq = (n: number): number => 440 * 2 ** ((n - 57) / 12) * 16777216 / (ntsc ? 1022730 : 985248);
+  // After a wave program's waveform row (tick 0): one wave-table slide row per tick ($F1 up / $F2 down; $E0-$EF is a silent waveform) that moves
+  // the SID frequency from `base` to sidFreq(base + semisAt(t)), then the stop row. semisAt is called for every tick in order (it may keep state).
+  // GT runs the wave table from the frame after note init, so tick 1 catches up Furnace's tick 0 and 1 steps.
+  const pushPitchCurve = (base: number, ticks: number, semisAt: (t: number) => number): void => {
+    const tb = tables[0];
+    let cur = sidFreq(base);
+    const ds: number[] = [];
+    for (let t = 0; t < ticks; t++) {
+      const semis = semisAt(t);
+      if (!t) continue;
+      const want = Math.round(Math.min(0xffff, sidFreq(base + semis)) - cur);
+      const d = Math.sign(want) * Math.min(0x7fff, Math.abs(want)); // player.s: speed left bit 7 means a note-relative speed
+      ds.push(d);
+      cur += d;
+      if (base + semis < 0) break; // below C-0, GT's lowest note: the rest is inaudible
+    }
+    while (ds.length && !ds[ds.length - 1]) ds.pop(); // the pitch has settled (or hit the SID floor): the stop row holds it
+    for (const d of ds) { tb.left.push(0xf0 | (d >= 0 ? 1 : 2)); tb.right.push(speedRow(Math.abs(d))); }
+    tb.left.push(0xff); tb.right.push(0);
+  };
+  // Wave program for E1xy/E2xy on a row WITH a note (toneporta would not retrigger): waveform, then per-tick slide rows that follow Furnace's
+  // linear-pitch slide (c64.cpp DIV_CMD_NOTE_PORTA: x*4*pitchSlideSpeed/128 semitone per tick from tick 0, clamped at the target). A constant
+  // SID-frequency speed glided too slowly at the top of a downward slide (yeah! voice 3: 1114 vs Furnace 999 one tick in).
+  // shortcut: replaces the instrument's own wave/arpeggio program for that note.
+  const slideProgs = new Map<string, number>();
   const slideProgram = (ins: number, note: number, dest: number, x: number): number => {
     const key = `${ins}_${note}_${dest}_${x}`;
     const have = slideProgs.get(key);
@@ -285,13 +307,77 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
     const c = m.instruments[ins]?.c64;
     const w = ((c ? baseWaveOf(c) : 1) << 4) | (c ? waveCtl(c) : 1);
     const tb = tables[0], pos = tb.left.length + 1;
-    const ticks = slideTicks(x, Math.abs(dest - note)), spd = Math.max(1, Math.round(Math.abs(sidFreq(dest) - sidFreq(note)) / ticks));
     tb.left.push(w >= 0x10 ? w : 0xe0 | w); tb.right.push(0);
-    // Wave-table commands are $F0+cmd ($E0-$EF is a silent waveform, which left the pitch constant).
-    const sp = speedRow(spd);
-    for (let t = 0; t < ticks; t++) { tb.left.push(0xf0 | (dest > note ? 1 : 2)); tb.right.push(sp); }
-    tb.left.push(0xff); tb.right.push(0);
+    const y = dest - note, step = x * slideSemis;
+    pushPitchCurve(note, Math.ceil(Math.abs(y) / step) + 1, (t) => Math.sign(y) * Math.min(Math.abs(y), (t + 1) * step));
     slideProgs.set(key, pos);
+    return pos;
+  };
+  // Ticks each (instrument, GT note) plays before the next note or key-off on its channel (upper bound: the slower speed per row).
+  const noteTicks = new Map<string, number>();
+  for (let ch = 0; ch < 3; ch++) {
+    let ins = -1, key = '', rows = 0;
+    const end = () => { if (key) noteTicks.set(key, Math.max(noteTicks.get(key) ?? 0, rows * Math.max(tempo, tempo2))); };
+    for (let o = 0; o < s.ordersLen; o++) {
+      const src = m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o] ?? 0}`);
+      for (let r = 0; r < s.patLen; r++) {
+        const cell = src?.rows[r];
+        const nv = cell ? convertFurnaceNoteValue(cell) : -1;
+        if (cell && cell.instrument >= 0) ins = cell.instrument;
+        if (nv >= 0 || nv === 253 || nv === 254) { end(); key = nv >= 0 ? `${ins}_${nv}` : ''; rows = 0; }
+        rows++;
+      }
+    }
+    end();
+  }
+  // Wave program for a note of an instrument with a pitch macro (Furnace c64.cpp: relative mode adds the value to pitch2 each step,
+  // absolute mode sets it; linear pitch, 1/128 semitone): the instrument's waveform row, then one wave-table slide row per tick that moves
+  // the SID frequency to Furnace's for that tick (same mechanism as slideProgram). SID frequency steps depend on the note, so one program per note.
+  // shortcut: needs a one-row instrument wave program (no stepping wave/arpeggio macro); Furnace's tick 0 offset lands on tick 1.
+  // Built after the pattern pass (pitchPending) so they only take the table rows the other wave programs leave free; the pattern
+  // pass stores -(index + 1) as a placeholder in the set-wave-pointer data byte.
+  const pitchPending: string[] = [];
+  const pitchRef = (ins: number, note: number): number => {
+    const key = `${ins}_${note}`;
+    let i = pitchPending.indexOf(key);
+    if (i < 0) i = pitchPending.push(key) - 1;
+    return -(i + 1);
+  };
+  const pitchProgram = (key: string, left: number): number => {
+    const [ins, note] = key.split('_').map(Number);
+    const own = instruments[ins + 1].ptr[0];
+    const mac = macroOf(m.instruments[ins], MACRO_PITCH);
+    const tb = tables[0];
+    let pos = 0;
+    if (mac && own > 0 && tb.left[own] === 0xff && tb.right[own] === 0) {
+      const p = expandProcMacro(mac, m.version), sp = Math.max(1, p.speed), dl = Math.max(0, p.delay);
+      // Value index per tick (-1: no step this tick); loop jumps back to the loop value, so relative steps keep adding.
+      const step = (t: number): number => {
+        if (t < dl || (t - dl) % sp) return -1;
+        let i = (t - dl) / sp;
+        if (i >= p.length) { if (p.loop === 0xff || p.loop >= p.length) return -1; i = p.loop + ((i - p.loop) % (p.length - p.loop)); }
+        return i;
+      };
+      const r0 = tb.right[own - 1];
+      const base = r0 === 0 || r0 === 0x80 ? note : r0 > 0x80 ? r0 & 0x7f : note + (r0 >= 0x60 ? r0 - 0x80 : r0);
+      // Rows left: the waveform row and the stop row, plus one speed row per tick at worst.
+      // Each program still to build gets an equal share, so every note keeps its attack sweep when the table is short.
+      const room = Math.floor(Math.min(253 - tb.left.length, 255 - tables[3].left.length) / left);
+      const want = Math.min(MAX_PROGRAM_TICKS, noteTicks.get(key) ?? MAX_PROGRAM_TICKS);
+      if (room < 2) lossy.add('pitch macro (GT table full)');
+      else {
+        if (want - 1 > room) lossy.add('pitch macro (cut short: GT table full)');
+        const ticks = Math.min(want, room + 1);
+        pos = tb.left.length + 1;
+        tb.left.push(tb.left[own - 1]); tb.right.push(r0);
+        let pitch = 0;
+        pushPitchCurve(base, ticks, (t) => {
+          const i = step(t);
+          if (i >= 0) pitch = p.mode ? Math.max(-65535, Math.min(65535, pitch + p.data[i])) : p.data[i];
+          return pitch / 128;
+        });
+      }
+    } else if (mac) lossy.add('pitch macro with a stepping wave/arpeggio program');
     return pos;
   };
   const slices = Math.ceil(s.patLen / GT_MAX_ROWS);
@@ -348,7 +434,12 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
             }
             // Furnace keeps an arpeggio on until 0000; a new note restarts the instrument's own wave program in GT, so re-arm it.
             const ar = arpOn[ch];
-            if (!arpSeen && !cmd && ar && note !== GT_REST && note !== GT_KEYOFF && curIns[ch] >= 0 && curIns[ch] < GT_MAX_INSTR - 1) { cmd = 7; data = arpProgram(curIns[ch], ar[0], ar[1]); }
+            if (!arpSeen && !cmd && ar && note !== GT_REST && note !== GT_KEYOFF && curIns[ch] >= 0 && curIns[ch] < GT_MAX_INSTR - 1) { cmd = 8; data = arpProgram(curIns[ch], ar[0], ar[1]); }
+            const ci = curIns[ch];
+            if (note !== GT_REST && note !== GT_KEYOFF && ci >= 0 && ci < GT_MAX_INSTR - 1 && macroOf(m.instruments[ci], MACRO_PITCH)) {
+              if (cmd) lossy.add('pitch macro on a row with a wave command (dropped)');
+              else { cmd = 8; data = pitchRef(ci, lastNote[ch]); }
+            }
           }
           if (first && r === 0) { cmd = funk ? CMD_FUNKTEMPO : CMD_SETTEMPO; data = funk || tempo; }
           rows.push([note, ins, cmd, data]);
@@ -361,6 +452,8 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
     }
     orderlists[ch].push(GT_LOOPSONG, 0);
   }
+  const pitchPos = pitchPending.map((k, i) => pitchProgram(k, pitchPending.length - i));
+  for (const rows of patterns) for (const r of rows) if (r[2] === 8 && r[3] < 0) { r[3] = pitchPos[-r[3] - 1]; if (!r[3]) r[2] = 0; }
   if (patterns.length > GT_MAX_PATT) throw new Error(`song needs ${patterns.length} GT patterns (maximum ${GT_MAX_PATT})`);
   for (let t = 0; t < 3; t++) if (tables[t].left.length > 255) throw new Error(`GT table ${t} overflows (${tables[t].left.length} rows)`);
 
