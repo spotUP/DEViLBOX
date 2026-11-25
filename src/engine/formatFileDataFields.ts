@@ -99,6 +99,7 @@ export const FILE_DATA_FIELDS = [
   'actionamicsFileData',
   'monotoneFileData',
   'kdmFileData',
+  'kdmBankData',               // companion waves.kwv for KDM
   'pieceFileData',
   't0astFileData',
   'jxsFileData',

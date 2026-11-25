@@ -900,6 +900,8 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'kdmFileData',
     loadMethod: 'loadTune',
+    // The companion waves.kwv goes in with the song (the worklet stores it before opening).
+    getLoadArgs: (song) => [song.kdmBankData],
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,

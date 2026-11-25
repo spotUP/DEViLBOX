@@ -1,7 +1,7 @@
 /**
  * Kdm.worklet.js - AudioWorklet processor for the Ken's Digital Music WASM replayer.
  * Stereo 48 kHz output rendered by the engine (kdm-wasm/src/kdm_engine.c); the
- * context resamples when it runs at another rate. waves.kwv is passed in at init.
+ * context resamples when it runs at another rate. waves.kwv (the song's companion) comes with each song.
  */
 class KdmProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -28,17 +28,22 @@ class KdmProcessor extends AudioWorkletProcessor {
     if (data.type !== 'init' && !this.module && this.initializing) return;
     switch (data.type) {
       case 'init':
-        await this.initWasm(data.wasmBinary, data.jsCode, data.bankData);
+        await this.initWasm(data.wasmBinary, data.jsCode);
         break;
       case 'loadModule':
         if (!this.module) { this.port.postMessage({ type: 'error', message: 'KDM player not initialised' }); break; }
+        if (!data.bankData) { this.port.postMessage({ type: 'error', message: 'KDM needs its instrument bank waves.kwv' }); break; }
+        if (!this.setBank(new Uint8Array(data.bankData))) { this.port.postMessage({ type: 'error', message: 'waves.kwv could not be stored' }); break; }
         this.songBytes = new Uint8Array(data.moduleData);
         this.playing = false;
         if (this.openSong(0)) this.port.postMessage({ type: 'moduleLoaded', channels: 1, totalTicks: this.module._kdm_total_ticks() });
         break;
       case 'replaceModule': {
-        // An edited song swapped in while it plays: reopen and fast-forward to the tick.
+        // An edited song swapped in while it plays: poke the changed bytes into the
+        // replayer, or (note times, a new length) reopen and fast-forward to the tick.
         if (!this.module) break;
+        const next = new Uint8Array(data.moduleData);
+        if (this.open && this.pokeChanges(next)) { this.songBytes = next; break; }
         const tick = this.open ? this.module._kdm_tick() : 0;
         this.songBytes = new Uint8Array(data.moduleData);
         this.openSong(this.playing ? tick : 0);
@@ -53,6 +58,25 @@ class KdmProcessor extends AudioWorkletProcessor {
       case 'pause': this.playing = !this.playing; break;
       case 'dispose': this.cleanup(); break;
     }
+  }
+
+  /** Poke each run of changed bytes; false when the length changed or a run needs a reopen. */
+  pokeChanges(next) {
+    const m = this.module, cur = this.songBytes;
+    if (!cur || next.length !== cur.length) return false;
+    for (let i = 0; i < next.length; i++) {
+      if (next[i] === cur[i]) continue;
+      let j = i;
+      while (j < next.length && next[j] !== cur[j]) j++;
+      const ptr = m._malloc(j - i);
+      if (!ptr) return false;
+      m.HEAPU8.set(next.subarray(i, j), ptr);
+      const ok = m._kdm_poke(i, ptr, j - i);
+      m._free(ptr);
+      if (!ok) return false;
+      i = j;
+    }
+    return true;
   }
 
   openSong(skipTicks) {
@@ -70,14 +94,21 @@ class KdmProcessor extends AudioWorkletProcessor {
     this.qlen = 0; this.frac = 0; this.drained = false;
     this.lastTick = -1;
     // Fast-forward: render and discard until the replayer is at the wanted tick.
-    const scratch = 4800;
     while (skipTicks > 0 && m._kdm_tick() < skipTicks) {
-      if (m._kdm_render(this.outPtr, scratch / 12) === 0) break;
+      if (m._kdm_render(this.outPtr, 128) === 0) break;   // outPtr holds 128 stereo frames
     }
     return true;
   }
 
-  async initWasm(wasmBinary, jsCode, bankData) {
+  setBank(bank) {
+    const bankPtr = this.module._malloc(bank.length);
+    this.module.HEAPU8.set(bank, bankPtr);
+    const ok = this.module._kdm_set_bank(bankPtr, bank.length);
+    this.module._free(bankPtr);
+    return ok;
+  }
+
+  async initWasm(wasmBinary, jsCode) {
     this.initializing = true;
     try {
       this.cleanup();
@@ -108,12 +139,6 @@ class KdmProcessor extends AudioWorkletProcessor {
       const config = {};
       if (wasmBinary) config.wasmBinary = wasmBinary;
       this.module = await globalThis.createKdm(config);
-      const bank = new Uint8Array(bankData);
-      const bankPtr = this.module._malloc(bank.length);
-      this.module.HEAPU8.set(bank, bankPtr);
-      const bankOk = this.module._kdm_set_bank(bankPtr, bank.length);
-      this.module._free(bankPtr);
-      if (!bankOk) { this.port.postMessage({ type: 'error', message: 'waves.kwv could not be stored' }); return; }
       this.outPtr = this.module._malloc(128 * 2 * 4);
       this.updateBufferViews();
       this.initialized = true;

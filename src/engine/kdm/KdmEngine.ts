@@ -1,8 +1,8 @@
 /**
  * KdmEngine.ts - Singleton WASM engine wrapper for Ken Silverman's Digital Music
  * replayer (kdm-wasm/src/kdm_engine.c). Whole-song replayer: the WASM engine sequences
- * the notes and renders the audio; the instrument bank waves.kwv is fetched once and
- * handed to the worklet at init. Follows the MonotoneEngine pattern.
+ * the notes and renders the audio; the instrument bank waves.kwv is the song's companion
+ * file and goes to the worklet with each song. Follows the MonotoneEngine pattern.
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
@@ -24,8 +24,6 @@ export interface KdmPositionUpdate {
 export class KdmEngine extends WASMChannelOutputsEngine {
   private static instance: KdmEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
-  /** waves.kwv, Ken's instrument bank, fetched once. */
-  private static bank: Promise<ArrayBuffer> | null = null;
 
   private _songEndCallback: (() => void) | null = null;
   private _positionCallbacks = new Set<(update: KdmPositionUpdate) => void>();
@@ -96,25 +94,20 @@ export class KdmEngine extends WASMChannelOutputsEngine {
       }
     };
 
-    const baseUrl = import.meta.env.BASE_URL || '/';
-    KdmEngine.bank ??= fetch(`${baseUrl}kdm/waves.kwv`).then((r) => {
-      if (!r.ok) throw new Error(`waves.kwv: HTTP ${r.status}`);
-      return r.arrayBuffer();
+    this.workletNode.port.postMessage({
+      type: 'init', sampleRate: ctx.sampleRate,
+      wasmBinary: KdmEngine.cache.wasmBinary, jsCode: KdmEngine.cache.jsCode,
     });
-    void KdmEngine.bank.then((bankData) => {
-      this.workletNode?.port.postMessage({
-        type: 'init', sampleRate: ctx.sampleRate,
-        wasmBinary: KdmEngine.cache.wasmBinary, jsCode: KdmEngine.cache.jsCode, bankData,
-      });
-    }, (err) => { KdmEngine.bank = null; console.error('[KdmEngine]', err); });
     this.workletNode.connect(this.output, 0);
   }
 
-  async loadTune(buffer: ArrayBuffer): Promise<void> {
+  /** `bank` is waves.kwv, the companion the song was opened with. */
+  async loadTune(buffer: ArrayBuffer, bank?: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('KdmEngine not initialized');
+    if (!bank) throw new Error('KDM needs its instrument bank waves.kwv; open it together with the song');
     const answered = this.beginModuleLoad();
-    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, bankData: bank.slice(0) });
     await answered;
   }
 

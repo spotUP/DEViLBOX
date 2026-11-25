@@ -265,6 +265,13 @@ function specialCases(moduleName: string, siblings: string[]): string[] {
     const wanted = find('wantedteam.bin');
     if (wanted) out.push(wanted);
   }
+  // Ken's Digital Music: every .kdm plays its instruments from one bank,
+  // waves.kwv, in the song's directory (Ken Silverman's KDM player loads it by
+  // that fixed name). A constant like WantedTeam.bin.
+  if (name.endsWith('.kdm')) {
+    const waves = find('waves.kwv');
+    if (waves) out.push(waves);
+  }
   return out;
 }
 
@@ -449,6 +456,7 @@ export async function modlandListing(
  * Empty when the name carries no known role.
  */
 export function expectedCompanionNames(moduleName: string): string[] {
+  if (lower(moduleName).endsWith('.kdm')) return ['waves.kwv'];
   const { role } = splitName(moduleName);
   if (role === null) return [];
   const partners = EXPECTED_PARTNER[role];

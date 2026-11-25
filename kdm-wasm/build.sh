@@ -4,11 +4,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT_DIR="$SCRIPT_DIR/../public/kdm"
 echo "=== KDM WASM Build ==="
 mkdir -p "$OUT_DIR"
-emcc -O2 -Wall -Wextra -Wno-unused-function -I"$SCRIPT_DIR/src" \
+# The glue is C and includes the engine (one C translation unit, so emcc is right here).
+# Integer engine; the float flags only keep the build in line with the other bbmp ports.
+emcc -O2 -std=gnu99 -fno-fast-math -ffp-contract=off -fwrapv -Wall -Wextra -Wno-unused-function -I"$SCRIPT_DIR/src" \
     "$SCRIPT_DIR/src/kdm_wasm.c" \
-    -sEXPORTED_FUNCTIONS="['_kdm_set_bank','_kdm_open','_kdm_error','_kdm_rate','_kdm_total_ticks','_kdm_tick','_kdm_render','_kdm_close','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_kdm_set_bank','_kdm_open','_kdm_error','_kdm_rate','_kdm_total_ticks','_kdm_tick','_kdm_poke','_kdm_render','_kdm_close','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['HEAPU8','HEAPF32','UTF8ToString']" \
-    -sMODULARIZE=1 -sEXPORT_NAME=createKdm -sENVIRONMENT=worker \
+    -sMODULARIZE=1 -sEXPORT_NAME=createKdm -sENVIRONMENT=worker -sINCOMING_MODULE_JS_API="['wasmBinary']" \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=8388608 -sMAXIMUM_MEMORY=67108864 \
     -sINVOKE_RUN=0 -lm -o "$OUT_DIR/Kdm.js"
 echo "=== Build complete ==="

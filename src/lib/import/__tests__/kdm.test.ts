@@ -97,8 +97,11 @@ describe.each(['kdmsong.kdm', 'flysong.kdm'])('%s', (name) => {
 describe('KDM is reachable through parseModuleToSong', () => {
   it('kdmsong.kdm runs parseKdmFile and activates KdmReplayer, not UADE', async () => {
     const bytes = load('kdmsong.kdm');
-    const song = await parseModuleToSong(new File([bytes.slice().buffer as ArrayBuffer], 'kdmsong.kdm'));
+    // The route only carries the bank bytes (waves.kwv is never shipped), so a stand-in bank suffices.
+    const bank = new Uint8Array([1, 2, 3, 4]).buffer;
+    const song = await parseModuleToSong(new File([bytes.slice().buffer as ArrayBuffer], 'kdmsong.kdm'), undefined, undefined, undefined, new Map([['waves.kwv', bank]]));
     expect(parseKdmFile).toHaveBeenCalledTimes(1);
+    expect(Array.from(new Uint8Array(song.kdmBankData as ArrayBuffer))).toEqual([1, 2, 3, 4]);
     expect(Array.from(new Uint8Array(song.kdmFileData as ArrayBuffer))).toEqual(Array.from(bytes));
     expect(song.format).toBe('KDM');
     const m = decodeKdmModule(bytes)!;
@@ -108,5 +111,10 @@ describe('KDM is reachable through parseModuleToSong', () => {
     const desc = WASM_ENGINES.find((d) => d.key === 'KdmReplayer')!;
     expect(shouldActivate(desc, song)).toBe(true);
     expect(song.uadeEditableFileData).toBeUndefined();
+  }, 60000);
+
+  it('refuses a .kdm opened without waves.kwv beside it', async () => {
+    const bytes = load('kdmsong.kdm');
+    await expect(parseModuleToSong(new File([bytes.slice().buffer as ArrayBuffer], 'kdmsong.kdm'))).rejects.toThrow(/waves\.kwv/);
   }, 60000);
 });

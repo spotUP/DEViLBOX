@@ -525,6 +525,8 @@ export interface TrackerSong {
   actionamicsFileData?: ArrayBuffer;
   monotoneFileData?: ArrayBuffer;
   kdmFileData?: ArrayBuffer;
+  /** waves.kwv, the KDM instrument bank, loaded as a companion of the song. */
+  kdmBankData?: ArrayBuffer;
   pieceFileData?: ArrayBuffer;
   t0astFileData?: ArrayBuffer;
   jxsFileData?: ArrayBuffer;

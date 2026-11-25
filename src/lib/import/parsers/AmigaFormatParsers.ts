@@ -2866,8 +2866,11 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['kdm'])) {
     const { isKdmFormat, parseKdmFile } = await import('@lib/import/formats/KdmParser');
     if (isKdmFormat(new Uint8Array(ctx.buffer))) {
+      // The instrument bank is a companion (companionResolver: waves.kwv beside the song), never shipped.
+      const bank = [...(ctx.companionFiles ?? [])].find(([n]) => n.split('/').pop()?.toLowerCase() === 'waves.kwv')?.[1];
+      if (!bank) throw new Error(`${ctx.originalFileName}: KDM needs its instrument bank waves.kwv. Open it together with the song (it sits in the same directory).`);
       const song = parseKdmFile(new Uint8Array(ctx.buffer), ctx.originalFileName);
-      if (song) return song;
+      if (song) { song.kdmBankData = bank.slice(0); return song; }
     }
     throw new Error(`KDM file did not decode: ${ctx.originalFileName}`);
   }
