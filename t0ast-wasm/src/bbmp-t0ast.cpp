@@ -48,7 +48,13 @@
 
 namespace {
 
+#ifdef T0AST_DOUBLE
+// DEViLBOX build switch: WASM long double is software binary128, too slow for real time;
+// double is close (the portable path is not bit-exact either).
+typedef double X;
+#else
 typedef long double X;   // the x87 extended type on x86
+#endif
 
 const int RATE = 44100;
 const int BLOCK = 2048;
@@ -134,6 +140,10 @@ inline X f2xm1(X a) {
   __asm__("f2xm1" : "=t"(r) : "0"(a));
   return r;
 }
+#elif defined(T0AST_DOUBLE)
+inline X fsin(X a) { return std::sin(a); }
+inline X fcos(X a) { return std::cos(a); }
+inline X f2xm1(X a) { return std::exp2(a) - 1; }
 #else
 inline X fsin(X a) { return sinl(a); }
 inline X fcos(X a) { return cosl(a); }
@@ -151,7 +161,7 @@ X pow2(X y0) {
   return std::ldexp(r, int(tc));
 }
 
-inline X xexp(X x) { return expl(x); }
+inline X xexp(X x) { return std::exp(x); }
 
 // ---- the song (description sections 2, 3)
 

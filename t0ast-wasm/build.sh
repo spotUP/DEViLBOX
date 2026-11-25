@@ -6,7 +6,8 @@ echo "=== T0AST WASM Build ==="
 mkdir -p "$OUT_DIR"
 # Floating-point engine (singles from extended results) and a float resampler: no fast-math,
 # no FMA contraction (bbmp README). WASM takes the portable path: close, not bit-exact.
-FLAGS="-O2 -fno-fast-math -ffp-contract=off -fwrapv"
+# T0AST_DOUBLE: engine type double, not software binary128 long double (owner 2026-11-25: too slow).
+FLAGS="-O2 -fno-fast-math -ffp-contract=off -fwrapv -DT0AST_DOUBLE"
 em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
     -I"$SCRIPT_DIR/src" \
     "$SCRIPT_DIR/src/t0ast_wasm.cpp" \
