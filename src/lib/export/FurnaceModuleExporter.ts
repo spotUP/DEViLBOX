@@ -286,6 +286,27 @@ export function neoGeoChannelVolMax(ch: number, ext: boolean): number {
   return maxVolumeOfChannel(ext ? FurnaceDispatchPlatform.YM2610_FULL_EXT : FurnaceDispatchPlatform.YM2610_FULL, ch);
 }
 
+/**
+ * XM volume-column command (0x60-0xFF) of a tracker-notation cell as the Furnace effect that plays
+ * the same (Furnace has no volume-column commands): 6x/7x slide -> 0A0x/0Ax0 (the code the effect
+ * column's Axy exports as, Furnace keeps it running until 0A00), 8x/9x fine slide -> F9/F8 (one step
+ * of x/64 of the channel maximum), Cx pan -> 80xx, Fx tone portamento -> 03(x*16), as XM reads it.
+ * Null: no Furnace command (0x01-0x0F, 0x51-0x5F do nothing in XM; Ax/Bx vibrato speed and depth
+ * need the other half; Dx/Ex pan slides have no matching unit on a hard left/right chip).
+ */
+export function volumeColumnEffect(vol: number, volMax = 127): { type: number; val: number } | null {
+  const x = vol & 0x0f;
+  switch (vol & 0xf0) {
+    case 0x60: return x ? { type: 0x0a, val: x } : null;
+    case 0x70: return x ? { type: 0x0a, val: x << 4 } : null;
+    case 0x80: return x ? { type: 0xf9, val: Math.max(1, Math.round(x * volMax / 64)) } : null;
+    case 0x90: return x ? { type: 0xf8, val: Math.max(1, Math.round(x * volMax / 64)) } : null;
+    case 0xc0: return { type: 0x80, val: x * 17 };
+    case 0xf0: return { type: 0x03, val: x << 4 };
+    default: return null;
+  }
+}
+
 export function cellToFile(
   cell: TrackerCell,
   insIndexById: Map<number, number>,
@@ -310,7 +331,8 @@ export function cellToFile(
     else ins = idx;
   }
   let vol = cell.volume ? xmVolToFurnace(cell.volume, volMax) : -1;
-  if (cell.volume && vol < 0) warnings.push(`${where}: volume column 0x${cell.volume.toString(16)} dropped, it is not a set-volume value (0x10-0x50)`);
+  const volFx = cell.volume && vol < 0 && notation === 'tracker' ? volumeColumnEffect(cell.volume, volMax) : null;
+  if (cell.volume && vol < 0 && !volFx) warnings.push(`${where}: volume column 0x${cell.volume.toString(16)} dropped, it is not a set-volume value (0x10-0x50) or a volume command Furnace has`);
   const fx = cellEffects(cell).map(([t, v]) => {
     if (notation === 'tracker' && t === 0x0c) {
       if (vol < 0) vol = xmVolToFurnace(0x10 + Math.min(64, v), volMax);
@@ -318,14 +340,23 @@ export function cellToFile(
       return { type: -1, val: -1 };
     }
     if (notation === 'tracker' && t === 0x0f) {
-      // Store meaning: 01-1F speed, 20-FF BPM, 00 stops. Furnace 0Fxx is speed only, F0xx is tempo
-      // (tick rate = value * 2 / 5 Hz, the same as a tracker BPM), FF00 stops the song.
-      if (v >= 0x20) return { type: 0xf0, val: v };
+      // Store meaning: 01-1F speed, 20-FF BPM, 00 stops. Furnace 0Fxx sets speed 1 while the song has
+      // one speed (playback.cpp case 0x0f), FF00 stops the song.
+      // F0xx sets the base rate and Furnace still scales it by the virtual tempo (playback.cpp
+      // tempoAccum), which the writer sets to initial BPM / 150. FDxx swaps the numerator, so the
+      // rate is hz * xx / 150 = xx * 2 / 5 Hz, the store's BPM rule.
+      // shortcut: exact only with virtual tempo denominator 150 (the default); a loaded module with another one plays off-tempo.
+      if (v >= 0x20) return { type: 0xfd, val: v };
       if (v === 0) return { type: 0xff, val: 0 };
     }
     const e = editorEffectToFurnace(t, v);
     return { type: e.cmd, val: e.val };
   });
+  if (volFx) {
+    const free = fx.find((f) => f.type < 0 && f.val < 0);
+    if (free) { free.type = volFx.type; free.val = volFx.val; }
+    else warnings.push(`${where}: volume column 0x${cell.volume.toString(16)} dropped, no free effect column for its Furnace command`);
+  }
   if (arpStop && notation === 'tracker') {
     const free = fx.find((f) => f.type < 0 && f.val < 0);
     if (free) { free.type = 0; free.val = 0; }

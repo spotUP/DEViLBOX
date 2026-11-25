@@ -158,7 +158,35 @@ describe('exportFurnaceModule', () => {
     expect(r.warnings.filter((w) => w.includes('volume column')).length).toBe(2);
   });
 
-  it('writes Fxx as the store plays it: 01-1F speed (0Fxx), 20-FF BPM (F0xx), 00 stop (FF00)', async () => {
+  it('moves XM volume-column commands to the Furnace effect that plays them, scaled to the channel maximum', async () => {
+    const s = song();
+    const rows: Array<[number, number, number]> = [ // channel, row, volume column
+      [0, 1, 0x64], [0, 2, 0x73], [0, 3, 0x88], [0, 4, 0x92], [0, 5, 0xc0], [0, 6, 0xcf], [0, 7, 0xf4],
+      [4, 1, 0x88], // SSG: 8/64 of 15
+      [0, 8, 0x05], [0, 9, 0xb3],
+    ];
+    for (const [ch, row, volume] of rows) set(s.patterns[0], ch, row, { note: 49, instrument: ch === 4 ? 2 : 1, volume });
+    set(s.patterns[0], 0, 7, { note: 49, instrument: 1, volume: 0xf4, effTyp: 0x04, eff: 0x21 });
+    const r = exportFurnaceModule(s);
+    const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+    const row = (ch: number, i: number) => mod.patterns.get(`0_${ch}_0`)!.rows[i];
+    const used = (ch: number, i: number) => row(ch, i).effects.filter((e) => e.type >= 0);
+    expect(used(0, 1)).toEqual([{ type: 0x0a, value: 0x04 }]);
+    expect(used(0, 2)).toEqual([{ type: 0x0a, value: 0x30 }]);
+    expect(used(0, 3)).toEqual([{ type: 0xf9, value: 16 }]); // round(8 * 127 / 64)
+    expect(used(0, 4)).toEqual([{ type: 0xf8, value: 4 }]);
+    expect(used(0, 5)).toEqual([{ type: 0x80, value: 0x00 }]);
+    expect(used(0, 6)).toEqual([{ type: 0x80, value: 0xff }]);
+    expect(used(0, 7)).toEqual([{ type: 0x04, value: 0x21 }, { type: 0x03, value: 0x40 }]);
+    expect(used(4, 1)).toEqual([{ type: 0xf9, value: 2 }]); // round(8 * 15 / 64)
+    for (const [ch, i] of [[0, 1], [0, 7], [4, 1]]) expect(row(ch, i).volume).toBe(-1);
+    // 0x05 does nothing in XM, Bx needs the vibrato speed: both dropped with a warning.
+    expect(used(0, 8)).toEqual([]);
+    expect(used(0, 9)).toEqual([]);
+    expect(r.warnings.filter((w) => w.includes('volume column')).length).toBe(2);
+  });
+
+  it('writes Fxx as the store plays it: 01-1F speed (0Fxx), 20-FF BPM (FDxx virtual tempo), 00 stop (FF00)', async () => {
     const s = song();
     set(s.patterns[0], 0, 1, { effTyp: 0x0f, eff: 0x03 });
     set(s.patterns[0], 0, 2, { effTyp: 0x0f, eff: 0x78 });
@@ -167,7 +195,9 @@ describe('exportFurnaceModule', () => {
     const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
     const fx = (row: number) => mod.patterns.get('0_0_0')!.rows[row].effects[0];
     expect(fx(1)).toEqual({ type: 0x0f, value: 3 });
-    expect(fx(2)).toEqual({ type: 0xf0, value: 0x78 });
+    // FDxx, not F0xx: Furnace multiplies F0's rate by the virtual tempo (initial BPM / 150), FD replaces the numerator.
+    expect(fx(2)).toEqual({ type: 0xfd, value: 0x78 });
+    expect(mod.subsongs[0].virtualTempoD).toBe(150);
     expect(fx(3)).toEqual({ type: 0xff, value: 0 });
   });
 

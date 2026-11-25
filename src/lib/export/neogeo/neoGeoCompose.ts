@@ -9,7 +9,7 @@
 import { EMPTY_CELL } from '@/types/tracker';
 import type { Pattern, TrackerCell, ChannelData } from '@/types/tracker';
 import type { InstrumentConfig, FurnaceConfig } from '@/types/instrument';
-import { ym2610TimerBHz, type FurnaceModuleSong } from '../FurnaceModuleExporter';
+import { ym2610TimerBHz, volumeColumnEffect, type FurnaceModuleSong } from '../FurnaceModuleExporter';
 import { xmVolToFurnace } from '@/lib/import/furnaceEditorCells';
 
 /** Channel index of each voice in the extended-FM chip (0xa6). */
@@ -233,8 +233,11 @@ export function lintNeoGeoSong(song: FurnaceModuleSong): string[] {
           if (t !== want) out.push(`${where}: instrument "${inst.name}" (type ${t}) does not fit a ${kind} channel`);
           if (kind === 'op') opPatches.add(`alg ${f.algorithm} fb ${f.feedback}`);
         }
-        for (const [t, v] of cellFx(cell)) {
+        // A volume-column command reaches the file as an effect (cellToFile), so furtool sees that effect.
+        const volCmd = cell.volume && xmVolToFurnace(cell.volume) < 0 ? volumeColumnEffect(cell.volume, VOL_MAX[kind]) : null;
+        for (const [t, v] of volCmd ? [...cellFx(cell), [volCmd.type, volCmd.val] as [number, number]] : cellFx(cell)) {
           const fx = `${hex(t)}${hex(v)}`;
+          if (t === 0x0f && v >= 0x20) { out.push(`${where}: BPM change F${hex(v)} is not supported by furtool (it is written as Furnace FD${hex(v)})`); continue; }
           if (kind === 'op') {
             if (!FX_OP.has(t)) out.push(`${where}: effect ${fx} crashes furtool on an FM 2 operator channel (only 03, 04, 0A, EA, ED)`);
             continue;

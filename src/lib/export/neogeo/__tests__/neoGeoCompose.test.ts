@@ -81,6 +81,19 @@ describe('neoGeoCompose', () => {
     expect(lintNeoGeoSong(s.build()).join('\n')).toMatch(/crashes furtool on an FM 2 operator channel/);
   });
 
+  it('lints a volume-column command as the effect the exporter writes, and BPM changes', () => {
+    const { s } = song();
+    const b = s.build();
+    const rows = b.patterns[0].channels[NEO.SSG1].rows;
+    rows[6] = { ...rows[6], volume: 0x88 }; // fine slide down -> F9xx, furtool has no F9
+    rows[7] = { ...rows[7], volume: 0x64 }; // slide down -> 0A04, furtool converts it
+    rows[8] = { ...rows[8], effTyp: 0x0f, eff: 0x78 }; // BPM 120 -> FD78
+    const out = lintNeoGeoSong(b).join('\n');
+    expect(out).toMatch(/row 6: effect F902 is not supported by furtool/);
+    expect(out).not.toMatch(/row 7:/);
+    expect(out).toMatch(/row 8: BPM change F78/);
+  });
+
   it('rejects 00xy, which runs until a 0000 the editor cell cannot hold', () => {
     const { s, p } = song();
     p.put(NEO.SSG1, 4, { note: 'A-4', fx: [[0x00, 0x37]] });
