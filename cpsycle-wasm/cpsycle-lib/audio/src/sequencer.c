@@ -861,6 +861,9 @@ void psy_audio_sequencer_insertmetronometicks(psy_audio_Sequencer* self,
 	}
 }
 
+void (*psy_audio_sequencer_rowlog_hook)(const psy_audio_Pattern*,
+	const psy_audio_PatternEntry*) = NULL;
+
 void psy_audio_sequencer_execute_line(psy_audio_Sequencer* self,
 	psy_audio_SequencerTrack* track,
 	psy_dsp_big_beat_t offset)
@@ -895,6 +898,10 @@ void psy_audio_sequencer_execute_line(psy_audio_Sequencer* self,
 			}
 			psy_audio_sequencer_execute_global_commands(self,
 				entry, track, offset);
+			/* DEViLBOX: played-row log for the grid test (cpsycle_grid.c) */
+			if (psy_audio_sequencer_rowlog_hook) {
+				psy_audio_sequencer_rowlog_hook(track->iterator->pattern, entry);
+			}
 			psy_list_append(&events, entry);
 		}
 		psy_audio_sequencetrackiterator_inc(track->iterator);

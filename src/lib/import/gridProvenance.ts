@@ -50,6 +50,7 @@ export type ExportRoundTrip = 'pass' | 'fail' | 'n/a';
  * which fails when a row here disagrees with its KNOWN defects). 'fail' rows name their plan unit there.
  */
 export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
+  eupmini: 'pass',
   jochenHippel7V: 'pass',
   davidWhittaker: 'pass',
   robHubbard: 'pass',
@@ -147,6 +148,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
  */
 export type LiveEditStatus = 'pass' | 'fail' | 'n/a';
 export const LIVE_EDIT: Record<string, LiveEditStatus> = {
+  pxtone: 'pass',
   silmarils: 'pass',
   forgottenWorlds: 'pass',
   majortom: 'pass',
@@ -208,6 +210,9 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   soundMaster: 'pass',
   soundPlayer: 'pass',
   soundmon: 'pass',
+  mugician: 'pass',
+  ixalance: 'pass',
+  cpsycle: 'pass',
   sonicArranger: 'pass',
   stm: 'pass',
   stp: 'pass',
@@ -284,7 +289,8 @@ export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
 export const LIVE_WHILE_PLAYING_WHY: Record<string, string> = {
   suntronic: 'the exported bytes are found in chip RAM (image at 0x20000, 0x100 records 0x2a000) and written there, but the stream does not move: the player reads a converted copy, not the file image',
   digi: 'UADE refuses the file (DigiBooster plays through the native engine only)',
-  mmdc: 'not a G19 row (no walk/direct grid); plays on nuade by engine swap, edit heard while playing measured by nuadeEditsAreHeard.test.ts (mmdc case: voice 2 +2 semitones from the edited row, 1.55 s)',
+  pt3: 'not a G19 row (liveEditHeard runs UADE); note edits poke the running Bulba player module in aylet memory and patch the saved module, measured by pt3LiveEditLands.test.ts (D-Juice Plaintive, row 1 ch 0: 47 -> 52 heard as AY tone period). Instrument/volume/effect columns and notes on empty lines are not routed',
+  mmdc: 'not a G19 row (direct grid, mmdcGridMatchesPlayer.test.ts); plays on nuade by engine swap, edit heard while playing measured by nuadeEditsAreHeard.test.ts (mmdc case: voice 2 +2 semitones from the edited row, 1.55 s)',
 };
 
 /** Why a LIVE_EDIT row is 'fail' (plan unit in thoughts/shared/plans/2026-10-06-fix-all-open.md, G19). */
@@ -297,6 +303,7 @@ export const LIVE_EDIT_WHY: Record<string, string> = {
  */
 export type AddOnEmptyRow = 'pass' | 'fail' | 'n/a';
 export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
+  pxtone: 'pass',
   silmarils: 'fail',
   forgottenWorlds: 'fail',
   majortom: 'pass',
@@ -361,6 +368,9 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   soundMaster: 'pass',
   soundPlayer: 'pass',
   soundmon: 'pass',
+  mugician: 'pass',
+  ixalance: 'pass',
+  cpsycle: 'pass',
   sonicArranger: 'pass',
   stm: 'pass',
   stp: 'pass',
@@ -403,6 +413,8 @@ export const GRID_PLAN_FILE = 'thoughts/shared/plans/2026-10-07-grid-from-replay
 
 /** Grid is the replayer's own walk; each entry names its oracle test. */
 export const WALK_GRIDS: Record<string, string> = {
+  // C++ walk of the EUP event stream (eup_grid.cpp); the test plays EUPPlayer and compares every note.
+  eupmini: 'src/lib/import/__tests__/eupminiWasmGridMatchesPlayer.test.ts',
   sidmon1: 'src/engine/__tests__/sidmon1GridMatchesUade.test.ts',
   fred: 'src/lib/import/__tests__/fredEditorGridMatchesPlayer.test.ts',
   robHubbard: 'src/engine/__tests__/robHubbardGridIsPlayersWalk.test.ts',
@@ -421,11 +433,17 @@ export const WALK_GRIDS: Record<string, string> = {
   piece: 'src/lib/import/__tests__/pieceGridMatchesPlayer.test.ts',
   // C++ cell decode (t0ast_wasm.cpp grid exports); the test plays the engine and checks each row's pattern and cells.
   t0ast: 'src/lib/import/__tests__/t0astGridMatchesPlayer.test.ts',
+  // C++ cell decode (berotracker_wasm.cpp grid exports); the test checks every pattern against the engine cells and each played row's pattern.
+  beRoTracker: 'src/lib/import/__tests__/beRoTrackerGridMatchesPlayer.test.ts',
+  // C cell decode (digmug.c dm_grid_* walk of the replayer); the test plays the engine and checks each row's notes and instruments.
+  mugician: 'src/lib/import/__tests__/digitalMugicianWasmGridMatchesPlayer.test.ts',
+  // C++ cell decode (ixs_grid.cpp, the replayer's own IT unpacker); the test plays the engine and checks each row's notes and instruments.
+  ixalance: 'src/lib/import/__tests__/ixalanceWasmGridMatchesPlayer.test.ts',
+  cpsycle: 'src/lib/import/__tests__/cpsycleWasmGridMatchesPlayer.test.ts',
 };
 
 /** Scope view by design: no pattern grid exists or can exist. */
 export const SCOPE_GRIDS: Record<string, string> = {
-  cinter4: 'Cinter4Parser: sequence data left to the WASM replayer (Cinter4Parser.ts header); no corpus song',
   buz: 'BuzParser: block shell, the WASM replayer plays the bytes (BuzParser.ts header); grid decode is the open buz ledger row',
   c64sid: 'SIDParser runs 6502 and intercepts SID writes (player program, register log) [h: 39p/7488r/5796n]',
   vgm: 'VGMParser rebuilds notes from chip register writes (register log) [h: 1p/768r/298n]',
@@ -444,21 +462,16 @@ export const SCOPE_GRIDS: Record<string, string> = {
   sndh: 'SNDHParser reads tag header only; 68000 player program (psgplay), scope view [h: 1p/192r/0n]',
   qsf: 'QsfParser: Z80 program + ROM; engine only',
   fmp: 'FmplayerParser: raw binary to engine, empty grid',
-  pxtone: 'PxtoneParser: unit tick grid from the wasm event list (pxtone_grid_*); edits reach the engine and PxtoneExporter; velocity, volume and pan columns not shown',
-  eupmini: 'EupminiParser: minimal shell, one empty pattern',
-  ixalance: 'IxalanceParser: minimal shell (format is IT-like with real patterns, not shown)',
-  cpsycle: 'CpsycleParser: minimal shell (Psycle has real patterns, not shown)',
-  zxtune: 'ZxtuneParser: minimal shell, one empty pattern; engine plays (PT3/PT2/STC/VTX... have real patterns, not shown',
+  zxtune: 'ZxtuneParser: minimal shell for PT2/STC/VTX/SQT/ASC...; ZXTune engine plays (PT3 has its own key)',
   v2m: 'no parser; V2 synth engine plays',
   uax: 'UAXParser: Unreal sound ripper, samples + one empty pattern (no song)',
+  uade_fw: 'Generated UADE-only alias for the fw. prefix (formatRegistryData.ts uade_ list); the forgottenWorlds entry claims the same fw. prefix and .fw extension with its own native parser (DIRECT), so this key has no grid of its own',
   uade_cus: 'UADE cannot run the player, no oracle can exist (plan D2)',
-  uade_fw: 'UADE renders it silent, no oracle can exist (plan D2)',
 };
 
 /** Reconstructed grids, each with the plan unit that replaces it with a walk or a decode. */
 export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   midi: 'G11-midi',
-  mugician: 'U11',
   imagesMusicSystem: 'U20',
   musicLine: 'U9',
   sawteeth: 'U13',
@@ -472,7 +485,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   markCooksey: 'G11-markCooksey',
   quartet: 'G11-quartet',
   synthPack: 'G11-synthPack',
-  mmdc: 'G11-mmdc',
   psa: 'G11-psa',
   tme: 'G11-tme',
   jasonPage: 'U26',
@@ -584,7 +596,10 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
 
 /** Direct decodes of a stored pattern format (or libopenmpt). */
 export const DIRECT_GRIDS: readonly string[] = [
-  'fur', 'ned', 'dmf', 'hvl', 'okt', 'med', 'digi', 'deltaMusic2', 'fc', 'soundmon', 'sidmon2', 'soundfx',
+  // pt3: pt3-wasm C++ decode, grid notes equal the Bulba player in aylet (pt3GridMatchesAylet.test.ts).
+  'pt3',
+  // MMDC: block bytes decoded by mmdcCodec.ts, grid + strans equals the MMDC player's notes in UADE (mmdcGridMatchesPlayer.test.ts).
+  'fur', 'ned', 'dmf', 'hvl', 'okt', 'med', 'mmdc', 'digi', 'deltaMusic2', 'fc', 'soundmon', 'sidmon2', 'soundfx',
   'jamcracker', 'quadraComposer', 'amosMusicBank', 'sonicArranger', 'inStereo2', 'inStereo1',
   'inStereoAmbiguous', 'hippelCoso', 'tfmx', 'artOfNoise', 'digitalSymphony', 'graoumfTracker2',
   'symphoniePro', 'digiBoosterPro', 'pumaTracker', 'synthesis', 'digitalSoundStudio',
@@ -600,8 +615,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'monotone', 'ansiMusic', 'kdm', 'organya', 'piyoPiyo', 'jxs', 'tonyWilliams',
   // Ben Daglish SID: nuade's tables (nw_bds_layout) walk to a tick grid (benDaglishSIDGrid.ts), no oracle yet.
   'benDaglishSID',
-  // Darius Zendeh: nuade's tables (nw_dz_layout) and the replayer's row grammar, no oracle yet.
-  'dariusZendeh',
+  // Darius Zendeh (registry key uade_dz): nuade's tables (nw_dz_layout) and the replayer's row grammar, no oracle yet.
+  'uade_dz',
   // SynthDream: the command streams decode to a read-only tick grid (synthDreamGrid.ts), no oracle yet.
   'synthDream',
   // Tim Follin: the command streams decode to a read-only tick grid (timFollinGrid.ts), no oracle yet.
@@ -614,6 +629,12 @@ export const DIRECT_GRIDS: readonly string[] = [
   'soundProgrammingLanguage',
   // Dynamic Synthesizer: the command streams decode to a read-only tick grid (dynamicSynthesizerGrid.ts), no oracle yet.
   'dynamicSynthesizer',
+  // AXS: the C++ block parse (axs.cpp via axsEditWasm) is the grid, one pattern per block (AxsParser.ts header). Grid speed/BPM are the replayer's SHDR clock (axs_start_speed/bpm); live edits go grid-cell -> axs_set_grid_cell, decoded in C++ (axsLiveEdit.test.ts).
+  'axs',
+  // FamiTracker: the Furnace WASM loader decodes the stored patterns, same path as fur.
+  'famitracker',
+  // pxtone: the C++ grid over the replayer's own event list (pxtone_grid_*, pxtoneGrid.test.ts); edits swap into the engine (pxtoneLiveEdit.test.ts) and PxtoneExporter writes them. Velocity, volume and pan columns not shown.
+  'pxtone',
   // Riff Raff: the pattern and track list streams decode to a read-only tick grid (riffRaffGrid.ts), no oracle yet.
   'riffRaff',
   // MCMD: the fixed 4-voice two-byte cell pool is the grid, read and written in place (MCMDParser.ts getCellFileOffset).
@@ -630,6 +651,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'howieDavies',
   // Silmarils, Forgotten Worlds, Major Tom: the native parser decodes the stream to an editable grid, exported byte-exact with note edits written in place.
   'silmarils', 'forgottenWorlds', 'majortom',
+  // Cinter4: decodeCinter4Music inverts the compiled per-tick note words and folds them to an editable grid (Cinter4Parser.ts), byte-exact round trip (cinter4Music.roundtrip.test.ts); corpus public/test-automatic.cinter4, public/back_in_space.cinter4. Playback stays on the WASM replayer until edited.
+  'cinter4',
 ];
 
 export function gridProvenanceOf(key: string): GridProvenance | null {

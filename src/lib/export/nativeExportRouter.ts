@@ -298,6 +298,11 @@ const songIds = (song: TrackerSong) => ({
 });
 
 const NATIVE_EXPORTERS: NativeExporterEntry[] = [
+  // The Psycle parser reports format 'MOD' (the engine plays the bytes); the source bytes name it.
+  { id: 'cpsycle', matches: (s) => !!s.psycleFileData,
+    run: async (s, baseName) => { const { exportAsCpsycle } = await import('./CpsycleExporter'); return exportAsCpsycle(s, baseName); } },
+  { id: 'eupmini', matches: (s) => !!s.eupFileData,
+    run: async (s, baseName) => { const { exportAsEup } = await import('./EupminiExporter'); return exportAsEup(s, baseName); } },
   { id: 'jamcracker', matches: (s) => songIds(s).format === 'JamCracker',
     run: async (s) => { const { exportAsJamCracker } = await import('./JamCrackerExporter'); return exportAsJamCracker(s); } },
   // The parser reports format 'MOD' (so UADE routes it); the layout names the format.

@@ -169,8 +169,8 @@ async function measure(id: string): Promise<Row> {
 }
 
 const results: Record<string, Row> = {};
-// benDaglish and davidWhittaker draw their grid from a WASM walk at import; without these bundles the parse falls back to an empty scope view.
-installWasmNodeFetches([['bd', 'Bd'], ['davidwhittaker', 'DavidWhittaker']]);
+// benDaglish, davidWhittaker and digitalMugician draw their grid from a WASM walk at import; the faked worker scope makes each bundle fetch its .wasm, so every one is served here.
+installWasmNodeFetches([['bd', 'Bd'], ['davidwhittaker', 'DavidWhittaker'], ['digmug', 'DigMugEdit']]);
 const runAll = (async () => { for (const id of ids) results[id] = await measure(id); })();
 
 describe('exporter edit round-trip (byte-exact rows)', () => {

@@ -212,3 +212,6 @@ void EXPORT cpsycle_set_channel_gain(int ch, float gain) {
         psy_audio_patterns_unmutetrack(&g_song->patterns, (uintptr_t)ch);
     }
 }
+
+/* The loaded song, for the grid reader in cpsycle_grid.c (CpsycleEdit target). */
+psy_audio_Song *cpsycle_current_song(void) { return g_song; }

@@ -4,10 +4,9 @@
  * EUP is a music format used by the Fujitsu FM Towns computer, featuring
  * 6 FM synthesis channels, 3 SSG channels, and 2 ADPCM channels (11 total).
  *
- * Minimal stub parser that creates a TrackerSong for the WASM engine.
- * Since EUP playback is handled entirely by the WASM engine
- * (suppressNotes = true), the TrackerSong returned here is a minimal shell
- * with one empty pattern. The WASM engine handles all actual audio rendering.
+ * The WASM engine plays the file (suppressNotes = true). The grid is the event
+ * stream as the vendored player walks it, decoded in wasm (eupmini-wasm
+ * src/eup_grid.cpp): one pattern per bar, 16 rows, one channel per track voice.
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -70,9 +69,7 @@ function bankFile(companions: Map<string, ArrayBuffer> | undefined, name: string
 /**
  * Parse an EUP file into a TrackerSong.
  *
- * Returns a minimal TrackerSong with one empty pattern.
- * The WASM engine handles all actual playback — this just provides the
- * TrackerSong shell that the UI/store layer expects.
+ * One pattern per bar, decoded in wasm; the WASM engine handles playback.
  */
 export async function parseEupFile(
   fileName: string,
@@ -85,39 +82,39 @@ export async function parseEupFile(
     );
   }
 
-  const numChannels = 11; // 6 FM + 3 SSG + 2 ADPCM
-  const numRows = 64;
   const baseName = fileName.replace(/\.[^.]+$/, '');
+  const { eupGrid, eupBarCells } = await import('@/engine/eupmini/eupminiEditWasm');
+  const grid = await eupGrid(new Uint8Array(data));
+  const numChannels = Math.max(1, grid.tracks.length);
 
-  const emptyRows = Array.from({ length: numRows }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
-
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: numRows,
-    channels: Array.from({ length: numChannels }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: 0,
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'EUP' as const,
-      sourceFile: fileName,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: numChannels,
-      originalPatternCount: 1,
-      originalInstrumentCount: 0,
-    },
-  };
+  const patterns = grid.bars.map((bar, b) => {
+    const cells = eupBarCells(bar);
+    return {
+      id: `pattern-${b}`,
+      name: `Bar ${b + 1}`,
+      length: cells.length,
+      channels: Array.from({ length: numChannels }, (_, ch) => ({
+        id: `channel-${ch}`,
+        name: grid.slots[ch] ? `Track ${grid.tracks[ch] + 1} Voice ${grid.slots[ch] + 1}` : `Track ${(grid.tracks[ch] ?? 0) + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: 0,
+        instrumentId: null,
+        color: null,
+        rows: cells.map((row) => row[ch]),
+      })),
+      importMetadata: {
+        sourceFormat: 'EUP' as const,
+        sourceFile: fileName,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: numChannels,
+        originalPatternCount: grid.bars.length,
+        originalInstrumentCount: 0,
+      },
+    };
+  });
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'FM Towns', type: 'synth' as const,
@@ -127,14 +124,15 @@ export async function parseEupFile(
   return {
     name: `${baseName} [EUP]`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions: patterns.map((_, i) => i),
+    songLength: patterns.length,
     restartPosition: 0,
     numChannels,
     initialSpeed: 6,
-    initialBPM: 125,
+    // one row = 24 of the player's 96 steps per beat: speed 6 at the song's tempo plays a row per 16th note
+    initialBPM: grid.tempo,
     linearPeriods: false,
     eupFileData: data.slice(0),
     // The banks the header names, beside the song (modland: in the song's own folder).

@@ -77,3 +77,38 @@ target_link_options(Cpsycle PRIVATE
     "SHELL:-s SINGLE_FILE=0"
     "SHELL:-s USE_ZLIB=1"
 )
+
+# CpsycleEdit: node + web module for the editor. Same loader and player plus cpsycle_grid.c
+# (grid decode from the PATD chunks, note/machine save, played-row log).
+add_executable(CpsycleEdit
+    cpsycle_harness.c
+    cpsycle_stubs.c
+    cpsycle_grid.c
+)
+target_link_libraries(CpsycleEdit PRIVATE
+    cpsycle_audio
+    cpsycle_dsp
+    cpsycle_file
+    cpsycle_thread
+    cpsycle_container
+)
+target_compile_options(CpsycleEdit PRIVATE -O2 -w)
+set_target_properties(CpsycleEdit PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${OUTPUT_DIR}"
+    SUFFIX ".js"
+    C_STANDARD 11
+)
+target_link_options(CpsycleEdit PRIVATE
+    "SHELL:-s MODULARIZE=1"
+    "SHELL:-s EXPORT_ES6=1"
+    "SHELL:-s EXPORT_NAME='createCpsycleEdit'"
+    "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_cpsycle_init','_cpsycle_stop','_cpsycle_render','_cps_grid_open','_cps_grid_close','_cps_grid_channels','_cps_grid_order_length','_cps_grid_order','_cps_grid_pattern_count','_cps_grid_pattern_rows','_cps_grid_pattern','_cps_edit_set','_cps_edit_save','_cps_edit_saved_ptr','_cps_rowlog_enable','_cps_rowlog_count','_cps_rowlog_record_size','_cps_rowlog_ptr']"
+    "SHELL:-s EXPORTED_RUNTIME_METHODS=['HEAPU8','HEAP32','HEAPF32']"
+    "SHELL:-s ALLOW_MEMORY_GROWTH=1"
+    "SHELL:-s INITIAL_MEMORY=33554432"
+    "SHELL:-s STACK_SIZE=1048576"
+    "SHELL:-s ENVIRONMENT='web,worker,node'"
+    "SHELL:-s NO_EXIT_RUNTIME=1"
+    "SHELL:-s SINGLE_FILE=0"
+    "SHELL:-s USE_ZLIB=1"
+)

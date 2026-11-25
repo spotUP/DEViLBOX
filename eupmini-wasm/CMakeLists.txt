@@ -43,3 +43,22 @@ if(EMSCRIPTEN)
     -O2
   )
 endif()
+
+# Grid decode + edit + player oracle (TS loads it as an ES module in the app and in vitest)
+add_executable(EupminiEdit src/eup_grid.cpp)
+target_compile_definitions(EupminiEdit PRIVATE EUPPLAYER_LITTLE_ENDIAN=1)
+target_link_libraries(EupminiEdit PRIVATE eupmini_static)
+if(EMSCRIPTEN)
+  set_target_properties(EupminiEdit PROPERTIES OUTPUT_NAME "EupminiEdit" SUFFIX ".js")
+  target_link_options(EupminiEdit PRIVATE
+    "SHELL:-s WASM=1"
+    "SHELL:-s MODULARIZE=1"
+    "SHELL:-s EXPORT_ES6=1"
+    "SHELL:-s EXPORT_NAME='createEupminiEdit'"
+    "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_eup_grid_open','_eup_grid_close','_eup_grid_bars','_eup_grid_rows','_eup_grid_channels','_eup_grid_channel_track','_eup_grid_channel_slot','_eup_grid_cell_ints','_eup_grid_cells','_eup_grid_tempo','_eup_edit_note','_eup_edit_insert','_eup_grid_redecode','_eup_edit_size','_eup_edit_ptr','_eup_oracle_run','_eup_oracle_log']"
+    "SHELL:-s EXPORTED_RUNTIME_METHODS=['HEAPU8','HEAP32']"
+    "SHELL:-s ALLOW_MEMORY_GROWTH=1"
+    "SHELL:-s ENVIRONMENT='web,worker,node'"
+    -O2
+  )
+endif()
