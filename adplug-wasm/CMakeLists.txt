@@ -130,6 +130,8 @@ set(EMSCRIPTEN_FLAGS
     "-s MAXIMUM_MEMORY=67108864"
     "-s STACK_SIZE=262144"
     "-s ENVIRONMENT='web,worker'"
+    # Worklet passes wasmBinary (no fetch there), extractor passes locateFile.
+    "-s INCOMING_MODULE_JS_API=['wasmBinary','locateFile','print','printErr']"
     "-s SINGLE_FILE=0"
     "-s NO_EXIT_RUNTIME=1"
     "-s ASSERTIONS=0"

@@ -3038,27 +3038,28 @@ export class TrackerReplayer {
           // note/instrument/effect data from the player's internal state.
           adplugPlayer.onChannelNotes = (notes, order, row) => {
             if (!this.playing || !this.song) return;
-            const store = useTrackerStore.getState();
             const patIdx = this.song.songPositions?.[order];
-            if (patIdx == null || patIdx < 0 || patIdx >= store.patterns.length) return;
-            const pattern = store.patterns[patIdx];
-            if (!pattern || row < 0 || row >= pattern.length) return;
-
-            for (const n of notes) {
-              if (n.trigger && n.note > 0 && n.ch < pattern.channels.length) {
-                const existing = pattern.channels[n.ch].rows[row];
-                // Only write if the cell is currently empty
-                if (!existing || (existing.note === 0 && existing.instrument === 0)) {
-                  setCellInPattern(pattern, n.ch, row, {
-                    note: n.note as any,
-                    instrument: n.inst as any,
-                    volume: n.vol > 0 ? (0x10 + Math.min(n.vol, 63)) as any : 0 as any,
-                    effTyp: n.effTyp as any,
-                    eff: n.eff as any,
-                  });
-                }
+            if (patIdx == null || patIdx < 0) return;
+            const isEmpty = (c: { note: number; instrument: number } | undefined) => !c || (c.note === 0 && c.instrument === 0);
+            const live = useTrackerStore.getState().patterns[patIdx];
+            if (!live || row < 0 || row >= live.length) return;
+            const fills = notes.filter((n) => n.trigger && n.note > 0 && n.ch < live.channels.length && isEmpty(live.channels[n.ch].rows[row]));
+            if (fills.length === 0) return;
+            // Store patterns are frozen immer state: write through a draft, never in place.
+            useTrackerStore.setState((state) => {
+              const pattern = state.patterns[patIdx];
+              if (!pattern) return;
+              for (const n of fills) {
+                if (!isEmpty(pattern.channels[n.ch]?.rows[row])) continue;
+                setCellInPattern(pattern, n.ch, row, {
+                  note: n.note as any,
+                  instrument: n.inst as any,
+                  volume: n.vol > 0 ? (0x10 + Math.min(n.vol, 63)) as any : 0 as any,
+                  effTyp: n.effTyp as any,
+                  eff: n.eff as any,
+                });
               }
-            }
+            });
           };
 
           // Wire onEnded so we stop when the song finishes — prevents

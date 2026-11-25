@@ -66,9 +66,15 @@ bool CdroPlayer::load(const std::string &filename, const CFileProvider &fp)
 		return false;
 	}
 	int version = f->readInt(4);
-	if (version != 0x10000) {
+	if (version == 2) {	// DRO v2.0: Cdro2Player's file
 		fp.close(f);
 		return false;
+	}
+	if (version != 0x10000) {
+		// Header without the version field (samurai.dro, dune1.dro in the
+		// Modland DOSBox set): the word just read is the length in
+		// milliseconds. The data-length check below still rejects garbage.
+		f->seek(8);
 	}
 
 	f->ignore(4);	// Length in milliseconds

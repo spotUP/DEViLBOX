@@ -640,7 +640,19 @@ int adplug_load(const uint8_t* data, uint32_t length, const char* filename) {
     g_mutingOpl->init();
     memset(g_channelState, 0, sizeof(g_channelState));
     memset(g_prevKeyOn, 0, sizeof(g_prevKeyOn));
+    // Capture/D00 results belong to the previous song. adplug_get_patterns reads
+    // g_captureTotalTicks for capture-type players, so stale ticks made the next
+    // song skip its own capture and report the old pattern count.
+    g_capturedNotes.clear();
     g_capturedInstruments.clear();
+    g_d00InstMap.clear();
+    g_captureTotalTicks = 0;
+    g_captureTicksPerRow = 0;
+    g_captureRefreshRate = 0.0f;
+    g_renderTickCount = 0;
+    g_d00Grid.clear();
+    g_d00GridRows = 0;
+    g_d00NativeExtracted = false;
 
     // Use AdPlug factory to auto-detect format and create player
     // Pass the muting OPL wrapper so we can mute channels during streaming.
