@@ -144,6 +144,7 @@ export interface FormatStore {
   t0astFileData: ArrayBuffer | null;
   jxsFileData: ArrayBuffer | null;
   beRoTrackerFileData: ArrayBuffer | null;
+  axsFileData: ArrayBuffer | null;
   buzFileData: ArrayBuffer | null;
   activisionProFileData: ArrayBuffer | null;
   activisionProSubsongCount: number;
@@ -753,14 +754,15 @@ export const useFormatStore = create<FormatStore>()(
     mdxminiFileData: null,
     pmdFileData: null,
     ronKlarenFileData: null,
-    t0astFileData: null,
     actionamicsFileData: null,
     monotoneFileData: null,
     kdmFileData: null,
     kdmBankData: null,
+    pieceFileData: null,
+    t0astFileData: null,
     jxsFileData: null,
     beRoTrackerFileData: null,
-    pieceFileData: null,
+    axsFileData: null,
     buzFileData: null,
     activisionProFileData: null,
     activisionProSubsongCount: 0,
@@ -1496,14 +1498,15 @@ export const useFormatStore = create<FormatStore>()(
         state.pmdFileData = (song as any).pmdFileData ?? null;
         state.ronKlarenFileData = (song as any).ronKlarenFileData ?? null;
         state.actionamicsFileData = (song as any).actionamicsFileData ?? null;
-        state.t0astFileData = (song as any).t0astFileData ?? null;
         state.monotoneFileData = (song as any).monotoneFileData ?? null;
         state.kdmFileData = (song as any).kdmFileData ?? null;
         state.kdmBankData = (song as any).kdmBankData ?? null;
+        state.pieceFileData = (song as any).pieceFileData ?? null;
+        state.t0astFileData = (song as any).t0astFileData ?? null;
         state.jxsFileData = (song as any).jxsFileData ?? null;
         state.beRoTrackerFileData = (song as any).beRoTrackerFileData ?? null;
+        state.axsFileData = (song as any).axsFileData ?? null;
         state.buzFileData = (song as any).buzFileData ?? null;
-        state.pieceFileData = (song as any).pieceFileData ?? null;
         state.activisionProFileData = (song as any).activisionProFileData ?? null;
         state.synthesisFileData = (song as any).synthesisFileData ?? null;
         state.dssFileData = (song as any).dssFileData ?? null;
@@ -1887,14 +1890,15 @@ export const useFormatStore = create<FormatStore>()(
       state.ronKlarenFileData = null;
       state.actionamicsFileData = null;
       state.monotoneFileData = null;
-      state.t0astFileData = null;
       state.kdmFileData = null;
       state.kdmBankData = null;
+      state.pieceFileData = null;
+      state.t0astFileData = null;
       state.jxsFileData = null;
       state.beRoTrackerFileData = null;
+      state.axsFileData = null;
       state.buzFileData = null;
       state.activisionProFileData = null;
-      state.pieceFileData = null;
       state.activisionProSubsongCount = 0;
       state.activisionProCurrentSubsong = 0;
       state.synthesisFileData = null;

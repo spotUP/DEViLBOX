@@ -145,6 +145,16 @@ export async function tryChipDumpParse(
     }
   }
 
+  // ── AXS — IFF FORM/AXSF (magic check), AxsEngine plays the file ──
+  if (/\.axs$/.test(filename)) {
+    const { isAxsFormat, parseAxsFile } = await import('@lib/import/formats/AxsParser');
+    const bytes = new Uint8Array(buffer);
+    if (isAxsFormat(bytes)) {
+      const song = await parseAxsFile(bytes, originalFileName);
+      if (song) return song;
+    }
+  }
+
   // ── T0AST — The 0ok Amazing Synth Tracker .t0ast (signature check), T0astEngine plays the file ──
   if (/\.t0ast$/.test(filename)) {
     const { isT0astFormat, parseT0astFile } = await import('@lib/import/formats/T0astParser');

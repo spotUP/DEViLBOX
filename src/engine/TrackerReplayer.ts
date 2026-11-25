@@ -110,6 +110,7 @@ export type TrackerFormat =
   | 'T0AST' // The 0ok Amazing Synth Tracker (own WASM player)
   | 'JXS'   // JayTrax (own WASM player)
   | 'BeRoTracker' // BeRoTracker .brt (own WASM player)
+  | 'AXS' // AXS (AXSF) synth songs (own WASM player)
   | 'BUZ'   // Buzzic 1 / Buzzic 2 (own WASM player)
   // Exotic Amiga formats (Phase 2 full editing)
   | 'OKT'   // Oktalyzer
@@ -532,6 +533,7 @@ export interface TrackerSong {
   t0astFileData?: ArrayBuffer;
   jxsFileData?: ArrayBuffer;
   beRoTrackerFileData?: ArrayBuffer;
+  axsFileData?: ArrayBuffer;
   buzFileData?: ArrayBuffer;
   activisionProFileData?: ArrayBuffer;
   synthesisFileData?: ArrayBuffer;

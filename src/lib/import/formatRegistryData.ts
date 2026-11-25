@@ -2037,6 +2037,17 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     nativeParser: { module: '@lib/import/formats/PieceParser', parseFn: 'parsePieceFile', detectFn: 'isPieceFormat' },
   },
   {
+    key: 'axs',
+    label: 'AXS',
+    description: "AXS synth songs (.axs, IFF 'FORM' of type 'AXSF') - own WASM player (bbmp axs, clean-room).",
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.axs$/i,
+    nativeOnly: true,
+    customDispatch: true,
+    nativeParser: { module: '@lib/import/formats/AxsParser', parseFn: 'parseAxsFile', detectFn: 'isAxsFormat' },
+  },
+  {
     key: 't0ast',
     label: 'T0AST',
     description: "T0AST (The 0ok Amazing Synth Tracker, .t0ast, 'T0AST' 1.0.1 or 'T0AST0OK' magic) - own WASM player (bbmp t0ast).",

@@ -933,6 +933,18 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/piece/PieceEngine')).PieceEngine as unknown as WASMSingletonStatic,
   },
   {
+    key: 'AxsReplayer',
+    synthType: 'AxsWasmSynth',
+    suppressNotes: true,
+    fileDataKey: 'axsFileData',
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/axs/AxsEngine')).AxsEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'T0astReplayer',
     synthType: 'T0astWasmSynth',
     suppressNotes: true,

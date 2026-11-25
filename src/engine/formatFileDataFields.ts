@@ -104,6 +104,7 @@ export const FILE_DATA_FIELDS = [
   't0astFileData',
   'jxsFileData',
   'beRoTrackerFileData',
+  'axsFileData',
   'buzFileData',
   'activisionProFileData',
   'synthesisFileData',
