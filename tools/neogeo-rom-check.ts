@@ -41,7 +41,7 @@ const SECONDS = Number(opt('--seconds') ?? 20);
 /** Decode YM2610 register writes (port 0 = A, 1 = B) to key-on starts with the channel's Hz at key-on (freq written within 50 ms after counts; the Z80 driver writes it up to ~40 ms after key-on). */
 let lastT0 = 0;
 function starts(w: W[], clk: number): Start[] {
-  const fnum: Record<string, number> = {}, hi: Record<string, number> = {}, vol: Record<string, number> = {}, per: Record<string, number> = {};
+  const mask: Record<string, number> = {}, fnum: Record<string, number> = {}, hi: Record<string, number> = {}, vol: Record<string, number> = {}, per: Record<string, number> = {};
   const out: (Start & { fix?: () => void })[] = [];
   const hzOf: Record<string, () => number> = {};
   let dn = 0;
@@ -60,7 +60,8 @@ function starts(w: W[], clk: number): Start[] {
     const { port, reg, val, t } = x;
     if (port === 0 && reg === 0x28) {
       const c = val & 7; const idx = c === 1 ? 'F1' : c === 2 ? 'F2' : c === 5 ? 'F3' : c === 6 ? 'F4' : undefined;
-      if (idx && val >> 4) on(t, idx);
+      // a start = a slot going off -> on; the driver re-writes the same key-on mask (28=12 x5 in 4 ms), which the chip ignores
+      if (idx) { if ((val >> 4) & ~(mask[idx] ?? 0)) on(t, idx); mask[idx] = val >> 4; }
     } else if (reg >= 0xa4 && reg <= 0xa6) { const c = fmCh(port, reg); if (c) hi[c] = val & 0x3f; }
     else if (reg >= 0xa0 && reg <= 0xa2) { const c = fmCh(port, reg); if (c) fnum[c] = ((hi[c] ?? 0) << 8) | val; }
     else if (port === 0 && reg < 6) { const n = (reg >> 1) + 1; const k = `S${n}`; const p = per[k] ?? 0; per[k] = reg & 1 ? (p & 0xff) | ((val & 0xf) << 8) : (p & 0xf00) | val; }
@@ -215,12 +216,17 @@ for (const song of SONGS) {
     // Furnace ends the render after the first tick of the loop-back row, so the key-ons it writes at the very end are the
     // song restarting; a song without 0B stops in nullsound (lint: will not loop), so those are not part of the song
     const all = starts(vgm.w, vgm.clk), wantT0 = lastT0;
-    const want = all.filter((e) => e.t < SECONDS - 2 && e.t + wantT0 < vgm.end - 1e-6);
+    const end = Math.min(SECONDS - 2, vgm.end - wantT0 - 1e-6);
+    const want = all.filter((e) => e.t < end);
+    // count MAME in the same window: MAME runs to SECONDS - 1 and keeps looping past the end of the Furnace render
+    const gotIn = got.filter((g) => g.t < end); v.mameStarts = gotIn.length;
     const pairs = want.map((w) => [w, got.find((g) => g.ch === w.ch && Math.abs(g.t - w.t) < 0.03)] as const);
     const hit = pairs.filter(([, g]) => g);
     // miss analysis: signed delta (MAME - Furnace) to the nearest same-channel MAME key-on; late = driver timing, none = lost row
     const nearest = (w: Start) => got.filter((g) => g.ch === w.ch).reduce<number | undefined>((b, g) => (b === undefined || Math.abs(g.t - w.t) < Math.abs(b) ? g.t - w.t : b), undefined);
     const missD = pairs.filter(([, g]) => !g).map(([w]) => ({ w, d: nearest(w) }));
+    if (detail) { const n = (l: Start[]) => JSON.stringify(Object.fromEntries([...new Set(l.map((x) => x.ch))].sort().map((c) => [c, l.filter((x) => x.ch === c).length]))); console.log(`  STARTS furnace ${n(want)} mame ${n(gotIn)}`); }
+    if (detail) for (const g of gotIn.filter((g) => !want.some((w) => w.ch === g.ch && Math.abs(g.t - w.t) < 0.03))) console.log(`  EXTRA ${g.t.toFixed(3)} ${g.ch}`);
     const loose = pairs.filter(([w, g]) => g || (nearest(w) !== undefined && Math.abs(nearest(w)!) < 0.15)).length;
     if (detail) for (const { w } of missD.filter((m) => m.w.ch.startsWith('S') && m.d !== undefined && Math.abs(m.d) > 0.15)) {
       // raw SSG volume writes (reg 8-10) of the missed channel around the miss, both streams, times relative to their own first key-on
