@@ -10,6 +10,8 @@
  * the same sample on both sides; a song that starts over plays to where every part has
  * started over once, then 8 seconds more, fading out. */
 #include "piece.cpp"
+#include "piece_edit.h"
+#include "piece_grid.h"
 
 #include <emscripten.h>
 
@@ -115,5 +117,73 @@ EMSCRIPTEN_KEEPALIVE int piece_render(float* out, int frames) {
 }
 
 EMSCRIPTEN_KEEPALIVE void piece_close(void) { g_open.reset(); }
+
+/* The song file as edited (Song::d). */
+EMSCRIPTEN_KEEPALIVE const uint8_t* piece_data(void) { return g_open ? g_open->song->d.data() : nullptr; }
+EMSCRIPTEN_KEEPALIVE int piece_data_size(void) { return g_open ? static_cast<int>(g_open->song->d.size()) : 0; }
+
+}
+
+namespace {
+std::vector<int32_t> g_grid;
+
+/* Take <d> as the song. Same size (byte edits): written into Song::d, heard when a part next
+ * reads it. Other size (pointers moved): reopened, then run up to the output frame it was at.
+ * shortcut: the run-up renders the song from the start (a dropout on a long song), upgrade to a
+ * sequencer-only seek in piece.cpp if size-changing edits during playback must be seamless. */
+int take(std::vector<uint8_t>& d) {
+  if (!g_open) return 0;
+  if (d.size() == g_open->song->d.size()) { g_open->song->d.swap(d); return 1; }
+  const long long k = g_open->k;
+  const int rate = g_open->rate;
+  if (!piece_open(d.data(), static_cast<int>(d.size()), rate)) return 0;
+  std::vector<float> tmp(2 * 1024);
+  while (g_open->k < k) {
+    const int n = static_cast<int>(std::min<long long>(1024, k - g_open->k));
+    if (piece_render(tmp.data(), n) < n) break;
+  }
+  return 1;
+}
+}  // namespace
+
+extern "C" {
+
+/* The editable grid (piece_grid.h): int32 [rowTicks, ticks, tempo, count, then count x
+ * (part, tick, len, note, inst, vol, tempo)]; inst/vol/tempo -1 when not set at that event. */
+EMSCRIPTEN_KEEPALIVE const int32_t* piece_grid(void) {
+  g_grid.clear();
+  if (!g_open) return nullptr;
+  const piece::Grid g = piece::buildGrid(g_open->song->d);
+  g_grid = {g.rowTicks, g.ticks, g.tempo, static_cast<int32_t>(g.events.size())};
+  for (const piece::GridEvent& e : g.events)
+    g_grid.insert(g_grid.end(), {e.part, e.tick, e.len, e.note, e.inst, e.vol, e.tempo});
+  return g_grid.data();
+}
+
+/* Write tracker note <note> (0 / 97 rest, 1..96) into part <part> at grid row <row>; 1 when the
+ * song changed (piece_error says why not). */
+EMSCRIPTEN_KEEPALIVE int piece_edit_cell(int part, int row, int note) {
+  if (!g_open) return 0;
+  std::vector<uint8_t> d = g_open->song->d;
+  g_error.clear();
+  if (!piece::editCell(d, part, row, note, g_error)) return 0;
+  return take(d);
+}
+
+/* Replace the playing song with an edited copy of it (bytes from piece_data of another instance). */
+EMSCRIPTEN_KEEPALIVE int piece_replace(const uint8_t* data, int size) {
+  if (size <= 0) return 0;
+  std::vector<uint8_t> d(data, data + size);
+  return take(d);
+}
+
+/* Splice: replace <oldLen> bytes at <off> with <n> bytes and fix every pointer (piece_edit.h). */
+EMSCRIPTEN_KEEPALIVE int piece_splice(int off, int oldLen, const uint8_t* bytes, int n) {
+  if (!g_open || off < 0 || oldLen < 0 || n < 0) return 0;
+  std::vector<uint8_t> d = g_open->song->d;
+  g_error.clear();
+  if (!piece::splice(d, off, oldLen, bytes, n, g_error)) return 0;
+  return take(d);
+}
 
 }

@@ -42,6 +42,20 @@ class PieceProcessor extends AudioWorkletProcessor {
         if (this.open) this.applyPoke(data.offset, bytes);
         break;
       }
+      case 'replace': {
+        // Live edit that may change the song size (a split note): the WASM takes the new bytes
+        // in place, or reopens and runs up to the frame it was at.
+        if (!this.module) break;
+        this.songBytes = new Uint8Array(data.moduleData);
+        if (!this.open) break;
+        const m = this.module;
+        const ptr = m._malloc(this.songBytes.length);
+        if (!ptr) break;
+        m.HEAPU8.set(this.songBytes, ptr);
+        m._piece_replace(ptr, this.songBytes.length);
+        m._free(ptr);
+        break;
+      }
       case 'play': this.playing = true; this.lastPos = -1; if (this.ended) this.openSong(); break;
       case 'stop':
         this.playing = false;

@@ -327,6 +327,9 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
   // KDM: its module (with the grid's edits) is the export.
   { id: 'kdm', matches: (s) => songIds(s).format === 'KDM' && !!s.kdmFileData,
     run: async (s) => { const { exportKdm } = await import('./KdmExporter'); return exportKdm(s); } },
+  // P/ECE music driver: its song file (edits written in as made) is the export.
+  { id: 'piece', matches: (s) => songIds(s).format === 'PIECE' && !!s.pieceFileData,
+    run: async (s) => { const { exportPiece } = await import('./PieceExporter'); return exportPiece(s); } },
   // Art of Noise: its module (with the grid's edits) is the export.
   { id: 'artOfNoise', matches: (s) => songIds(s).format === 'AON' && !!s.artOfNoiseFileData,
     run: async (s) => { const { exportArtOfNoise } = await import('./ArtOfNoiseExporter'); return exportArtOfNoise(s); } },

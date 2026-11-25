@@ -140,7 +140,7 @@ export async function tryChipDumpParse(
     const { isPieceFormat, parsePieceFile } = await import('@lib/import/formats/PieceParser');
     const bytes = new Uint8Array(buffer);
     if (isPieceFormat(bytes)) {
-      const song = parsePieceFile(bytes, originalFileName);
+      const song = await parsePieceFile(bytes, originalFileName);
       if (song) return song;
     }
   }

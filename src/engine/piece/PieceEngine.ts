@@ -105,6 +105,12 @@ export class PieceEngine extends WASMChannelOutputsEngine {
   }
 
   /** Live edit: overwrite bytes of the song file at a file offset (same length, e.g. a note byte 0x80+n or a length byte); heard when a part next reads them. */
+  /** Swap in an edited copy of the song (any size); playback goes on from where it is. */
+  replaceModule(bytes: Uint8Array): void {
+    const copy = bytes.slice();
+    this.workletNode?.port.postMessage({ type: 'replace', moduleData: copy.buffer }, [copy.buffer]);
+  }
+
   poke(offset: number, bytes: Uint8Array): void {
     this.workletNode?.port.postMessage({ type: 'poke', offset, bytes: bytes.slice() });
   }
