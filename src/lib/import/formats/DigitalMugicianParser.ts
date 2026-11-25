@@ -23,6 +23,7 @@ import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeDigitalMugicianCell } from '@/engine/uade/encoders/DigitalMugicianEncoder';
 import { arrayBufferToBase64 } from '@/lib/import/InstrumentConverter';
 import { dmIndexToNote } from './DigitalMugicianNotes';
+import { digMugGrid } from '@/engine/digmug/digMugEditWasm';
 
 // -- WAV helper for sample editor ------------------------------------------
 
@@ -127,58 +128,6 @@ interface DMVoice {
   column: number;
   name: string;
   pan: number;
-}
-
-/**
- * One pool cell as the replayer plays it. The note that sounds is always the
- * row's note byte (+ transpose + finetune): the effect byte only ADDS a
- * behaviour. Effect bytes 0..63 are Pitch Bend (val1 1) whose target note is
- * the effect byte and whose speed is the parameter - a plain note carries
- * effect 0 / param 0, a bend that never moves. 0x4A (val1 12) is Note Wander:
- * no retrigger, the voice slides to the row's note.
- */
-function dmCellToTracker(row: DMPatternRow, transpose: number, finetune: number, instrument: number): TrackerCell {
-  const noteAt = (n: number): number => {
-    const idx = n + transpose + finetune;
-    return dmIndexToNote(idx);
-  };
-  const xmNote = noteAt(row.note);
-  const val1 = row.effect < 64 ? 1 : row.effect - 62;
-  const val2 = row.param;
-  let effTyp = 0;
-  let eff = 0;
-  switch (val1) {
-    case 1: { // Pitch bend from the note towards the effect byte's note
-      if (val2 !== 0 && row.effect !== row.note) {
-        effTyp = row.effect > row.note ? 0x01 : 0x02; // higher index = higher pitch
-        eff = Math.min(Math.abs(val2), 0xFF);
-      }
-      break;
-    }
-    case 6: // Song speed
-      if (val2 > 0 && val2 <= 15) { effTyp = 0x0F; eff = val2 & 0xFF; }
-      break;
-    case 7: // LED filter on
-      effTyp = 0x0E; eff = 0x01;
-      break;
-    case 8: // LED filter off
-      effTyp = 0x0E; eff = 0x00;
-      break;
-    case 12: // Note wander: slide to the row's note, no retrigger
-      if (val2 !== 0) { effTyp = 0x03; eff = Math.min(Math.abs(val2), 0xFF); }
-      break;
-    case 13: { // Shuffle: different speeds on even/odd rows
-      const lo = val2 & 0x0F;
-      const hi = (val2 >> 4) & 0x0F;
-      if (lo > 0 && hi > 0) { effTyp = 0x0F; eff = lo; }
-      break;
-    }
-    default: // 2-4 no envelope restart, 5 pattern length (the grid cuts the pattern),
-      // 9 switch filter, 10 no DMA, 11 arpeggio select
-      break;
-  }
-  // DM volume comes from the instrument's envelope; no per-row volume.
-  return { note: xmNote, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
 }
 
 // -- Format detection -------------------------------------------------------
@@ -579,117 +528,36 @@ export async function parseDigitalMugicianFile(
   }
 
   // -- Convert to TrackerSong patterns --------------------------------------
-  // One TrackerSong pattern per distinct song position. A position plays its
-  // tracks until the row counter reaches 64 or the current pattern length -
-  // a global the Pattern Length effect (val1 5, param 1..64) sets and that
-  // persists across positions. Every voice re-applies its last effect on
-  // every tick, so after a row the length is the param of the LAST voice (in
-  // replayer order) whose current effect is Pattern Length.
-
-  const numPositions = Math.floor(song.length / 4);
+  // The replayer (digmug.c, dm_grid_*) walks sub-song 0 and names every row it plays: one grid
+  // pattern per song position, cut where the Pattern Length effect ends it, each note named by the
+  // period it plays at (transpose + instrument fine tune applied).
+  const grid = await digMugGrid(buf);
   const trackerPatterns: Pattern[] = [];
-  const songPositions: number[] = [];
-  const patternCache = new Map<string, number>();
-
-  // DM base row (pool offset) per channel for each TrackerSong pattern, for
-  // getCellFileOffset: (pattern, row, channel) -> file offset.
+  const songPositions: number[] = grid.order.slice();
+  // DM base row (pool offset) per [pattern][channel], for getCellFileOffset: (pattern, row, channel) -> file offset.
   const patternChannelBaseRows: number[][] = [];
   // transpose + finetune per [pattern][channel][row], for writing an edited grid note back.
   const patternNoteShifts: number[][][] = [];
 
-  const poolRow = (rowOffset: number): DMPatternRow | null =>
-    rowOffset >= 0 && rowOffset < patternRows.length ? patternRows[rowOffset] : null;
-
-  // Replayer state carried across rows and positions.
-  let patLength = 64;
-  const voiceEffect = voices.map(() => 0);  // 15(a5): val1 of the voice's last note row
-  const voiceParam = voices.map(() => 0);   // 13(a5): its parameter byte
-  const voiceSample = voices.map(() => 1);  // 5(a5)+1: last instrument (finetune source)
-
-  for (let posIdx = 0; posIdx < numPositions; posIdx++) {
-    const steps: DMStep[] = [];
-    for (const v of voices) {
-      const step = songs[v.song]?.tracks[posIdx * 4 + v.column];
-      if (!step) break;
-      steps.push(step);
-    }
-    if (steps.length < numChannels) break;
-
-    // Rows this position plays.
-    let rowCount = 64;
-    for (let row = 0; row < 64; row++) {
-      for (let ch = 0; ch < numChannels; ch++) {
-        const cell = poolRow(steps[ch].pattern + row);
-        if (!cell || cell.note === 0) continue;
-        voiceEffect[ch] = cell.effect < 64 ? 1 : cell.effect - 62;
-        voiceParam[ch] = cell.param & 0xFF;
-        if (voiceEffect[ch] === 13) voiceEffect[ch] = 0; // shuffle clears 15(a5)
-      }
-      for (let ch = 0; ch < numChannels; ch++) {
-        if (voiceEffect[ch] === 5 && voiceParam[ch] >= 1 && voiceParam[ch] <= 64) patLength = voiceParam[ch];
-      }
-      if (row + 1 === 64 || row + 1 === patLength) { rowCount = row + 1; break; }
-    }
-
-    const startSamples = voiceSample.slice();
-    const cacheKey = `${rowCount}|${steps.map((s, ch) => `${s.pattern}:${s.transpose}:${startSamples[ch]}`).join('|')}`;
-    const cached = patternCache.get(cacheKey);
-    // Advance each voice's last-instrument state over the rows that play.
-    for (let ch = 0; ch < numChannels; ch++) {
-      for (let row = 0; row < rowCount; row++) {
-        const cell = poolRow(steps[ch].pattern + row);
-        if (cell && cell.note > 0 && cell.effect !== 0x4A && cell.sample > 0) voiceSample[ch] = cell.sample;
-      }
-    }
-    if (cached !== undefined) {
-      songPositions.push(cached);
-      continue;
-    }
-
-    const patIdx = trackerPatterns.length;
-    patternCache.set(cacheKey, patIdx);
-    songPositions.push(patIdx);
-    patternChannelBaseRows.push(steps.map((s) => s.pattern));
-
-    const shiftRows: number[][] = [];
-    patternNoteShifts.push(shiftRows);
-    const channelRows: TrackerCell[][] = steps.map((step, ch) => {
-      const rows: TrackerCell[] = [];
-      const shifts: number[] = [];
-      shiftRows.push(shifts);
-      let lastSample = startSamples[ch];
-      for (let row = 0; row < rowCount; row++) {
-        const cell = poolRow(step.pattern + row);
-        shifts.push(step.transpose + (lastSample > 0 && lastSample < samples.length ? samples[lastSample].finetune : 0));
-        if (!cell || cell.note === 0) {
-          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-          continue;
-        }
-        // Note wander (0x4A) keeps the voice's instrument; otherwise a
-        // non-zero sample byte selects a new one.
-        if (cell.effect !== 0x4A && cell.sample > 0) lastSample = cell.sample;
-        const finetune = lastSample > 0 && lastSample < samples.length ? samples[lastSample].finetune : 0;
-        shifts[row] = step.transpose + finetune;
-        rows.push(dmCellToTracker(cell, step.transpose, finetune, cell.sample > 0 ? getOrCreateInstrument(cell.sample) : 0));
-      }
-      return rows;
-    });
-
+  grid.patterns.forEach((gp, patIdx) => {
+    const rowCount = gp.cells.length;
+    patternChannelBaseRows.push(voices.map((_, ch) => (gp.tracks[0]?.[ch] ?? 0) * 64));
+    patternNoteShifts.push(voices.map((_, ch) => gp.shifts.map((r) => r[ch])));
     trackerPatterns.push({
       id: `pattern-${patIdx}`,
       name: `Pattern ${patIdx}`,
       length: rowCount,
-      channels: channelRows.map((rows, ch) => ({
+      channels: voices.map((v, ch) => ({
         id: `channel-${ch}`,
-        name: voices[ch].name,
+        name: v.name,
         muted: false,
         solo: false,
         collapsed: false,
         volume: 100,
-        pan: voices[ch].pan,
+        pan: v.pan,
         instrumentId: null,
         color: null,
-        rows,
+        rows: gp.cells.map((r) => r[ch]),
       })),
       importMetadata: {
         sourceFormat: 'MOD' as const,
@@ -700,7 +568,7 @@ export async function parseDigitalMugicianFile(
         originalInstrumentCount: sampleCount,
       },
     });
-  }
+  });
 
   // Fallback: at least one empty pattern
   if (trackerPatterns.length === 0) {
@@ -708,10 +576,7 @@ export async function parseDigitalMugicianFile(
     songPositions.push(0);
   }
 
-  // -- Build the restart position -------------------------------------------
-  const restartPos = song.loop > 0
-    ? Math.min(Math.floor(song.loopStep / 4), songPositions.length - 1)
-    : 0;
+  const restartPos = Math.min(grid.restart, songPositions.length - 1);
 
   // -- Module name from first song title or filename ------------------------
   const moduleName = song.title.trim() || filename.replace(/\.[^/.]+$/, '');
@@ -769,10 +634,8 @@ export async function parseDigitalMugicianFile(
     getCellNoteShift: (pattern: number, row: number, channel: number): number =>
       patternNoteShifts[pattern]?.[channel]?.[row] ?? 0,
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
-      if (pattern < 0 || pattern >= patternChannelBaseRows.length) return patternDataStart;
-      if (channel < 0 || channel >= numChannels) return patternDataStart;
-      // patternChannelBaseRows[pattern][channel] = base row index in the flat pool
-      const baseRow = patternChannelBaseRows[pattern][channel];
+      const baseRow = patternChannelBaseRows[pattern]?.[channel];
+      if (baseRow === undefined) return patternDataStart;
       return patternDataStart + (baseRow + row) * 4;
     },
   };

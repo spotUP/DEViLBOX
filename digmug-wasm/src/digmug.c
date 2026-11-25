@@ -1922,3 +1922,157 @@ void dm_preview_stop(DmModule* m) {
     m->preview_done = true;
     for (int i = 0; i < m->number_of_channels; i++) m->channels[i].active = false;
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Editor grid: the replayer's own walk of sub-song 0, one grid pattern per song position
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// A fresh module steps play_it (no mixing) from the start until the song wraps. At every row the
+// replayer reads, each voice's track, transpose and fine tune (after play_note took the row) are what
+// the cell plays with, so the grid shows exactly the rows each position plays (the Pattern Length
+// effect cuts it) and names each note by the period it plays (periodNotes.ts naming, 428 = C-2).
+// Each grid cell is DM_GRID_INTS ints: note, instrument, effTyp, eff, track, note shift
+// (transpose + fine_tune * 64, for writing an edited note back).
+
+#define DM_GRID_INTS 6
+
+static const uint16_t dm_amiga_periods[72] = {
+    1712, 1616, 1525, 1440, 1357, 1281, 1209, 1141, 1077, 1017, 961, 907,
+    856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
+    428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
+    214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
+    107, 101, 95, 90, 85, 80, 75, 71, 67, 63, 60, 56,
+    53, 50, 47, 45, 42, 40, 37, 35, 33, 31, 30, 28,
+};
+
+// periodToNote: the nearest Amiga period (first on a tie), note = index + 1; 0 for no period
+static int dm_period_to_note(int period) {
+    if (period <= 0) return 0;
+    int best = 0, best_diff = 1 << 30;
+    for (int i = 0; i < 72; i++) {
+        int d = abs((int)dm_amiga_periods[i] - period);
+        if (d < best_diff) { best_diff = d; best = i + 1; }
+    }
+    return best;
+}
+
+// The grid cell of one track row played with `transpose` and fine tune `ft`
+static void dm_grid_cell(const DmModule* m, const DmTrackRow* row, int transpose, int ft, int32_t* out) {
+    memset(out, 0, sizeof(int32_t) * 4);
+    if (row->note == 0) return;
+    int index = PERIOD_START_OFFSET + row->note + transpose + ft * 64;
+    out[0] = dm_period_to_note(index >= PERIOD_START_OFFSET && index < DM_PERIODS_COUNT ? dm_periods[index] : 0);
+    int ins = row->instrument & 0x3f;
+    out[1] = (ins >= 1 && (uint32_t)ins <= m->number_of_instruments) ? ins : 0;
+    int val1 = row->effect < 64 ? 1 : row->effect - 62;
+    int val2 = (int8_t)row->effect_param; // the parameter byte is signed
+    int amount = abs(val2) > 255 ? 255 : abs(val2);
+    switch (val1) {
+        case 1: // pitch bend from the note towards the effect byte's note
+            if (val2 != 0 && row->effect != row->note) { out[2] = row->effect > row->note ? 0x01 : 0x02; out[3] = amount; }
+            break;
+        case 6: if (val2 > 0 && val2 <= 15) { out[2] = 0x0F; out[3] = val2; } break; // song speed
+        case 7: out[2] = 0x0E; out[3] = 0x01; break; // LED filter on
+        case 8: out[2] = 0x0E; out[3] = 0x00; break; // LED filter off
+        case 12: if (val2 != 0) { out[2] = 0x03; out[3] = amount; } break; // note wander: slide, no retrigger
+        case 13: if ((val2 & 0x0f) && (val2 >> 4)) { out[2] = 0x0F; out[3] = val2 & 0x0f; } break; // shuffle
+        default: break; // 2-4 no envelope restart, 5 pattern length (the grid cuts the pattern), 9-11
+    }
+}
+
+static struct {
+    int channels;
+    int restart;
+    int order_length;
+    int* order;          // grid pattern per song position
+    int pattern_count;
+    int* pattern_rows;
+    int32_t** patterns;  // rows x channels x DM_GRID_INTS
+} dm_grid;
+
+void dm_grid_close(void) {
+    for (int p = 0; p < dm_grid.pattern_count; p++) free(dm_grid.patterns[p]);
+    free(dm_grid.patterns);
+    free(dm_grid.pattern_rows);
+    free(dm_grid.order);
+    memset(&dm_grid, 0, sizeof(dm_grid));
+}
+
+int dm_grid_open(const uint8_t* data, size_t size) {
+    dm_grid_close();
+    DmModule* m = dm_create(data, size, 50.0f);
+    if (!m) return 0;
+    if (m->sub_song_count <= 0) { dm_destroy(m); return 0; }
+    int nch = m->number_of_channels;
+    int positions = m->song_length;
+    dm_grid.channels = nch;
+    dm_grid.restart = m->current_sub_song->loop_song && m->current_sub_song->loop_position < positions
+        ? m->current_sub_song->loop_position : 0;
+    dm_grid.order = (int*)calloc((size_t)(positions > 0 ? positions : 1), sizeof(int));
+    dm_grid.pattern_rows = (int*)calloc((size_t)(positions > 0 ? positions : 1), sizeof(int));
+    dm_grid.patterns = (int32_t**)calloc((size_t)(positions > 0 ? positions : 1), sizeof(int32_t*));
+    const size_t row_ints = (size_t)nch * DM_GRID_INTS;
+    int32_t* cur = (int32_t*)calloc(64 * row_ints, sizeof(int32_t));
+    int cur_pos = -1, cur_rows = 0;
+    if (!dm_grid.order || !dm_grid.pattern_rows || !dm_grid.patterns || !cur) { free(cur); dm_destroy(m); dm_grid_close(); return 0; }
+
+    // Close the position being collected: reuse an equal pattern or keep it as a new one
+    #define DM_GRID_FLUSH() do { \
+        if (cur_pos >= 0 && cur_pos < positions) { \
+            int found = -1; \
+            for (int p = 0; p < dm_grid.pattern_count && found < 0; p++) \
+                if (dm_grid.pattern_rows[p] == cur_rows && memcmp(dm_grid.patterns[p], cur, (size_t)cur_rows * row_ints * sizeof(int32_t)) == 0) found = p; \
+            if (found < 0) { \
+                found = dm_grid.pattern_count++; \
+                dm_grid.pattern_rows[found] = cur_rows; \
+                dm_grid.patterns[found] = (int32_t*)malloc((size_t)cur_rows * row_ints * sizeof(int32_t)); \
+                memcpy(dm_grid.patterns[found], cur, (size_t)cur_rows * row_ints * sizeof(int32_t)); \
+            } \
+            dm_grid.order[cur_pos] = found; \
+            if (cur_pos + 1 > dm_grid.order_length) dm_grid.order_length = cur_pos + 1; \
+        } \
+    } while (0)
+
+    // a song plays at most positions x 64 rows x 255 ticks before it wraps
+    for (long tick = 0; tick < (long)(positions + 1) * 64 * 256 && !m->end_reached; tick++) {
+        bool row_start = m->new_row;
+        int pos = m->current_position, row = m->current_row;
+        play_it(m);
+        if (!row_start) continue;
+        if (pos != cur_pos) { DM_GRID_FLUSH(); cur_pos = pos; cur_rows = 0; }
+        if (cur_rows >= 64) continue;
+        for (int ch = 0; ch < nch; ch++) {
+            const DmVoiceInfo* vi = &m->voice_info[ch];
+            int32_t* out = cur + (size_t)cur_rows * row_ints + (size_t)ch * DM_GRID_INTS;
+            if (vi->track < m->number_of_tracks) dm_grid_cell(m, &m->tracks[vi->track].rows[row], vi->transpose, vi->fine_tune, out);
+            else memset(out, 0, sizeof(int32_t) * 4);
+            out[4] = vi->track;
+            out[5] = vi->transpose + vi->fine_tune * 64;
+        }
+        cur_rows++;
+    }
+    DM_GRID_FLUSH();
+    #undef DM_GRID_FLUSH
+    free(cur);
+    dm_destroy(m);
+    return dm_grid.order_length > 0;
+}
+
+int dm_grid_channels(void) { return dm_grid.channels; }
+int dm_grid_restart(void) { return dm_grid.restart; }
+int dm_grid_order_length(void) { return dm_grid.order_length; }
+int dm_grid_order(int k) { return k >= 0 && k < dm_grid.order_length ? dm_grid.order[k] : 0; }
+int dm_grid_pattern_count(void) { return dm_grid.pattern_count; }
+int dm_grid_pattern_rows(int p) { return p >= 0 && p < dm_grid.pattern_count ? dm_grid.pattern_rows[p] : 0; }
+const int32_t* dm_grid_pattern(int p) { return p >= 0 && p < dm_grid.pattern_count ? dm_grid.patterns[p] : 0; }
+
+// The period-table index voice `ch` plays its last note at (note + transpose + fine_tune * 64, the
+// table base excluded) and its instrument (1-based): what the grid's note and instrument name.
+int dm_voice_note_index(const DmModule* m, int ch) {
+    if (!m || ch < 0 || ch >= m->number_of_channels) return -1;
+    const DmVoiceInfo* vi = &m->voice_info[ch];
+    return vi->last_note + vi->transpose + vi->fine_tune * 64;
+}
+int dm_voice_instrument(const DmModule* m, int ch) {
+    return m && ch >= 0 && ch < m->number_of_channels ? m->voice_info[ch].last_instrument + 1 : 0;
+}

@@ -44,6 +44,22 @@ size_t dm_export(const DmModule* module, uint8_t* out, size_t max_size);
 bool dm_preview_note(DmModule* module, int instrument, int note);
 void dm_preview_stop(DmModule* module);
 
+// Editor grid: the replayer's walk of sub-song 0, one pattern per song position. Each cell is 6 ints:
+// note, instrument, effTyp, eff, track, note shift (transpose + fine tune * 64).
+int dm_grid_open(const uint8_t* data, size_t size);
+void dm_grid_close(void);
+int dm_grid_channels(void);
+int dm_grid_restart(void);
+int dm_grid_order_length(void);
+int dm_grid_order(int k);
+int dm_grid_pattern_count(void);
+int dm_grid_pattern_rows(int p);
+const int32_t* dm_grid_pattern(int p);
+
+// Period-table index (base excluded) and 1-based instrument of voice ch's last note
+int dm_voice_note_index(const DmModule* module, int ch);
+int dm_voice_instrument(const DmModule* module, int ch);
+
 
 #ifdef __cplusplus
 }
