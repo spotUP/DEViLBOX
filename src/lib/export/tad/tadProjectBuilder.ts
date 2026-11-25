@@ -224,7 +224,8 @@ export async function buildTadProject(files: TadBuildFile[], create: CreateTadCo
     const next = over !== null && buf ? Math.floor((Number(buf[1]) - over) / 2048) : -1;
     if (next >= 0 && next < cap) { cap = next; continue; }
     if (over === null) return r;
-    // Greedy: take the sample with the most BRR bytes, lower its rate by a quarter, until the overshoot (plus a block of slack) is saved.
+    // Greedy: take the sample with the most BRR bytes, lower its rate by at most a quarter, until the overshoot (plus a block of slack) is saved.
+    // The last cut saves only what is still needed: a fixed quarter step left up to ~2.6 KB of Audio-RAM unused (Breezy.fur).
     let need = over + 64;
     const orig = new Map(samples.map((s) => [s.name, s]));
     const cur = new Map(shrunk.map((s) => {
@@ -235,7 +236,7 @@ export async function buildTadProject(files: TadBuildFile[], create: CreateTadCo
     while (need > 0) {
       const [name, big] = [...cur].filter(([, c]) => c.rate > MIN_SAMPLE_RATE).sort((a, b) => b[1].bytes - a[1].bytes)[0] ?? [];
       if (!name || !big) break;
-      const { file, rate } = resampleTadSample(orig.get(name)!, Math.max(MIN_SAMPLE_RATE, big.rate * 0.75));
+      const { file, rate } = resampleTadSample(orig.get(name)!, Math.max(MIN_SAMPLE_RATE, big.rate * Math.max(0.75, 1 - need / big.bytes)));
       const bytes = brrBytes(samplePcm(file).data.length);
       need -= big.bytes - bytes;
       // Loop quantisation can hold the rate just above the floor: count that sample as done.
