@@ -107,6 +107,7 @@ export type TrackerFormat =
   | 'MON'   // MONOTONE (PC speaker tracker, own WASM player)
   | 'KDM'   // Ken Silverman KDM (own WASM player)
   | 'JXS'   // JayTrax (own WASM player)
+  | 'BUZ'   // Buzzic 1 / Buzzic 2 (own WASM player)
   // Exotic Amiga formats (Phase 2 full editing)
   | 'OKT'   // Oktalyzer
   | 'MED'   // OctaMED / MED
@@ -523,6 +524,7 @@ export interface TrackerSong {
   monotoneFileData?: ArrayBuffer;
   kdmFileData?: ArrayBuffer;
   jxsFileData?: ArrayBuffer;
+  buzFileData?: ArrayBuffer;
   activisionProFileData?: ArrayBuffer;
   synthesisFileData?: ArrayBuffer;
   dssFileData?: ArrayBuffer;

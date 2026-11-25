@@ -1728,6 +1728,18 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     customDispatch: true,
   },
   {
+    key: 'buz',
+    label: 'Buzzic',
+    description: 'Buzzic 1 / Buzzic 2 (Stan/Rebels 4k-intro synth) — own WASM player.',
+    family: 'amiga-native',
+    matchMode: 'extension',
+    extRegex: /\.(buz|buz2)$/i,
+    prefKey: 'buz',
+    nativeParser: { module: '@lib/import/formats/BuzParser', parseFn: 'parseBuzFile', detectFn: 'isBuzFormat' },
+    uadeFallback: false,
+    customDispatch: true,
+  },
+  {
     key: 'monotone',
     label: 'MONOTONE',
     description: 'MONOTONE (PC speaker tracker) — native parser and own WASM player. Shares .mon with Maniacs of Noise, which owns the name-only answer (this entry sits after it); detectFormatFromContent and the import dispatch pick MONOTONE by its header.',

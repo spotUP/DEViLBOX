@@ -140,6 +140,7 @@ export interface FormatStore {
   monotoneFileData: ArrayBuffer | null;
   kdmFileData: ArrayBuffer | null;
   jxsFileData: ArrayBuffer | null;
+  buzFileData: ArrayBuffer | null;
   activisionProFileData: ArrayBuffer | null;
   activisionProSubsongCount: number;
   activisionProCurrentSubsong: number;
@@ -752,6 +753,7 @@ export const useFormatStore = create<FormatStore>()(
     monotoneFileData: null,
     kdmFileData: null,
     jxsFileData: null,
+    buzFileData: null,
     activisionProFileData: null,
     activisionProSubsongCount: 0,
     activisionProCurrentSubsong: 0,
@@ -1489,6 +1491,7 @@ export const useFormatStore = create<FormatStore>()(
         state.monotoneFileData = (song as any).monotoneFileData ?? null;
         state.kdmFileData = (song as any).kdmFileData ?? null;
         state.jxsFileData = (song as any).jxsFileData ?? null;
+        state.buzFileData = (song as any).buzFileData ?? null;
         state.activisionProFileData = (song as any).activisionProFileData ?? null;
         state.synthesisFileData = (song as any).synthesisFileData ?? null;
         state.dssFileData = (song as any).dssFileData ?? null;
@@ -1874,6 +1877,7 @@ export const useFormatStore = create<FormatStore>()(
       state.monotoneFileData = null;
       state.kdmFileData = null;
       state.jxsFileData = null;
+      state.buzFileData = null;
       state.activisionProFileData = null;
       state.activisionProSubsongCount = 0;
       state.activisionProCurrentSubsong = 0;

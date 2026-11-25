@@ -907,6 +907,18 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/kdm/KdmEngine')).KdmEngine as unknown as WASMSingletonStatic,
   },
   {
+    key: 'BuzReplayer',
+    synthType: 'BuzWasmSynth',
+    suppressNotes: true,
+    fileDataKey: 'buzFileData',
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/buz/BuzEngine')).BuzEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'ActivisionProReplayer',
     synthType: 'ActivisionProWasmSynth',
     suppressNotes: true,

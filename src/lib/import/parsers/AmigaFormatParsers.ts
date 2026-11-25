@@ -2852,6 +2852,16 @@ export async function tryRouteFormat(
     throw new Error(`JXS file did not decode: ${ctx.originalFileName}`);
   }
 
+  // ── Buzzic 1 / Buzzic 2 (.buz, .buz2) ──────────────────────────────────────
+  if (matchesExt(filename, ['buz', 'buz2'])) {
+    const { isBuzFormat, parseBuzFile } = await import('@lib/import/formats/BuzParser');
+    if (isBuzFormat(new Uint8Array(ctx.buffer))) {
+      const song = parseBuzFile(new Uint8Array(ctx.buffer), ctx.originalFileName);
+      if (song) return song;
+    }
+    throw new Error(`Buzzic file did not decode: ${ctx.originalFileName}`);
+  }
+
   // ── Ken Silverman KDM (.kdm) ────────────────────────────────────────────────
   if (matchesExt(filename, ['kdm'])) {
     const { isKdmFormat, parseKdmFile } = await import('@lib/import/formats/KdmParser');
