@@ -233,6 +233,17 @@ function macroFrames(macIn: FurnaceMacro, kind: 'vol' | 'arp' | 'duty' | 'pitch'
  * pitch envelope, so both go into one relative envelope: per-frame deltas of (macro offset + vibrato), +-63 per step.
  * `vib` is one looping vibrato cycle (absolute offsets); `mac` is the macro as macroFrames gives it (period units).
  */
+/** The engine's pitch envelope value after it read step k (0 = first frame) of a pitch override (encodeEnvelope semantics:
+ * a loop repeats from `loop`, no loop holds the last value / stops adding). k < 0: nothing read yet (0). */
+export function overrideValue(env: { vals: number[]; loop: number; rel: boolean }, k: number): number {
+  const L = env.vals.length, idx = (i: number): number => (i < L ? i : env.loop >= 0 ? env.loop + ((i - env.loop) % (L - env.loop)) : -1);
+  if (k < 0 || !L) return 0;
+  if (!env.rel) { const i = idx(k); return clampEnv(env.vals[i < 0 ? L - 1 : i]); }
+  let sum = 0;
+  for (let i = 0; i <= k; i++) { const j = idx(i); if (j < 0) break; sum += clampEnv(env.vals[j]); }
+  return sum;
+}
+
 export function mergeVibratoPitch(vib: number[], mac: { vals: number[]; loop: number; relative: boolean }, lossy: { add(s: string): void }, vibShort?: number[]): { deltas: number[]; loop: number } {
   let len = mac.vals.length;
   // A held tail (ADSR sustain, trailing zero increments) repeats already: end the macro part where it stops moving.
@@ -725,7 +736,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     // Furnace duty is channel state a duty macro writes (nes.cpp chan.duty); FamiStudio's 0x4f value (famistudio_duty_cycle) is what a note of a duty-macro-less instrument plays.
     let furDuty = 0, fsDuty = 0, dutyMac: { vals: number[]; loop: number; t: number } | null = null;
     let vibPos = 0, vibFrame = 0; // Furnace's vibratoPos (64-step sine) at the row start
-    let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, slideEnv = -1, envCarry = 0, arpXY = 0, arpOn = -1, keyOff = false, noteArp: number[] | null = null, insArp: { vals: number[]; loop: number } | null = null, fineRaw = 128, fineSent = 0;
+    let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, slideEnv = -1, envCarry = 0, ovr: { vals: number[]; loop: number; rel: boolean; at: number } | null = null, arpXY = 0, arpOn = -1, keyOff = false, noteArp: number[] | null = null, insArp: { vals: number[]; loop: number } | null = null, fineRaw = 128, fineSent = 0;
     // Furnace 01xx/02xx is channel state (playback.cpp portaSpeed): it keeps sliding every new note until x00, another
     // slide effect, or the slide reaching its target (note 0 / 179, targetResetsSlides).
     let heldSlide: [number, number] | null = null;
@@ -835,6 +846,10 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           const sb = spdOut ? spdOut[o][r] : rowSpeed[o][r] !== lastSpd || (o === loopOrder && r === 0) ? rowSpeed[o][r] * spdMul : -1;
           if (sb >= 0) { ops.push(0x46, Math.min(255, sb)); lastSpd = rowSpeed[o][r]; }
         }
+        // Furnace EDxx postpones the channel's whole row (playback.cpp processRow after rowDelay), and the engine's 0x47 stops
+        // reading the row until the delay ends, so every op after this point goes behind 0x47 (Bop pulse1 order 4 row 47:
+        // a 0x49 before it restarted the old note's vibrato during the delay). Speed / saw shift above are global, kept first.
+        const delayAt = ops.length;
         // Furnace stops a running 0Axy once the volume passes its maximum or drops below 0 (playback.cpp, unless noVolSlideReset).
         if (slideOps.length && slVol >= 0) {
           slVol += slStep * (seq[ri].frame - slFrame) / perTick;
@@ -949,7 +964,8 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           if (tonal && (fxChanged || n > 0)) {
             // Speed is exact (a snapped speed changes the vibrato rate audibly); identical rounded envelopes share one id.
             const x = vibXY >> 4, y = vibXY & 15;
-            let pid = -1, vib: number[] | null = null, vibLen1 = 0;
+            let pid = -1, vib: number[] | null = null, vibLen1 = 0, pidEnv: { v: { vals: number[]; loop: number; rel: boolean } | null } = { v: null }; // holder: set inside pitchPid, so TS must not narrow it to null
+            const pitchPid = (vals: number[], loop: number, rel = false): number => { pidEnv.v = { vals, loop, rel }; return envId(encodeEnvelope(vals, loop, -1, 'pitch', rel)); };
             if (x > 0 && y > 0) {
               // Furnace steps a 64-entry sine x per tick and has stepped once on the note tick: loop the whole cycle set
               // (64/gcd(x,64) ticks) so a rate like 64/6 does not drift.
@@ -997,7 +1013,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 return rnd(X * 2 ** (-(u + fp) / 1536)) - 1 - P - F;
               });
               vibLen1 = len1;
-              pid = envId(encodeEnvelope(vib, 0, -1, 'pitch'));
+              pid = pitchPid(vib, 0);
             }
             if (linear) {
               const pm = curIns?.macros.find((mc) => mc.code === MACRO_PITCH && mc.length > 0);
@@ -1041,13 +1057,13 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                     if (Math.abs(o - prev) > 63) lossy.add('pitch macro step past 63 period units (clamped)');
                     deltas.push(o - prev); prev = o;
                   }
-                  pid = envId(encodeEnvelope(deltas.length ? deltas : [0], -1, -1, 'pitch', true));
+                  pid = pitchPid(deltas.length ? deltas : [0], -1, true);
                 } else if (vib || (!mf.relative && ex !== pm)) {
                   // Vibrato on top, or an ADSR/LFO position curve (+-63 only holds per-frame steps): one relative envelope.
                   const mg = mergeVibratoPitch(vib ?? [0], mf, lossy, vib?.slice(0, vibLen1));
                   const lt = !vib && ex !== pm && (mg.loop < 0 || mg.loop >= mg.deltas.length - 1) ? loopPeriodicTail(mg.deltas) : mg;
-                  pid = envId(encodeEnvelope(lt.deltas, lt.loop, -1, 'pitch', true));
-                } else pid = envId(encodeEnvelope(mf.vals, mf.loop, -1, 'pitch', mf.relative));
+                  pid = pitchPid(lt.deltas, lt.loop, true);
+                } else pid = pitchPid(mf.vals, mf.loop, mf.relative);
               }
             }
             // Fine pitch under an arpeggio: Furnace applies E5xx as 1/128 semitone to the note each arp step gives (calcFreq
@@ -1060,11 +1076,20 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             if (arpSteps && arpSteps.vals.some((v) => v !== 0)) {
               const sn = src || 46, fineAt = (k: number): number => rnd(pulsePeriodRaw(k) * 2 ** (-fp / 1536)) - 1 - pulsePeriod(k);
               const F = fineAt(sn), d = arpSteps.vals.map((v) => fineAt(Math.max(1, Math.min(96, sn + v))) - F);
-              if (d.some((v) => v !== 0)) pid = envId(encodeEnvelope(d, arpSteps.loop, -1, 'pitch'));
+              if (d.some((v) => v !== 0)) pid = pitchPid(d, arpSteps.loop);
             }
             // An override persists across notes and instrument changes in the engine: send it only when it changes.
-            if (pid >= 0) { if (vibOn !== pid) ops.push(0x49, { env: pid }); vibOn = pid; }
-            else if (vibOn !== -1) { ops.push(0x4a); vibOn = -1; lastIns = -1; }
+            // The engine reads the row before its envelope update, so the frame an op lands on is the row frame plus the ED delay.
+            const opFrame = seq[ri].frame + (delay > 0 ? Math.round(delay * perTick) : 0);
+            if (pid >= 0) { if (vibOn !== pid) { ops.push(0x49, { env: pid }); ovr = pidEnv.v && { ...pidEnv.v, at: opFrame }; } vibOn = pid; }
+            else if (vibOn !== -1) {
+              // 0x4a only clears the override flag: the engine keeps reading the vibrato envelope (address and pointer stay)
+              // until the next attack, so `ovr` keeps running and a later no-attack 03xx takes its value at the slide frame
+              // (Byte-Sized Bop pulse1 order 4 row 100: 0305 0400 slid +4..+7 high; pulse2 frame 3378: 0400 four frames before
+              // the slide, the engine went on from +5 to -4).
+              if (vibOn === slideEnv) ovr = null;
+              ops.push(0x4a); vibOn = -1; lastIns = -1;
+            }
           }
           if (ch !== DPCM_CH && (fxChanged || n > 0)) {
             const env = arpXY !== 0 ? encodeEnvelope(arp00(), 0, -1, 'arp') : noteArp;
@@ -1189,6 +1214,9 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             // a no-attack 03 starts with a step that cancels it (turtle_byte pulse1 frame 403: 462 played 739), and a no-attack
             // 0x50 slide after one gets a one-step cancel envelope (Famitune1 triangle frame 1440: 80 played 93).
             if (n > 0 && !noAttack) envCarry = 0;
+            // shortcut: a no-attack note row between the 0x4a and this slide reloads the instrument pitch envelope (stale
+            // pointer); not modelled, the vibrato is taken as still running.
+            else if (vibOn === -1 && ovr) envCarry = overrideValue(ovr, seq[ri].frame + (delay > 0 ? Math.round(delay * perTick) : 0) - ovr.at - 1);
             // The envelope path plays the start note; a 00xy / 04xy / E5xx before the next note replaces the envelope with an
             // override that rides on that start note (Famitune1 triangle frame 1260: vibrato around 39, Furnace around 35).
             const playsOut = (): boolean => {
@@ -1221,7 +1249,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 // steps play before the next row (turtle_byte pulse2 frame 403: ED01 left the engine at 216, not the end 242).
                 const played = open ? d.length : Math.max(0, d.length - Math.round(delay * perTick)); // open: trimmed to the target, all steps play
                 envCarry = start + d.slice(0, played).reduce((a, b) => a + b, 0); // shortcut: assumes the envelope plays out before the next 0x49 / attack
-                ops.push(0x49, { env: slideEnv }); vibOn = slideEnv;
+                ops.push(0x49, { env: slideEnv }); vibOn = slideEnv; ovr = null;
                 if (noAttack) tail.push(0x43);
                 rowByte = from >= 13 && from <= 75 ? [from - 12] : [0x40, from];
                 envTo = to;
@@ -1243,7 +1271,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               if (noAttack && envCarry && vibOn === -1) {
                 const cancel: number[] = [];
                 for (let left = -envCarry; left !== 0; left -= cancel[cancel.length - 1]) cancel.push(Math.max(-64, Math.min(63, left)));
-                vibOn = envId(encodeEnvelope(cancel, -1, -1, 'pitch', true)); ops.push(0x49, { env: vibOn }); envCarry = 0;
+                vibOn = envId(encodeEnvelope(cancel, -1, -1, 'pitch', true)); ops.push(0x49, { env: vibOn }); envCarry = 0; ovr = null;
               }
               rowByte = null;
               if (n > 0) hasNotes = true;
@@ -1251,11 +1279,11 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           }
           if (slide || envTo) curNote = slide ? slide[2] : envTo;
           else if (n > 0) curNote = n;
-          if (n > 0 && !noAttack && !envTo) envCarry = 0; // any attacked note zeroes the engine's pitch envelope offset
+          if (n > 0 && !noAttack && !envTo) { envCarry = 0; if (vibOn === -1) ovr = null; else if (ovr) ovr.at = seq[ri].frame + (delay > 0 ? Math.round(delay * perTick) : 0); } // an attack zeroes the offset and restarts the envelope
           if (delay > 0) {
             const d = Math.round(delay * perTick) - 1;
             // 0x47 n plays the note n + 1 frames after the row (engine counts n down and plays on the wrap to $FF), so n = 0 is a 1-frame delay.
-            if (d >= 0) ops.push(0x47, Math.min(255, d)); else lossy.add('note delay under 1 frame');
+            if (d >= 0) ops.splice(delayAt, 0, 0x47, Math.min(255, d)); else lossy.add('note delay under 1 frame');
           }
         }
         if (slide) { tail.push(...(noAttack ? [0x43] : []), 0x50, ...slide); }
