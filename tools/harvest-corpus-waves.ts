@@ -1,22 +1,31 @@
 /**
  * Harvest real wavetables from the .fur and .dmf songs under public/data/songs
  * into public/data/wavetables/corpus-waves.json for the Waveform Studio preset
- * browser. Dedupe and chip tagging live in corpusWaves.ts (tested there).
+ * browser. Songs load through Furnace's own C++ loader (FurnaceFileOps WASM),
+ * the same path the app imports them with. Dedupe and chip tagging live in
+ * corpusWaves.ts (tested there).
  *
- *   npx tsx tools/harvest-corpus-waves.ts
+ *   npx tsx --tsconfig tsconfig.app.json tools/harvest-corpus-waves.ts [--only <path part>] [--failed]
+ *
+ * Resumable: each song's result is recorded in test-data/corpus-waves-harvest.json
+ * as it completes and skipped on the next run; --failed re-runs the failed rows,
+ * --only re-runs the songs whose path contains the given text. The bank is
+ * rebuilt from every recorded row.
  */
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { parseFurnaceSong } from '../src/lib/import/formats/FurnaceSongParser';
-import { DefleMaskParser, type DMFModule } from '../src/lib/import/formats/DefleMaskParser';
-import { decompressFur } from '../src/lib/import/formats/furnace/FurnaceBinaryReader';
+import { loadFurFileWasm } from '../src/lib/import/wasm/FurnaceFileOps';
+import { FILE_ID_TO_ENUM } from '../src/lib/import/formats/FurnaceSongParser';
 import {
-  harvestSongWaves, WAVE_CHIPS_BY_SYSTEM_ID, type CorpusWave,
+  harvestSongWaves, type CorpusWave, type HarvestWaveInput,
 } from '../src/components/instruments/editors/wavetable/corpusWaves';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SONGS = path.join(ROOT, 'public/data/songs');
 const OUT = path.join(ROOT, 'public/data/wavetables/corpus-waves.json');
+const RESULTS = path.join(ROOT, 'test-data/corpus-waves-harvest.json');
+
+type Row = { ok: true; fileIds: number[]; waves: HarvestWaveInput[] } | { ok: false; error: string };
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -27,48 +36,83 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-function toArrayBuffer(b: Uint8Array): ArrayBuffer {
-  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+/** FurnaceFileOps loads its glue through a <script> tag; answer that tag in Node. */
+function installNodeLoader(): void {
+  const dir = path.join(ROOT, 'public/furnace-fileops');
+  const js = readFileSync(path.join(dir, 'FurnaceFileOps.js'), 'utf8');
+  const wasmBinary = readFileSync(path.join(dir, 'FurnaceFileOps.wasm'));
+  const g = globalThis as unknown as Record<string, unknown>;
+  g.document = {
+    createElement: () => ({}),
+    head: {
+      appendChild: (node: { onload?: () => void }) => {
+        (0, eval)(js);
+        const factory = g.createFurnaceFileOps as (o: object) => Promise<unknown>;
+        g.createFurnaceFileOps = () => factory({
+          wasmBinary,
+          instantiateWasm: (imports: WebAssembly.Imports, done: (i: WebAssembly.Instance) => void) => {
+            void WebAssembly.instantiate(wasmBinary, imports).then((r) => done(r.instance));
+            return {};
+          },
+        });
+        queueMicrotask(() => node.onload?.());
+      },
+    },
+  };
 }
 
+const ENUM_TO_FILE_ID = new Map(Object.entries(FILE_ID_TO_ENUM).map(([file, e]) => [e, Number(file)]));
+
 async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : undefined;
+  const retryFailed = args.includes('--failed');
+  installNodeLoader();
+  const results: Record<string, Row> = existsSync(RESULTS) ? JSON.parse(readFileSync(RESULTS, 'utf8')) : {};
   const files = walk(SONGS).sort();
-  const bank: CorpusWave[] = [];
-  const seen = new Map<string, CorpusWave>();
-  let failed = 0;
-  const failures: string[] = [];
   const log = console.log;
+  const save = (): void => { mkdirSync(path.dirname(RESULTS), { recursive: true }); writeFileSync(RESULTS, JSON.stringify(results)); };
+  let done = 0;
   for (const file of files) {
-    const songName = path.basename(file);
-    const raw = new Uint8Array(readFileSync(file));
+    const rel = path.relative(SONGS, file);
+    const prev = results[rel];
+    const wanted = only ? rel.includes(only) : !prev || (retryFailed && !prev.ok);
+    if (!wanted) continue;
+    const raw = readFileSync(file);
     try {
-      console.log = () => {}; // parsers log per section
-      if (/\.fur$/i.test(file)) {
-        const mod = await parseFurnaceSong(toArrayBuffer(raw));
-        const ids = mod.systems.slice(0, mod.systemLen);
-        harvestSongWaves(bank, seen, songName, ids, mod.wavetables.map((w) => ({ max: w.height, data: w.data })));
-      } else {
-        const dmf = DefleMaskParser.parse(toArrayBuffer(decompressFur(raw)), 'dmf') as DMFModule;
-        const chip = WAVE_CHIPS_BY_SYSTEM_ID[dmf.system.id];
-        if (chip && dmf.wavetables.length > 0) {
-          harvestSongWaves(bank, seen, songName, [dmf.system.id],
-            dmf.wavetables.map((data) => ({ max: chip.height - 1, data })));
-        }
-      }
+      console.log = () => {}; // the loader logs per section
+      const song = await loadFurFileWasm(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer);
+      results[rel] = {
+        ok: true,
+        fileIds: song.chipIds.map((id) => ENUM_TO_FILE_ID.get(id) ?? -1),
+        waves: song.wavetables.map((w) => ({ max: w.height, data: w.data })),
+      };
     } catch (err) {
-      failed++;
-      failures.push(`${path.relative(SONGS, file)}: ${(err as Error).message}`);
+      results[rel] = { ok: false, error: (err as Error).message };
     } finally {
       console.log = log;
     }
+    if (++done % 100 === 0) save();
+  }
+  save();
+
+  const bank: CorpusWave[] = [];
+  const seen = new Map<string, CorpusWave>();
+  const failures: string[] = [];
+  for (const file of files) {
+    const rel = path.relative(SONGS, file);
+    const row = results[rel];
+    if (!row) continue;
+    if (!row.ok) { failures.push(`${rel}: ${row.error}`); continue; }
+    harvestSongWaves(bank, seen, path.basename(file), row.fileIds, row.waves);
   }
   mkdirSync(path.dirname(OUT), { recursive: true });
   writeFileSync(OUT, JSON.stringify(bank));
   const perChip: Record<string, number> = {};
   for (const w of bank) for (const c of w.chips) perChip[c] = (perChip[c] ?? 0) + 1;
-  console.log(`files ${files.length}, failed ${failed}, waves ${bank.length}, bytes ${statSync(OUT).size}`);
+  console.log(`files ${files.length}, loaded now ${done}, failed ${failures.length}, waves ${bank.length}, bytes ${statSync(OUT).size}`);
   console.log(JSON.stringify(perChip));
-  for (const f of failures.slice(0, 5)) console.log(`failed: ${f}`);
+  for (const f of failures.slice(0, 10)) console.log(`failed: ${f}`);
 }
 
 void main();

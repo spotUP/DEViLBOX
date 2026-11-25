@@ -110,14 +110,14 @@ export const CHIP_TARGETS: Record<ChipTargetId, ChipTarget> = {
     id: 'fds',
     name: 'FDS',
     maxValue: 63,
-    defaultLen: 32,
-    minLen: 32,
-    maxLen: 32,
-    lenStep: 32,
+    defaultLen: 64,
+    minLen: 64,
+    maxLen: 64,
+    lenStep: 64,
     lockedLen: true,
     lockedDepth: true,
     bitDepth: 6,
-    description: 'Famicom Disk System: 32 × 6-bit (fixed)',
+    description: 'Famicom Disk System: 64 × 6-bit (fixed)',
   },
   n163: {
     id: 'n163',
@@ -240,7 +240,8 @@ export function snapLength(target: ChipTarget, len: number): number {
  */
 export function detectChipTarget(length: number, maxValue: number): ChipTargetId {
   if (length === 32 && maxValue === 15) return 'gameboy';
-  if (length === 32 && maxValue === 63) return 'fds';
+  if (length === 64 && maxValue === 63) return 'fds';
+  if (length === 32 && maxValue === 63) return 'virtualboy';
   if (length === 32 && maxValue === 31) return 'generic-32x32';
   if (maxValue === 15 && length % 4 === 0 && length >= 4 && length <= 252) {
     // Could be N163 or generic 32x16

@@ -51,14 +51,23 @@ export function harvestSongWaves(
   waves: HarvestWaveInput[],
 ): void {
   const chips = systemIds.map((id) => WAVE_CHIPS_BY_SYSTEM_ID[id]).filter((c) => c !== undefined);
-  waves.forEach((w, index) => {
+  waves.forEach((orig, index) => {
+    if (orig.max <= 0 || orig.data.length === 0 || orig.data.some((v) => v < 0 || v > orig.max)) return;
+    let w = orig;
+    let matching = chips
+      .filter((c) => c.height === w.max + 1 && (c.width === 0 ? w.data.length % 4 === 0 : c.width === w.data.length))
+      .map((c) => c.chip);
+    // A wave of another size still plays on the song's only wave chip: Furnace scales it to the chip
+    // (DivWaveSynth: data[i*len/width]*height/max). Keep it as the chip hears it; with two wave
+    // chips in the song the wave's chip is unknown, so it is left out rather than guessed.
+    if (matching.length === 0 && chips.length === 1 && chips[0].width > 0) {
+      const c = chips[0];
+      w = { max: c.height - 1, data: furnaceScaleWave(orig, c.width, c.height - 1) };
+      matching = [c.chip];
+    }
+    if (matching.length === 0) return;
     const len = w.data.length;
     const max = w.max;
-    const matching = chips
-      .filter((c) => c.height === max + 1 && (c.width === 0 ? len > 0 && len % 4 === 0 : c.width === len))
-      .map((c) => c.chip);
-    if (matching.length === 0) return;
-    if (w.data.some((v) => v < 0 || v > max)) return;
     const key = `${len}x${max}:${w.data.join(',')}`;
     const existing = seen.get(key);
     if (existing) {
@@ -69,4 +78,10 @@ export function harvestSongWaves(
     seen.set(key, entry);
     bank.push(entry);
   });
+}
+
+/** A wave scaled to a chip's wave size the way Furnace's DivWaveSynth does it when the song plays. */
+export function furnaceScaleWave(w: HarvestWaveInput, width: number, height: number): number[] {
+  return Array.from({ length: width }, (_, i) =>
+    Math.min(height, Math.max(0, Math.trunc((w.data[Math.trunc((i * w.data.length) / width)] * height) / w.max))));
 }

@@ -37,4 +37,12 @@ describe('harvestSongWaves', () => {
     ]);
     expect(bank.map((w) => w.len)).toEqual([24]);
   });
+
+  it('keeps an SCC song wave of another depth as the SCC plays it (Furnace scaling)', () => {
+    const bank: CorpusWave[] = [];
+    harvestSongWaves(bank, new Map(), 'msx.fur', [0xa1], [{ max: 15, data: ramp(32, 15) }]);
+    expect(bank.map((w) => [w.chips, w.len, w.max])).toEqual([[['SCC'], 32, 255]]);
+    expect(bank[0].data[1]).toBe(Math.trunc((ramp(32, 15)[1] * 255) / 15));
+    expect(bank[0].data[31]).toBe(255);
+  });
 });

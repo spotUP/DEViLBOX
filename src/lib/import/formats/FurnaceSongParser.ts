@@ -938,7 +938,7 @@ const CHIP_CHANNELS: Record<number, number> = {
  * but the WASM dispatch wrapper expects the C++ enum value (e.g. 20 = YM2612).
  * Built from Furnace sysDef.cpp: sysDefs[ENUM]->id = FILE_ID.
  */
-const FILE_ID_TO_ENUM: Record<number, number> = {
+export const FILE_ID_TO_ENUM: Record<number, number> = {
   0x01: 1,    // YMU759
   0x02: 2,    // GENESIS (compound)
   0x42: 3,    // GENESIS_EXT (compound)
