@@ -44,6 +44,17 @@ describe('hUGEDriver Game Boy export', () => {
     expect(at(rom, 29)).toBe(1669); // note 29 (F, 4 semitones under A-4) at 436 Hz: the period Furnace.app writes for spreadtro (1673 at 440)
   });
 
+  it('note off keeps the DAC on (NRx2 = $08) and retriggers with the channel period, like Furnace gb.cpp keyOff', () => {
+    // Stock hUGE note_cut wrote NRx2 = 0 (DAC off) and NRx4 = $FF (period bits 7 -> freq 1792): finger.fur ch2/ch4 diverged.
+    const player = readFileSync(join(ROOT, 'public/gb/huge-player.gb'));
+    const start = (META as typeof META & { noteCutOffset: number }).noteCutOffset;
+    const body = Array.from(player.subarray(start, player.indexOf(0xc9, start) + 1)); // up to the routine's RET
+    const has = (a: number, b: number) => body.some((x, i) => x === a && body[i + 1] === b);
+    expect(has(0x36, 0x08)).toBe(true); // ld [hl], $08
+    expect(has(0x36, 0xff)).toBe(false); // no ld [hl], $FF
+    expect(body.slice(0, 2)).toEqual([0xc5, 0xd5]); // push bc / push de: callers keep B and DE
+  });
+
   it('lagtrain.fur: 11xx noise length becomes a per-width noise instrument, not a lossy item', async () => {
     const fur = readFileSync(join(ROOT, 'public/data/songs/furnace/gameboy/lagtrain.fur'));
     const song = furnaceToHuge(await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length)));

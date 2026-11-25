@@ -1019,8 +1019,16 @@ fx_note_cut:
 
 ;;; Cuts note on a channel.
 ;;; Param: B = Current channel ID (0 = CH1, 1 = CH2, etc.)
+;;; DEViLBOX: Furnace gb.cpp key-off write sequence. CH1/CH2/CH4: NRx2 = $08 (volume 0, envelope up:
+;;; the DAC stays on, no click), then NRx3 / NRx4 with the channel's current period and the trigger bit,
+;;; length-enable bit from the instrument (highmask bit 6). CH3: NR32 = 0, no retrigger.
+;;; Stock hUGE wrote NRx2 = 0 (DAC off) and NRx4 = $FF (period bits 7, length enable on).
 ;;; Destroy: AF HL
+ASSERT channel2 - channel1 == 16 && channel3 - channel1 == 32 && channel4 - channel1 == 48
+ASSERT highmask1 - channel1 == 5 && highmask4 - channel4 == 5
 note_cut:
+    push bc
+    push de
     ld a, b
     add a
     add a
@@ -1028,15 +1036,48 @@ note_cut:
     add LOW(rAUD1ENV)
     ld l, a
     ld h, HIGH(rAUD1ENV)
-    xor a
-    ld [hl+], a
     ld a, b
     cp 2
-    ret z ; return early if CH3-- no need to retrigger note
+    jr z, .wave
 
-    ;; Retrigger note
+    ld [hl], $08
     inc l ; Not `inc hl` because H stays constant (= $FF)
-    ld [hl], $FF
+    ;; DE = channel1 + 16 * B (channel_periodN)
+    ld a, b
+    swap a
+    ld de, channel1
+    add e
+    ld e, a
+    adc d
+    sub e
+    ld d, a
+    ld a, [de]
+    ld [hl+], a ; NRx3: period low (CH4: NR43 polynomial)
+    inc de
+    ld a, b
+    cp 3
+    ld a, [de] ; period high
+    jr nz, .tone
+    xor a ; NR44 has no period bits
+.tone:
+    and %00000111
+    ld c, a
+    inc de
+    inc de
+    inc de
+    inc de ; highmaskN
+    ld a, [de]
+    and %01000000
+    or %10000000
+    or c
+    ld [hl], a ; NRx4: trigger
+    jr .done
+
+.wave:
+    ld [hl], 0
+.done:
+    pop de
+    pop bc
     ret
 
 
