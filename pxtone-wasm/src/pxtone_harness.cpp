@@ -167,6 +167,13 @@ EXPORT int pxtone_init(const uint8_t *data, uint32_t size) {
         return -3;
     }
 
+    /* Before tones_ready(): envelopes and delays are built at _dst_sps. */
+    if (!g_pxtn->set_destination_quality(PXTONE_CHANNELS, PXTONE_SAMPLE_RATE)) {
+        delete g_pxtn;
+        g_pxtn = nullptr;
+        return -6;
+    }
+
     err = g_pxtn->read(&g_memfile);
     if (err != pxtnOK) {
         delete g_pxtn;
@@ -179,12 +186,6 @@ EXPORT int pxtone_init(const uint8_t *data, uint32_t size) {
         delete g_pxtn;
         g_pxtn = nullptr;
         return -5;
-    }
-
-    if (!g_pxtn->set_destination_quality(PXTONE_CHANNELS, PXTONE_SAMPLE_RATE)) {
-        delete g_pxtn;
-        g_pxtn = nullptr;
-        return -6;
     }
 
     pxtnVOMITPREPARATION prep;

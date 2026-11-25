@@ -108,6 +108,11 @@ pxtnService::pxtnService( pxtnIO_r io_read, pxtnIO_w io_write, pxtnIO_seek io_se
 	_sampled_proc = NULL;
 	_sampled_user = NULL;
 
+	// tones_ready() reads _dst_sps; without set_destination_quality() it was uninitialised heap.
+	_dst_ch_num       = 2;
+	_dst_sps          = 44100;
+	_dst_byte_per_smp = pxtnBITPERSAMPLE / 8 * _dst_ch_num;
+
 	_moo_constructor();
 }
 

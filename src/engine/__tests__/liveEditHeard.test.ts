@@ -14,7 +14,8 @@
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join, basename, dirname } from 'node:path';
+import { expectedCompanionNames } from '@/lib/import/companionResolver';
 import { FORMAT_REGISTRY, detectFormatFromContent } from '@/lib/import/FormatRegistry';
 import { WALK_GRIDS, DIRECT_GRIDS, LIVE_EDIT, LIVE_WHILE_PLAYING, LIVE_WHILE_PLAYING_WHY, ADD_ON_EMPTY_ROW, type LiveEditStatus } from '@/lib/import/gridProvenance';
 import { pickDscNote } from './helpers/pickDscNote';
@@ -50,7 +51,7 @@ vi.mock('@/lib/songdb', () => ({ computeSongDBHash: () => '', lookupSongDB: asyn
 
 const ROOT = process.cwd();
 const SONGS = join(ROOT, 'public/data/songs');
-const WASM_BUNDLES: Array<[string, string]> = [['davidwhittaker', 'DavidWhittaker'], ['bd', 'Bd'], ['tfmx', 'TFMX']];
+const WASM_BUNDLES: Array<[string, string]> = [['davidwhittaker', 'DavidWhittaker'], ['bd', 'Bd'], ['tfmx', 'TFMX'], ['pxtone', 'Pxtone'], ['digmug', 'DigMugEdit'], ['ixalance', 'IxalanceEdit'], ['cpsycle', 'CpsycleEdit']];
 
 beforeAll(() => {
   const g = globalThis as Record<string, unknown>;
@@ -112,6 +113,10 @@ const FILE: Record<string, string> = {
   emsv6: 'formats/perception.ems',
   fashionTracker: 'fashion-tracker/ivory tover ii.ex',
   mcmd: 'formats/ep-trmonsterbusiness.mcmd',
+  // tracked songs: an untracked local download (OctaMED MMDC/, NSF/!DPCM Sample Collection!/sd2.dmc, Nintendo Sound Format/Smam/jam.nsf) sorts first and changes the row
+  med: 'formats/bounty hunter - outro (remixed).mmd3',
+  sidmon2: 'formats/bruno_time.sid2',
+  jamcracker: 'formats/analogue_vibes.jam',
 };
 /** Formats UADE plays from the module bytes: the Paula stream is the sound. */
 const PAULA = new Set(['suntronic', 'robHubbard', 'davidWhittaker', 'benDaglish', 'jochenHippelST', 'activisionPro', 'fred', 'actionamics', 'soundMaster', 'digitalSonixChrome', 'sidmon1']);
@@ -154,6 +159,9 @@ const UNCONFIRMED: string[] = [];
  */
 export const UNMEASURED: Record<string, string> = {
   dmf: 'import needs the Furnace WASM (FurnaceFileOps.js) the node run cannot load',
+  ned: 'import needs the Furnace WASM (FurnaceFileOps.js) the node run cannot load',
+  famitracker: 'import needs the Furnace WASM (FurnaceFileOps.js) the node run cannot load',
+  dsm: 'no corpus song: the only .dsm files are Technocop 6502 assembly source (NSF/Music Source Code/Technocop), not DSIK modules; detectFormatFromContent has no .dsm case and returns the name match',
   steveTurner: 'import needs an AudioContext (ToneEngine)',
   goatTracker: 'import needs an AudioContext (ToneEngine)', anders0land: 'import needs an AudioContext (ToneEngine)',
   fmTracker: 'import needs an AudioContext (ToneEngine)', imagoOrpheus: 'import needs an AudioContext (ToneEngine)',
@@ -166,6 +174,7 @@ export const UNMEASURED: Record<string, string> = {
   soundfx: 'import needs the OpenMPT WASM the node run cannot load',
   ams: 'import needs the OpenMPT WASM the node run cannot load',
   monotone: 'no corpus song: the only .mon files are Maniacs of Noise (content detection says so)',
+  piece: 'no corpus song: the only .pmd files are PiyoPiyo (content detection says so); P/ECE songs live in test-data/piece (pieceGridMatchesPlayer.test.ts)',
   iceTracker: 'the registry match is an instrument file, no corpus module',
   musicMaker: 'the song needs its instrument companion file, not in the corpus folder',
   stoneTracker: 'the song needs its sample bank companion file, not in the corpus folder',
@@ -196,6 +205,14 @@ type Cell = { note: number; instrument: number };
 interface Measured { engine: string; route: string; status: LiveEditStatus; add: 'yes' | 'no' | 'n/a' }
 export const measured: Record<string, Measured> = {};
 
+// The app's own companion list (KDM waves.kwv), read from the song's directory.
+function companionsOf(rel: string): Map<string, ArrayBuffer> | undefined {
+  const found = expectedCompanionNames(basename(rel))
+    .map((n) => [n, join(SONGS, dirname(rel), n)] as const)
+    .filter(([, p]) => existsSync(p));
+  return found.length ? new Map(found.map(([n, p]) => [n, new Uint8Array(readFileSync(p)).buffer as ArrayBuffer])) : undefined;
+}
+
 async function load(rel: string): Promise<{ bytes: Uint8Array; name: string }> {
   const bytes = new Uint8Array(readFileSync(join(SONGS, rel)));
   const name = basename(rel);
@@ -204,7 +221,7 @@ async function load(rel: string): Promise<{ bytes: Uint8Array; name: string }> {
   await importTrackerModule({
     metadata: { title: name, type: 'MOD', channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1, duration: 0 },
     arrayBuffer: await file.arrayBuffer(), file,
-  } as never, { useLibopenmpt: true } as never);
+  } as never, { useLibopenmpt: true, companionFiles: companionsOf(rel) } as never);
   const { liveTrackerSong } = await import('@/lib/song/liveSong');
   (globalThis as { __liveSong?: () => unknown }).__liveSong = () => liveTrackerSong();
   return { bytes, name };
@@ -362,7 +379,9 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
           try {
             const out = await exportNativeSong(null, {});
             if (out) {
-              const back = await parseModuleToSong(new File([new Uint8Array(out.data).buffer as ArrayBuffer], name)) as unknown as { patterns: Array<{ channels: Array<{ rows: Cell[] }> }> };
+              const { useFormatStore } = await import('@/stores/useFormatStore');
+              // A reload opens the song with the companions it was loaded with (KDM waves.kwv), as editedModuleForPlay does.
+              const back = await parseModuleToSong(new File([new Uint8Array(out.data).buffer as ArrayBuffer], name), undefined, undefined, undefined, useFormatStore.getState().uadeCompanionFiles ?? undefined) as unknown as { patterns: Array<{ channels: Array<{ rows: Cell[] }> }> };
               ok = back.patterns[e.p]?.channels[e.ch]?.rows[e.r]?.note === e.any;
               if (process.env.G24_DEBUG && !ok) console.log('[g24add]', key, 'cell', JSON.stringify(e), 'wanted', e.any, 'back', JSON.stringify(back.patterns[e.p]?.channels[e.ch]?.rows[e.r]), 'warnings', JSON.stringify(out.warnings).slice(0, 300), 'sizes', out.data.length);
             }
