@@ -12,5 +12,6 @@ emcc -O2 -std=c99 \
   -sEXPORTED_RUNTIME_METHODS="['ccall','cwrap','HEAPU8','HEAPF32']" \
   -sMODULARIZE=1 -sEXPORT_NAME=createProTracker4 -sENVIRONMENT=worker \
   -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=16777216 -sINVOKE_RUN=0 \
+  -sINCOMING_MODULE_JS_API="['wasmBinary','locateFile','print','printErr']" \
   -o "$OUT_DIR/ProTracker4.js"
 echo "Built $OUT_DIR/ProTracker4.js + .wasm"

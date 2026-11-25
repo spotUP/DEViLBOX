@@ -141,14 +141,7 @@ class ProTracker4Processor extends AudioWorkletProcessor {
         return result;
       };
       const config = {};
-      if (wasmBinary) {
-        config.wasmBinary = wasmBinary;
-        // Emscripten 7 glue ignores wasmBinary and falls back to fetch/XHR, which a worklet does not have.
-        config.instantiateWasm = (imports, done) => {
-          WebAssembly.instantiate(wasmBinary, imports).then((r) => done(r.instance, r.module));
-          return {};
-        };
-      }
+      if (wasmBinary) config.wasmBinary = wasmBinary;
       try {
         this.module = await globalThis.createProTracker4(config);
       } finally {

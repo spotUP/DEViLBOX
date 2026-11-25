@@ -49,5 +49,6 @@ target_link_options(Pxtone PRIVATE
     "SHELL:-s STACK_SIZE=1048576"
     "SHELL:-s ENVIRONMENT='web,worker,node'"
     "SHELL:-s NO_EXIT_RUNTIME=1"
+    "SHELL:-s INCOMING_MODULE_JS_API=['wasmBinary','locateFile','print','printErr']"
     "SHELL:-s SINGLE_FILE=0"
 )
