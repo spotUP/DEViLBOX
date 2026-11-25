@@ -138,16 +138,18 @@ Song g_grid;
 int32_t g_gridOut[64 * 16 * 7];
 uint8_t g_cellOut[6];
 
+void gridCell(const Cell& x, int32_t* o) {
+  o[0] = (x.note == 254 || x.note == 255 || x.note == 129) ? 97 : x.note;
+  o[2] = x.vol <= 64 ? 0x10 + x.vol : 0;
+  o[3] = x.fx[0]; o[4] = x.par[0]; o[5] = x.fx[1]; o[6] = x.par[1];
+}
+
 const int32_t* gridPattern(const Song& song, int p) {
   std::memset(g_gridOut, 0, sizeof g_gridOut);
   if (p < 0 || p > 255 || song.cells.empty()) return g_gridOut;
   for (int r = 0; r < 64; ++r)
     for (int c = 0; c < 16; ++c) {
-      const Cell& x = song.cells[(size_t(p) * 64 + size_t(r)) * 16 + size_t(c)];
-      int32_t* o = g_gridOut + (r * 16 + c) * 7;
-      o[0] = (x.note == 254 || x.note == 255 || x.note == 129) ? 97 : x.note;
-      o[2] = x.vol <= 64 ? 0x10 + x.vol : 0;
-      o[3] = x.fx[0]; o[4] = x.par[0]; o[5] = x.fx[1]; o[6] = x.par[1];
+      gridCell(song.cells[(size_t(p) * 64 + size_t(r)) * 16 + size_t(c)], g_gridOut + (r * 16 + c) * 7);
     }
   return g_gridOut;
 }
@@ -186,6 +188,142 @@ EMSCRIPTEN_KEEPALIVE const uint8_t* t0ast_encode_cell(int note, int volume, int 
   g_cellOut[4] = uint8_t(eff); g_cellOut[5] = uint8_t(eff2);
   return g_cellOut;
 }
+}  // extern "C"
+
+namespace {
+/* ---- export: the song file with the grid's edits. Every pattern whose cells did not change is
+ * carried byte for byte (an unedited song exports byte-identical); a changed pattern is packed
+ * again with the loader's own codes (empty cell, field mask, mask + repeat count; no back-copy),
+ * so it decodes to the same cells but is not the bytes T0AST's own packer would write. The order
+ * list is written from the grid's; header, instruments, restart and texts are carried. */
+std::vector<uint8_t> g_expSrc, g_expOut;
+Song g_exp;                  // the file as loaded
+std::vector<Cell> g_expCells;  // its cells with the edits
+bool g_expDirty[256];
+std::vector<uint8_t> g_expOrder;
+
+bool sameCell(const Cell& a, const Cell& b) { return !std::memcmp(&a, &b, sizeof(Cell)); }
+
+// Offset of the order-length field (the loader's header walk; the file already loaded).
+size_t orderPos(const std::vector<uint8_t>& d, const Song& s) {
+  size_t pos = 8 + 560 + (s.old ? 0 : 272) + 4;
+  const int ch = d[pos++];
+  for (int c = 0; c < ch; ++c) if (d[pos++]) pos += 3;
+  for (int c = 0; c < ch; ++c) if (d[pos++]) pos += 25;
+  return pos;
+}
+
+// End of one packed pattern starting at pos (the loader's control-byte walk, nothing stored).
+size_t skipPattern(const std::vector<uint8_t>& d, size_t pos, int channels) {
+  for (int ch = 0; ch < channels; ++ch) {
+    int j = 0;
+    while (j < 64) {
+      const uint8_t b = d[pos++];
+      if (b & 0x80) {
+        const int n = b & 0x7F;
+        if (n == 0) ++j;
+        else { ++pos; j = std::min(64, j + n); }
+      } else {
+        for (int k = 0; k < 6; ++k) pos += (b >> k) & 1;
+        if (b & 0x40) j = std::min(64, j + d[pos++]);
+        else ++j;
+      }
+    }
+  }
+  return pos;
+}
+
+void packPattern(int p, int channels, std::vector<uint8_t>& out) {
+  auto at = [p](int r, int c) -> const Cell& { return g_expCells[(size_t(p) * 64 + size_t(r)) * 16 + size_t(c)]; };
+  for (int ch = 0; ch < channels; ++ch) {
+    Cell c;  // the loader's carried cell, reset per channel
+    int j = 0;
+    while (j < 64) {
+      const Cell& x = at(j, ch);
+      if (sameCell(x, Cell())) { out.push_back(0x80); c = Cell(); ++j; continue; }
+      const uint8_t xb[6] = {x.note, x.vol, x.fx[0], x.par[0], x.fx[1], x.par[1]};
+      const uint8_t cb[6] = {c.note, c.vol, c.fx[0], c.par[0], c.fx[1], c.par[1]};
+      uint8_t mask = 0;
+      for (int k = 0; k < 6; ++k) if (xb[k] != cb[k]) mask |= uint8_t(1 << k);
+      int run = 1;
+      while (j + run < 64 && sameCell(at(j + run, ch), x)) ++run;
+      out.push_back(uint8_t(mask | (run > 1 ? 0x40 : 0)));
+      for (int k = 0; k < 6; ++k) if (mask & (1 << k)) out.push_back(xb[k]);
+      if (run > 1) out.push_back(uint8_t(run));
+      c = x;
+      j += run;
+    }
+  }
+}
+}  // namespace
+
+extern "C" {
+EMSCRIPTEN_KEEPALIVE int t0ast_export_open(const uint8_t* data, int size) {
+  g_exp = Song();
+  g_error.clear();
+  if (size <= 0 || (size_t)size > MAX_FILE) { g_error = "the file is too big for a T0AST song"; return 0; }
+  g_expSrc.assign(data, data + size);
+  g_error = load(g_expSrc, g_exp);
+  if (!g_error.empty()) return 0;
+  g_expCells = g_exp.cells;
+  std::memset(g_expDirty, 0, sizeof g_expDirty);
+  g_expOrder.assign(g_exp.order, g_exp.order + g_exp.orderLength);
+  return 1;
+}
+
+/* One grid cell (tracker numbers, as t0ast_grid_pattern gives them). A cell that reads the same as
+ * the stored one keeps its stored bytes (254/129 key offs stay); 0 when out of range. */
+EMSCRIPTEN_KEEPALIVE int t0ast_export_cell(int p, int r, int c, int note, int volume, int effTyp, int eff, int effTyp2, int eff2) {
+  if (g_exp.cells.empty() || p < 0 || p > 255 || r < 0 || r > 63 || c < 0 || c >= g_exp.channels) return 0;
+  const size_t i = (size_t(p) * 64 + size_t(r)) * 16 + size_t(c);
+  int32_t o[7] = {};
+  gridCell(g_exp.cells[i], o);
+  if (o[0] == note && o[2] == volume && o[3] == effTyp && o[4] == eff && o[5] == effTyp2 && o[6] == eff2) {
+    g_expCells[i] = g_exp.cells[i];
+  } else {
+    const uint8_t* b = t0ast_encode_cell(note, volume, effTyp, eff, effTyp2, eff2);
+    Cell& x = g_expCells[i];
+    x.note = b[0]; x.vol = b[1]; x.fx[0] = b[2]; x.fx[1] = b[3]; x.par[0] = b[4]; x.par[1] = b[5];
+  }
+  g_expDirty[p] = true;  // settled in t0ast_export_build: repacked only if a cell differs
+  return 1;
+}
+
+/* The order list (pattern numbers), 1..256 positions; 0 when out of range. */
+EMSCRIPTEN_KEEPALIVE int t0ast_export_order(const uint8_t* order, int length) {
+  if (g_exp.cells.empty() || length < 1 || length > 256) return 0;
+  g_expOrder.assign(order, order + length);
+  return 1;
+}
+
+/* Builds the file; returns its bytes (t0ast_export_size long), null when nothing is open. */
+EMSCRIPTEN_KEEPALIVE const uint8_t* t0ast_export_build(void) {
+  g_expOut.clear();
+  if (g_exp.cells.empty()) return nullptr;
+  const std::vector<uint8_t>& d = g_expSrc;
+  const size_t op = orderPos(d, g_exp);
+  g_expOut.assign(d.begin(), d.begin() + long(op));
+  g_expOut.push_back(uint8_t(g_expOrder.size() & 0xFF));
+  g_expOut.push_back(uint8_t(g_expOrder.size() >> 8));
+  g_expOut.insert(g_expOut.end(), g_expOrder.begin(), g_expOrder.end());
+  size_t pos = op + 2 + size_t(g_exp.orderLength);
+  for (int p = 0; p < 256; ++p) {
+    const bool present = d[pos++] != 0;
+    const size_t start = pos;
+    if (present) pos = skipPattern(d, pos, g_exp.channels);
+    bool changed = false;
+    if (g_expDirty[p])
+      for (size_t i = size_t(p) * 64 * 16; i < size_t(p + 1) * 64 * 16 && !changed; ++i)
+        changed = !sameCell(g_expCells[i], g_exp.cells[i]);
+    g_expOut.push_back(present || changed ? 1 : 0);
+    if (changed) packPattern(p, g_exp.channels, g_expOut);
+    else g_expOut.insert(g_expOut.end(), d.begin() + long(start), d.begin() + long(pos));
+  }
+  g_expOut.insert(g_expOut.end(), d.begin() + long(pos), d.end());  // restart byte and texts
+  return g_expOut.data();
+}
+EMSCRIPTEN_KEEPALIVE int t0ast_export_size(void) { return int(g_expOut.size()); }
+EMSCRIPTEN_KEEPALIVE void t0ast_export_close(void) { g_exp = Song(); g_expSrc.clear(); g_expOut.clear(); g_expCells.clear(); }
 }  // extern "C"
 
 extern "C" {

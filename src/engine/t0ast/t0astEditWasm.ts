@@ -20,6 +20,12 @@ export interface T0astEditModule {
   _t0ast_play_pattern(p: number): number;
   _t0ast_play_pattern_index(): number;
   _t0ast_encode_cell(note: number, volume: number, effTyp: number, eff: number, effTyp2: number, eff2: number): number;
+  _t0ast_export_open(ptr: number, size: number): number;
+  _t0ast_export_cell(p: number, r: number, c: number, note: number, volume: number, effTyp: number, eff: number, effTyp2: number, eff2: number): number;
+  _t0ast_export_order(ptr: number, length: number): number;
+  _t0ast_export_build(): number;
+  _t0ast_export_size(): number;
+  _t0ast_export_close(): void;
   _t0ast_open(ptr: number, size: number, rate: number): number;
   _t0ast_error(): number;
   _t0ast_position(): number;
@@ -56,7 +62,8 @@ export function readT0astPattern(m: T0astEditModule, ptr: number): TrackerCell[]
 
 export interface T0astGrid { channels: number; order: number[]; patterns: Map<number, TrackerCell[][]> }
 
-/** The file's order list and every pattern it names, decoded by the C++ loader. */
+/** The file's order list and patterns 0..highest named (the song's pattern slots, unplayed ones
+ * too, so export writes them back as they are), decoded by the C++ loader. */
 export async function t0astGrid(bytes: Uint8Array, create?: CreateT0astEdit): Promise<T0astGrid> {
   const m = await t0astEditModule(create);
   const ptr = m._malloc(bytes.length);
@@ -66,7 +73,8 @@ export async function t0astGrid(bytes: Uint8Array, create?: CreateT0astEdit): Pr
   if (!ok) throw new Error(`T0AST song does not open: ${m.UTF8ToString(m._t0ast_error())}`);
   const order = Array.from({ length: m._t0ast_grid_order_length() }, (_, k) => m._t0ast_grid_order(k));
   const patterns = new Map<number, TrackerCell[][]>();
-  for (const p of order) if (!patterns.has(p)) patterns.set(p, readT0astPattern(m, m._t0ast_grid_pattern(p)));
+  const count = order.length > 0 ? Math.max(...order) + 1 : 1;
+  for (let p = 0; p < count; p++) patterns.set(p, readT0astPattern(m, m._t0ast_grid_pattern(p)));
   const grid = { channels: m._t0ast_grid_channels(), order, patterns };
   m._t0ast_grid_close();
   return grid;

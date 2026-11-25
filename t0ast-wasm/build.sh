@@ -21,7 +21,7 @@ em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
 em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
     -I"$SCRIPT_DIR/src" \
     "$SCRIPT_DIR/src/t0ast_wasm.cpp" \
-    -sEXPORTED_FUNCTIONS="['_t0ast_grid_open','_t0ast_grid_channels','_t0ast_grid_order_length','_t0ast_grid_order','_t0ast_grid_pattern','_t0ast_grid_close','_t0ast_play_pattern','_t0ast_play_pattern_index','_t0ast_encode_cell','_t0ast_open','_t0ast_error','_t0ast_position','_t0ast_poke','_t0ast_render','_t0ast_close','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_t0ast_grid_open','_t0ast_grid_channels','_t0ast_grid_order_length','_t0ast_grid_order','_t0ast_grid_pattern','_t0ast_grid_close','_t0ast_play_pattern','_t0ast_play_pattern_index','_t0ast_encode_cell','_t0ast_export_open','_t0ast_export_cell','_t0ast_export_order','_t0ast_export_build','_t0ast_export_size','_t0ast_export_close','_t0ast_open','_t0ast_error','_t0ast_position','_t0ast_poke','_t0ast_render','_t0ast_close','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['HEAPU8','HEAP32','HEAPF32','UTF8ToString']" \
     -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createT0astEdit -sENVIRONMENT=web,worker,node \
     -sALLOW_MEMORY_GROWTH=1 -sINVOKE_RUN=0 -o "$OUT_DIR/T0astEdit.js"

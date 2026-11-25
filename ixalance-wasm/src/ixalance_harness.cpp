@@ -8,6 +8,7 @@
 #include "PlayerIXS.h"
 #include "PlayerCore.h"
 #include "WaveGen.h"
+#include "FileSFXI.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -27,15 +28,26 @@ extern "C" {
         (void)msg;
     }
 
-    /* JS_getCacheFileData: webixs calls this to load sample data asynchronously.
-     * In our harness, the entire file is loaded at once via loadIxsFileData,
-     * so sample cache is not separately needed. Return 0 = failure to skip caching. */
+    /* JS_saveCacheFile: only reached when WaveGen builds its own cache (no destination);
+     * JS_getCacheFileData always passes one, so there is nothing to save. */
+    void JS_saveCacheFile(char *filename, unsigned char *dataBuf, unsigned int lenBuf) {
+        (void)filename; (void)dataBuf; (void)lenBuf;
+    }
+
+    /* JS_getCacheFileData: the EMSCRIPTEN loader asks the host for the generated sample
+     * cache. Build it in memory into the loader's transfer buffer (as the LINUX path does);
+     * the loader then reads the cache back from `destination`. Returning 0 fails every load. */
     unsigned int JS_getCacheFileData(char *filename, unsigned char *dataBuf1,
                                      unsigned int lenBuf1, unsigned char *dataBuf2,
                                      unsigned int lenBuf2, unsigned char *destination) {
-        (void)filename; (void)dataBuf1; (void)lenBuf1;
-        (void)dataBuf2; (void)lenBuf2; (void)destination;
-        return 0;
+        (void)lenBuf1; (void)lenBuf2;
+        IXS::BufSFXI *buf = (IXS::BufSFXI *)destination;
+        buf->magic_0x0 = 0;  // reset: the transfer buffer is reused between songs
+        IXS::FileSFXI *dest = IXS::IXS__FileSFXI__newFileSFXI_00413c20(buf);
+        if (!dest) return 0;
+        int ok = IXS::IXS__WAVEGEN__createSampleCacheFile(filename, dataBuf1, dataBuf2, dest);
+        (*dest->vftptr_0x0->deleteObject)(dest);  // frees the wrapper only, not the buffer
+        return ok ? 1 : 0;
     }
 }
 

@@ -114,6 +114,8 @@ namespace IXS {
   void __thiscall IXS__PlayerCore__resumeOutput_00407a40(PlayerCore *core);
 
   Module *__thiscall IXS__PlayerCore__createModule_00407a70(PlayerCore *core);
+  // DEViLBOX: called after each row step, before the row index advances (null: off)
+  extern void (*IXS_rowHook)(PlayerCore *);
 
   char *__thiscall IXS__PlayerCore__getSongTitle_00407b20(PlayerCore *core);
 

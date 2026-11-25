@@ -1,8 +1,7 @@
 /**
  * Grid edits for a T0AST song: each cell is encoded to its six stored bytes in C++
  * (t0ast_encode_cell) and poked into the running engine's decoded cells, heard when that row
- * next plays. shortcut: the song file is not rewritten (T0AST packs patterns with RLE and
- * copy-back refs), so save and export do not carry edits; upgrade with a C++ pattern packer.
+ * next plays. Save/export rebuild the file from the grid (T0astExporter, C++ t0ast_export_*).
  */
 import type { TrackerSong } from '../TrackerReplayer';
 import type { LiveCellEdit } from '../replayer/liveCellEdits';

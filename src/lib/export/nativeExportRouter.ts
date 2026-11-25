@@ -209,6 +209,7 @@ const NATIVE_FORMAT_LABELS: Record<string, string> = {
   organya: 'Organya (.org)',
   piyoPiyo: 'PiyoPiyo (.pmd)',
   buz: 'Buzzic (.buz / .buz2)',
+  t0ast: 'T0AST (.t0ast)',
 };
 
 /** Human label of the matched non-Amiga exporter for the song (live song when null), or null for the Amiga text. */
@@ -298,6 +299,8 @@ const songIds = (song: TrackerSong) => ({
 });
 
 const NATIVE_EXPORTERS: NativeExporterEntry[] = [
+  { id: 'ixalance', matches: (s) => songIds(s).format === 'IXS' && !!s.ixsFileData,
+    run: async (s, baseName) => { const { exportAsIxalance } = await import('./IxalanceExporter'); return exportAsIxalance(s, baseName); } },
   // The Psycle parser reports format 'MOD' (the engine plays the bytes); the source bytes name it.
   { id: 'cpsycle', matches: (s) => !!s.psycleFileData,
     run: async (s, baseName) => { const { exportAsCpsycle } = await import('./CpsycleExporter'); return exportAsCpsycle(s, baseName); } },
@@ -336,6 +339,9 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
   // Buzzic 1/2: its song file (with the grid's edits) is the export.
   { id: 'buz', matches: (s) => songIds(s).format === 'BUZ' && !!s.buzFileData,
     run: async (s) => { const { exportBuz } = await import('./BuzExporter'); return exportBuz(s); } },
+  // T0AST: its song file (with the grid's edits and order list) is the export.
+  { id: 't0ast', matches: (s) => songIds(s).format === 'T0AST' && !!s.t0astFileData,
+    run: async (s) => { const { exportT0ast } = await import('./T0astExporter'); return exportT0ast(s); } },
   // P/ECE music driver: its song file (edits written in as made) is the export.
   { id: 'piece', matches: (s) => songIds(s).format === 'PIECE' && !!s.pieceFileData,
     run: async (s) => { const { exportPiece } = await import('./PieceExporter'); return exportPiece(s); } },

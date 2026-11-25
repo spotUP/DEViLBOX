@@ -2,9 +2,8 @@
  * IxalanceParser.ts -- Ixalance (.ixs) format parser
  *
  * Ixalance is an extended Impulse Tracker format supporting up to 64 channels.
- * Since IXS playback is handled entirely by the WASM engine
- * (suppressNotes = true), the TrackerSong returned here is a minimal shell
- * with one empty pattern. The WASM engine handles all actual audio rendering.
+ * Playback is the Ixalance WASM engine (suppressNotes = true); the grid is decoded
+ * in wasm by the replayer's own unpacker (ixs_grid.cpp).
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -29,11 +28,9 @@ export function isIxsFormat(data: ArrayBuffer): boolean {
 // ── Parser ────────────────────────────────────────────────────────────────────
 
 /**
- * Parse an Ixalance (IXS) module file into a TrackerSong.
- *
- * Returns a minimal TrackerSong with one empty pattern.
- * The WASM engine handles all actual playback — this just provides the
- * TrackerSong shell that the UI/store layer expects.
+ * Parse an Ixalance (IXS) module file into a TrackerSong. The grid comes from the replayer's own
+ * loader and IT pattern unpacker in wasm (ixalanceEditWasm / ixs_grid.cpp); playback stays the
+ * Ixalance engine, which plays `ixsFileData` (an edit is saved into those bytes on export).
  */
 export async function parseIxsFile(
   fileName: string,
@@ -44,19 +41,16 @@ export async function parseIxsFile(
       `Invalid IXS file: too small (${data.byteLength} bytes, minimum 100)`
     );
   }
-
-  const numChannels = 64;
-  const numRows = 64;
+  const { ixalanceGrid } = await import('@/engine/ixalance/ixalanceEditWasm');
+  const grid = await ixalanceGrid(new Uint8Array(data));
+  const numChannels = Math.max(1, grid.channels);
   const baseName = fileName.replace(/\.[^.]+$/, '');
 
-  const emptyRows = Array.from({ length: numRows }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
-
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: numRows,
+  let maxIns = 0;
+  const patterns = grid.patterns.map((cells, p) => ({
+    id: `pattern-${p}`,
+    name: `Pattern ${p}`,
+    length: cells.length,
     channels: Array.from({ length: numChannels }, (_, ch) => ({
       id: `channel-${ch}`,
       name: `Channel ${ch + 1}`,
@@ -67,30 +61,32 @@ export async function parseIxsFile(
       pan: ch % 2 === 0 ? -50 : 50,
       instrumentId: null,
       color: null,
-      rows: emptyRows,
+      rows: cells.map((row) => { const c = row[ch]; if (c.instrument > maxIns) maxIns = c.instrument; return c; }),
     })),
     importMetadata: {
       sourceFormat: 'IXS' as const,
       sourceFile: fileName,
       importedAt: new Date().toISOString(),
       originalChannelCount: numChannels,
-      originalPatternCount: 1,
-      originalInstrumentCount: 0,
+      originalPatternCount: grid.patterns.length,
+      originalInstrumentCount: maxIns,
     },
-  };
+  }));
 
-  const instruments: InstrumentConfig[] = [{
-    id: 1, name: '', type: 'synth' as const,
+  // The engine plays the module's own instruments; these slots only carry the numbers the grid uses.
+  const instruments: InstrumentConfig[] = Array.from({ length: Math.max(1, maxIns) }, (_, i) => ({
+    id: i + 1, name: '', type: 'synth' as const,
     synthType: 'IxalanceSynth' as const, effects: [], volume: 0, pan: 0,
-  } as InstrumentConfig];
+  } as InstrumentConfig));
 
+  const songPositions = grid.order.length ? grid.order : [0];
   return {
     name: `${baseName} [Ixalance]`,
     format: 'IXS' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions,
+    songLength: songPositions.length,
     restartPosition: 0,
     numChannels,
     initialSpeed: 6,
