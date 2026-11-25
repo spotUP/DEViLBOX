@@ -100,6 +100,7 @@ export const FILE_DATA_FIELDS = [
   'monotoneFileData',
   'kdmFileData',
   'pieceFileData',
+  't0astFileData',
   'jxsFileData',
   'buzFileData',
   'activisionProFileData',

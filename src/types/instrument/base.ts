@@ -319,6 +319,7 @@ export type SynthType =
   | 'BuzWasmSynth'            // Buzzic 1 / Buzzic 2 (WASM replayer)
   | 'KdmWasmSynth'            // Ken Silverman KDM (WASM replayer)
   | 'PieceWasmSynth'          // Aquaplus P/ECE music driver (WASM replayer)
+  | 'T0astWasmSynth'          // The 0ok Amazing Synth Tracker (WASM replayer)
   | 'MonotoneWasmSynth'        // MONOTONE (WASM replayer)
   | 'ActivisionProWasmSynth'   // Activision Pro (WASM replayer)
   | 'FaceTheMusicWasmSynth'    // Face The Music (WASM replayer)

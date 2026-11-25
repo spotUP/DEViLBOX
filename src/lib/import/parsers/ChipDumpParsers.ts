@@ -145,6 +145,17 @@ export async function tryChipDumpParse(
     }
   }
 
+  // ── T0AST — The 0ok Amazing Synth Tracker .t0ast (signature check), T0astEngine plays the file ──
+  if (/\.t0ast$/.test(filename)) {
+    const { isT0astFormat, parseT0astFile } = await import('@lib/import/formats/T0astParser');
+    const bytes = new Uint8Array(buffer);
+    if (isT0astFormat(bytes)) {
+      const song = parseT0astFile(bytes, originalFileName);
+      if (song) return song;
+    }
+    throw new Error(`T0AST file did not decode: ${originalFileName}`);
+  }
+
   // ── TFM Music Maker — ZX Spectrum TurboFM .tfe (2x YM2203), TFMEngine plays the file ──
   if (/\.tfe$/.test(filename)) {
     const { parseTfmMusicMakerFile } = await import('@lib/import/formats/TFMMusicMakerParser');
