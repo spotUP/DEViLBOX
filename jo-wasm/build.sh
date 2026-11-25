@@ -7,6 +7,6 @@ em++ -O2 -std=c++17 -fno-fast-math -ffp-contract=off -fwrapv -I src/scummvm -I s
   src/jo_wasm.cpp src/scummvm/audio/mods/paula.cpp \
   -s EXPORTED_FUNCTIONS='["_jo_open","_jo_error","_jo_tracks","_jo_kind","_jo_ticks","_jo_render","_jo_poke","_jo_close","_malloc","_free"]' \
   -s EXPORTED_RUNTIME_METHODS='["HEAPU8","HEAPF32","UTF8ToString"]' \
-  -s MODULARIZE=1 -s EXPORT_NAME=createJo -s ENVIRONMENT=worker \
+  -s MODULARIZE=1 -s EXPORT_NAME=createJo -s ENVIRONMENT=worker -sINCOMING_MODULE_JS_API="['wasmBinary']" \
   -s ALLOW_MEMORY_GROWTH=1 \
   -o ../public/jo/Jo.js

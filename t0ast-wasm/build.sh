@@ -12,7 +12,7 @@ em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
     "$SCRIPT_DIR/src/t0ast_wasm.cpp" \
     -sEXPORTED_FUNCTIONS="['_t0ast_open','_t0ast_error','_t0ast_duration_ms','_t0ast_channels','_t0ast_position','_t0ast_poke','_t0ast_render','_t0ast_close','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['HEAPU8','HEAPF32','UTF8ToString']" \
-    -sMODULARIZE=1 -sEXPORT_NAME=createT0ast -sENVIRONMENT=worker \
+    -sMODULARIZE=1 -sEXPORT_NAME=createT0ast -sENVIRONMENT=worker -sINCOMING_MODULE_JS_API="['wasmBinary']" \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=16777216 \
     -sINVOKE_RUN=0 -o "$OUT_DIR/T0ast.js"
 echo "=== Build complete ==="

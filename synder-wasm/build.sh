@@ -12,7 +12,7 @@ em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
     "$SCRIPT_DIR/src/synder_wasm.cpp" \
     -sEXPORTED_FUNCTIONS="['_synder_open','_synder_error','_synder_duration_ms','_synder_voices','_synder_frames','_synder_frame_rate','_synder_position','_synder_poke','_synder_render','_synder_close','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['HEAPU8','HEAPF32','UTF8ToString']" \
-    -sMODULARIZE=1 -sEXPORT_NAME=createSynder -sENVIRONMENT=worker \
+    -sMODULARIZE=1 -sEXPORT_NAME=createSynder -sENVIRONMENT=worker -sINCOMING_MODULE_JS_API="['wasmBinary']" \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=16777216 \
     -sINVOKE_RUN=0 -o "$OUT_DIR/Synder.js"
 echo "=== Build complete ==="

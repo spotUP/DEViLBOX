@@ -14,7 +14,7 @@ em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
     "$SCRIPT_DIR/src/smx_wasm.cpp" "$OBJ_DIR/emu2212.o" \
     -sEXPORTED_FUNCTIONS="['_smx_open','_smx_error','_smx_duration_ms','_smx_position','_smx_poke','_smx_render','_smx_close','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['HEAPU8','HEAPF32','UTF8ToString']" \
-    -sMODULARIZE=1 -sEXPORT_NAME=createSmx -sENVIRONMENT=worker \
+    -sMODULARIZE=1 -sEXPORT_NAME=createSmx -sENVIRONMENT=worker -sINCOMING_MODULE_JS_API="['wasmBinary']" \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=16777216 \
     -sINVOKE_RUN=0 -o "$OUT_DIR/Smx.js"
 echo "=== Build complete ==="

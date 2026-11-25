@@ -12,7 +12,7 @@ em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
     "$SCRIPT_DIR/src/berotracker_wasm.cpp" \
     -sEXPORTED_FUNCTIONS="['_brt_open','_brt_error','_brt_duration_ms','_brt_channels','_brt_position','_brt_cell_size','_brt_pattern_rows','_brt_poke','_brt_render','_brt_close','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['HEAPU8','HEAPF32','UTF8ToString']" \
-    -sMODULARIZE=1 -sEXPORT_NAME=createBeRoTracker -sENVIRONMENT=worker \
+    -sMODULARIZE=1 -sEXPORT_NAME=createBeRoTracker -sENVIRONMENT=worker -sINCOMING_MODULE_JS_API="['wasmBinary']" \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=16777216 \
     -sINVOKE_RUN=0 -o "$OUT_DIR/BeRoTracker.js"
 echo "=== Build complete ==="
