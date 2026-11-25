@@ -7,8 +7,8 @@
  "titleOffset": 7425,
  "authorOffset": 7436,
  "scrollOffset": 7453,
- "noteTableOffset": 6612,
- "noteCutOffset": 5232,
+ "noteTableOffset": 6707,
+ "noteCutOffset": 5240,
  "sources": [
   "public/gb/huge-player.asm",
   "tools/build-gb-player.sh",
@@ -18,5 +18,5 @@
   "third-party/hugedriver/include/hUGE_note_table.inc",
   "public/gb/screen_font.inc"
  ],
- "sourceHash": "b222a26ebf6e7e2a568cff4c11d936f818505527"
+ "sourceHash": "b5e30effdac434a30d3ce6105534cff2f4d19c64"
 }

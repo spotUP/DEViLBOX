@@ -66,6 +66,9 @@ ticks_per_row: db
 ;; DEViLBOX: Furnace speed alternation. The other speed of a two-entry speed pattern (0 = none);
 ;; swapped with ticks_per_row at every row boundary. Outside start_zero so hUGE_init keeps it.
 speed_alt: db
+;; DEViLBOX: Furnace tone-porta curves (song descriptor bytes 24-25). 3xx with bit 7 set = curve x & $7F:
+;; a pointer table, each entry -> [ticks] + one period word per tick from tick 0; the target after that.
+porta_curves: dw
 
 _hUGE_current_wave::
 hUGE_current_wave::
@@ -197,8 +200,12 @@ hUGE_init::
     jr nz, .copy_song_descriptor_loop
 
     ;; DEViLBOX: the byte after the descriptor pointers is the alternate speed
-    ld a, [hl]
+    ld a, [hl+]
     ld [speed_alt], a
+    ld a, [hl+]
+    ld [porta_curves], a
+    ld a, [hl]
+    ld [porta_curves+1], a
 
 IF !DEF(PREVIEW_MODE)
     ;; Zero some ram
@@ -1456,6 +1463,8 @@ fx_porta_down:
 ;;; Destroy: A B DE HL
 fx_toneporta:
     jr z, .setup
+    bit 7, c
+    jp nz, .curve
 
     ld d, 0
     call ptr_to_channel_member
@@ -1548,6 +1557,21 @@ fx_toneporta:
     ld a, l
     ld [de], a
 
+    ;; DEViLBOX: Furnace steps the slide on tick 0 too (gb.cpp NOTE_PORTA). Write the curve's tick-0 period
+    ;; without a retrigger; the "initial" flag stays for tick 1, as before.
+    bit 7, c
+    jr z, ret_dont_play_note
+    xor a
+    call porta_curve_period
+    push de
+    ld d, 5
+    call ptr_to_channel_member
+    pop de
+    ld a, [hl]
+    and $7F
+    ld h, a
+    call update_channel_freq.nonzero_highmask
+
 ret_dont_play_note:
     ;; Don't call play_chX_note. This is done by popping the saved AF register and clearing
     ;; the C flag, which relies on the way the caller is implemented!!
@@ -1557,6 +1581,60 @@ ret_dont_play_note:
     push af
     jp hl
 
+
+;;; DEViLBOX: tone-porta curve on ticks 1.. (period from the curve, the target once it ends).
+fx_toneporta.curve:
+    call porta_curve_period
+    push de
+    ld d, 5
+    call ptr_to_channel_member
+    pop de
+    ld a, [hl]
+    res 7, [hl]
+    ld h, a
+    jp update_channel_freq.nonzero_highmask
+
+;;; DEViLBOX: period of tone-porta curve C & $7F at tick A (A < 128).
+;;; Param: A = tick, B = channel, C = 3xx param (bit 7 set)
+;;; Return: DE = period: curve[A] while A < curve length, else the channel's toneporta target
+;;; Destroy: AF HL
+porta_curve_period:
+    ld e, a
+    ld a, [porta_curves]
+    ld l, a
+    ld a, [porta_curves+1]
+    ld h, a
+    ld a, c
+    add a ; (C & $7F) * 2, bit 7 drops out
+    add l
+    ld l, a
+    adc h
+    sub l
+    ld h, a
+    ld a, [hl+]
+    ld h, [hl]
+    ld l, a
+    ld a, e
+    cp [hl]
+    jr nc, .target
+    inc hl
+    add a
+    add l
+    ld l, a
+    adc h
+    sub l
+    ld h, a
+    ld a, [hl+]
+    ld d, [hl]
+    ld e, a
+    ret
+.target:
+    ld d, 2
+    call ptr_to_channel_member
+    ld a, [hl+]
+    ld d, [hl]
+    ld e, a
+    ret
 
 ;;; Processes effect A, "volume slide".
 ;;; Param: B = Current channel ID (0 = CH1, 1 = CH2, etc.)

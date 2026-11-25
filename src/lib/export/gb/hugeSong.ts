@@ -279,6 +279,20 @@ function waveVol(v: number): number {
   return v >= 12 ? 15 : v >= 8 ? 9 : v >= 4 ? 4 : 0;
 }
 
+/**
+ * Furnace linear-pitch 03xx slide -> the periods of the ticks before it reaches the target. gb.cpp NOTE_PORTA adds xx * 4
+ * (1/128 semitone) to baseFreq on every tick from tick 0; calcFreq turns the linear base into a period (exponential).
+ * The driver plays these from a curve (hUGEDriver fx_toneporta, 3xx bit 7) and holds the target after the last one.
+ */
+export function portaCurve(from: number, to: number, xx: number, tuning: number): number[] {
+  const step = Math.max(1, xx * 4) * Math.sign(to - from), dest = to * 128, out: number[] = [];
+  for (let s = from * 128 + step; step > 0 ? s < dest : s > dest; s += step) {
+    if (out.length === 127) break; // the driver indexes ticks 0-126; no row lasts longer
+    out.push(hugeNotePeriod(s / 128, tuning));
+  }
+  return out;
+}
+
 /** Furnace effect -> hUGE effect word, or undefined when it has no hUGE equivalent. */
 function mapEffect(type: number, value: number, kind: Kind, jumpTarget: (order: number) => number, waveNo: (w: number) => number): number | undefined {
   const v = value & 0xff;
@@ -286,7 +300,7 @@ function mapEffect(type: number, value: number, kind: Kind, jumpTarget: (order: 
     case 0x00: return v === 0 ? undefined : v;
     case 0x01: return 0x100 | v;
     case 0x02: return 0x200 | v;
-    case 0x03: return v === 0 ? undefined : 0x300 | v; // 0300 = portamento off: the note plays normally
+    case 0x03: return v === 0 ? undefined : 0x300 | Math.min(v, 0x7f); // 0300 = portamento off; bit 7 = driver curve
     case 0x04: return 0x400 | v;
     case 0x0a: return 0xa00 | v;
     case 0x0b: { const t = jumpTarget(v); return t < 255 ? 0xb00 | (t + 1) : undefined; } // hUGE stores order + 1 in one byte
@@ -314,8 +328,10 @@ export function furnaceToHuge(m: FurnaceModule, subsong = 0): HugeSong {
 
 function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>): { song: HugeSong; used: Record<Kind, number> } {
   const lossy = new Lossy();
+  const curves: number[][] = [], curveKey = new Map<string, number>(); // driver tone-porta curves (3xx bit 7)
   const s = m.subsongs[subsong];
   if (!s) throw new Error(`subsong ${subsong} missing`);
+  const linear = Number(m.compatFlags?.linearPitch ?? 0) > 0, tuning = m.tuning;
   // Tick rate: VBlank when it is the Furnace GB default, else the timer at 4096 / (256 - TMA) Hz (16-4096 Hz).
   const timerTma = Math.abs(s.hz - VBLANK_HZ) <= 0.5 ? 0 : 256 - Math.min(255, Math.max(1, Math.round(4096 / s.hz)));
   if (timerTma && Math.abs(4096 / (256 - timerTma) - s.hz) > 0.5) lossy.add(`tick rate ${s.hz} Hz played at ${(4096 / (256 - timerTma)).toFixed(2)} Hz`);
@@ -376,8 +392,10 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
   // hUGE has no such effect, so a noise instrument is exported once per width (key = Furnace index + NOISE_SHORT).
   const noiseDuty = [0, 0, 0, 0];
   // Furnace duty of channels 1-2 (gb.cpp chan.duty): channel state set by 12xx or a duty macro, never by an instrument
-  // load. -1 = not known (no 12xx yet, or a duty macro ran).
-  const dutyNow = [-1, -1, -1, -1];
+  // load. Starts at 0 (gb.h Channel duty(0)); -1 = not known (a duty macro ran).
+  const dutyNow = [0, 0, 0, 0];
+  // Furnace CH3 volume (gb.cpp chan.vol): a note-on never reloads it on channel 2, so it lasts until the next volume.
+  const waveVolNow = [15, 15, 15, 15];
   const lastNote = [-1, -1, -1, -1]; // hUGE note per channel, for E1xy / E2xy targets
   let sweep = 0; // Furnace chan[0].sweep (NR10 shadow): 13xx sets time and shift, 14xx the direction bit
   const fine = [0x80, 0x80, 0x80, 0x80]; // E5xx per channel: one that keeps the current pitch is a no-op
@@ -394,7 +412,7 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
         const kind = KIND[ch];
         for (let r = 0; r < ROWS; r++) {
           const cell = r < rows ? cellAt(ch, o, c0 + r) : undefined;
-          let note = NO_NOTE, instr = 0, effect = -1, baseKey = -1, plainRepeat = false, noiseAbs = -1;
+          let note = NO_NOTE, prevNote = -1, instr = 0, effect = -1, baseKey = -1, plainRepeat = false, noiseAbs = -1;
           if (cell) {
             const nv = convertFurnaceNoteValue(cell);
             if (nv === 253 || nv === 254) effect = 0xe00; // note off / release -> note cut now
@@ -419,6 +437,7 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
               if (note !== NO_NOTE || lastNote[ch] < 0) lossy.add('E1xy/E2xy note slide on a row with a note');
               else { note = Math.max(0, Math.min(71, lastNote[ch] + (slide.type === 0xe1 ? 1 : -1) * (slide.value & 15))); effect = 0x300 | ((slide.value >> 4) * 4); }
             }
+            prevNote = lastNote[ch];
             if (note !== NO_NOTE) lastNote[ch] = note;
             // Furnace keeps duty (12xx) and the channel volume when the same instrument plays again; a hUGE instrument
             // reload resets both, so a repeat of a macro-less instrument plays as instrument 0 (no reload).
@@ -460,12 +479,13 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
               else if (effect < 0) effect = h; else lossy.add('second effect in one cell (hUGE has one effect column)');
             }
             if (cell.volume >= 0) {
+              if (kind === 'wave') waveVolNow[ch] = cell.volume & 15;
               const cxy = 0xc00 | (kind === 'wave' ? waveVol(cell.volume & 15) : cell.volume & 15);
               // A note's volume rides in a start-volume variant of its instrument, which frees the Cxy slot for the effect.
               // The reload sets NR11, but Furnace keeps the channel's duty across notes: a macro-less duty instrument's
               // variant carries that duty, unless the cell's own effect is the 12xx (9xx sets it after the load).
               const keepDuty = baseKey >= 0 && kind === 'duty' && !macro(m.instruments[ci], MACRO_DUTY) && (effect & 0xf00) !== 0x900;
-              const variantKey = baseKey + (keepDuty && dutyNow[ch] >= 0 ? DUTY_STEP * (dutyNow[ch] + 1) : 0) + VOL_STEP * ((cxy & 15) + 1);
+              const variantKey = baseKey + (keepDuty && dutyNow[ch] > 0 ? DUTY_STEP * (dutyNow[ch] + 1) : 0) + VOL_STEP * ((cxy & 15) + 1);
               const variantOk = baseKey >= 0 && !macro(m.instruments[ci], MACRO_VOL) && (effect & 0xf00) !== 0x300;
               if (effect < 0) effect = cxy;
               // An arp with no variant slot gives way to the volume: the arp runs on from the next row (arpNow), a dropped
@@ -477,12 +497,25 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
                 if (keepDuty && plainRepeat && dutyNow[ch] < 0) lossy.add('volume column beside an effect on an instrument repeat (duty reset)');
                 instr = insNo(kind, variantKey, baseKey);
               } else lossy.add('volume column beside an effect');
+            } else if (instr > 0 && baseKey >= 0) {
+              // A reload with no volume column: hUGE writes the instrument's NR11 / NR32, Furnace keeps the channel's
+              // duty (12xx) and CH3 volume, so the load uses a variant that carries them.
+              const ins = m.instruments[ci];
+              if (kind === 'duty' && dutyNow[ch] > 0 && !macro(ins, MACRO_DUTY) && (effect & 0xf00) !== 0x900) instr = insNo(kind, baseKey + DUTY_STEP * (dutyNow[ch] + 1), baseKey);
+              else if (kind === 'wave' && waveVolNow[ch] < 12 && !macro(ins, MACRO_VOL)) instr = insNo(kind, baseKey + VOL_STEP * (waveVol(waveVolNow[ch]) + 1), baseKey);
             }
             // A row's own volume (Cxy) wins over the carried arp: the arp misses that one row, a lost volume lasts the note.
             if (effect < 0 && arpNow[ch]) effect = arpNow[ch];
             else if (arpNow[ch] && !fxs.some((e) => e.type === 0x00)) lossy.add('running arpeggio beside another effect (paused that row)');
             // A pan in a busy cell moves to a free slot of the row as a channel-pair pan (driver fx_set_pan param bit 7).
             if (pan >= 0) { if (effect < 0) effect = pan; else spill.push({ r, ch, lr: (pan & 0x10 ? 2 : 0) | (pan & 1) }); }
+          }
+          if ((effect & 0xf00) === 0x300 && linear && note !== NO_NOTE && prevNote >= 0) {
+            const curve = portaCurve(prevNote, note, effect & 0xff, tuning), key = curve.join(',');
+            let id = curveKey.get(key);
+            if (id === undefined && curves.length < 128) { id = curves.push(curve) - 1; curveKey.set(key, id); }
+            if (id === undefined) lossy.add('more than 128 different portamento slides (rest step linearly from tick 1)');
+            else effect = 0x380 | id;
           }
           if (cell && cell.instrument < 0 && (effect & 0xf00) === 0x300) instr = 0; // portamento keeps the old instrument, no reload
           fxFree[ch].push(effect < 0);
@@ -531,7 +564,7 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
       const synth = kind === 'wave' ? waveSynthFrames(ins, m.wavetables, lossy)?.map((f) => waveSlot(packWave(f, invert))) : undefined;
       const table = buildTable(ins, kind, lossy, waveNo, synth, key >= NOTE_STEP ? Math.floor(key / NOTE_STEP) - 1 : undefined);
       if (table) tableRefs.push({ kind, slot: hi - 1, table: tables.push(table) - 1 });
-      const duty0 = key >= DUTY_STEP ? Math.floor(key / DUTY_STEP) - 1 : macro(ins, MACRO_DUTY)?.data[0] ?? 2;
+      const duty0 = key >= DUTY_STEP ? Math.floor(key / DUTY_STEP) - 1 : macro(ins, MACRO_DUTY)?.data[0] ?? 0;
       if (kind === 'duty') instrBytes.duty[hi - 1] = [0x00, ((duty0 & 3) << 6) | len, startVol >= 0 ? (startVol << 4) | (envelope(ins, lossy) & 15) : envelope(ins, lossy), 0, 0, high];
       else if (kind === 'wave') instrBytes.wave[hi - 1] = [len, startVol < 0 ? 0x20 : startVol >= 10 ? 0x20 : startVol >= 5 ? 0x40 : startVol > 0 ? 0x60 : 0, synth?.[0] ?? waveNo(macro(ins, MACRO_WAVE)?.data[0] ?? 0), 0, 0, high];
       else instrBytes.noise[hi - 1] = [startVol >= 0 ? (startVol << 4) | (envelope(ins, lossy) & 15) : envelope(ins, lossy), 0, 0, (short ? 0x80 : 0) | (enable ? 0x40 : 0) | (len & 0x3f), 0, 0];
@@ -541,7 +574,7 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
   // Layout.
   const out: number[] = [];
   const w16 = (at: number, v: number) => { out[at] = v & 0xff; out[at + 1] = (v >> 8) & 0xff; };
-  out.length = 24; // 23 descriptor bytes + the alternate speed
+  out.length = 26; // 23 descriptor bytes + the alternate speed + the tone-porta curve table pointer
   out.fill(0);
   out[0] = Math.max(1, speeds[0]);
   out[23] = speedAlt;
@@ -569,6 +602,10 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
     const at = insAt[t.kind] + t.slot * 6 + (t.kind === 'noise' ? 1 : 3);
     w16(at, here()); out.push(...tables[t.table]);
   }
+  w16(24, here());
+  const curveAt = out.length;
+  out.push(...new Array(Math.max(1, curves.length) * 2).fill(0));
+  curves.forEach((c, i) => { w16(curveAt + i * 2, here()); out.push(c.length, ...c.flatMap((p) => [p & 0xff, p >> 8])); });
   // Patterns: contiguous up to $7FFF with bank 1; when an order's patterns do not fit, the next bank opens at
   // $4000. A pattern wholly below $4000 is seen from every bank; one in an older bank is copied again.
   const commonEnd = here();
