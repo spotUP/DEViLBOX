@@ -1,7 +1,8 @@
 /**
  * Furnace instrument files (.fui, .dmp) written from the editor's instrument state. The bytes are written by
  * Furnace's own C++ (fileops WASM): the store's FurnaceConfig becomes an INS2 block (encodeInstrumentAsINS2, the
- * encoder the .fur exporters use), DivInstrument::readInsData reads it, putInsData2 / saveDMP write the file.
+ * encoder the .fur exporters use), DivInstrument::readInsData reads it, putInsData2 / saveDMP write the file. The .fui
+ * also carries the instrument's wavetables its wave macro uses (Furnace's LW feature + WAVE blocks).
  */
 import type { FurnaceConfig } from '@typedefs/instrument';
 import { encodeInstrumentAsINS2, type FurnaceInstrument } from '@lib/import/formats/furnace/FurnaceInstrumentParser';
@@ -25,5 +26,6 @@ function toFileInstrument(name: string, cfg: FurnaceConfig): FurnaceInstrument {
 }
 
 export function furnaceInstrumentFile(name: string, cfg: FurnaceConfig): Promise<FurnaceInstrumentFile> {
-  return instrumentFromIns2Wasm(encodeInstrumentAsINS2(toFileInstrument(name, cfg), FUR_EXPORT_VERSION));
+  const waves = cfg.wavetables.map((w) => ({ data: w.data, max: w.max ?? Math.max(1, ...w.data) }));
+  return instrumentFromIns2Wasm(encodeInstrumentAsINS2(toFileInstrument(name, cfg), FUR_EXPORT_VERSION), waves);
 }

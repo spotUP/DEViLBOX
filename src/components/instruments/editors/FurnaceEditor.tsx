@@ -15,6 +15,7 @@ import { Toggle } from '@components/controls/Toggle';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
 import { notify } from '@stores/useNotificationStore';
+import { saveFurnaceInstrumentFile } from '@components/instruments/controls/FurnaceSaveInstrumentButtons';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { parseWavToAudioBuffer } from '@utils/audio/wavParser';
 import { FurnaceModuleSampleEditor, FurnaceUserSampleEditor } from './FurnaceUserSampleEditor';
@@ -40,7 +41,7 @@ import { FurnaceMacroType } from '@typedefs/instrument';
 import { SNESPanel, SNESEchoPanel } from './SNESPanels';
 import { SNES_MACRO_LABELS } from '@/lib/furnace/snesDsp';
 import { chipMacroProfile, NEOGEO_MACRO_PROFILES, macroCode } from '@/lib/furnace/chipMacroProfiles';
-import { WaveMorphPanel, appendMorphSequence } from './wavetable';
+import { WaveMorphPanel, appendMorphSequence, WAVE_LIST_MAX } from './wavetable';
 import { AYPanel } from './AYPanel';
 import { NESPanel } from './NESPanel';
 import { FurnaceWaveList } from './FurnaceWaveList';
@@ -348,6 +349,9 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   const showFmPanels = category === "FM" && (!neoKind || neoKind.id === 'fm');
   // Neo Geo voices take nullsound's limits per voice kind; other chips take their synth's profile.
   const voiceProfile = neoKind ? NEOGEO_MACRO_PROFILES[neoKind.id] : macroProfile;
+  // The Wave macro range is the chip's playable wave count (Game Boy hUGEDriver: 0..15); the list cap bounds the rest.
+  const waveMacroMax = voiceProfile?.ranges?.[FurnaceMacroType.WAVE]?.max;
+  const morphWaveLimit = Math.min(WAVE_LIST_MAX, waveMacroMax !== undefined ? waveMacroMax + 1 : WAVE_LIST_MAX);
   const showAyPanel = neoKind?.id === 'ssg' || synthType === 'FurnaceAY';
   // nullsound plays no FM macros: offer the tab only to show macros an imported song already carries.
   const fmMacrosPlayable = neoKind?.id !== 'fm' || config.macros.length > 0 || hasOpMacros;
@@ -835,13 +839,15 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
             wavetables={config.wavetables as WavetableData[]}
             onChange={(wavetables) => onChange({ wavetables })}
             onMacroLanesShown={setStudioLanesShown}
+            onExportInstrument={() => { void saveFurnaceInstrumentFile(instrumentId, 'fui'); }}
             morphPanel={(target) => (
               <WaveMorphPanel
                 waveCount={config.wavetables.length}
                 target={target}
+                waveLimit={morphWaveLimit}
                 onMorph={(a, b, steps) => {
                   const current = configRef.current;
-                  const { wavetables, sequence } = appendMorphSequence(current.wavetables as WavetableData[], a, b, steps, target);
+                  const { wavetables, sequence } = appendMorphSequence(current.wavetables as WavetableData[], a, b, steps, target, morphWaveLimit);
                   const waveMacro: FurnaceMacro = { type: FurnaceMacroType.WAVE, data: sequence, loop: -1, release: -1, mode: 0, speed: 1 };
                   const macros = [...current.macros.filter((m) => macroCode(m) !== FurnaceMacroType.WAVE), waveMacro];
                   onChange({ wavetables: wavetables as WavetableData[], macros });

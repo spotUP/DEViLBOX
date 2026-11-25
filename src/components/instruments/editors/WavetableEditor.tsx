@@ -23,7 +23,7 @@ import {
   StudioToolbar, DrawCanvas, HarmonicPanel, MathPanel, PresetBrowser, LivePanels,
   type StudioMode, type StudioLayout,
   CHIP_TARGETS, detectChipTarget, type ChipTargetId, type ChipTarget,
-  chipLimitsLabel, fitsChipTarget, snapLength,
+  chipLimitsLabel, fitsChipTarget, snapLength, WAVE_LIST_MAX, WaveExportPanel,
   applyChipTarget, requantize, dcRemove, normalize, invert as invertOp, reverse as reverseOp,
   mirrorLeftToRight, quarterWaveReflect, phaseAlignToPeak,
 } from './wavetable';
@@ -53,6 +53,8 @@ interface WavetableEditorProps {
   onMacroLanesShown?: (shown: boolean) => void;
   /** Wave morph controls the host owns, shown in the studio layout; gets the chip target new waves quantise to. */
   morphPanel?: (target: ChipTarget) => React.ReactNode;
+  /** Saves the host instrument as a Furnace .fui; adds that choice to the studio Export control. */
+  onExportInstrument?: () => void;
 }
 
 interface WavetableListEditorProps {
@@ -62,6 +64,8 @@ interface WavetableListEditorProps {
   macroLanes?: React.ReactNode;
   onMacroLanesShown?: (shown: boolean) => void;
   morphPanel?: (target: ChipTarget) => React.ReactNode;
+  /** Saves the host instrument as a Furnace .fui; adds that choice to the studio Export control. */
+  onExportInstrument?: () => void;
 }
 
 // ============================================================================
@@ -139,6 +143,7 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
   macroLanes,
   onMacroLanesShown,
   morphPanel,
+  onExportInstrument,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showGenerator, setShowGenerator] = useState(false);
@@ -555,6 +560,9 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
       )}
 
       {showStudioPanels && morphPanel && <div className="px-2 pb-2">{morphPanel(targetConfig)}</div>}
+      {showStudioPanels && (
+        <WaveExportPanel data={wavetable.data} max={maxValue} target={targetConfig} name={`Wave ${wavetable.id}`} onExportInstrument={onExportInstrument} />
+      )}
     </div>
   );
 };
@@ -566,10 +574,11 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
 export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
   wavetables,
   onChange,
-  maxWavetables = 64,
+  maxWavetables = WAVE_LIST_MAX,
   macroLanes,
   onMacroLanesShown,
   morphPanel,
+  onExportInstrument,
 }) => {
   const [selectedWave, setSelectedWave] = useState<number | null>(
     wavetables.length > 0 ? 0 : null,
@@ -684,6 +693,7 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
           macroLanes={macroLanes}
           onMacroLanesShown={onMacroLanesShown}
           morphPanel={morphPanel}
+          onExportInstrument={onExportInstrument}
         />
       )}
 

@@ -240,7 +240,7 @@ function waveLevels(w: FurnaceWavetable | undefined): number[] {
 }
 
 /** 32 levels -> 16 wave RAM bytes, with gb.cpp invertWave (chip flag, default on). */
-function packWave(levels: number[], invert: boolean): number[] {
+export function packWave(levels: number[], invert: boolean): number[] {
   const bytes: number[] = [];
   for (let i = 0; i < 32; i += 2) bytes.push((((invert ? 15 : 0) ^ levels[i]) << 4) | ((invert ? 15 : 0) ^ levels[i + 1]));
   return bytes;

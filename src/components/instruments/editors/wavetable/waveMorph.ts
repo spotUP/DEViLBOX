@@ -3,7 +3,7 @@
  * lay the result out as a Furnace wave macro (FurnaceMacroType.WAVE), whose
  * values are indices into the instrument's wavetable list.
  */
-import { snapLength, type ChipTarget } from './chipTargets';
+import { snapLength, WAVE_LIST_MAX, type ChipTarget } from './chipTargets';
 import { resample } from './waveformOps';
 
 export interface MorphSourceWave {
@@ -33,8 +33,18 @@ export function morphWaves(a: MorphSourceWave, b: MorphSourceWave, steps: number
 }
 
 /**
+ * Most morph steps (A and B included) whose in-between waves still fit when the list
+ * already holds `waveCount` waves and may hold `waveLimit` (list cap or the chip's playable count).
+ * 2 means no in-between wave fits.
+ */
+export function maxMorphSteps(waveCount: number, waveLimit: number): number {
+  return Math.max(2, waveLimit - waveCount + 2);
+}
+
+/**
  * Append the in-between waves of an A-to-B morph to `wavetables` and return the
  * wave-macro sequence (list indices): A, the new waves, B. A and B stay as they are.
+ * Steps are clamped so the list never grows past `waveLimit`.
  */
 export function appendMorphSequence(
   wavetables: readonly MorphSourceWave[],
@@ -42,8 +52,10 @@ export function appendMorphSequence(
   b: number,
   steps: number,
   target: ChipTarget,
+  waveLimit: number = WAVE_LIST_MAX,
 ): { wavetables: MorphSourceWave[]; sequence: number[] } {
-  const frames = morphWaves(wavetables[a], wavetables[b], steps, target).slice(1, -1);
+  const n = Math.min(Math.max(2, Math.round(steps)), maxMorphSteps(wavetables.length, waveLimit));
+  const frames = n > 2 ? morphWaves(wavetables[a], wavetables[b], n, target).slice(1, -1) : [];
   let nextId = wavetables.reduce((m, w) => Math.max(m, w.id), -1) + 1;
   const added = frames.map((data) => ({ id: nextId++, data, len: data.length, max: target.maxValue }));
   const sequence = [a, ...added.map((_, i) => wavetables.length + i), b];

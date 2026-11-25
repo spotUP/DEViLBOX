@@ -10,3 +10,6 @@ export { PresetBrowser } from './PresetBrowser';
 export { LivePanels } from './LivePanels';
 export * from './waveMorph';
 export { WaveMorphPanel } from './WaveMorphPanel';
+export { WaveExportPanel } from './WaveExportPanel';
+export type { WaveExportPanelProps } from './WaveExportPanel';
+export * from './waveExport';

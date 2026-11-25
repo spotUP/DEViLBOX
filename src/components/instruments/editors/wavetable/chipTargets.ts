@@ -37,6 +37,9 @@ export interface ChipTarget {
   description: string;
 }
 
+/** Most waves an instrument's wavetable list holds (WavetableListEditor's add-wave cap). */
+export const WAVE_LIST_MAX = 64;
+
 export const CHIP_TARGETS: Record<ChipTargetId, ChipTarget> = {
   'generic-32x16': {
     id: 'generic-32x16',

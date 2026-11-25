@@ -107,6 +107,7 @@ interface FurnaceFileOpsAPI {
   fur_ins_get_type(i: number): number;
   fur_ins_to_fui(i: number, buf: number, bufLen: number): number;
   fur_ins_to_dmp(i: number, buf: number, bufLen: number): number;
+  fur_ins_add_wave(values: number, len: number, max: number): number;
 }
 
 function getAPI(m: WasmModule): FurnaceFileOpsAPI {
@@ -177,6 +178,7 @@ function getAPI(m: WasmModule): FurnaceFileOpsAPI {
     fur_ins_get_type: m.cwrap('fur_ins_get_type', 'number', ['number']),
     fur_ins_to_fui: m.cwrap('fur_ins_to_fui', 'number', ['number', 'number', 'number']),
     fur_ins_to_dmp: m.cwrap('fur_ins_to_dmp', 'number', ['number', 'number', 'number']),
+    fur_ins_add_wave: m.cwrap('fur_ins_add_wave', 'number', ['number', 'number', 'number']),
   };
 }
 
@@ -758,7 +760,8 @@ function readInstrumentSlot(m: WasmModule, api: FurnaceFileOpsAPI, i: number): F
  * The editor's instrument as an INS2 block (encodeInstrumentAsINS2) read by Furnace's own readInsData, then written
  * back by Furnace as .fui and .dmp: the files carry the CURRENT edited state, written by Furnace's C++.
  */
-export async function instrumentFromIns2Wasm(ins2: Uint8Array): Promise<FurnaceInstrumentFile> {
+/** `waves` is the instrument's own wavetable list (its wave macro indexes it); Furnace embeds the used ones in the .fui. */
+export async function instrumentFromIns2Wasm(ins2: Uint8Array, waves: readonly FurnaceWavetableFile[] = []): Promise<FurnaceInstrumentFile> {
   const m = await getModule();
   if (!cachedAPI) cachedAPI = getAPI(m);
   const api = cachedAPI;
@@ -767,6 +770,13 @@ export async function instrumentFromIns2Wasm(ins2: Uint8Array): Promise<FurnaceI
   const n = api.fur_ins_from_ins2(ptr, ins2.length);
   m._free(ptr);
   if (n < 0) throw new Error(`Furnace instrument read failed: ${api.fur_get_error()}`);
+  for (const w of waves) {
+    const vPtr = m._malloc(w.data.length * 4);
+    new Int32Array(m.HEAPU8.buffer, vPtr, w.data.length).set(w.data);
+    const r = api.fur_ins_add_wave(vPtr, w.data.length, w.max);
+    m._free(vPtr);
+    if (r < 0) throw new Error('Wavetable length must be 1 to 256 for Furnace files');
+  }
   return readInstrumentSlot(m, api, 0);
 }
 

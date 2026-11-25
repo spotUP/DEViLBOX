@@ -16,19 +16,22 @@ export interface FurnaceSaveInstrumentButtonsProps {
 
 const fileSafe = (name: string): string => name.replace(/[\\/:*?"<>|]/g, '_').trim() || 'Instrument';
 
+/** Saves one store instrument as Furnace .fui or .dmp; errors go to a toast. */
+export async function saveFurnaceInstrumentFile(instrumentId: number, ext: 'fui' | 'dmp'): Promise<void> {
+  const inst = useInstrumentStore.getState().instruments.find((i) => i.id === instrumentId);
+  if (!inst?.furnace) return;
+  try {
+    const file = await furnaceInstrumentFile(inst.name, inst.furnace);
+    const bytes = ext === 'fui' ? file.fui : file.dmp;
+    if (!bytes) { notify.error(`${inst.name} has no .dmp form: Furnace writes .dmp only for instrument types the format can hold`); return; }
+    FileSaver.saveAs(new Blob([bytes.slice().buffer]), `${fileSafe(inst.name)}.${ext}`);
+  } catch (e) {
+    notify.error(`Could not save ${inst.name}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 export const FurnaceSaveInstrumentButtons: React.FC<FurnaceSaveInstrumentButtonsProps> = ({ instrumentId }) => {
-  const saveOne = async (ext: 'fui' | 'dmp'): Promise<void> => {
-    const inst = useInstrumentStore.getState().instruments.find((i) => i.id === instrumentId);
-    if (!inst?.furnace) return;
-    try {
-      const file = await furnaceInstrumentFile(inst.name, inst.furnace);
-      const bytes = ext === 'fui' ? file.fui : file.dmp;
-      if (!bytes) { notify.error(`${inst.name} has no .dmp form: Furnace writes .dmp only for instrument types the format can hold`); return; }
-      FileSaver.saveAs(new Blob([bytes.slice().buffer]), `${fileSafe(inst.name)}.${ext}`);
-    } catch (e) {
-      notify.error(`Could not save ${inst.name}: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
+  const saveOne = (ext: 'fui' | 'dmp'): Promise<void> => saveFurnaceInstrumentFile(instrumentId, ext);
 
   const saveAll = async (): Promise<void> => {
     const all = useInstrumentStore.getState().instruments.filter((i) => i.synthType === 'Furnace' && i.furnace);

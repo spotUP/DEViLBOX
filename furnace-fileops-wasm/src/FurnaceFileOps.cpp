@@ -687,9 +687,31 @@ void fur_remap_waves(const int32_t* map, int n) {
 // ============================================================
 static std::vector<DivInstrument*> g_insFile;
 
+// The wavetable list fur_ins_to_fui embeds (Furnace's LW feature + WAVE blocks); the instrument's wave macro indexes it.
+static DivSong g_fuiWaves;
+
+static void clearFuiWaves() {
+  for (DivWavetable* w: g_fuiWaves.wave) delete w;
+  g_fuiWaves.wave.clear();
+  g_fuiWaves.waveLen=0;
+}
+
 static void clearInsFile() {
   for (DivInstrument* i: g_insFile) delete i;
   g_insFile.clear();
+  clearFuiWaves();
+}
+
+// Appends one wave (len 1..256) to the list the next .fui embeds. Call after fur_ins_from_ins2, in list order.
+int fur_ins_add_wave(const int32_t* values, int len, int max) {
+  if (len<1 || len>256) return -1;
+  DivWavetable* w=new DivWavetable;
+  w->len=len;
+  w->max=max;
+  for (int i=0; i<len; i++) w->data[i]=values[i];
+  g_fuiWaves.wave.push_back(w);
+  g_fuiWaves.waveLen=(int)g_fuiWaves.wave.size();
+  return g_fuiWaves.waveLen;
 }
 
 // Returns the number of instruments read (a .bnk/.wopl holds many), or -1 on error.
@@ -749,7 +771,7 @@ int fur_ins_to_fui(int i, uint8_t* buf, size_t bufLen) {
   if (i<0 || i>=(int)g_insFile.size()) return -1;
   SafeWriter w;
   w.init();
-  g_insFile[i]->putInsData2(&w,true,NULL,true);
+  g_insFile[i]->putInsData2(&w,true,g_fuiWaves.wave.empty()?NULL:&g_fuiWaves,true);
   size_t sz=w.size();
   if (!buf) { w.finish(); return (int)sz; }
   if (bufLen<sz) { w.finish(); return -1; }
