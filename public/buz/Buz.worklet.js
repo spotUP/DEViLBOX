@@ -1,5 +1,5 @@
 /**
- * Jxs.worklet.js - AudioWorklet processor for the Buzzic 1 / Buzzic 2 WASM replayer.
+ * Buz.worklet.js - AudioWorklet processor for the Buzzic 1 / Buzzic 2 WASM replayer.
  * Stereo 44.1 kHz output rendered by the engine (buz-wasm/src/buz_engine.cpp); the
  * context resamples when it runs at another rate. Subsong 0 is played.
  */
@@ -71,9 +71,9 @@ class BuzProcessor extends AudioWorkletProcessor {
     this.qlen = 0; this.frac = 0; this.drained = false;
     this.lastTick = -1;
     // Fast-forward: render and discard until the replayer is at the wanted song row.
-    const scratch = 4800;
+    // outPtr holds 128 stereo frames: never ask for more (asking 400 wrote 2 KB past it per edit).
     while (skipTicks > 0 && m._buz_row() < skipTicks) {
-      if (m._buz_render(this.outPtr, scratch / 12) === 0) break;
+      if (m._buz_render(this.outPtr, 128) === 0) break;
     }
     return true;
   }
@@ -156,7 +156,7 @@ class BuzProcessor extends AudioWorkletProcessor {
     if (!output || output.length < 2) return true;
     const outputL = output[0], outputR = output[1];
     const n = Math.min(outputL.length, 128);
-    // Linear resample from the engine's 48 kHz to the context rate.
+    // Linear resample from the engine's 44.1 kHz to the context rate.
     const ratio = 44100 / sampleRate;
     const need = Math.floor(this.frac + (n - 1) * ratio) + 2;
     this.fill(need);
