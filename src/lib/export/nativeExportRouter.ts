@@ -208,6 +208,7 @@ const NATIVE_FORMAT_LABELS: Record<string, string> = {
   pxtone: 'PxTone (.ptcop)',
   organya: 'Organya (.org)',
   piyoPiyo: 'PiyoPiyo (.pmd)',
+  buz: 'Buzzic (.buz / .buz2)',
 };
 
 /** Human label of the matched non-Amiga exporter for the song (live song when null), or null for the Amiga text. */
@@ -327,6 +328,9 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
   // KDM: its module (with the grid's edits) is the export.
   { id: 'kdm', matches: (s) => songIds(s).format === 'KDM' && !!s.kdmFileData,
     run: async (s) => { const { exportKdm } = await import('./KdmExporter'); return exportKdm(s); } },
+  // Buzzic 1/2: its song file (with the grid's edits) is the export.
+  { id: 'buz', matches: (s) => songIds(s).format === 'BUZ' && !!s.buzFileData,
+    run: async (s) => { const { exportBuz } = await import('./BuzExporter'); return exportBuz(s); } },
   // P/ECE music driver: its song file (edits written in as made) is the export.
   { id: 'piece', matches: (s) => songIds(s).format === 'PIECE' && !!s.pieceFileData,
     run: async (s) => { const { exportPiece } = await import('./PieceExporter'); return exportPiece(s); } },

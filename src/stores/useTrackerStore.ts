@@ -39,6 +39,7 @@ import { songToSongFile, type SongMeta } from '@lib/uprough/songFile';
 import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
 import { hippelLinkedEdits, hippelSpansFor } from '@/engine/hippel/hippelLinkedCells';
 import { aonLinkedEdits } from '@/lib/import/formats/artOfNoiseGrid';
+import { buzLinkedEdits } from '@/lib/import/formats/buzGrid';
 import { sharedCellEdits } from '@/lib/song/sharedCellEdits';
 import { isCoSo } from '@/engine/hippel/rebuildHippelModule';
 import { moduleHeldIn } from '@/engine/formatFileDataFields';
@@ -274,10 +275,13 @@ function pushEditAction(
   const hippelModule = UNLINKED_EDITS.has(type) ? null : moduleHeldIn(fmt, 'hippelFileData');
   const spans = hippelModule ? hippelSpansFor(hippelModule, useInstrumentStore.getState().instruments.length, fmt.fileSubsongs?.current ?? 0) : null;
   const aonModule = UNLINKED_EDITS.has(type) ? null : moduleHeldIn(fmt, 'artOfNoiseFileData');
+  // Buzzic blocks and instruments share patterns through their sequences: a pattern byte shows in every cell that reads it.
+  const buzModule = UNLINKED_EDITS.has(type) ? null : moduleHeldIn(fmt, 'buzFileData');
   // Art of Noise positions share stored patterns: an edit shows in every position of the same stored pattern.
   const linked: Array<{ pattern: number; row: number; channel: number; values: Partial<import('@/types/tracker').TrackerCell> }> = spans
     ? hippelLinkedEdits(spans, patternIndex, before, after, useTrackerStore.getState().patterns)
     : aonModule ? aonLinkedEdits(new Uint8Array(aonModule), patternIndex, before, after, useTrackerStore.getState().patterns)
+    : buzModule ? buzLinkedEdits(new Uint8Array(buzModule), patternIndex, before, after, useTrackerStore.getState().patterns)
     // A layout whose stored pattern plays at several song positions (Composer 669): grid cells with one file offset are one cell.
     : (fmt.uadePatternLayout ?? fmt.uadeVariableLayout) && !UNLINKED_EDITS.has(type) ? sharedCellEdits((fmt.uadePatternLayout ?? fmt.uadeVariableLayout)!, patternIndex, before, after, useTrackerStore.getState().patterns) : [];
   if (linked.length === 0) { history.pushAction(type, description, patternIndex, before, after); return; }

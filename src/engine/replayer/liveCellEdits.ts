@@ -53,7 +53,7 @@ export function playingDescriptor(song: TrackerSong): NativeEngineDescriptor | n
 
 /** Where a grid edit of a song goes (one per branch of sendCellEditsToEngine). */
 export type LiveEditRoute =
-  | 'fred-module' | 'actionamics-module' | 'monotone-module' | 'kdm-module' | 'piece-module' | 'organya-module' | 'pxtone-module' | 'aon-module' | 'piyopiyo-module' | 'jxs-module' | 'activisionPro-module'
+  | 'fred-module' | 'actionamics-module' | 'monotone-module' | 'kdm-module' | 'piece-module' | 'buz-module' | 'organya-module' | 'pxtone-module' | 'aon-module' | 'piyopiyo-module' | 'jxs-module' | 'activisionPro-module'
   | 'track-index' | 'grid-cell' | 'engine-swap' | 'eagleplayer-module' | 'hippelst-module' | 'med-module' | 'chip-ram' | 'uade-module' | 'none';
 
 /**
@@ -70,6 +70,7 @@ export function liveEditRoute(song: TrackerSong): { route: LiveEditRoute; engine
   if (desc?.key === 'MonotoneReplayer') return at('monotone-module');
   if (desc?.key === 'KdmReplayer') return at('kdm-module');
   if (desc?.key === 'PieceReplayer') return at('piece-module');
+  if (desc?.key === 'BuzReplayer') return at('buz-module');
   if (desc?.key === 'Organya') return at('organya-module');
   if (desc?.key === 'Pxtone') return at('pxtone-module');
   if (desc?.key === 'ArtOfNoise') return at('aon-module');
@@ -119,6 +120,11 @@ export async function sendCellEditsToEngine(
     case 'piece-module': {
       const { applyPieceModuleEdits } = await import('../piece/pieceModuleEdits');
       await applyPieceModuleEdits(song, edits);
+      break;
+    }
+    case 'buz-module': {
+      const { applyBuzModuleEdits } = await import('../buz/buzModuleEdits');
+      await applyBuzModuleEdits(song, edits);
       break;
     }
     case 'organya-module': {
