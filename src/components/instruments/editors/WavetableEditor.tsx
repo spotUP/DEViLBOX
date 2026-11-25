@@ -22,7 +22,7 @@ import { Button } from '@components/ui/Button';
 import {
   StudioToolbar, DrawCanvas, HarmonicPanel, MathPanel, PresetBrowser, LivePanels,
   type StudioMode, type StudioLayout,
-  CHIP_TARGETS, detectChipTarget, type ChipTargetId,
+  CHIP_TARGETS, detectChipTarget, type ChipTargetId, type ChipTarget,
   chipLimitsLabel, fitsChipTarget, snapLength,
   applyChipTarget, requantize, dcRemove, normalize, invert as invertOp, reverse as reverseOp,
   mirrorLeftToRight, quarterWaveReflect, phaseAlignToPeak,
@@ -49,6 +49,10 @@ interface WavetableEditorProps {
   initialLayout?: StudioLayout;
   /** Macro lanes the host instrument owns, shown under the wave in the studio layout. */
   macroLanes?: React.ReactNode;
+  /** Told whether the studio macro lanes are on screen, so the host's Macros panel can drop them (no view duplication). */
+  onMacroLanesShown?: (shown: boolean) => void;
+  /** Wave morph controls the host owns, shown in the studio layout; gets the chip target new waves quantise to. */
+  morphPanel?: (target: ChipTarget) => React.ReactNode;
 }
 
 interface WavetableListEditorProps {
@@ -56,6 +60,8 @@ interface WavetableListEditorProps {
   onChange: (wavetables: WavetableData[]) => void;
   maxWavetables?: number;
   macroLanes?: React.ReactNode;
+  onMacroLanesShown?: (shown: boolean) => void;
+  morphPanel?: (target: ChipTarget) => React.ReactNode;
 }
 
 // ============================================================================
@@ -131,6 +137,8 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
   height = 180,
   initialLayout = 'compact',
   macroLanes,
+  onMacroLanesShown,
+  morphPanel,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showGenerator, setShowGenerator] = useState(false);
@@ -297,6 +305,11 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
   }, []);
 
   const showStudioPanels = layout === 'studio';
+  const macroLanesShown = showStudioPanels && !!macroLanes;
+  useEffect(() => {
+    onMacroLanesShown?.(macroLanesShown);
+    return () => onMacroLanesShown?.(false);
+  }, [macroLanesShown, onMacroLanesShown]);
   const showLivePanels = layout === 'studio';
 
   const headerBadge = useMemo(() => (
@@ -540,6 +553,8 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
           {macroLanes}
         </div>
       )}
+
+      {showStudioPanels && morphPanel && <div className="px-2 pb-2">{morphPanel(targetConfig)}</div>}
     </div>
   );
 };
@@ -553,6 +568,8 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
   onChange,
   maxWavetables = 64,
   macroLanes,
+  onMacroLanesShown,
+  morphPanel,
 }) => {
   const [selectedWave, setSelectedWave] = useState<number | null>(
     wavetables.length > 0 ? 0 : null,
@@ -665,6 +682,8 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
           onChange={(w) => updateWavetable(selectedWave, w)}
           onRemove={wavetables.length > 1 ? () => removeWavetable(selectedWave) : undefined}
           macroLanes={macroLanes}
+          onMacroLanesShown={onMacroLanesShown}
+          morphPanel={morphPanel}
         />
       )}
 

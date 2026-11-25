@@ -61,11 +61,17 @@ interface MacroListEditorProps {
   note?: string;
   /** Show and offer only these macro types; the others stay in `macros` untouched (Waveform Studio lanes). */
   types?: readonly number[];
+  /** Hide and do not offer these macro types; they stay in `macros` untouched (another view shows them). */
+  hideTypes?: readonly number[];
 }
 
-/** Indices into `macros` of the macros to show; all when `types` is absent. */
-export function shownMacroIndices(macros: readonly FurnaceMacro[], types?: readonly number[]): number[] {
-  return macros.flatMap((m, i) => (!types || types.includes(macroCode(m)) ? [i] : []));
+/** True when a macro type passes the show (`types`) and hide (`hideTypes`) filters. */
+const macroTypeShown = (code: number, types?: readonly number[], hideTypes?: readonly number[]): boolean =>
+  (!types || types.includes(code)) && !hideTypes?.includes(code);
+
+/** Indices into `macros` of the macros to show; all when neither filter is given. */
+export function shownMacroIndices(macros: readonly FurnaceMacro[], types?: readonly number[], hideTypes?: readonly number[]): number[] {
+  return macros.flatMap((m, i) => (macroTypeShown(macroCode(m), types, hideTypes) ? [i] : []));
 }
 
 // ── Macro type metadata ────────────────────────────────────────────────────────
@@ -676,6 +682,7 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
   allowSpeed,
   note,
   types,
+  hideTypes,
 }) => {
   const typeNames = labels ?? MACRO_TYPE_NAMES;
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -732,7 +739,7 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
 
   // Types not yet added
   const availableTypes = Object.entries(typeNames)
-    .filter(([typeNum]) => !types || types.includes(parseInt(typeNum)))
+    .filter(([typeNum]) => macroTypeShown(parseInt(typeNum), types, hideTypes))
     .filter(([typeNum]) => !macros.some(m => macroCode(m) === parseInt(typeNum)))
     .map(([typeNum, name]) => ({ type: parseInt(typeNum), name }));
 
@@ -741,7 +748,7 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
       {note && <p className="text-[10px] font-mono text-text-muted">{note}</p>}
       {/* Macros — side by side grid, always visible */}
       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
-        {shownMacroIndices(macros, types).map((index) => { const macro = macros[index]; return (
+        {shownMacroIndices(macros, types, hideTypes).map((index) => { const macro = macros[index]; return (
           <div key={index} className="border border-dark-border rounded-lg overflow-hidden flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between px-2 py-1 bg-dark-bg select-none">

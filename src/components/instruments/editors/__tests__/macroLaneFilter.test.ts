@@ -15,4 +15,9 @@ describe('shownMacroIndices (Waveform Studio macro lanes)', () => {
     const lanes = [FurnaceMacroType.VOL, FurnaceMacroType.PITCH, FurnaceMacroType.DUTY, FurnaceMacroType.ARP];
     expect(shownMacroIndices(macros, lanes)).toEqual([1, 3]);
   });
+
+  it('hides the studio lanes from the Macros panel while the studio shows them, keeping the rest', () => {
+    const lanes = [FurnaceMacroType.VOL, FurnaceMacroType.PITCH, FurnaceMacroType.DUTY, FurnaceMacroType.ARP];
+    expect(shownMacroIndices(macros, undefined, lanes)).toEqual([0, 2]);
+  });
 });

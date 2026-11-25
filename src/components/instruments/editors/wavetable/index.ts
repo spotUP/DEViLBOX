@@ -8,3 +8,5 @@ export { HarmonicPanel } from './HarmonicPanel';
 export { MathPanel } from './MathPanel';
 export { PresetBrowser } from './PresetBrowser';
 export { LivePanels } from './LivePanels';
+export * from './waveMorph';
+export { WaveMorphPanel } from './WaveMorphPanel';

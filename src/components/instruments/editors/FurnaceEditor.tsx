@@ -39,7 +39,8 @@ import { MacroListEditor } from './MacroEditor';
 import { FurnaceMacroType } from '@typedefs/instrument';
 import { SNESPanel, SNESEchoPanel } from './SNESPanels';
 import { SNES_MACRO_LABELS } from '@/lib/furnace/snesDsp';
-import { chipMacroProfile, NEOGEO_MACRO_PROFILES } from '@/lib/furnace/chipMacroProfiles';
+import { chipMacroProfile, NEOGEO_MACRO_PROFILES, macroCode } from '@/lib/furnace/chipMacroProfiles';
+import { WaveMorphPanel, appendMorphSequence } from './wavetable';
 import { AYPanel } from './AYPanel';
 import { NESPanel } from './NESPanel';
 import { FurnaceWaveList } from './FurnaceWaveList';
@@ -227,6 +228,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sampleInputRef = useRef<HTMLInputElement>(null);
   const configRef = useRef(config);
+  // The Waveform Studio shows these lanes; the Macros panel drops them meanwhile (no view duplication).
+  const [studioLanesShown, setStudioLanesShown] = useState(false);
   // chipType holds a Furnace instrument type on imports (VERA=24) but a chip id on new ones (SNES=24), so gate SNES UI on synthType
   const synthType = useInstrumentStore((s) => s.instruments.find((i) => i.id === instrumentId)?.synthType);
   const isSnes = synthType === 'FurnaceSNES' || !!config.snes;
@@ -403,6 +406,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           macros={config.macros}
           onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
           chipType={config.chipType}
+          hideTypes={studioLanesShown ? STUDIO_MACRO_TYPES : undefined}
           labels={isSnes ? SNES_MACRO_LABELS : voiceProfile?.labels}
           ranges={voiceProfile?.ranges}
           valueNames={voiceProfile?.valueNames}
@@ -830,6 +834,20 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           <WavetableListEditor
             wavetables={config.wavetables as WavetableData[]}
             onChange={(wavetables) => onChange({ wavetables })}
+            onMacroLanesShown={setStudioLanesShown}
+            morphPanel={(target) => (
+              <WaveMorphPanel
+                waveCount={config.wavetables.length}
+                target={target}
+                onMorph={(a, b, steps) => {
+                  const current = configRef.current;
+                  const { wavetables, sequence } = appendMorphSequence(current.wavetables as WavetableData[], a, b, steps, target);
+                  const waveMacro: FurnaceMacro = { type: FurnaceMacroType.WAVE, data: sequence, loop: -1, release: -1, mode: 0, speed: 1 };
+                  const macros = [...current.macros.filter((m) => macroCode(m) !== FurnaceMacroType.WAVE), waveMacro];
+                  onChange({ wavetables: wavetables as WavetableData[], macros });
+                }}
+              />
+            )}
             macroLanes={
               <MacroListEditor
                 macros={config.macros}
