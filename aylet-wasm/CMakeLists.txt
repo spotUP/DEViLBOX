@@ -25,7 +25,7 @@ set_target_properties(Aylet PROPERTIES
 
 target_compile_options(Aylet PRIVATE -O2 -Wall -Wno-unused-label -Wno-parentheses)
 
-set(EXPORTED_FUNCS "_malloc,_free,_aylet_wasm_init,_aylet_wasm_load,_aylet_wasm_render,_aylet_wasm_stop,_aylet_wasm_set_mute_mask,_aylet_wasm_get_num_tracks,_aylet_wasm_get_first_track,_aylet_wasm_get_track,_aylet_wasm_is_finished,_aylet_wasm_get_author,_aylet_wasm_get_misc,_aylet_wasm_get_track_name,_aylet_wasm_step_frame,_aylet_wasm_get_regs")
+set(EXPORTED_FUNCS "_malloc,_free,_aylet_wasm_init,_aylet_wasm_load,_aylet_wasm_render,_aylet_wasm_stop,_aylet_wasm_set_mute_mask,_aylet_wasm_get_num_tracks,_aylet_wasm_get_first_track,_aylet_wasm_get_track,_aylet_wasm_is_finished,_aylet_wasm_get_author,_aylet_wasm_get_misc,_aylet_wasm_get_track_name,_aylet_wasm_step_frame,_aylet_wasm_get_regs,_aylet_wasm_poke")
 
 target_link_options(Aylet PRIVATE
     "SHELL:-s MODULARIZE=1"
@@ -37,6 +37,7 @@ target_link_options(Aylet PRIVATE
     "SHELL:-s STACK_SIZE=65536"
     "SHELL:-s ENVIRONMENT=web,worker"
     "SHELL:-s FILESYSTEM=0"
+    "SHELL:-s INCOMING_MODULE_JS_API=[wasmBinary,print,printErr]"
     "SHELL:-s SINGLE_FILE=0"
     -O2
     --no-entry

@@ -35,7 +35,7 @@ int decodeChannel(const R& r, size_t pos, int patRows, std::vector<Cell>& out, s
       else if (b == 0xB0) c.envType = 0;
       else if (b == 0xB1) { skip = r.u8(pos++); c.skip = skip; }
       else if (b > 0xB1) { c.envType = b - 0xB1; c.envPeriod = (r.u8(pos) << 8) | r.u8(pos + 1); pos += 2; }  // SETENV: high byte first
-      else if (b >= 0x50) { c.note = b - 0x50; done = true; }
+      else if (b >= 0x50) { c.note = b - 0x50; c.noteOffset = (int)pos - 1; done = true; }
       else if (b >= 0x40) c.ornament = b - 0x40;
       else if (b >= 0x20) c.noise = b - 0x20;
       else if (b >= 0x10) {

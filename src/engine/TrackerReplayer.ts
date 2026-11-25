@@ -390,6 +390,8 @@ export interface TrackerSong {
   sd2FileData?: ArrayBuffer;
   /** Whole ZX Spectrum .ay file (ZXAY EMUL) for AyletEngine WASM playback */
   ayFileData?: ArrayBuffer;
+  /** PT3 on aylet: song pattern -> rows x 3 module offsets of the note byte (-1: no note byte on that line) */
+  pt3NoteOffsets?: number[][][];
   /** Whole Studio Pixel PiyoPiyo .pmd for PiyoPiyoEngine worklet playback */
   piyoPiyoFileData?: ArrayBuffer;
   /** MusicMaker V8 song + instruments as one FORM/MMV8 IFF for MusicMakerEngine worklet playback */
@@ -2787,7 +2789,10 @@ export class TrackerReplayer {
     // are NOT whole-player synths.
     if (!this.song.libopenmptFileData && !this.useWasmSequencer && !this.song.furnaceNative
         && !this._suppressNotes && !this.coordinator.hasActiveDispatch
-        && !this.song.nativeSamplePlayback) {
+        && !this.song.nativeSamplePlayback
+        // AdPlug streaming starts below and only when libopenmpt did not; a
+        // built XM of OPL3 notes takes the song and plays it silent.
+        && !this.song.adplugFileData) {
       try {
         const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
         if (gen !== this._playGeneration) return;

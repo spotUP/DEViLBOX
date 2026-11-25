@@ -422,18 +422,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/qsf/QsfEngine')).QsfEngine as unknown as WASMSingletonStatic,
   },
   {
-    key: 'Zxtune',
-    synthType: 'ZxtuneSynth',
-    suppressNotes: true,
-    fileDataKey: 'zxtuneFileData',
-    loadMethod: 'loadTune',
-    supportsPause: false,
-    supportsResume: false,
-    needsDirectRouting: true,
-    staticRef: null,
-    dynamicResolver: async () => (await import('@/engine/zxtune/ZxtuneEngine')).ZxtuneEngine as unknown as WASMSingletonStatic,
-  },
-  {
     // ZX Spectrum .ay (ZXAY EMUL): aylet 0.5 compiled to wasm runs the tune's
     // own Z80 code with a real AY. The grid is a view (AYParser); the engine
     // plays the whole file (ledger F15).
@@ -447,6 +435,20 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/aylet/AyletEngine')).AyletEngine as unknown as WASMSingletonStatic,
+  },
+  {
+    // After Aylet: a PT3 song carries both keys (ZxtuneParser); aylet plays it through the real Bulba player
+    // and zxtuneFileData stays the untouched file for export.
+    key: 'Zxtune',
+    synthType: 'ZxtuneSynth',
+    suppressNotes: true,
+    fileDataKey: 'zxtuneFileData',
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/zxtune/ZxtuneEngine')).ZxtuneEngine as unknown as WASMSingletonStatic,
   },
   {
     // Studio Pixel PiyoPiyo (.pmd): a worklet port of piyopiyo-rs plays the
@@ -937,6 +939,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'AxsWasmSynth',
     suppressNotes: true,
     fileDataKey: 'axsFileData',
+    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,

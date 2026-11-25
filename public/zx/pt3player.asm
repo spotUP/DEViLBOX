@@ -7,6 +7,12 @@ CurPosCounter=0
 ACBBAC=0
 LoopChecker=1
 Id=0
+	IFDEF AYFILE
+; AY-file build (tools/build-zx-pt3.sh, pt3-wasm pt3_ay): no boot, no screen; the AY host calls START
+; once and START+5 every 1/50 s. The module sits right after the player.
+MDLADDR EQU 0x9000
+	ORG 0x8000
+	ELSE
 MDLADDR EQU 0xC000
 	ORG 0x8000
 BOOT	LD SP,0x7F00
@@ -24,6 +30,7 @@ MAINLP	EI
 	PUSH AF			; keep PLAY's exit flags across the screen code
 	CALL SCRFRAME
 	POP AF
+	ENDIF
 TonA	EQU 0
 TonB	EQU 2
 TonC	EQU 4
@@ -36,7 +43,9 @@ Env	EQU 11
 EnvTp	EQU 13
 
 ;Entry and other points
+	IFNDEF AYFILE
 	JR MAINLP
+	ENDIF
 BANK	DB 16
 ;START initialize playing of module at MDLADDR
 ;START+3 initialization with module address in HL
@@ -1413,6 +1422,7 @@ T_PACK	DB #06EC*2/256,#06EC*2
 	DB #0E10-#0D60
 	DB #0EF8-#0E10
 
+	IFNDEF AYFILE
 ; ---- Player screen: thoughts/shared/design/player-ui/player-screens.html entry 'zx', drawn with the screen.inc tiles.
 ; Static parts once before playback (SCRINIT); per frame (SCRFRAME, after PLAY wrote the AY) the three bars, the clock
 ; and every 8th frame the coarse scroller. The worst frame (all bars jump 0 -> full) stays well inside the 69888 T frame,
@@ -1873,6 +1883,7 @@ titlebuf DS 32
 authbuf	DS 32
 msgbuf	DS 11 + 32 + 4 + 32 + 15
 	include "screen.inc"
+	ENDIF
 
 
 ;vars from here can be stripped

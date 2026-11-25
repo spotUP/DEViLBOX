@@ -85,6 +85,13 @@ class AyletProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'poke':
+        // Live edit: [addr, value] pairs into the tune's Z80 memory (song data the tune's player reads).
+        if (this.module && typeof this.module._aylet_wasm_poke === 'function') {
+          for (const [addr, value] of data.bytes) this.module._aylet_wasm_poke(addr, value);
+        }
+        break;
+
       case 'setMuteMask':
         // Bit N set = AY channel N (A, B, C) audible; DEViLBOX solo/mute.
         if (this.module && typeof this.module._aylet_wasm_set_mute_mask === 'function') {

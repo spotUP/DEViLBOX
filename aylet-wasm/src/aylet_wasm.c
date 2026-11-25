@@ -520,6 +520,11 @@ return 1;
 EMSCRIPTEN_KEEPALIVE
 const unsigned char *aylet_wasm_get_regs(void) { return g_ay_shadow; }
 
+/* Live edit: write one byte of Z80 memory (the tune's song data), read by the
+ * tune's own player on its next pass. A reload restores the file's bytes. */
+EMSCRIPTEN_KEEPALIVE
+void aylet_wasm_poke(int addr,int val) { mem[addr&0xffff]=(unsigned char)val; }
+
 /* Render `frames` stereo float frames (L R interleaved). Silence when nothing
  * is loaded or the song has finished. Returns `frames`. */
 EMSCRIPTEN_KEEPALIVE

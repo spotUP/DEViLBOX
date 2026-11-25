@@ -99,6 +99,10 @@ export class AyletEngine extends WASMSingletonBase {
   setMuteMask(mask: number): void {
     this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
   }
+  /** Live edit: write [Z80 address, byte] pairs into the playing tune's memory. */
+  poke(bytes: Array<[number, number]>): void {
+    this.workletNode?.port.postMessage({ type: 'poke', bytes });
+  }
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
 

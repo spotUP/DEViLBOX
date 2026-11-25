@@ -2160,12 +2160,22 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     nativeOnly: true,
   },
   {
+    // Own key so its grid status (C++ decode, live edit) is not claimed for the other ZXTune formats.
+    key: 'pt3',
+    label: 'Pro Tracker 3',
+    description: 'ZX Spectrum Pro Tracker 3 / Vortex Tracker module (AY-3-8910)',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.pt3$/i,
+    nativeOnly: true,
+  },
+  {
     key: 'zxtune',
     label: 'ZXTune',
     description: 'ZX Spectrum / AY-3-8910 chiptune formats',
     family: 'chip-dump',
     matchMode: 'extension',
-    extRegex: /\.(pt3|pt2|pt1|stc|st1|st3|vtx|psg|sqt|psc|asc|gtr|ftc|ayc|cop|tfc|tfd|tf0|pdt|chi|str|dst|dmm|et1)$/i,
+    extRegex: /\.(pt2|pt1|stc|st1|st3|vtx|psg|sqt|psc|asc|gtr|ftc|ayc|cop|tfc|tfd|tf0|pdt|chi|str|dst|dmm|et1)$/i,
     nativeOnly: true,
   },
   {

@@ -22,6 +22,7 @@ struct Cell {
   int noise = kNoValue;     // 0..31 (global Ns_Base write)
   int skip = kNoValue;      // B1 rows-per-line (persistent per channel)
   std::vector<Effect> effects;
+  int noteOffset = -1;      // file offset of the note byte (0x50+n), -1 when the line has no note
   bool lineStart = false;   // a line was decoded here (distinguishes D0 empty line from no line)
 };
 

@@ -9,6 +9,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import { isPt3, pt3Grid, type CreatePt3Edit } from '@/engine/pt3/pt3EditWasm';
 
 // ── Format detection ──────────────────────────────────────────────────────────
 
@@ -71,12 +72,15 @@ export function isZxtuneFormat(data: ArrayBuffer): boolean {
 export async function parseZxtuneFile(
   fileName: string,
   data: ArrayBuffer,
+  create?: CreatePt3Edit,
 ): Promise<TrackerSong> {
   if (data.byteLength < 2) {
     throw new Error(
       `Invalid ZXTune file: too small (${data.byteLength} bytes, minimum 2)`
     );
   }
+
+  if (isPt3(new Uint8Array(data))) return parsePt3(fileName, data, create);
 
   const numChannels = 3; // AY-3-8910/8912 has 3 channels: A, B, C
   const numRows = 64;
@@ -134,5 +138,52 @@ export async function parseZxtuneFile(
     initialBPM: 125,
     linearPeriods: false,
     zxtuneFileData: data.slice(0),
+  };
+}
+
+/**
+ * PT3 / Vortex Tracker II: the C++ decoder (public/pt3/Pt3Edit.js) gives the real patterns; the grid note is the
+ * pitch the Bulba player plays. aylet plays the module through that player (ayFileData, the .ay wrapper);
+ * zxtuneFileData stays the untouched file, so an unedited export is byte-exact.
+ */
+async function parsePt3(fileName: string, data: ArrayBuffer, create?: CreatePt3Edit): Promise<TrackerSong> {
+  const grid = await pt3Grid(new Uint8Array(data), create);
+  const numbers = [...grid.patterns.keys()];
+  const patterns = numbers.map((p) => {
+    const cells = grid.patterns.get(p) ?? [];
+    return {
+      id: `pattern-${p}`,
+      name: `Pattern ${p}`,
+      length: cells.length,
+      channels: ['A', 'B', 'C'].map((name, ch) => ({
+        id: `channel-${ch}`, name, muted: false, solo: false, collapsed: false, volume: 100,
+        pan: ch === 0 ? -50 : ch === 2 ? 50 : 0, instrumentId: null, color: null,
+        rows: cells.map((row) => row[ch]),
+      })),
+      importMetadata: {
+        sourceFormat: 'ZXTune' as const, sourceFile: fileName, importedAt: new Date().toISOString(),
+        originalChannelCount: 3, originalPatternCount: numbers.length, originalInstrumentCount: 0,
+      },
+    };
+  });
+  const instruments: InstrumentConfig[] = ['A', 'B', 'C'].map((c, i) => ({
+    id: i + 1, name: `AY ${c}`, type: 'synth' as const, synthType: 'AyletSynth' as const, effects: [], volume: 0, pan: 0,
+  } as InstrumentConfig));
+  const songPositions = grid.positions.map((p) => numbers.indexOf(p));
+  return {
+    name: `${fileName.replace(/\.[^.]+$/, '')} [PT3]`,
+    format: 'ZXTune' as TrackerFormat,
+    patterns,
+    instruments,
+    songPositions,
+    songLength: songPositions.length,
+    restartPosition: grid.loop,
+    numChannels: 3,
+    initialSpeed: grid.speed,
+    initialBPM: 125,  // 50 Hz frames: one tick per frame
+    linearPeriods: false,
+    zxtuneFileData: data.slice(0),
+    ayFileData: grid.ay,
+    pt3NoteOffsets: numbers.map((p) => grid.noteOffsets.get(p) ?? []),
   };
 }
