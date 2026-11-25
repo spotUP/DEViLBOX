@@ -35,6 +35,42 @@ struct Open {
   long long left = 0;                      // output frames still to come
 };
 std::unique_ptr<Open> g_open;
+
+/* Engine::block renders a whole 16384-frame BLOCK (0.37 s) in one go, so Player would do all
+ * that work inside one 128-frame worklet call. This does the same steps as Engine::block (plug-in
+ * tempo latched at each BLOCK start, tick-length chunks) but at most PIECE frames at a time, and
+ * hands each piece to Player through its buffer so Player::frame still does the output step. */
+const int PIECE = 128;
+int g_blockPos = BLOCK;  // frames made in the current engine BLOCK
+
+void fill(Open& o) {
+  Player& p = *o.player;
+  Engine& e = *o.engine;
+  while (p.at == p.have && !p.done) {
+    if (g_blockPos == BLOCK) {
+      e.plugBpm = e.bpm;
+      e.plugFbpm = e.fbpm;
+      g_blockPos = 0;
+    }
+    if (e.remain <= 0) {
+      if (!e.startTicks()) { p.done = true; break; }
+      if (e.remain <= 0) continue;
+    }
+    int n = int(e.remain < BLOCK - g_blockPos ? e.remain : BLOCK - g_blockPos);
+    if (n > PIECE) n = PIECE;
+    e.remain -= n;
+    e.chunk(p.buf.data(), n);
+    g_blockPos += n;
+    p.have = n;
+    p.at = 0;
+  }
+}
+
+void pieceSource(void* user, int16_t* frame) {
+  Open& o = *static_cast<Open*>(user);
+  fill(o);
+  o.player->frame(frame);
+}
 std::string g_error;
 std::vector<int16_t> g_pcm;
 bool g_constants = false;
@@ -59,8 +95,9 @@ EMSCRIPTEN_KEEPALIVE int brt_open(const uint8_t* data, int size, int rate) {
   o->engine.reset(new Engine(*o->song, false));
   o->player.reset(new Player{o->engine.get()});
   o->left = o->total;
+  g_blockPos = BLOCK;
   if (rate != RATE) {
-    o->rs.reset(new Resampler(RATE, rate, source, o->player.get()));
+    o->rs.reset(new Resampler(RATE, rate, pieceSource, o.get()));
     o->left = (long long)((unsigned long long)o->total * (unsigned long long)rate / RATE);
   }
   g_open = std::move(o);
@@ -102,7 +139,7 @@ EMSCRIPTEN_KEEPALIVE int brt_render(float* out, int frames) {
   int got = 0;
   while (got < frames && o.left > 0) {
     if (o.rs) o.rs->frame(&g_pcm[2 * got]);
-    else o.player->frame(&g_pcm[2 * got]);
+    else pieceSource(&o, &g_pcm[2 * got]);
     ++got;
     --o.left;
   }

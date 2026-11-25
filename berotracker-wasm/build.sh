@@ -6,7 +6,9 @@ echo "=== BeRoTracker WASM Build ==="
 mkdir -p "$OUT_DIR"
 # Floating-point engine (single, double and x87 extended steps): no fast-math,
 # no FMA contraction (bbmp README). WASM takes the portable path (no x87): close, not bit-exact.
-FLAGS="-O2 -fno-fast-math -ffp-contract=off -fwrapv"
+# BRT_DOUBLE: X = double. WASM long double is software binary128, too slow for real time
+# (5 of 19 songs over 100% load at 48 kHz); owner accepted close, not bit-exact.
+FLAGS="-O2 -fno-fast-math -ffp-contract=off -fwrapv -DBRT_DOUBLE"
 em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
     -I"$SCRIPT_DIR/src" \
     "$SCRIPT_DIR/src/berotracker_wasm.cpp" \
