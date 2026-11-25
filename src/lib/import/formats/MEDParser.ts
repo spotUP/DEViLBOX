@@ -186,6 +186,29 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   const softwareMix   = (medFlags2 & 0x80) !== 0;
   const rowsPerBeat   = 1 + (medFlags2 & 0x1F);
 
+  // The grid names the note the player sounds: typed note + playtransp + the instrument's strans (MMD0Sample byte 7),
+  // and a plain sample at or above the fold point plays octaves lower (OpenMPT Load_med.cpp NoteMap fold: middle C + 24
+  // with hardware mixing, + 36 with the MIX flag; grid 49 / 61). Measured on the MMDC corpus against UADE's Paula
+  // periods (mmdcGridMatchesPlayer.test.ts). Synths and multi-octave IFF samples are not folded (OpenMPT: MMD0/1 synths
+  // never wrap; IFF octave sets map their own octaves).
+  // shortcut: multi-octave IFF and ext samples (type 1..7) keep the unfolded note; fold them when a corpus song needs it.
+  const foldAt = (isMMD1Plus && magic !== 'MMD1' && softwareMix) ? 61 : 49;
+  const noteInfo = Array.from({ length: MAX_INSTRUMENTS }, (_, i) => {
+    const ptr = sampleArrOffset > 0 && sampleArrOffset + i * 4 + 4 <= buf.length ? u32(buf, sampleArrOffset + i * 4) : 0;
+    const type = ptr > 0 && ptr + 6 <= buf.length ? s16(buf, ptr + 4) : 0;
+    return { strans: s8(buf, songOffset + i * INSTR_HDR_SIZE + 7), folds: type === 0 };
+  });
+  /** Grid note for a stored note number (1..127) on instrument inst. */
+  const heardNote = (rawNote: number, inst: number): number => {
+    const info = inst > 0 ? noteInfo[inst - 1] : undefined;
+    let n = rawNote + noteBaseTranspose + playTranspose + (info?.strans ?? 0);
+    if (info?.folds && n >= foldAt) n -= Math.floor((n - foldAt + 12) / 12) * 12;
+    return Math.max(1, n);
+  };
+  /** Stored note number that sounds grid note n on inst (unfolded: a note at or above the fold point stays as typed). */
+  const storedNote = (n: number, inst: number): number =>
+    n - noteBaseTranspose - playTranspose - (inst > 0 ? noteInfo[inst - 1]?.strans ?? 0 : 0);
+
   let computedBPM: number;
   if (bpmMode && !is8Ch) {
     computedBPM = defTempo < 7 ? 111.5 : (defTempo * rowsPerBeat) / 4.0;
@@ -229,6 +252,9 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   const trackerPatterns: Pattern[] = [];
   // Track per-pattern data offsets for uadePatternLayout
   const blockDataOffsets: Array<{ dataStart: number; nTracks: number; nLines: number }> = [];
+  // A note with no instrument plays on the channel's previous one (OpenMPT applies that instrument's NoteMap fold).
+  // shortcut: carried in file block order, not song order; walk the order list if a song starts a block on a bare note.
+  const lastInst: number[] = [];
 
   for (let patIdx = 0; patIdx < blockPtrs.length; patIdx++) {
     const bptr = blockPtrs[patIdx];
@@ -275,11 +301,12 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           inst    = buf[offset + 1];
           const rawEff1 = buf[offset + 2];
           const rawParm = buf[offset + 3];
+          if (inst > 0) lastInst[ch] = inst;
           if (rawNoteVal === 0x80) {
             note = 97; // note cut
           } else {
             const rawNote = rawNoteVal & 0x7F;
-            note = rawNote > 0 ? Math.max(1, rawNote + noteBaseTranspose + playTranspose) : 0;
+            note = rawNote > 0 ? heardNote(rawNote, inst || (lastInst[ch] ?? 0)) : 0;
           }
           // Apply effect mapping (same as MMD0 — MED effects need conversion)
           const mapped1 = mapMEDEffect(rawEff1, rawParm, tempoCtx);
@@ -299,7 +326,8 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           const rawNote = raw0 & 0x3F;
           inst = (raw1 >> 4) | ((raw0 & 0x80) >> 3) | ((raw0 & 0x40) >> 1);
           const rawEff = raw1 & 0x0F;
-          note = rawNote > 0 ? Math.max(1, rawNote + noteBaseTranspose + playTranspose) : 0;
+          if (inst > 0) lastInst[ch] = inst;
+          note = rawNote > 0 ? heardNote(rawNote, inst || (lastInst[ch] ?? 0)) : 0;
           const { effTyp: e, eff: ev } = mapMEDEffect(rawEff, raw2, tempoCtx);
           effTyp = e;
           eff = ev;
@@ -660,7 +688,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
             note = 97; // note cut
           } else {
             const rawNote = rawNoteVal & 0x7F;
-            note = rawNote > 0 ? Math.max(1, rawNote + noteBaseTranspose + playTranspose) : 0;
+            note = rawNote > 0 ? heardNote(rawNote, inst) : 0;
           }
           const mapped = mapMEDEffect(rawEff, rawParam, tempoCtx);
           return { note, instrument: inst, volume: 0, effTyp: mapped.effTyp, eff: mapped.eff, effTyp2: 0, eff2: 0 };
@@ -673,7 +701,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           const rawNote = raw0 & 0x3F;
           const inst = (raw1 >> 4) | ((raw0 & 0x80) >> 3) | ((raw0 & 0x40) >> 1);
           const rawEff = raw1 & 0x0F;
-          const note = rawNote > 0 ? Math.max(1, rawNote + noteBaseTranspose + playTranspose) : 0;
+          const note = rawNote > 0 ? heardNote(rawNote, inst) : 0;
           const mapped = mapMEDEffect(rawEff, raw2, tempoCtx);
           return { note, instrument: inst, volume: 0, effTyp: mapped.effTyp, eff: mapped.eff, effTyp2: 0, eff2: 0 };
         },
@@ -690,8 +718,14 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
     const raw = new Uint8Array(medBytesPerCell);
     if (stored) raw.set(stored.subarray(0, medBytesPerCell));
     const was = uadePatternLayout.decodeCell!(raw);
-    const noteRaw = (n: number) => n - noteBaseTranspose - playTranspose;
-    if (cell.note !== was.note) {
+    const noteRaw = (n: number) => storedNote(n, cell.instrument ?? 0);
+    // The grid note includes the instrument's strans, so a new instrument re-stores the note to keep the pitch heard.
+    // A bare note's grid value folded on the carried instrument, which the cell bytes cannot name: keep it if it is one of
+    // the stored note's readings.
+    const storedRaw = isMMD1Plus ? (raw[0] === 0x80 ? 0 : raw[0] & 0x7F) : raw[0] & 0x3F;
+    const bareKept = !was.instrument && !cell.instrument && storedRaw > 0 && cell.note > 0 && cell.note < 97
+      && noteInfo.some((_, i) => heardNote(storedRaw, i + 1) === cell.note);
+    if (!bareKept && (cell.note !== was.note || (cell.instrument !== was.instrument && cell.note > 0 && cell.note < 97))) {
       if (isMMD1Plus) raw[0] = cell.note === 97 ? 0x80 : cell.note > 0 ? Math.max(1, Math.min(0x7F, noteRaw(cell.note))) : 0;
       else raw[0] = (raw[0] & 0xC0) | (cell.note > 0 ? Math.max(1, Math.min(0x3F, noteRaw(cell.note))) : 0);
     }
