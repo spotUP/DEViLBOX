@@ -7,7 +7,7 @@
 // keyOnMatch = share of Furnace note starts (silent -> sounding, or a period jump >= 80 cents on a sounding tone channel) with a ROM start on the same channel
 // within 2 ticks (~30 ms). pitchMatch = share of ticks where both sound a tone (noise off) within 50 cents. volumeMatch = same ticks, control volume
 // within 1 step. DDA ticks (control bits 7+6: sample stream, period unused) are not tone ticks; ddaMatch = share of Furnace DDA ticks the ROM
-// also plays in DDA. pass = the ROM sounded and keyOnMatch and pitchMatch (and ddaMatch when Furnace uses DDA) are all at least 90 %. Needs Mesen2 and the Furnace CLI (FURNACE_CLI overrides).
+// also plays in DDA. pass = the ROM sounded and keyOnMatch and pitchMatch (when Furnace plays tone ticks; ddaMatch when it uses DDA) are all at least 90 %. Needs Mesen2 and the Furnace CLI (FURNACE_CLI overrides).
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -83,11 +83,13 @@ emu.addMemoryCallback(function(a,v) v=v&0xFF print(string.format("W 0 %d %d %d",
   const out = execFileSync(MESEN, ['--testRunner', `--timeout=${timeout}`, '--doNotSaveSettings', '--enableStdout', '--PcEngine.Port1.Type=PceController', path.join(dir, 'tap.lua'), path.join(dir, 'p.pce')],
     { encoding: 'utf8', timeout: timeout * 1000 + 30000, maxBuffer: 1 << 28 });
   if (!out.includes('DONE')) throw new Error(`Mesen2 run did not reach DONE: ${out.slice(-300)}`);
-  const raw = out.split('\n').filter((l) => l.startsWith('W ')).map((l) => { const [, , r, v, cy] = l.trim().split(' ').map(Number); return { tick: 0, reg: r, val: v, cy }; });
-  // tick = driver interrupt: the channel-select run 0 -> 1 that follows channel 5 (or the start). The XPCM timer interrupt also selects
-  // channels (its own, then the interrupted one back), so a bare "select 0" is not a frame boundary; "5, 0, 1" in the distinct select sequence is.
+  const raw: W[] = out.split('\n').filter((l) => l.startsWith('W ')).map((l) => { const [, , r, v, cy] = l.trim().split(' ').map(Number); return { tick: 0, reg: r, val: v, cy }; });
+  // tick = driver interrupt: a "5, 0, 1" run in the distinct channel-select sequence. The XPCM timer interrupt (_pcm_proc) writes
+  // "select c, DAC" per streaming channel, then restores the select; with ch0 + ch1 streaming that alone forms "5, 0, 1" at the
+  // timer rate, so selects followed by exactly one DAC write and another select are left out of the sequence.
+  const timerSel = (i: number) => raw[i].reg === 0 && raw[i + 1]?.reg === 6 && raw[i + 2]?.reg === 0;
   const sels: { i: number; v: number }[] = [];
-  raw.forEach((w, i) => { if (w.reg === 0 && sels[sels.length - 1]?.v !== (w.val & 7)) sels.push({ i, v: w.val & 7 }); });
+  raw.forEach((w, i) => { if (w.reg === 0 && !timerSel(i) && sels[sels.length - 1]?.v !== (w.val & 7)) sels.push({ i, v: w.val & 7 }); });
   const startAt = new Set<number>();
   sels.forEach((s, k) => { if (s.v === 0 && sels[k + 1]?.v === 1 && (k === 0 || sels[k - 1].v === 5)) startAt.add(s.i); });
   let g = 0;
@@ -99,7 +101,8 @@ emu.addMemoryCallback(function(a,v) v=v&0xFF print(string.format("W 0 %d %d %d",
 function states(ws: W[]): St[][] {
   const pan = new Array<number>(CH).fill(255), per = new Array<number>(CH).fill(0), ctl = new Array<number>(CH).fill(0), nz = new Array<number>(CH).fill(0);
   let sel = 0, i = 0;
-  const snap = () => Array.from({ length: CH }, (_, c) => ({ on: (ctl[c] & 0x80) !== 0 && (ctl[c] & 31) > 0, dda: (ctl[c] & 0xc0) === 0xc0, per: per[c], vol: ctl[c] & 31, noise: c >= 4 && (nz[c] & 0x80) !== 0, nfreq: nz[c] & 31, pan: pan[c] }));
+  // Noise wins over DDA on channels 5-6 (Furnace pce_psg.cpp: noisectrl & control & 0x80 outputs noise), so a noise tick is not a DDA tick.
+  const snap = () => Array.from({ length: CH }, (_, c) => ({ on: (ctl[c] & 0x80) !== 0 && (ctl[c] & 31) > 0, dda: (ctl[c] & 0xc0) === 0xc0 && !(c >= 4 && (nz[c] & 0x80) !== 0), per: per[c], vol: ctl[c] & 31, noise: c >= 4 && (nz[c] & 0x80) !== 0, nfreq: nz[c] & 31, pan: pan[c] }));
   const all: St[][] = [];
   const last = ws.length ? ws[ws.length - 1].tick : 0;
   for (let t = 0; t <= last; t++) {
@@ -121,13 +124,13 @@ function states(ws: W[]): St[][] {
 }
 
 /** Note starts: silent -> sounding, or a period jump of at least 80 cents in one tick on a sounding tone channel (a new note or an
- * arpeggio step; vibrato and slides move the period by a few cents per tick and are not starts). */
+ * arpeggio step; vibrato and slides move the period by a few cents per tick and are not starts). DDA ignores the period, so no jump there. */
 function starts(s: St[][]): Array<{ t: number; ch: number }> {
   const out: Array<{ t: number; ch: number }> = [];
   s.forEach((row, t) => row.forEach((c, ch) => {
     const p = s[t - 1]?.[ch];
     const jump = p?.per && c.per ? Math.abs(1200 * Math.log2(p.per / c.per)) : 0;
-    if (c.on && (!p?.on || (!c.noise && !p.noise && jump >= 80))) out.push({ t, ch });
+    if (c.on && (!p?.on || (!c.noise && !p.noise && !c.dda && !p.dda && jump >= 80))) out.push({ t, ch });
   }));
   return out;
 }
@@ -174,10 +177,11 @@ for (const file of walk(SONGS)) {
     const hits = wantStarts.map((w) => romStarts.some((g) => g.ch === w.ch && Math.abs(g.t - w.t) <= 2));
     const hit = hits.filter(Boolean).length;
     if (detail) wantStarts.forEach((w, i) => { if (!hits[i]) console.log(`  missed start tick ${w.t} ch${w.ch}${want[w.t][w.ch].noise ? ' (noise)' : ''}`); });
-    let tone = 0, inTune = 0, volOk = 0, volEq = 0, panOk = 0, dda = 0, ddaEq = 0;
+    let furTone = 0, tone = 0, inTune = 0, volOk = 0, volEq = 0, panOk = 0, dda = 0, ddaEq = 0;
     for (let t = 0; t < Math.min(want.length, got.length); t++) for (let ch = 0; ch < CH; ch++) {
       const a = want[t][ch], b = got[t][ch];
       if (a.on && a.dda) { dda++; if (b.on && b.dda) ddaEq++; }
+      if (a.on && !a.dda && !a.noise && a.per) furTone++;
       if (a.dda || b.dda) continue;
       if (!a.on || !b.on || a.noise || b.noise || !a.per || !b.per) continue;
       tone++;
@@ -201,10 +205,12 @@ for (const file of walk(SONGS)) {
     }
     v.noiseMatch = pct(nzEq, nz);
     if (dda) v.ddaMatch = pct(ddaEq, dda);
-    Object.assign(v, { furnaceStarts: wantStarts.length, keyOnMatch: pct(hit, wantStarts.length), pitchMatch: pct(inTune, tone), volumeMatch: pct(volOk, tone), volumeExact: pct(volEq, tone), panMatch: pct(panOk, tone) });
+    Object.assign(v, { furnaceStarts: wantStarts.length, keyOnMatch: pct(hit, wantStarts.length), });
+    // an all-DDA / all-noise song has no Furnace tone ticks: tone scores are not applicable, not 0
+    if (furTone) Object.assign(v, { pitchMatch: pct(inTune, tone), volumeMatch: pct(volOk, tone), volumeExact: pct(volEq, tone), panMatch: pct(panOk, tone) });
     const fw = heardWaves(furW), rw = heardWaves(romW);
     v.waveMatch = pct([...rw].filter((x) => fw.has(x)).length, rw.size); // waves the ROM plays that Furnace also plays (phase-free)
-    v.pass = romStarts.length > 0 && (v.keyOnMatch ?? 0) >= 90 && (v.pitchMatch ?? 0) >= 90 && (v.ddaMatch ?? 100) >= 90;
+    v.pass = romStarts.length > 0 && (v.keyOnMatch ?? 0) >= 90 && (furTone ? (v.pitchMatch ?? 0) : 100) >= 90 && (v.ddaMatch ?? 100) >= 90;
   } catch (e) {
     v = { inputHash, file: rel, pass: false, seconds: SECONDS, error: e instanceof Error ? e.message.split('\n')[0] : String(e) };
   } finally { rmSync(dir, { recursive: true, force: true }); }
