@@ -23,7 +23,7 @@ const FREQ_TABLE = 0x2d; // `_freq` sits after LL0's strings (25 bytes) and the 
 const NOISE_FREQ = [4, 13, 15, 18, 21, 23, 25, 27, 29, 31, 0, 2]; // Furnace pce.cpp noiseFreq (old noise layout)
 // HuSIC track commands (hmckc output / hus.c SEQ_xx)
 const XPCM = 0xef, SLUR = 0xe9, PORTA = 0xeb, PAN = 0xf0, WAVE = 0xf1, NOISE = 0xf2, WAIT = 0xf4, NOTE_ENV = 0xf7, PITCH_ENV = 0xf8, REST = 0xfc, VOLUME = 0xfd, WAVE_ENV = 0xfe, PAN_ENV = 0xe6, JUMP = 0xee;
-const HANDLED = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0f, 0x10, 0x11, 0x80, 0xec, 0xed]);
+const HANDLED = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0f, 0x10, 0x11, 0x80, 0xec, 0xed, 0xff]);
 
 interface Frames { vals: number[]; loop: number }
 // glide: a slurred note (no envelope reset, no key-on volume); with port, the driver then slides by port per frame.
@@ -98,6 +98,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   const s = m.subsongs[subsong];
   const tb1 = (s.timeBase ?? 0) + 1;
   const hz = s.hz > 0 ? s.hz : 60;
+  const delayBehavior = Number((m.compatFlags as Record<string, unknown> | undefined)?.delayBehavior ?? 2);
   const flag = (k: string) => Number((m.compatFlags as Record<string, unknown> | undefined)?.[k] ?? 0) > 0;
   const resetAtTarget = flag('targetResetsSlides');
   const linear = flag('linearPitch'), slideMul = Number((m.compatFlags as Record<string, unknown> | undefined)?.pitchSlideSpeed ?? 4) || 4;
@@ -107,9 +108,9 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     (cellAt(ch, o, r)?.effects ?? []).filter((e) => e.type >= 0).map((e) => ({ type: e.type, value: e.value < 0 ? 0 : e.value }));
 
   // 1. Linear row order with Furnace's speed / jump rules, until a row repeats (the loop point).
-  const rows: Array<{ o: number; r: number; tick: number; ticks: number }> = [];
+  const rows: Array<{ o: number; r: number; tick: number; ticks: number; speed: number }> = [];
   const seen = new Map<number, number>();
-  let o = 0, r = 0, tick = 0, speedIdx = 0, sp1 = s.speed1, sp2 = s.speed2, loopRow = 0;
+  let stopped = false, o = 0, r = 0, tick = 0, speedIdx = 0, sp1 = s.speed1, sp2 = s.speed2, loopRow = 0;
   // Virtual tempo (FDxx / FExx): Furnace adds N to an accumulator each engine tick and counts one row tick per D in it, so a row
   // of L row ticks lasts until the engine tick that brings the count to L. Effects inside a row (EDxx, ECxx, macros) stay on engine ticks.
   // Engine tick 0 already adds N once: its first row tick starts row 0, the rest count toward row 0.
@@ -126,7 +127,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     let jump = -1, brk = -1;
     for (let ch = 0; ch < CHANNELS; ch++) for (const { type: t, value: v } of fxOf(ch, o, r)) {
       if (t === 0x09 && v) sp1 = v; else if (t === 0x0f && v) sp2 = v; else if (t === 0x0b) jump = v; else if (t === 0x0d) brk = v;
-      else if (t === 0xfd && v) vtN = v; else if (t === 0xfe && v) vtD = v;
+      else if (t === 0xfd && v) vtN = v; else if (t === 0xfe && v) vtD = v; else if (t === 0xff) stopped = true;
     }
     const rowTicks = Math.max(1, (groove ? groove[speedIdx % groove.length] : speedIdx % 2 ? sp2 : sp1) * tb1);
     const start = tick;
@@ -134,15 +135,17 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     credit -= rowTicks;
     // shortcut: rows shorter than one engine tick (N > D * speed) keep one tick each; such songs drift.
     if (tick === start) tick++;
-    rows.push({ o, r, tick: start, ticks: tick - start });
+    rows.push({ o, r, tick: start, ticks: tick - start, speed: rowTicks });
     speedIdx++;
+    // FFxx: Furnace stops when this row's ticks run out (playback.cpp shallStopSched); the tracks then loop on one silent frame.
+    if (stopped) break;
     if (jump >= 0 || brk >= 0) { o = jump >= 0 ? jump : o + 1; r = brk >= 0 ? brk : 0; }
     else if (++r >= s.patLen) { r = 0; o++; }
     if (o >= s.ordersLen) o = 0;
     if (r >= s.patLen) r = 0;
   }
   const frameOf = (t: number) => Math.round((t * FRAME_HZ) / hz);
-  const endFrame = frameOf(tick), loopFrame = frameOf(rows[loopRow]?.tick ?? 0);
+  const endFrame = frameOf(tick) + (stopped ? 1 : 0), loopFrame = stopped ? frameOf(tick) : frameOf(rows[loopRow]?.tick ?? 0);
   if (Math.abs(hz - FRAME_HZ) > 0.01) lossy.add(`tick rate ${hz} Hz quantized to 60 Hz frames`);
 
   // 2. Pitch: the driver's note byte (octave << 4 | semitone) whose period is closest to Furnace's.
@@ -279,6 +282,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   for (let ch = 0; ch < CHANNELS; ch++) {
     const evs: Ev[] = [{ frame: 0, kind: 'off', cmds: [] }];
     if (loopFrame > 0) evs.push({ frame: loopFrame, kind: 'mark', cmds: [] });
+    if (stopped) evs.push({ frame: loopFrame, kind: 'off', cmds: [] });
     let ins = -1, chanVol = 31, noteFrame = 0, arpFx = 0, waveFx = 0, noiseFx = false;
     // Furnace volume slide (0Axy, playback.cpp): volume is kept << 8, volSpeed = x*64 up / -y*64 down per tick.
     let volFine = 31 << 8, volSpeed = 0;
@@ -326,7 +330,9 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         else if (t === 0xe5) pitchFx = v - 0x80;
         else if ((t === 0xe1 || t === 0xe2) && v & 15) { e12Semis = (t === 0xe1 ? 1 : -1) * (v & 15); e12Speed = (v >> 4) * 4; }
         else if (t === 0x0a) volSpeed = !v ? 0 : v & 15 ? -(v & 15) * 64 : (v >> 4) * 64;
-        else if (t === 0xed) delay = Math.min(v, row.ticks - 1);
+        // EDxx counts engine ticks; Furnace tests it against the row speed (row ticks), not the row's engine length (playback.cpp delayBehavior).
+        // shortcut: a lax delay past the row end is held at the next row start; split the note across rows if a song needs more.
+        else if (t === 0xed && (delayBehavior === 2 || (delayBehavior === 1 ? v <= row.speed : v < row.speed))) delay = Math.min(v, row.ticks);
         else if (t === 0xec) cut = v;
         else if (!HANDLED.has(t)) lossy.add(`effect ${t.toString(16).toUpperCase().padStart(2, '0')}xx`);
       }

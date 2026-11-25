@@ -2019,12 +2019,21 @@ LL90:
 	__andwi	31
 	__orws
 	  call	_poke.2
+; DEViLBOX: a slurred noise key-on keeps the volume envelope running (no set_vol), as the tone path does
+	__ldwi	_ch_efx
+	__addw_s	10
+	__ldb_p
+	__andwi	1
+	__notw
+	__tstw
+	__lbeq	LLN1
 	__ldw_s	10
 	__pushw
 	__ldwi	_ch_vol
 	__addw_s	12
 	__ldb_p
 	  call	_set_vol
+LLN1:
 ; DEViLBOX: a noise key-on clears the slur flag too (the tone path does at LL96); else one slurred
 ; noise note leaves EFX_SLAR set and every later key-on on the channel skips its envelope resets.
 	__ldwi	_ch_efx

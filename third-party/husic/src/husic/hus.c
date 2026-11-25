@@ -899,7 +899,9 @@ endpoint:
         noise_freq[ch - 4] = sd & 0x1F;
         poke(SND_NOI, 0x80 | sd & 0x1F);
 
-        set_vol(ch, ch_vol[ch]);
+        /* DEViLBOX: a slurred noise note keeps its volume envelope running, as the tone path does */
+        if (!(ch_efx[ch] & EFX_SLAR))
+            set_vol(ch, ch_vol[ch]);
 
         /* DEViLBOX: clear the slur flag here too, as the tone path does below */
         ch_efx[ch] &= ~(EFX_SLAR);
