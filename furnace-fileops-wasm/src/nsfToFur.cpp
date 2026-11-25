@@ -73,42 +73,48 @@ bool hzToNote(double f, int& note, int& fine) {
   return true;
 }
 
-// Furnace's 2A03/MMC5 period for a linear-pitch offset (note*128+fine): DivPitchTable
-// (engine/pitchTable.cpp, tuning 440, clock COLOR_NTSC/2, divider 16, max 0x800) then
-// freq-- (platform/nes.cpp). Furnace interpolates the period linearly inside a semitone
+// Furnace's period register for a linear-pitch offset (note*128+fine): DivPitchTable
+// (engine/pitchTable.cpp, tuning 440, clock COLOR_NTSC/2) then freq--; 2A03/MMC5 divider 16 max 0x800
+// (platform/nes.cpp), VRC6 pulse divider 16 / saw 14, max 0x1000 (platform/vrc6.cpp). Furnace interpolates the period linearly inside a semitone
 // from rounded per-semitone roots, so a continuous log2 fine misses by one step.
 struct FurPeriodTable {
-  int pitch[13], diff[12], shift = 0;
-  FurPeriodTable() {
+  int pitch[13], diff[12], shift = 0, maxF;
+  FurPeriodTable(double div, int mx): maxF(mx) {
     const double clock = 315000000.0 / 88.0 / 2.0, tun = 440.0 * 0.0625;
-    auto bf = [&](int nbase) { return (int)std::lround((clock / (tun * std::pow(2.0, (double)(float)(nbase + 3) / 12.0))) / 16.0); };
-    while (shift < 14 && bf((shift - 4) * 12) > 0x800) shift++;
+    auto bf = [&](int nbase) { return (int)std::lround((clock / (tun * std::pow(2.0, (double)(float)(nbase + 3) / 12.0))) / div); };
+    while (shift < 14 && bf((shift - 4) * 12) > maxF) shift++;
     for (int i = 0; i <= 12; i++) pitch[i] = bf(i + (shift - 5) * 12);
     for (int i = 0; i < 12; i++) diff[i] = pitch[i + 1] - pitch[i];
   }
   static int shr(int v, int o) { const bool c = v & (1 << (o - 1)); v >>= o; return c ? v + 1 : v; }
   int reg(int off) const {
     const int coarse = std::max(0, off >> 7), fine = off & 127, oct = coarse / 12 - shift;
-    if (oct < 0) return 0x7ff;
+    if (oct < 0) return maxF - 1;
     int root = pitch[coarse % 12], d = diff[coarse % 12];
     if (oct > 0) { root = shr(root, oct); d = shr(d, oct); }
-    return std::clamp(root + ((d * fine) >> 7) - 1, 0, 0x7ff);
+    return std::clamp(root + ((d * fine) >> 7) - 1, 0, maxF - 1);
   }
 };
 
-const FurPeriodTable& furPeriods() { static const FurPeriodTable t; return t; }
+const FurPeriodTable& furPeriods() { static const FurPeriodTable t(16.0, 0x800); return t; }
+const FurPeriodTable& vrc6Periods(bool saw) {
+  static const FurPeriodTable sq(16.0, 0x1000), sw(14.0, 0x1000);
+  return saw ? sw : sq;
+}
 // Non-linear pitch (compatFlags.linearPitch 0): register = getBase(note) - pitch - pitch2, then freq--
 // (pitchTable.cpp DivPitchTable::get/getBase, platform/nes.cpp), so the semitone root is reg(note*128).
 int noteReg(int note) { return furPeriods().reg(std::max(0, note) * 128); }
 
-// Note and fine whose Furnace 2A03/MMC5 period register equals p (nearest to the log2 estimate).
-bool periodToNote(int p, int& note, int& fine) {
-  const FurPeriodTable& t = furPeriods();
-  if (!hzToNote(kCpu / (16.0 * (p + 1)), note, fine)) return false;
+// Note and fine whose Furnace period register (table t, clock divider div) is nearest to p, then nearest
+// to the log2 estimate. Low notes skip registers (a semitone spans more than 128 steps), so exact can miss.
+bool periodToNote(int p, int& note, int& fine, const FurPeriodTable& t = furPeriods(), double div = 16.0) {
+  if (!hzToNote(kCpu / (div * (p + 1)), note, fine)) return false;
   const int est = note * 128 + fine;
-  int best = est, bestD = 1 << 30;
-  for (int off = std::max(0, est - 256); off <= est + 256; off++)
-    if (t.reg(off) == p && std::abs(off - est) < bestD) { bestD = std::abs(off - est); best = off; }
+  int best = est, bestE = 1 << 30, bestD = 1 << 30;
+  for (int off = std::max(0, est - 256); off <= est + 256; off++) {
+    const int e = std::abs(t.reg(off) - p), d = std::abs(off - est);
+    if (e < bestE || (e == bestE && d < bestD)) { bestE = e; bestD = d; best = off; }
+  }
   note = (best + 64) >> 7; fine = best - note * 128;
   return note >= 0 && note <= 179;
 }
@@ -213,7 +219,7 @@ V voice(Builder& b, const Chan& ch, const uint16_t* o, const uint16_t* prev, int
       const bool saw = ch.kind == K_VRC6_SAW;
       const int vol = saw ? (s[0] & 63) : (s[0] & 15);
       if (!(s[2] & 0x80) || !vol || s[3] < 2) break;
-      if (!hzToNote(kCpu / ((saw ? 14.0 : 16.0) * s[3]), v.note, v.fine)) break;
+      if (!periodToNote(s[3] - 1, v.note, v.fine, vrc6Periods(saw), saw ? 14.0 : 16.0)) break; // s[3] = GME period() = reg + 1
       v.on = true; v.vol = vol;
       if (saw) insOut = b.ins("VRC6 saw", [](DivInstrument& i) { i.type = DIV_INS_VRC6_SAW; i.name = "VRC6 saw"; });
       else { insOut = pulseIns(b, "VRC6", DIV_INS_VRC6); v.duty = (s[0] >> 4) & 7; }
