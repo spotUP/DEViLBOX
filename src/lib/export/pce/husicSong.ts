@@ -11,6 +11,7 @@ import type { FurnaceInstrument, FurnaceMacro } from '../../import/formats/furna
 import { convertFurnaceNoteValue } from '../../import/formats/furnace/FurnacePatternParser';
 import { Lossy } from '../md/mdsSong';
 import { expandProcMacro } from '../nes/famistudioSong';
+import { furnaceSamplePcm } from '../../furnace/furnaceSampleDecode';
 
 /** dataBank/dataStart/dataEnd: free tail of the HuC data bank (MPR3, $6000-$7FFF), measured by tools/build-pce-player.sh. */
 export interface HusicLayout { soundDat: number; songEnd: number; ll0: number; constBank: number; firstFreeBank: number; dataBank: number; dataStart: number; dataEnd: number }
@@ -196,17 +197,20 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     if (!smp || smp.length < 2) return -1;
     const rate = (smp.c4Rate || smp.compatRate || 8363) * 2 ** (((nm ? nm.freq : abs) - 60) / 12);
     const step = rate / XPCM_HZ, n = Math.max(2, Math.min(XPCM_MAX, Math.round(smp.length / step)) & ~1);
-    const key = `${nm ? nm.map : a?.initSample}:${n}`;
+    // Pitch is part of the key: n clamps at XPCM_MAX, so two pitches of one long sample would share n.
+    const key = `${nm ? nm.map : a?.initSample}:${step}`;
     const known = xpcmKeys.get(key);
     if (known !== undefined) return known;
     if (xpcm.length >= 0xe0) { lossy.add('more than 224 sample/pitch pairs (sample played as a wavetable tone)'); return -1; }
     if (Math.round(smp.length / step) > XPCM_MAX) lossy.add('sample longer than one 8 KB bank (cut at 2.3 s)');
     if (smp.loop) lossy.add('looping sample played once');
-    const d = smp.data, scale = d instanceof Int16Array ? 32768 : 128, bias = d instanceof Uint8Array ? 128 : 0;
+    const d = furnaceSamplePcm(smp);
+    if (!d) { lossy.add(`sample depth ${smp.depth} not decoded (sample played as a wavetable tone)`); return -1; }
+    const scale = d instanceof Int16Array ? 32768 : 128;
     const nib = (i: number) => {
       const from = Math.floor(i * step), to = Math.max(from + 1, Math.floor((i + 1) * step));
       let sum = 0;
-      for (let k = from; k < to; k++) sum += ((d[Math.min(k, d.length - 1)] - bias) / scale);
+      for (let k = from; k < to; k++) sum += d[Math.min(k, d.length - 1)] / scale;
       return Math.max(0, Math.min(15, Math.round(((sum / (to - from)) + 1) * 7.5)));
     };
     const bytes = new Uint8Array(n >> 1);
@@ -284,6 +288,9 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     if (loopFrame > 0) evs.push({ frame: loopFrame, kind: 'mark', cmds: [] });
     if (stopped) evs.push({ frame: loopFrame, kind: 'off', cmds: [] });
     let ins = -1, chanVol = 31, noteFrame = 0, arpFx = 0, waveFx = 0, noiseFx = false;
+    // Furnace pce.cpp chan.noise: set by 11xx or a duty macro, kept until one of them changes it (a new instrument without a duty macro keeps it).
+    let noiseHeld = false;
+    const noiseStart = (insIdx: number) => { const df = framesOf(insIdx, MACRO_DUTY, 'noise'); return ch >= 4 && (noiseFx || (df ? frameAt(df, 0) > 0 : noiseHeld)); };
     // Furnace volume slide (0Axy, playback.cpp): volume is kept << 8, volSpeed = x*64 up / -y*64 down per tick.
     let volFine = 31 << 8, volSpeed = 0;
     // Tone portamento (03xx): Furnace slides baseFreq by speed per tick (linear pitch: speed*pitchSlideSpeed / 128
@@ -320,7 +327,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         if (t === 0x08) cmds.push(PAN, v);
         else if (t === 0x80) cmds.push(PAN, linearPan(v));
         else if (t === 0x10) { waveFx = v; if (!framesOf(Math.max(0, ins), MACRO_WAVE, 'wave')) cmds.push(WAVE, v); }
-        else if (t === 0x11) { if (ch >= 4) noiseFx = v > 0; else lossy.add('noise effect on channels 1-4'); }
+        else if (t === 0x11) { if (ch >= 4) noiseHeld = noiseFx = v > 0; else lossy.add('noise effect on channels 1-4'); }
         else if (t === 0x00) arpFx = v;
         else if (t === 0x03) { porta = v; portaSet = true; portaDone = -1; }
         else if (t === 0x01 || t === 0x02) { slide = (t === 0x01 ? 1 : -1) * v * pmul; slideTo = undefined; slideSet = true; }
@@ -352,14 +359,15 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         evs.push(snap);
         glideFrom = curNv; glideTo = nv; glideStart = at; curNv = nv;
         if (resetAtTarget) portaDone = fa;
-      } else if (nv >= 0 && nv < 253 && xpcmIndex(Math.max(0, ins), nv) >= 0) {
+      } else if (nv >= 0 && nv < 253 && !noiseStart(Math.max(0, ins)) && xpcmIndex(Math.max(0, ins), nv) >= 0) {
         // Furnace pce.cpp: an Amiga-type or useSample instrument plays its sample through DDA; the driver streams it as XPCM ($EF 01).
+        // With noise on (channels 5-6) the HuC6280 outputs noise over DDA (pce_psg.cpp), so that note takes the tone path below.
         curNv = nv; toneOn = false; noteFrame = at; noteTick = delay;
         evs.push({ frame: at, kind: 'note', cmds, note: xpcmIndex(Math.max(0, ins), nv), dda: true, vol: volCode(Math.max(0, ins), chanVol) });
       } else if (nv >= 0 && nv < 253) {
         curNv = nv; toneOn = !(ch >= 4 && noiseFx); noteFrame = at;
         const insIdx = Math.max(0, ins);
-        if (isSampleIns(m.instruments[insIdx])) lossy.add('sample instrument without a usable sample played as a wavetable tone');
+        if (isSampleIns(m.instruments[insIdx]) && !noiseStart(insIdx)) lossy.add('sample instrument without a usable sample played as a wavetable tone');
         const wf = framesOf(insIdx, MACRO_WAVE, 'wave');
         const wave = wf && new Set(wf.vals).size > 1 ? -1 - waveEnv.level(wf) : wf ? wf.vals[0] : waveFx;
         const af0 = arpFrames(insIdx, arpFx);
@@ -367,7 +375,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         const pf = framesOf(insIdx, MACRO_PITCH, 'pitch'), rel = !!macroOf(m.instruments[insIdx], MACRO_PITCH)?.mode;
         // Noise mode per frame (duty macro on channels 5-6). Each switch is a slurred note (volume envelope runs on) that
         // sets the mode and restarts the arp / pitch envelopes at that frame of the macro.
-        const noiseAt = (f: number) => ch >= 4 && (noiseFx || (df ? frameAt(df, f) > 0 : false));
+        const noiseAt = (f: number) => ch >= 4 && (noiseFx || (df ? frameAt(df, f) > 0 : noiseHeld));
         const segEnd = df && new Set(df.vals).size > 1 ? (df.loop >= 0 ? 64 : df.vals.length) : 1;
         if (df && df.loop >= 0 && new Set(df.vals.slice(df.loop)).size > 1) lossy.add('looping noise mode switch in a duty macro (stops after 64 frames)');
         let owner: Ev | undefined;
@@ -390,6 +398,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
           evs.push(ev);
           pend.push({ ev, tick: row.tick + delay, f0, nv, af: arpOn ? af0 : undefined, pf, rel, noise, arpOn });
         }
+        if (df) noiseHeld = noiseAt(df.loop >= 0 ? df.loop : df.vals.length - 1);
         noteTick = delay;
       } else if (nv === 253) { dropSnap(at); toneOn = false; evs.push({ frame: at, kind: 'off', cmds }); }
       else if (cmds.length || volChanged) evs.push({ frame: at, kind: 'cont', cmds, vol: volChanged ? volCode(Math.max(0, ins), chanVol, Math.max(0, at - noteFrame)) : undefined });

@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseFurnaceSong } from '../../../import/formats/FurnaceSongParser';
 import { furnaceToHusic, type HusicLayout } from '../husicSong';
+import { furnaceSamplePcm } from '../../../furnace/furnaceSampleDecode';
 
 const root = join(__dirname, '../../../../..');
 const player = readFileSync(join(root, 'public/pce/player.pce'));
@@ -33,5 +34,17 @@ describe('PCE sample instruments (XPCM)', () => {
   it('does not add sample banks on a wavetable-only song', async () => {
     const r = furnaceToHusic(await load('pcengineasdmo.fur'), 0, player, layout);
     expect(r.lossy.some((l) => l.startsWith(SAMPLE))).toBe(false);
+  });
+  it('decodes ADPCM-B / QSound ADPCM samples to PCM over their whole length (Contest thing 2025)', async () => {
+    // FurnaceSongParser keeps codec bytes (length/2); read as PCM the second half was one clamped value: ROM ch2 silent from tick ~210.
+    const m = await load('Contest thing 2025.fur');
+    for (const i of [2, 4, 5]) {
+      const smp = m.samples[i], pcm = furnaceSamplePcm(smp);
+      expect([4, 6]).toContain(smp.depth);
+      expect(pcm?.length).toBe(smp.length);
+      expect(new Set(pcm!.slice(pcm!.length >> 1)).size).toBeGreaterThan(100);
+    }
+    const r = furnaceToHusic(m, 0, player, layout);
+    expect(r.lossy.some((l) => l.startsWith('sample depth') || l.startsWith(SAMPLE))).toBe(false);
   });
 });
