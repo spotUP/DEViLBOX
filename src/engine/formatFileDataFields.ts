@@ -99,6 +99,7 @@ export const FILE_DATA_FIELDS = [
   'actionamicsFileData',
   'monotoneFileData',
   'kdmFileData',
+  'pieceFileData',
   'jxsFileData',
   'buzFileData',
   'activisionProFileData',

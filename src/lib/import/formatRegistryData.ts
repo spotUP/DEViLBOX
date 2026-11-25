@@ -2026,6 +2026,17 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     nativeParser: { module: '@lib/import/formats/PiyoPiyoParser', parseFn: 'parsePiyoPiyoFile', detectFn: 'isPiyoPiyoFormat' },
   },
   {
+    key: 'piece',
+    label: 'P/ECE music driver',
+    description: 'Aquaplus P/ECE music driver (.pmd, compiled MML command bytes) - own WASM player (bbmp piece). `.pmd` is shared with PC-98 PMD and PiyoPiyo; detectFormatFromContent and the import dispatch pick it by its header pointers.',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.pmd$/i,
+    nativeOnly: true,
+    customDispatch: true,
+    nativeParser: { module: '@lib/import/formats/PieceParser', parseFn: 'parsePieceFile', detectFn: 'isPieceFormat' },
+  },
+  {
     key: 'stoneTracker',
     label: 'StoneTracker',
     description: "StoneTracker (.spm + .sps sample bank, 'SPM' magic) — the authors' player on a 68020 core in wasm",

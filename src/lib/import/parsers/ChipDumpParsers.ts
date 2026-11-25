@@ -135,6 +135,16 @@ export async function tryChipDumpParse(
     if (isPiyoPiyoFormat(new Uint8Array(buffer))) return parsePiyoPiyoFile(buffer, originalFileName);
   }
 
+  // ── P/ECE music driver — Aquaplus .pmd (header pointer check), before PC-98 PMD claims the extension ──
+  if (/\.pmd$/.test(filename)) {
+    const { isPieceFormat, parsePieceFile } = await import('@lib/import/formats/PieceParser');
+    const bytes = new Uint8Array(buffer);
+    if (isPieceFormat(bytes)) {
+      const song = parsePieceFile(bytes, originalFileName);
+      if (song) return song;
+    }
+  }
+
   // ── TFM Music Maker — ZX Spectrum TurboFM .tfe (2x YM2203), TFMEngine plays the file ──
   if (/\.tfe$/.test(filename)) {
     const { parseTfmMusicMakerFile } = await import('@lib/import/formats/TFMMusicMakerParser');

@@ -11,6 +11,7 @@
 import { isGoatTrackerSong } from './formats/GoatTrackerDetect';
 import { isSunTronicV13Format } from './formats/SunTronicV13';
 import { hasMonotoneSignature } from './formats/monotoneGrid';
+import { isPieceFormat } from './formats/PieceParser';
 import { FORMAT_REGISTRY, type FormatDefinition } from './formatRegistryData';
 import { detectFormat } from './formatFilenameMatcher';
 
@@ -103,6 +104,8 @@ export function detectFormatFromContent(filename: string, bytes: Uint8Array): Fo
     case 'pmd':
       // Studio Pixel PiyoPiyo starts 'PMD'; PC-98 PMD98 files start with a version byte.
       if (ascii(0, 'PMD')) return byKey('piyoPiyo');
+      // P/ECE music driver: byte 0 = 0, part count, every header pointer inside the file (before PC-98 PMD).
+      if (isPieceFormat(bytes)) return byKey('piece');
       break;
     default:
       break;
