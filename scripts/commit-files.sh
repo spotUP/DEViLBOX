@@ -30,11 +30,15 @@ export GIT_INDEX_FILE="$tmp_dir/index"
 
 for attempt in $(seq 1 30); do
   base=$(git rev-parse HEAD)
-  git read-tree "$base"
+  # Seed from the real index so the stat cache survives: a bare read-tree makes
+  # the commit rehash every tracked file (13+ min with the virus scanner on).
+  cp "$(git rev-parse --git-dir)/index" "$GIT_INDEX_FILE"
+  git reset -q "$base" -- .
   git add -- "${files[@]}"
 
   # Every changed path must be one of the named files (or under a named dir).
-  unexpected=$(git diff --cached --name-only "$base" | while read -r path; do
+  # quotePath=false: non-ASCII paths come out raw, not octal-quoted, so they match the named files.
+  unexpected=$(git -c core.quotePath=false diff --cached --name-only "$base" | while IFS= read -r path; do
     ok=0
     for f in "${files[@]}"; do
       case "$path" in "${f%/}"|"${f%/}"/*) ok=1; break ;; esac
