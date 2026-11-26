@@ -19,6 +19,12 @@ def writes_tap(path):
 
 def writes_vgm(path):
     b = open(path, 'rb').read(); p = 0x34 + struct.unpack_from('<I', b, 0x34)[0]; s = 0
+    # Per stream: freq (0x92), sample frames left in the playing pass, and the VGM sample time they were counted at. Furnace ends the
+    # first pass of a looping sample with a 0x93 at the loop start (vgmOps.cpp "insert loop", flags 0x81); that is no new note.
+    blocks = []; freq = {}; left = {}; at = {}
+    def settle(i):
+        if i in left: left[i] -= (s - at[i]) * freq.get(i, 0) / 44100
+        at[i] = s
     LEN = {0x4F: 1, 0x90: 4, 0x91: 4, 0x92: 5, 0x93: 10, 0x94: 1, 0x95: 4, 0xE0: 4}
     while p < len(b):
         c = b[p]; p += 1
@@ -28,10 +34,20 @@ def writes_vgm(path):
         elif c == 0x62: s += 735
         elif c == 0x63: s += 882
         elif c == 0x66: return
-        elif c == 0x67: p += 6 + struct.unpack_from('<I', b, p + 2)[0]
+        elif c == 0x67:
+            if b[p + 1] == 0: blocks.append(struct.unpack_from('<I', b, p + 2)[0])  # one YM2612 PCM block per sample, block id = index
+            p += 6 + struct.unpack_from('<I', b, p + 2)[0]
+        elif c == 0x92: settle(b[p]); freq[b[p]] = struct.unpack_from('<I', b, p + 1)[0]; p += 5
+        elif c == 0x93:
+            i = b[p]; settle(i); loop = b[p + 5] == 0x81 and i in left and abs(left[i]) <= 1 + freq.get(i, 0) * 0.002
+            left[i] = struct.unpack_from('<I', b, p + 6)[0]; p += 10
+            if not loop: yield s / 44100, 'pcm', c, 0  # DAC stream start with offset (90xx-92xx sample offset)
+        elif c == 0x95:
+            i = b[p]; blk = struct.unpack_from('<H', b, p + 1)[0]; settle(i); left[i] = blocks[blk] if blk < len(blocks) else 0; p += 4
+            yield s / 44100, 'pcm', c, blk  # DAC stream start, block id
+        elif c == 0x94: left.pop(b[p], None); p += 1
         elif 0x70 <= c <= 0x7F: s += c - 0x6F
         elif 0x80 <= c <= 0x8F: s += c - 0x80
-        elif c in (0x93, 0x95): yield s / 44100, 'pcm', c, b[p + 1] if c == 0x95 else 0; p += LEN[c]  # DAC stream start
         elif c in LEN: p += LEN[c]
         else: raise SystemExit(f'vgm command {c:02x} at {p - 1:x}')
 
