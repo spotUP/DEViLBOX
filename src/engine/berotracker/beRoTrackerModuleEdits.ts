@@ -2,8 +2,7 @@
  * Grid edits for a BeRoTracker song: each cell is encoded to its stored Cell bytes in C++
  * (brt_encode_cell) and poked into the running engine's decoded cells, heard when that row next
  * plays. Two pokes a cell (note..vol, fx..param) so the stored pan/filter bytes stay.
- * shortcut: the song file is not rewritten (PATT is RLE-coded and aPLib-packed), so save and
- * export do not carry edits; upgrade with a C++ PATT packer.
+ * Save/export rebuild the file from the grid (BeRoTrackerExporter, C++ brt_export_*).
  */
 import type { TrackerSong } from '../TrackerReplayer';
 import type { LiveCellEdit } from '../replayer/liveCellEdits';

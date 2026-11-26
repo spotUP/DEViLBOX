@@ -210,6 +210,7 @@ const NATIVE_FORMAT_LABELS: Record<string, string> = {
   piyoPiyo: 'PiyoPiyo (.pmd)',
   buz: 'Buzzic (.buz / .buz2)',
   t0ast: 'T0AST (.t0ast)',
+  beRoTracker: 'BeRoTracker (.brt)',
 };
 
 /** Human label of the matched non-Amiga exporter for the song (live song when null), or null for the Amiga text. */
@@ -342,6 +343,9 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
   // T0AST: its song file (with the grid's edits and order list) is the export.
   { id: 't0ast', matches: (s) => songIds(s).format === 'T0AST' && !!s.t0astFileData,
     run: async (s) => { const { exportT0ast } = await import('./T0astExporter'); return exportT0ast(s); } },
+  // BeRoTracker: its song file (with the grid's edits and order list) is the export.
+  { id: 'beRoTracker', matches: (s) => songIds(s).format === 'BeRoTracker' && !!s.beRoTrackerFileData,
+    run: async (s) => { const { exportBeRoTracker } = await import('./BeRoTrackerExporter'); return exportBeRoTracker(s); } },
   // P/ECE music driver: its song file (edits written in as made) is the export.
   { id: 'piece', matches: (s) => songIds(s).format === 'PIECE' && !!s.pieceFileData,
     run: async (s) => { const { exportPiece } = await import('./PieceExporter'); return exportPiece(s); } },

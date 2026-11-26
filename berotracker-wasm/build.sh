@@ -22,7 +22,7 @@ em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
 em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
     -I"$SCRIPT_DIR/src" \
     "$SCRIPT_DIR/src/berotracker_wasm.cpp" \
-    -sEXPORTED_FUNCTIONS="['_brt_grid_open','_brt_grid_channels','_brt_grid_speed','_brt_grid_bpm','_brt_grid_order_length','_brt_grid_order','_brt_grid_pattern_rows','_brt_grid_pattern','_brt_grid_close','_brt_play_pattern','_brt_play_pattern_index','_brt_pattern_rows','_brt_encode_cell','_brt_open','_brt_error','_brt_position','_brt_cell_size','_brt_poke','_brt_render','_brt_close','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_brt_grid_open','_brt_grid_channels','_brt_grid_speed','_brt_grid_bpm','_brt_grid_order_length','_brt_grid_order','_brt_grid_pattern_rows','_brt_grid_pattern','_brt_grid_close','_brt_play_pattern','_brt_play_pattern_index','_brt_pattern_rows','_brt_encode_cell','_brt_export_open','_brt_export_cell','_brt_export_order','_brt_export_build','_brt_export_size','_brt_export_close','_brt_open','_brt_error','_brt_position','_brt_cell_size','_brt_poke','_brt_render','_brt_close','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['HEAPU8','HEAP32','HEAPF32','UTF8ToString']" \
     -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createBeRoTrackerEdit -sENVIRONMENT=web,worker,node \
     -sALLOW_MEMORY_GROWTH=1 -sINVOKE_RUN=0 -o "$OUT_DIR/BeRoTrackerEdit.js"

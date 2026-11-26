@@ -162,6 +162,27 @@ std::unique_ptr<Song> g_grid;
 std::vector<int32_t> g_gridOut;
 uint8_t g_cellOut[sizeof(Cell)];
 
+/* The order list as the grid shows it: positions up to the 255 end mark (advanceRow stops there);
+ * a skip marker (240..254) shows the pattern advanceRow moves on to, so order index = curOrder. */
+std::vector<uint8_t> orderView(const Song& s) {
+  std::vector<uint8_t> v;
+  for (int k = 0; k <= s.orderCount && k < 257 && s.order[k] != 255; ++k) {
+    uint8_t p = 0;
+    for (int i = k; i < 257 && s.order[i] != 255; ++i)
+      if (s.order[i] < 240) { p = s.order[i]; break; }
+    v.push_back(p);
+  }
+  return v;
+}
+
+void gridCell(const Cell& x, int32_t* o) {
+  o[0] = (x.note == 254 || x.note == 255) ? 97 : (x.note <= 120 ? x.note : 0);
+  o[1] = x.ins;
+  o[2] = (x.volcmd == 1 && x.vol <= 64) ? 0x10 + x.vol : 0;
+  o[3] = x.fx;
+  o[4] = x.param;
+}
+
 int32_t* gridPattern(const Song* song, int p) {
   g_gridOut.clear();
   if (!song || p < 0 || p >= 240 || !song->pat[p].present) { g_gridOut.resize(7); return g_gridOut.data(); }
@@ -171,12 +192,7 @@ int32_t* gridPattern(const Song* song, int p) {
   for (int c = 0; c < ch; ++c)
     for (int r = 0; r < pt.rows; ++r) {
       const Cell& x = pt.cells[size_t(c) * size_t(pt.rows) + size_t(r)];
-      int32_t* o = g_gridOut.data() + (size_t(r) * size_t(ch) + size_t(c)) * 7;
-      o[0] = (x.note == 254 || x.note == 255) ? 97 : (x.note <= 120 ? x.note : 0);
-      o[1] = x.ins;
-      o[2] = (x.volcmd == 1 && x.vol <= 64) ? 0x10 + x.vol : 0;
-      o[3] = x.fx;
-      o[4] = x.param;
+      gridCell(x, g_gridOut.data() + (size_t(r) * size_t(ch) + size_t(c)) * 7);
     }
   return g_gridOut.data();
 }
@@ -193,22 +209,11 @@ EMSCRIPTEN_KEEPALIVE int brt_grid_open(const uint8_t* data, int size) {
 EMSCRIPTEN_KEEPALIVE int brt_grid_channels(void) { return g_grid ? g_grid->channels : 0; }
 EMSCRIPTEN_KEEPALIVE int brt_grid_speed(void) { return g_grid ? (g_grid->speed < 1 ? 1 : g_grid->speed) : 6; }
 EMSCRIPTEN_KEEPALIVE int brt_grid_bpm(void) { return g_grid ? (g_grid->bpm < 1 ? 1 : g_grid->bpm > 255 ? 255 : g_grid->bpm) : 125; }
-/* Order positions up to the 255 end mark (advanceRow stops there). */
-EMSCRIPTEN_KEEPALIVE int brt_grid_order_length(void) {
-  if (!g_grid) return 0;
-  int k = 0;
-  while (k <= g_grid->orderCount && k < 257 && g_grid->order[k] != 255) ++k;
-  return k;
-}
-/* A skip marker (240..254) shows the pattern advanceRow moves on to, so order index = curOrder. */
+EMSCRIPTEN_KEEPALIVE int brt_grid_order_length(void) { return g_grid ? int(orderView(*g_grid).size()) : 0; }
 EMSCRIPTEN_KEEPALIVE int brt_grid_order(int k) {
-  if (!g_grid || k < 0 || k >= 257) return 0;
-  for (int i = k; i < 257; ++i) {
-    const int p = g_grid->order[i];
-    if (p == 255) break;
-    if (p < 240) return p;
-  }
-  return 0;
+  if (!g_grid || k < 0) return 0;
+  const std::vector<uint8_t> v = orderView(*g_grid);
+  return size_t(k) < v.size() ? v[size_t(k)] : 0;
 }
 EMSCRIPTEN_KEEPALIVE int brt_grid_pattern_rows(int p) {
   return g_grid && p >= 0 && p < 240 && g_grid->pat[p].present ? g_grid->pat[p].rows : 0;
@@ -232,5 +237,219 @@ EMSCRIPTEN_KEEPALIVE const uint8_t* brt_encode_cell(int note, int ins, int volum
   c.param = uint16_t(eff);
   std::memcpy(g_cellOut, &c, sizeof(Cell));
   return g_cellOut;
+}
+}  // extern "C"
+
+namespace {
+/* ---- export: the song file with the grid's edits. Every chunk is carried byte for byte (an
+ * unedited song exports byte-identical) except: a pattern whose cells changed gets its last PATT
+ * chunk (and that chunk's PAEX) written again with the loader's codes, set-form field masks and
+ * repeat counts; a changed order list gets a new PORD. Packed songs (flags 0x8000) get an aPLib
+ * stream of literals only: it decodes to the same bytes, larger than BeRoTracker's own packer.
+ * A changed pattern the file does not hold (a listed one load() filled with 64 empty rows) is
+ * appended as a new PATT chunk.
+ * shortcut: a changed order list is written as plain pattern numbers, so skip markers (240..254)
+ * are dropped; pattern row counts are the file's (cells past them are ignored). */
+std::vector<uint8_t> g_expSrc, g_expOut;
+std::unique_ptr<Song> g_exp;     // the file as loaded
+std::vector<Cell> g_expCells[240];  // its cells with the edits
+std::vector<uint8_t> g_expOrder;
+
+bool sameCell(const Cell& a, const Cell& b) { return !std::memcmp(&a, &b, sizeof(Cell)); }
+void put32(std::vector<uint8_t>& o, uint32_t v) { for (int k = 0; k < 4; ++k) o.push_back(uint8_t(v >> (8 * k))); }
+void putChunk(std::vector<uint8_t>& o, const char* tag, const std::vector<uint8_t>& body) {
+  o.insert(o.end(), tag, tag + 4);
+  put32(o, uint32_t(body.size()));
+  o.insert(o.end(), body.begin(), body.end());
+}
+
+// The pattern data as the file stores it: raw, or (packed songs) u32 size + aPLib literals.
+std::vector<uint8_t> store(const std::vector<uint8_t>& raw) {
+  if (!(g_exp->flags & 0x8000)) return raw;
+  std::vector<uint8_t> o;
+  put32(o, uint32_t(raw.size()));
+  for (size_t i = 0; i < raw.size(); ++i) {
+    if (i > 0 && (i - 1) % 8 == 0) o.push_back(0);  // tag byte: eight 0 bits = eight literals
+    o.push_back(raw[i]);
+  }
+  return o;
+}
+
+// readPattern's RLE (PATT, param low byte) or readPaex's (PAEX, param high byte; empty when all 0).
+std::vector<uint8_t> packCells(const std::vector<Cell>& cells, bool high) {
+  std::vector<uint8_t> o;
+  if (high) {
+    bool any = false;
+    for (const Cell& x : cells) any |= (x.param >> 8) != 0;
+    if (!any) return o;
+  }
+  auto key = [high](const Cell& x) {
+    Cell k = x;
+    if (high) k = Cell(), k.param = uint16_t(x.param >> 8);
+    else k.param &= 0xFF;
+    return k;
+  };
+  Cell run;  // the loader's carried cell
+  if (high) run = Cell(), run.param = 0;
+  size_t at = 0;
+  while (at < cells.size()) {
+    const Cell x = key(cells[at]);
+    size_t count = 1;
+    while (at + count < cells.size() && count < 255 && sameCell(key(cells[at + count]), x)) ++count;
+    uint8_t b = 0;
+    std::vector<uint8_t> f;
+    if (high) {
+      if (x.param != run.param) b |= 1, f.push_back(uint8_t(x.param));
+    } else {
+      if (x.note != run.note) b |= 1, f.push_back(x.note);
+      if (x.ins != run.ins) b |= 2, f.push_back(x.ins);
+      if (x.volcmd != run.volcmd || x.vol != run.vol) b |= 4, f.push_back(x.volcmd), f.push_back(x.vol);
+      if (x.pan != run.pan || x.filter != run.filter) b |= 8, f.push_back(x.pan), f.push_back(x.filter);
+      if (x.fx != run.fx) b |= 16, f.push_back(uint8_t(x.fx)), f.push_back(uint8_t(x.fx >> 8));
+      if (x.param != run.param) b |= 32, f.push_back(uint8_t(x.param));
+    }
+    if (count > 1) b |= 0x80;
+    o.push_back(b);
+    o.insert(o.end(), f.begin(), f.end());
+    if (count > 1) o.push_back(uint8_t(count));
+    run = x;
+    at += count;
+  }
+  return o;
+}
+
+bool patternChanged(int p) {
+  const std::vector<Cell>& a = g_exp->pat[p].cells;
+  const std::vector<Cell>& b = g_expCells[p];
+  for (size_t i = 0; i < a.size(); ++i) if (!sameCell(a[i], b[i])) return true;
+  return false;
+}
+
+// New PATT (+ PAEX) chunks for pattern p; `head` = the old chunk's num/name/rows (empty: none).
+void writePattern(std::vector<uint8_t>& o, int p, const uint8_t* head, size_t headLen) {
+  std::vector<uint8_t> body;
+  if (headLen) body.assign(head, head + headLen);
+  else body = {uint8_t(p), 0, uint8_t(g_exp->pat[p].rows), uint8_t(g_exp->pat[p].rows >> 8)};
+  const std::vector<uint8_t> data = store(packCells(g_expCells[p], false));
+  put32(body, uint32_t(data.size()));
+  body.insert(body.end(), data.begin(), data.end());
+  putChunk(o, "PATT", body);
+  const std::vector<uint8_t> high = packCells(g_expCells[p], true);
+  if (high.empty()) return;
+  const std::vector<uint8_t> hd = store(high);
+  body = {uint8_t(p)};
+  put32(body, uint32_t(hd.size()));
+  body.insert(body.end(), hd.begin(), hd.end());
+  putChunk(o, "PAEX", body);
+}
+
+// PORD: count, the positions, then the 255 end mark.
+void writeOrder(std::vector<uint8_t>& o) {
+  std::vector<uint8_t> b = {uint8_t(g_expOrder.size()), uint8_t(g_expOrder.size() >> 8)};
+  b.insert(b.end(), g_expOrder.begin(), g_expOrder.end());
+  b.push_back(255);
+  putChunk(o, "PORD", b);
+}
+
+uint32_t tagAt(const std::vector<uint8_t>& d, size_t pos) {
+  return uint32_t(d[pos]) | uint32_t(d[pos + 1]) << 8 | uint32_t(d[pos + 2]) << 16 | uint32_t(d[pos + 3]) << 24;
+}
+}  // namespace
+
+extern "C" {
+EMSCRIPTEN_KEEPALIVE int brt_export_open(const uint8_t* data, int size) {
+  g_exp.reset(new Song());
+  g_error.clear();
+  if (size <= 0 || (size_t)size > MAX_FILE) { g_error = "the file is too big for a BeRoTracker song"; g_exp.reset(); return 0; }
+  g_expSrc.assign(data, data + size);
+  g_error = load(g_expSrc, *g_exp);
+  if (!g_error.empty()) { g_exp.reset(); return 0; }
+  for (int p = 0; p < 240; ++p) g_expCells[p] = g_exp->pat[p].cells;
+  g_expOrder = orderView(*g_exp);
+  return 1;
+}
+
+/* One grid cell (tracker numbers, as brt_grid_pattern gives them). A cell that reads the same as
+ * the stored one keeps its stored bytes (254 note cuts, other volume commands stay); an edited one
+ * keeps the stored pan/filter. 0 when out of range. */
+EMSCRIPTEN_KEEPALIVE int brt_export_cell(int p, int r, int c, int note, int ins, int volume, int effTyp, int eff) {
+  if (!g_exp || p < 0 || p >= 240 || !g_exp->pat[p].present || r < 0 || r >= g_exp->pat[p].rows || c < 0 || c >= g_exp->channels) return 0;
+  const size_t i = size_t(c) * size_t(g_exp->pat[p].rows) + size_t(r);
+  const Cell& old = g_exp->pat[p].cells[i];
+  int32_t o[7] = {};
+  gridCell(old, o);
+  if (o[0] == note && o[1] == ins && o[2] == volume && o[3] == effTyp && o[4] == eff) {
+    g_expCells[p][i] = old;
+  } else {
+    Cell x;
+    std::memcpy(&x, brt_encode_cell(note, ins, volume, effTyp, eff), sizeof(Cell));
+    x.pan = old.pan;
+    x.filter = old.filter;
+    g_expCells[p][i] = x;
+  }
+  return 1;
+}
+
+/* The order list (pattern numbers 0..239), 1..256 positions; 0 when out of range. */
+EMSCRIPTEN_KEEPALIVE int brt_export_order(const uint8_t* order, int length) {
+  if (!g_exp || length < 1 || length > 256) return 0;
+  for (int k = 0; k < length; ++k) if (order[k] >= 240) return 0;
+  g_expOrder.assign(order, order + length);
+  return 1;
+}
+
+/* Builds the file; returns its bytes (brt_export_size long), null when nothing is open. */
+EMSCRIPTEN_KEEPALIVE const uint8_t* brt_export_build(void) {
+  g_expOut.clear();
+  if (!g_exp) return nullptr;
+  const std::vector<uint8_t>& d = g_expSrc;
+  bool changed[240];
+  for (int p = 0; p < 240; ++p) changed[p] = g_exp->pat[p].present && patternChanged(p);
+  const bool orderChanged = g_expOrder != orderView(*g_exp);
+  // The last PATT chunk of each pattern number is the one load() keeps.
+  size_t last[240] = {};
+  for (size_t pos = 8; pos + 8 <= d.size();) {
+    uint32_t n;
+    std::memcpy(&n, &d[pos + 4], 4);
+    if (tagAt(d, pos) == tag4("PATT") && n >= 1 && d[pos + 8] < 240) last[d[pos + 8]] = pos;
+    pos += 8 + n;
+  }
+  g_expOut.assign(d.begin(), d.begin() + 8);
+  bool wrote[240] = {}, dropPaex = false, wroteOrder = false;
+  size_t pos = 8;
+  while (pos + 8 <= d.size()) {
+    const uint32_t tag = tagAt(d, pos);
+    uint32_t n;
+    std::memcpy(&n, &d[pos + 4], 4);
+    const uint8_t* body = &d[pos + 8];
+    if (tag == tag4("PATT")) dropPaex = false;
+    if (tag == tag4("PATT") && n >= 1 && body[0] < 240 && changed[body[0]] && last[body[0]] == pos) {
+      const int p = body[0];
+      Reader r(body, n);  // num, name, rows: the head the new chunk keeps
+      r.u8(); r.str8(); r.u16();
+      writePattern(g_expOut, p, body, r.pos);
+      wrote[p] = true;
+      dropPaex = true;  // this chunk's PAEX was written with it
+    } else if (tag == tag4("PAEX") && dropPaex) {
+      // dropped: written with its pattern
+    } else if (tag == tag4("PORD") && orderChanged) {
+      writeOrder(g_expOut);
+      wroteOrder = true;
+    } else {
+      g_expOut.insert(g_expOut.end(), d.begin() + long(pos), d.begin() + long(pos + 8 + n));
+    }
+    pos += 8 + n;
+  }
+  g_expOut.insert(g_expOut.end(), d.begin() + long(pos), d.end());  // bytes after the last chunk
+  for (int p = 0; p < 240; ++p) if (changed[p] && !wrote[p]) writePattern(g_expOut, p, nullptr, 0);
+  if (orderChanged && !wroteOrder) {
+    writeOrder(g_expOut);
+  }
+  return g_expOut.data();
+}
+EMSCRIPTEN_KEEPALIVE int brt_export_size(void) { return int(g_expOut.size()); }
+EMSCRIPTEN_KEEPALIVE void brt_export_close(void) {
+  g_exp.reset(); g_expSrc.clear(); g_expOut.clear(); g_expOrder.clear();
+  for (auto& c : g_expCells) c.clear();
 }
 }  // extern "C"

@@ -24,6 +24,12 @@ export interface BeRoTrackerEditModule {
   _brt_pattern_rows(p: number): number;
   _brt_play_pattern_index(): number;
   _brt_encode_cell(note: number, ins: number, volume: number, effTyp: number, eff: number): number;
+  _brt_export_open(ptr: number, size: number): number;
+  _brt_export_cell(p: number, r: number, c: number, note: number, ins: number, volume: number, effTyp: number, eff: number): number;
+  _brt_export_order(ptr: number, length: number): number;
+  _brt_export_build(): number;
+  _brt_export_size(): number;
+  _brt_export_close(): void;
   _brt_open(ptr: number, size: number, rate: number): number;
   _brt_error(): number;
   _brt_position(): number;
