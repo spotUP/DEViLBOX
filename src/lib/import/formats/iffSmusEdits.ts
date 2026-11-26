@@ -11,8 +11,13 @@
  * note the event governs was edited to the same instrument and an INS1 register holds that instrument; one note of a shared
  * event cannot change without changing the others.
  *
- * Not written, and named in `warnings`, never half-applied: a note moved to another row, or added anywhere but the first row of a rest (a note
- * added on a rest's first row and a note removed rewrite that event in place, rest <-> note, keeping the duration), a note leaving 0-127, an instrument edit that does not cover its whole event or names an instrument
+ * A note added on a rest's first row and a note removed rewrite that event in place, rest <-> note, keeping the duration.
+ * A note added inside a note's tail or a rest splits that event: the part before the new note keeps its type, the new note
+ * runs to the next event, each part a note of the longest duration that fits plus rests (durations come from DURATION_TABLE,
+ * so a part of 1 row cannot be written). The TRAK chunk grows by 2 bytes per added event; its size and the FORM size follow.
+ *
+ * Not written, and named in `warnings`, never half-applied: a note moved to another row, a split with a 1-row part, a note
+ * leaving 0-127, an instrument edit that does not cover its whole event or names an instrument
  * with no register, and volume or effect cells (SMUS tracks carry no per-note volume or effect).
  */
 import type { Pattern, TrackerCell } from '@/types';
@@ -29,7 +34,7 @@ export interface IffSmusEditResult {
   warnings: string[];
 }
 
-interface NoteEv { row: number; at: number; insAt: number; rest?: boolean }
+interface NoteEv { row: number; at: number; insAt: number; dur: number; rest?: boolean }
 
 function u32(b: Uint8Array, o: number): number { return ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0; }
 
@@ -62,10 +67,34 @@ function walkTrack(src: Uint8Array, at: number, size: number): NoteEv[] {
     if (type > EVENT_REST) continue;
     const dur = DURATION_TABLE[src[at + i + 1] & 0x0f];
     if (dur < 0) continue;
-    out.push({ row, at: at + i, insAt, rest: type === EVENT_REST });
+    out.push({ row, at: at + i, insAt, dur: Math.max(1, dur), rest: type === EVENT_REST });
     row += Math.max(1, dur);
   }
   return out;
+}
+
+/** Durations a TRAK event can hold, longest first, with their data (DURATION_TABLE index). */
+const DURS = DURATION_TABLE.map((d, i) => ({ d, i })).filter((x) => x.d > 0).sort((a, b) => b.d - a.d);
+
+/** `n` rows as table durations, longest first (null when it cannot be made, e.g. 1 row). */
+function durations(n: number, memo = new Map<number, number[] | null>()): number[] | null {
+  if (n === 0) return [];
+  if (memo.has(n)) return memo.get(n) ?? null;
+  let got: number[] | null = null;
+  for (const { d, i } of DURS) {
+    if (d > n) continue;
+    const restOf = durations(n - d, memo);
+    if (restOf) { got = [i, ...restOf]; break; }
+  }
+  memo.set(n, got);
+  return got;
+}
+
+/** One `len`-row part of a split event: `type` (a note or a rest) for the first duration, rests for the remainder. */
+function encodePart(type: number, len: number, highBits: number): number[] | null {
+  const ds = durations(len);
+  if (!ds) return null;
+  return ds.flatMap((i, k) => (k === 0 ? [type, i | highBits] : [EVENT_REST, i]));
 }
 
 /**
@@ -81,6 +110,8 @@ export function applyIffSmusGridEdits(
   const regs = registerMap(source);
   let patched = 0;
   const poke = (o: number, v: number) => { if (out[o] !== v) { out[o] = v; patched++; } };
+  // Events split by a note added inside them: replaced after every in-place edit, so the parts read the edited type byte.
+  const splits: { ch: number; ev: NoteEv; adds: { k: number; type: number }[] }[] = [];
 
   for (let ch = 0; ch < blockRows.length; ch++) {
     const base = blockRows[ch];
@@ -104,7 +135,17 @@ export function applyIffSmusGridEdits(
         if (now[r].instrument !== 0 && now[r].instrument !== gov) warnings.push(`${label} row ${r}: the new note's instrument differs from the track's current instrument; not written`);
         else if (add + 11 > 127) warnings.push(`${label} row ${r}: note outside 0-127; not written`);
         else { poke(rest.at, add + 11); poke(rest.at + 1, source[rest.at + 1] & 0x0f); }
-      } else if (!noteRows.has(r) && add !== 0) warnings.push(`${label} row ${r}: a note added where the track has none changes its length; not written`);
+      } else if (!noteRows.has(r) && add > 0 && add < 97) {
+        const ev = events.find((e) => e.row < r && r < e.row + e.dur);
+        const gov = !ev || ev.insAt < 0 ? 0 : regs[source[ev.insAt + 1]] ?? 0;
+        if (!ev) warnings.push(`${label} row ${r}: a note added past the end of the track changes its length; not written`);
+        else if (now[r].instrument !== 0 && now[r].instrument !== gov) warnings.push(`${label} row ${r}: the new note's instrument differs from the track's current instrument; not written`);
+        else if (add + 11 > 127) warnings.push(`${label} row ${r}: note outside 0-127; not written`);
+        else {
+          const sp = splits.find((x) => x.ev === ev) ?? splits[splits.push({ ch, ev, adds: [] }) - 1];
+          sp.adds.push({ k: r - ev.row, type: add + 11 });
+        }
+      } else if (!noteRows.has(r) && add !== 0) warnings.push(`${label} row ${r}: a note-off where the track has no note is not written`);
     }
 
     const groups = new Map<number, { notes: NoteEv[]; want: Set<number> }>();
@@ -141,5 +182,37 @@ export function applyIffSmusGridEdits(
       }
     }
   }
-  return { data: out, patched, warnings };
+  if (splits.length === 0) return { data: out, patched, warnings };
+
+  // Encode each split, then grow the chunks: size fields first (in place), then the event bytes from the end of the file down,
+  // so every offset still to be used sits below the bytes already moved.
+  const grow: { at: number; bytes: number[] }[] = [];
+  const delta = new Array<number>(trackAddrs.length).fill(0);
+  for (const { ch, ev, adds } of splits) {
+    const cuts = [0, ...adds.map((a) => a.k), ev.dur];
+    const types = [out[ev.at], ...adds.map((a) => a.type)];
+    const high = out[ev.at + 1] & 0xf0;
+    const parts = types.map((t, q) => encodePart(t, cuts[q + 1] - cuts[q], q === 0 ? high : 0));
+    if (parts.some((x) => !x)) {
+      warnings.push(`voice ${ch + 1} row ${ev.row + adds[0].k}: a 1-row part has no SMUS duration; not written`);
+      continue;
+    }
+    const bytes = parts.flat() as number[];
+    grow.push({ at: ev.at, bytes });
+    delta[ch] += bytes.length - 2;
+    patched += bytes.length;
+  }
+  const put32 = (b: Uint8Array, o: number, v: number) => { b[o] = v >>> 24; b[o + 1] = (v >>> 16) & 0xff; b[o + 2] = (v >>> 8) & 0xff; b[o + 3] = v & 0xff; };
+  for (let ch = 0; ch < trackAddrs.length; ch++) if (delta[ch]) put32(out, trackAddrs[ch] - 4, u32(out, trackAddrs[ch] - 4) + delta[ch]);
+  const total = delta.reduce((a, b) => a + b, 0);
+  if (total) put32(out, 4, u32(out, 4) + total);
+  let data = out;
+  for (const g of grow.sort((a, b) => b.at - a.at)) {
+    const next = new Uint8Array(data.length + g.bytes.length - 2);
+    next.set(data.subarray(0, g.at));
+    next.set(g.bytes, g.at);
+    next.set(data.subarray(g.at + 2), g.at + g.bytes.length);
+    data = next;
+  }
+  return { data, patched, warnings };
 }

@@ -251,6 +251,8 @@ interface NoteEvent {
   eff: number;
   /** File offset of the note byte ($00-$7F) that played this event, when the grid shows it unclamped. */
   offset?: number;
+  /** Set for a $B0-$CF trigger (the instrument's own pitch, no note byte). */
+  trigger?: true;
 }
 
 /**
@@ -276,6 +278,12 @@ interface ChannelBlock {
   fileOffset: number;
   /** Real byte length of the block (up to and including its terminator). */
   fileSize: number;
+  /** File offset of the OFFTBL word that points at this block (a grown block moves to the file end and is repointed here). */
+  refAt: number;
+  /** Duration in force when the block starts (carried from the blocks before it). */
+  durIn: number;
+  /** The player's current instrument when the block starts (set by $D0-$EF only; $B0-$CF triggers do not change it). */
+  instIn: number;
 }
 
 function decodeChannel(
@@ -288,6 +296,7 @@ function decodeChannel(
   let pos = posListStart;
   let duration = 1;
   let currentInstrument = 0;
+  let playerInstrument = 0;
   let blockCount = 0;
 
   while (pos < buf.length && blockCount < MAX_PATTERN_BLOCKS) {
@@ -305,6 +314,8 @@ function decodeChannel(
     blockCount++;
 
     const events: NoteEvent[] = [];
+    const durIn = duration;
+    const instIn = playerInstrument;
     let row = 0;
     let p = patBlockStart;
     let blockDone = false;
@@ -333,10 +344,12 @@ function decodeChannel(
           note: Math.min(derivedNote, 96),
           instrument: currentInstrument + 1,
           effTyp: 0, eff: 0,
+          trigger: true,
         });
         row += duration;
       } else if (b <= 0xef) {
         currentInstrument = b - 0xd0;
+        playerInstrument = b - 0xd0;
       } else if (b <= 0xf8) {
         const effectNum = b - 0xf0;
         if (effectNum > 0 && events.length > 0) {
@@ -351,7 +364,7 @@ function decodeChannel(
       }
     }
 
-    blocks.push({ events, rowCount: row, fileOffset: patBlockStart, fileSize: p - patBlockStart });
+    blocks.push({ events, rowCount: row, fileOffset: patBlockStart, fileSize: p - patBlockStart, refAt: offtblByteOff, durIn, instIn });
   }
 
   return blocks;
@@ -584,6 +597,7 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
   // shared pattern blocks (one carrier per distinct block file offset).
   let subsongChannelBlocks: ChannelBlock[][] = [];
   const noteByteAt = new Map<string, NonNullable<UADEVariablePatternLayout['noteBytes']>[number]>();
+  const blockEntries: NonNullable<UADEVariablePatternLayout['steveTurnerBlocks']>['entries'] = [];
 
   // Only decode subsong 0 (the main song). Additional subsongs are SFX/alternate tunes.
   {
@@ -617,6 +631,7 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
       for (let ch = 0; ch < 4; ch++) {
         const block = channelBlocks[ch]?.[step];
         if (block) {
+          blockEntries.push({ pattern: patterns.length, channel: ch, start: block.fileOffset, refAt: block.refAt, durIn: block.durIn, instIn: block.instIn, triggerNotes: block.events.filter((e) => e.trigger).map((e) => [e.row, e.note]) });
           channelEvents.push(block.events);
           if (block.rowCount > maxRow) maxRow = block.rowCount;
         } else {
@@ -695,6 +710,7 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
     blockRows,
     trackMap,
     noteBytes: [...noteByteAt.values()],
+    steveTurnerBlocks: { base: hdr.offtblOffset, entries: blockEntries },
   };
 
   const result: TrackerSong = {

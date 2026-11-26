@@ -247,7 +247,7 @@ let restoreFetch: (() => void) | null = null;
 let runAll: Promise<void>;
 
 beforeAll(() => {
-  restoreFetch = installWasmNodeFetches([['davidwhittaker', 'DavidWhittaker'], ['bd', 'Bd']]);
+  restoreFetch = installWasmNodeFetches([['davidwhittaker', 'DavidWhittaker'], ['bd', 'Bd'], ['digmug', 'DigMugEdit']]); // DigitalMugicianParser decodes the grid in DigMugEdit
   runAll = (async () => {
     for (const entry of ENCODER_FIXTURES) {
       const r = await measure(entry);

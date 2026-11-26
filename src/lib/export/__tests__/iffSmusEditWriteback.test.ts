@@ -46,14 +46,38 @@ describe('IFF SMUS edit write-back', () => {
     expect(again.patterns[p].channels[c].rows[r].note).toBe(was + 2);
   });
 
-  it('refuses a note added on an empty row and keeps the source', async () => {
+  // A note typed in another note's tail splits that event (TRAK grows by 2 bytes, chunk + FORM sizes follow).
+  const tail = (song: TrackerSong) => {
+    for (let p = 0; p < song.patterns.length; p++) for (let c = 0; c < song.numChannels; c++) {
+      const rows = song.patterns[p].channels[c].rows;
+      for (let r = 0; r + 4 < rows.length; r++) {
+        if (rows[r].note > 0 && rows[r].note < 90 && [1, 2, 3, 4].every((k) => rows[r + k].note === 0)) return { p, c, r };
+      }
+    }
+    throw new Error('no note with a 4-row tail');
+  };
+  const notesOf = (song: TrackerSong) => song.patterns.map((pat) => pat.channels.map((ch) => ch.rows.map((cell) => cell.note)));
+
+  it('places a note added in a note tail and re-imports the edited grid', async () => {
     const song = await load();
-    const { p, c, r } = firstNote(song);
-    const rows = song.patterns[p].channels[c].rows;
-    const gap = rows.findIndex((cell, i) => i > r && cell.note === 0);
-    rows[gap].note = 40;
+    const { p, c, r } = tail(song);
+    song.patterns[p].channels[c].rows[r + 2].note = 40;
     const res = await exportIffSmus(song);
-    expect(res.warnings.some((w) => w.includes('note added'))).toBe(true);
+    expect(res.warnings.filter((w) => w.includes('row'))).toEqual([]);
+    const out = new Uint8Array(await res.data.arrayBuffer());
+    const src = new Uint8Array(readFileSync(FILE));
+    expect(out.length).toBeGreaterThan(src.length);
+    const again = await parseIffSmusFile(out.buffer.slice(0) as ArrayBuffer, 'Alanko1.smus');
+    expect(again.patterns[p].channels[c].rows[r + 2].note).toBe(40);
+    expect(notesOf(again)).toEqual(notesOf(song));
+  });
+
+  it('refuses a note one row after a note (no 1-row SMUS duration) and keeps the source', async () => {
+    const song = await load();
+    const { p, c, r } = tail(song);
+    song.patterns[p].channels[c].rows[r + 1].note = 40;
+    const res = await exportIffSmus(song);
+    expect(res.warnings.some((w) => w.includes('1-row part'))).toBe(true);
     expect(new Uint8Array(await res.data.arrayBuffer())).toEqual(new Uint8Array(readFileSync(FILE)));
   });
 

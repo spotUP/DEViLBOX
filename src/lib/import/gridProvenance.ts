@@ -160,7 +160,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   ams: 'n/a',
   // ToneEngine-group imports, measured 2026-11-25 (liveEditHeard.test.ts).
   iffSmus: 'pass',
-  steveTurner: 'fail',
+  steveTurner: 'pass',
   imagoOrpheus: 'n/a',
   madTracker2: 'n/a',
   pxtone: 'pass',
@@ -321,7 +321,6 @@ export const LIVE_WHILE_PLAYING_WHY: Record<string, string> = {
 
 /** Why a LIVE_EDIT row is 'fail' (plan unit in thoughts/shared/plans/2026-10-06-fix-all-open.md, G19). */
 export const LIVE_EDIT_WHY: Record<string, string> = {
-  steveTurner: "the harness cell (offroad.jpo pattern 0 voice 1 row 0) is an instrument trigger byte ($B2 at file offset 35119; the block is $83 then sixteen $B2): its pitch is the instrument's own, no note byte ($00-$7F) holds it, and a pitch there needs a $D0 select plus a note byte (the block stream grows). 297 of the song's 656 note cells have no note byte; the 359 that have one are written in place and heard (steveTurnerLiveEdit.test.ts)",
 };
 
 /**
@@ -341,8 +340,8 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   chuckBiscuits: 'n/a',
   ams: 'n/a',
   // ToneEngine-group imports, measured 2026-11-25 (liveEditHeard.test.ts).
-  iffSmus: 'fail',
-  steveTurner: 'fail',
+  iffSmus: 'pass',
+  steveTurner: 'pass',
   imagoOrpheus: 'n/a',
   madTracker2: 'n/a',
   pxtone: 'pass',

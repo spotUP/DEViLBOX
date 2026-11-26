@@ -344,6 +344,12 @@ export interface UADEVariablePatternLayout {
   trackTable?: { pointersAt: number; base: number };
   /** Dave Lowe: per file pattern, the file offsets of the u32 big-endian pointers (value = address - `base`) that reach it, so a grown section can move to the file end. */
   sectionRefs?: { base: number; at: number[][] };
+  /**
+   * Steve Turner: per grid (pattern, channel) the block it plays: its file offset, the OFFTBL word that reaches it (value =
+   * block offset - `base`, signed 16-bit), and the duration and player instrument in force at its start, and the note each $B0-$CF trigger shows (row, note), so a block that
+   * grows (a pitch on an instrument trigger, a note on a held row) can be rebuilt, moved to the file end and repointed.
+   */
+  steveTurnerBlocks?: { base: number; entries: Array<{ pattern: number; channel: number; start: number; refAt: number; durIn: number; instIn: number; triggerNotes: Array<[number, number]> }> };
 
   /**
    * Original byte sizes of each file-level pattern's encoded data.
