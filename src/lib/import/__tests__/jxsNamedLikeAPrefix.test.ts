@@ -16,7 +16,7 @@ import { parseJxsFile } from '@lib/import/formats/JxsParser';
 
 describe('prefix-form names', () => {
   it('a .jxs named two.jxs routes to the native JayTrax parser, not UADE', async () => {
-    const raw = new Uint8Array(readFileSync('public/data/songs/formats/popcorn.jxs'));
+    const raw = new Uint8Array(readFileSync('public/data/songs/jaytrax/popcorn.jxs'));
     vi.mocked(parseJxsFile).mockClear();
     const song = await parseModuleToSong(new File([raw], 'two.jxs'));
     expect(vi.mocked(parseJxsFile)).toHaveBeenCalledTimes(1);

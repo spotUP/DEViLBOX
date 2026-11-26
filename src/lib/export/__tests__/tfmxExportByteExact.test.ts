@@ -9,7 +9,7 @@ import { parseTFMXFile } from '@/lib/import/formats/TFMXParser';
 import { exportTFMX } from '../TFMXExporter';
 import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 
-const FIXTURES = ['public/data/songs/formats/mdat.rocknroll', 'public/data/songs/formats/mdat.turrican_bonus'];
+const FIXTURES = ['public/data/songs/tfmx/mdat.rocknroll', 'public/data/songs/tfmx/mdat.turrican_bonus'];
 
 function load(path: string) {
   const raw = new Uint8Array(readFileSync(path));

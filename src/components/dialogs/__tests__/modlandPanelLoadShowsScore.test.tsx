@@ -15,7 +15,7 @@ import { useFormatStore } from '@/stores/useFormatStore';
 import { useRatingsStore, ratingId } from '@/stores/useRatingsStore';
 
 const modBytes = (): ArrayBuffer => {
-  const b = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../../public/data/songs/formats/a sleep so deep.mod'));
+  const b = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../../public/data/songs/mod/a sleep so deep.mod'));
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
 };
 

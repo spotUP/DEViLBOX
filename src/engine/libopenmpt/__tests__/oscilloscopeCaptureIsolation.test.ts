@@ -33,7 +33,7 @@ async function capture(): Promise<{ peaks: number[]; mainPeak: number; frames: n
   await import(/* @vite-ignore */ workletPath);
 
   const p = new Ctor({});
-  const file = readFileSync(join(process.cwd(), 'public/data/songs/formats/chiptracker.cba'));
+  const file = readFileSync(join(process.cwd(), 'public/data/songs/chuck-biscuits/chiptracker.cba'));
   const buf = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength);
   // libopenmpt wasm instantiates asynchronously
   for (let i = 0; i < 100; i++) {

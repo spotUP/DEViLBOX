@@ -20,7 +20,7 @@ const cba = new Uint8Array(332 + 64 * 4 * 5);
 cba.set([0x43, 0x42, 0x41, 0xF9]);
 cba[36] = 0x1A; cba[39] = 4; cba[41] = 1; cba[43] = 6; cba[44] = 125;
 const buf = () => cba.buffer.slice(0) as ArrayBuffer;
-const other = readFileSync(join(process.cwd(), 'public/data/songs/formats/chiptracker.cba'));
+const other = readFileSync(join(process.cwd(), 'public/data/songs/chuck-biscuits/chiptracker.cba'));
 const otherBuf = () => other.buffer.slice(other.byteOffset, other.byteOffset + other.byteLength) as ArrayBuffer;
 
 describe('Chuck Biscuits routing follows the setting', () => {

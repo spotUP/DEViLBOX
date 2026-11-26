@@ -12,14 +12,14 @@
  *
  * SM1 uses track/pattern indirection, so layout.getCellFileOffset maps cell -> file.
  *
- * Fixture: public/data/songs/formats/anarchy.sid1 (real module).
+ * Fixture: public/data/songs/sidmon-1/anarchy.sid1 (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseSidMon1File } from '../SidMon1Parser';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/anarchy.sid1');
+const FIXTURE = join(process.cwd(), 'public/data/songs/sidmon-1/anarchy.sid1');
 
 describe('SidMon 1.0 (SID1) pattern codec', () => {
   it('encodeCell is a byte-exact inverse of decodeCell over every pattern cell', () => {

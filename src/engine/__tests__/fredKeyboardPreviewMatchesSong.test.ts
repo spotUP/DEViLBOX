@@ -100,7 +100,7 @@ async function preview(config: Parameters<typeof serializeFredConfig>[0], key: n
   return out;
 }
 
-const bytes = (n: string) => new Uint8Array(readFileSync(resolve(ROOT, 'public/data/songs/formats', n)));
+const bytes = (n: string) => new Uint8Array(readFileSync(resolve(ROOT, 'public/data/songs/fredmon', n)));
 
 describe('Fred Editor keyboard preview is the instrument as the song plays it', () => {
   for (const name of ['bomb jack.fred', 'fuzzball-title.fred']) {

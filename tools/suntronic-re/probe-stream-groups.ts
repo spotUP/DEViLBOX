@@ -9,7 +9,7 @@ import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV1
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../..');
-const CORPUS = resolve(REPO, 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = resolve(REPO, 'public/data/songs/suntronic');
 
 for (const name of ['gliders.src', 'ballblaser.src']) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

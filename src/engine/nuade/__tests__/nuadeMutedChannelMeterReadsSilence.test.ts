@@ -8,8 +8,8 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { loadSharedWorkletScripts, startWorklet, songBuffer, stereoOutputs, type WorkletProc, type WorkletMsg } from '../../__tests__/workletHarness';
 
 const CASES = [
-  { id: 'soundmon', file: 'public/data/songs/formats/antidust.bp3' },
-  { id: 'robhubbard', file: 'public/data/songs/formats/centurion_battle.rh' },
+  { id: 'soundmon', file: 'public/data/songs/bp-soundmon-3/antidust.bp3' },
+  { id: 'robhubbard', file: 'public/data/songs/rob-hubbard/centurion_battle.rh' },
 ];
 
 interface Rig { proc: WorkletProc; send: (m: unknown) => Promise<void>; posted: WorkletMsg[] }

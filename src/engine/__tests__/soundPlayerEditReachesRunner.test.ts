@@ -32,7 +32,7 @@ vi.mock('@/engine/eagleplayer/EaglePlayerEngine', () => ({
   EaglePlayerEngine: { hasInstance: () => true, getInstance: () => ({ writeModule }) },
 }));
 
-const DIR = 'public/data/songs/formats/Scott Johnston';
+const DIR = 'public/data/songs/scott-johnston';
 const bytes = (p: string) => { const b = readFileSync(resolve(ROOT, p)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 
 /** sjs.tune6 row 1, voice 1: note $06 (period $2FA), the voice's first note. */

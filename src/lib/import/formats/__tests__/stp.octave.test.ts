@@ -10,7 +10,7 @@ import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { periodToNote, noteToPeriod } from '@/lib/amiga/periodNotes';
 import { stpByteToGridNote, gridNoteToStpByte } from '@/lib/import/formats/stpPitch';
 
-const PATH = 'public/data/songs/formats/noname.stp';
+const PATH = 'public/data/songs/soundtracker-pro-ii/noname.stp';
 
 describe('SoundTracker Pro II octave', () => {
   it('noname.stp byte 48 shows C-3 (period 214) and every note has a period', async () => {

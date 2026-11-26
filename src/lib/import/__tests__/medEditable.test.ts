@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseModuleToSong } from '../parseModuleToSong';
 import { setGridBaseline, baselineOf } from '@/lib/song/gridBaseline';
+import { songFile } from '@/test/songPath';
 
 // One reachability test: OctaMED songs through the importer's entry point. Each version keeps its module bytes, re-encodes
 // every cell to its own stored bytes, and an edit lands in the exported module as exactly its own cell.
@@ -10,7 +11,7 @@ describe('OctaMED editable grid', () => {
     ['bounty hunter - outro (remixed).mmd3', 'med_mmd1'],
     ['universal monsters - dracula.mmd0', 'med_mmd0'],
   ])('%s imports with a grid, round-trips byte-exact, and an edit lands in export', async (name, formatId) => {
-    const raw = readFileSync(`public/data/songs/formats/${name}`);
+    const raw = readFileSync(songFile(name));
     const bytes = new Uint8Array(raw);
     const song = await parseModuleToSong(new File([bytes], name));
     const layout = song.uadePatternLayout!;

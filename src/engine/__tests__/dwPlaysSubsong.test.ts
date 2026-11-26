@@ -14,7 +14,7 @@ import { walkDavidWhittaker, DW_WALK } from '@/lib/import/formats/DavidWhittaker
 import { WASM_ENGINES } from '@/engine/replayer/wasmEngineRegistry';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
-const APB = 'public/data/songs/formats/apb.dw';
+const APB = 'public/data/songs/david-whittaker/apb.dw';
 
 /** Peak per voice over `seconds` of playback of subsong `subsong`; `stopFirst` plays, stops and plays again. */
 async function voicePeaks(subsong: number, seconds: number, stopFirst = false): Promise<number[]> {

@@ -50,12 +50,12 @@ vi.mock('@/lib/import/parseModuleToSong', async (orig) => {
 interface Case { id: string; prefKey: string; file: string; pattern: number; channel: number; row: number | 'first-note' }
 // The NUADE-EDIT-PATH sites (nuadeEditsAreHeard.test.ts).
 const CASES: Case[] = [
-  { id: 'robhubbard', prefKey: 'robHubbard', file: 'public/data/songs/formats/centurion_battle.rh', pattern: 0, channel: 0, row: 48 },
-  { id: 'soundmaster', prefKey: 'soundMaster', file: "public/data/songs/formats/rackney'sisland_4.sm", pattern: 12, channel: 1, row: 0 },
-  { id: 'hippel', prefKey: 'hippelCoso', file: 'public/data/songs/formats/prehistoric_tale.hipc', pattern: 3, channel: 3, row: 'first-note' },
-  { id: 'instereo1', prefKey: 'inStereo1', file: 'public/data/songs/formats/fantasi8.is', pattern: 8, channel: 1, row: 0 },
-  { id: 'sidmon2', prefKey: 'sidmon2', file: 'public/data/songs/formats/bruno_time.sid2', pattern: 2, channel: 1, row: 2 },
-  { id: 'soundmon', prefKey: 'soundmon', file: 'public/data/songs/formats/antidust.bp3', pattern: 4, channel: 0, row: 0 },
+  { id: 'robhubbard', prefKey: 'robHubbard', file: 'public/data/songs/rob-hubbard/centurion_battle.rh', pattern: 0, channel: 0, row: 48 },
+  { id: 'soundmaster', prefKey: 'soundMaster', file: "public/data/songs/sound-master/rackney'sisland_4.sm", pattern: 12, channel: 1, row: 0 },
+  { id: 'hippel', prefKey: 'hippelCoso', file: 'public/data/songs/hippel-coso/prehistoric_tale.hipc', pattern: 3, channel: 3, row: 'first-note' },
+  { id: 'instereo1', prefKey: 'inStereo1', file: 'public/data/songs/instereo!/fantasi8.is', pattern: 8, channel: 1, row: 0 },
+  { id: 'sidmon2', prefKey: 'sidmon2', file: 'public/data/songs/sidmon-2/bruno_time.sid2', pattern: 2, channel: 1, row: 2 },
+  { id: 'soundmon', prefKey: 'soundmon', file: 'public/data/songs/bp-soundmon-3/antidust.bp3', pattern: 4, channel: 0, row: 0 },
 ];
 
 describe('a note typed into a restored song that plays on nuade is heard', () => {

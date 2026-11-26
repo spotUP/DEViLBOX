@@ -29,7 +29,7 @@ import { SunTronicPlayer } from '@/engine/suntronic/SunTronicPlayer';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../../../..');
-const CORPUS = resolve(REPO, 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = resolve(REPO, 'public/data/songs/suntronic');
 const GOLDEN = resolve(HERE, 'sunTronicNoteTimeline.golden.json');
 
 interface Row { period: number; acc: number; vol: number; flags: number }

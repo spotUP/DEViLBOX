@@ -21,7 +21,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseSunTronicFile } from '../SunTronicParser';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 function readFixture(name: string): ArrayBuffer {
   const raw = new Uint8Array(readFileSync(join(CORPUS, name)));
   return raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;

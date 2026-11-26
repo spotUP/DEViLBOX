@@ -82,6 +82,6 @@ describe('David Whittaker pattern codec', () => {
       return walk.events.find((e) => e.channel === 0 && e.kind === DW_WALK.sample)?.a;
     };
     expect(await firstSample('public/data/songs/david-whittaker/garfield2+.dw')).toBe(2);   // sample 3
-    expect(await firstSample('public/data/songs/formats/apb.dw')).toBe(1);                   // sample 2
+    expect(await firstSample('public/data/songs/david-whittaker/apb.dw')).toBe(1);                   // sample 2
   });
 });

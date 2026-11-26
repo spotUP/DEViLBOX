@@ -21,7 +21,7 @@ type AyMod = { HEAPU8: Uint8Array; _aylet_wasm_step_frame(): number; _aylet_wasm
 
 describe('PT3 live edit', () => {
   it('pokes the typed note into the running tune and the player plays it', async () => {
-    const song = await parseZxtuneFile(NAME, songBuffer(`public/data/songs/PT3/${NAME}`), createPt3);
+    const song = await parseZxtuneFile(NAME, songBuffer(`public/data/songs/pt3/${NAME}`), createPt3);
     expect(liveEditRoute(song).route).toBe('pt3-module');
 
     const { proc, send } = await startWorklet('aylet', 'Aylet');

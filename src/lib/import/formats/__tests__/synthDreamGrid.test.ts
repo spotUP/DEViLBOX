@@ -20,7 +20,7 @@ import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder
 import { BD_FX } from '../benDaglishEffectGlyphs';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
-const DIR = `${process.cwd()}/public/data/songs/formats`;
+const DIR = `${process.cwd()}/public/data/songs/synth-dream`;
 
 function load(name: string): { bytes: Uint8Array; song: TrackerSong } {
   const raw = readFileSync(`${DIR}/${name}`);

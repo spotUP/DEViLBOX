@@ -10,7 +10,7 @@ import { HC_FX, commandStreamEffectToString } from '../formats/commandStreamEffe
 import { patchModuleByLayout } from '@lib/export/layoutPatch';
 import { setGridBaseline, baselineOf } from '@/lib/song/gridBaseline';
 
-const file = readFileSync(join(__dirname, '../../../../public/data/songs/formats/ep-trmonsterbusiness.mcmd'));
+const file = readFileSync(join(__dirname, '../../../../public/data/songs/mcmd/ep-trmonsterbusiness.mcmd'));
 const orig = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer;
 const rowsOf = (song: ReturnType<typeof parseMcmdFile>) =>
   song.patterns.flatMap((p, pi) => p.channels.flatMap((c, ch) => c.rows.map((cell, row) => ({ cell, pi, ch, row }))));

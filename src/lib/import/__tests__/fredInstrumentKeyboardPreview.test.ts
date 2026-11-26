@@ -12,7 +12,7 @@ import { resolve } from 'path';
 import { parseModuleToSong } from '../parseModuleToSong';
 
 async function load(name: string) {
-  const b = readFileSync(resolve(import.meta.dirname, '../../../../public/data/songs/formats', name));
+  const b = readFileSync(resolve(import.meta.dirname, '../../../../public/data/songs/fredmon', name));
   return parseModuleToSong(new File([b], name));
 }
 

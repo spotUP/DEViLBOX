@@ -28,7 +28,7 @@ vi.mock('@engine/berotracker/beRoTrackerEditWasm', async (orig) => ({
   beRoTrackerEditModule: () => create(),
 }));
 
-const SONG = 'public/data/songs/formats/wonderful-dream-landscapes.brt';
+const SONG = 'public/data/songs/berotracker/wonderful-dream-landscapes.brt';
 type BrtProc = { _brt_position(): number };
 
 describe('BeRoTracker live edit', () => {

@@ -11,7 +11,7 @@
  * carriers (fields the grid loop never sets — it pushes a separately-built cmds[row].cell),
  * and encodeTFMXCell reproduces all 4 bytes verbatim when present.
  *
- * Fixture: public/data/songs/formats/mdat.rocknroll (real module).
+ * Fixture: public/data/songs/tfmx/mdat.rocknroll (real module).
  *
  * The layout declares rowsPerPattern=1 (patterns are variable-length), so — mirroring the
  * harness — the round-trip is measured over the first row of every pattern/channel.
@@ -21,7 +21,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseTFMXFile } from '../TFMXParser';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/mdat.rocknroll');
+const FIXTURE = join(process.cwd(), 'public/data/songs/tfmx/mdat.rocknroll');
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;

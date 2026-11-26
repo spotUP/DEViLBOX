@@ -52,7 +52,7 @@ describe('exporter round-trip regressions', () => {
   it('SoundFX export includes sample PCM so the file re-parses (was a 1684-byte sub-minimum file)', async () => {
     const { parseSoundFXFile } = await import('@lib/import/formats/SoundFXParser');
     const { exportSoundFX } = await import('../SoundFXExporter');
-    const raw = fixture('public/data/songs/formats/operation_stealth.sfx');
+    const raw = fixture('public/data/songs/soundfx/operation_stealth.sfx');
     const song = await parseSoundFXFile(raw, 'operation_stealth.sfx');
     // The parser must now read the real 15-entry sample-size table and load PCM.
     expect(song.instruments.some((i) => (i.sample?.audioBuffer?.byteLength ?? 0) > 44)).toBe(true);
@@ -106,7 +106,7 @@ describe('exporter round-trip regressions', () => {
   it('C67 FM-only export preserves the OPL2 register dump so the file re-parses', async () => {
     const { parseCDFM67File } = await import('@lib/import/formats/CDFM67Parser');
     const { exportCDFM67 } = await import('../CDFM67Exporter');
-    const raw = fixture('public/data/songs/formats/amnesia_credits.c67');
+    const raw = fixture('public/data/songs/composer-670-cdfm/amnesia_credits.c67');
     const song = parseCDFM67File(new Uint8Array(raw), 'amnesia_credits.c67');
     expect(song).not.toBeNull();
     // FM instruments must carry their raw OPL2 registers now.
@@ -157,7 +157,7 @@ describe('exporter round-trip regressions', () => {
   it('HippelCoSo export encodes empty rows as the -2 rest command (note byte 0 is a real note)', async () => {
     const { parseHippelCoSoFile } = await import('@lib/import/formats/HippelCoSoParser');
     const { exportAsHippelCoSo } = await import('../HippelCoSoExporter');
-    const raw = fixture('public/data/songs/formats/prehistoric_tale.hipc');
+    const raw = fixture('public/data/songs/hippel-coso/prehistoric_tale.hipc');
     const song = await parseHippelCoSoFile(raw, 'prehistoric_tale.hipc');
     expect(song).not.toBeNull();
     const out = await toU8(await exportAsHippelCoSo(song as TrackerSong));
@@ -176,7 +176,7 @@ describe('exporter round-trip regressions', () => {
   it('SidMon1 export is the loaded module with the grid edits written in, notes at the period the player sounds', async () => {
     const { parseSidMon1File } = await import('@lib/import/formats/SidMon1Parser');
     const { exportSidMon1 } = await import('../SidMon1Exporter');
-    const raw = fixture('public/data/songs/formats/anarchy.sid1');
+    const raw = fixture('public/data/songs/sidmon-1/anarchy.sid1');
     const song = parseSidMon1File(raw, 'anarchy.sid1');
     // Unedited: byte-identical to the file that was loaded.
     const same = await toU8(await exportSidMon1(song as TrackerSong));
@@ -204,7 +204,7 @@ describe('exporter round-trip regressions', () => {
   it('FC export encodes note as period index xmNote-13 (was -12, shifting every note up a semitone)', async () => {
     const { parseFCFile } = await import('@lib/import/formats/FCParser');
     const { exportFC } = await import('../FCExporter');
-    const raw = fixture('public/data/songs/formats/anthrox.fc');
+    const raw = fixture('public/data/songs/future-composer-1.4/anthrox.fc');
     const song = await parseFCFile(raw, 'anthrox.fc');
     const out = await toU8(exportFC(song));
     const re = await parseFCFile(out.buffer.slice(0) as ArrayBuffer, 'anthrox.fc');
@@ -247,7 +247,7 @@ describe('exporter round-trip regressions', () => {
   it('FredEditor export is the module the song plays, byte for byte (was a rebuild from the display grid)', async () => {
     const { parseFredEditorFile } = await import('@lib/import/formats/FredEditorParser');
     const { exportFredEditor } = await import('../FredEditorExporter');
-    const raw = fixture('public/data/songs/formats/bomb jack.fred');
+    const raw = fixture('public/data/songs/fredmon/bomb jack.fred');
     const song = await parseFredEditorFile(raw, 'bomb jack.fred');
     const out = await toU8(await exportFredEditor(song));
     // The old exporter re-derived patterns, durations and instruments from the
@@ -359,7 +359,7 @@ describe('exporter round-trip regressions', () => {
   it('NRU export writes the full 0..255 note byte and the 0x0C empty-effect slot (was dropping notes >72 and forcing tone-porta)', async () => {
     const { parseNRUFile } = await import('@lib/import/formats/NRUParser');
     const { exportNRU } = await import('../NRUExporter');
-    const raw = fixture('public/data/songs/formats/howiedavies.nru');
+    const raw = fixture('public/data/songs/noiserunner/howiedavies.nru');
     const song = await parseNRUFile(raw, 'howiedavies.nru');
     const out = await toU8(await exportNRU(song));
     const re = await parseNRUFile(out.buffer.slice(0) as ArrayBuffer, 'howiedavies.nru');

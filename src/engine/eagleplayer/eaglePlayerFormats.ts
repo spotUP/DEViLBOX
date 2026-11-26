@@ -83,14 +83,14 @@ export const EAGLE_PLAYER_FORMATS: Readonly<Record<string, EaglePlayerFormat>> =
   },
   SoundPlayer: {
     id: 'SoundPlayer', label: 'Sound Player', player: 'SoundPlayer', prefixes: ['sjs'], voices: 4,
-    corpus: 'public/data/songs/formats/Scott Johnston/sjs.tune1', uadeEnvelopeCorrelation: 0.9986,
-    companions: ['public/data/songs/formats/Scott Johnston/smp.tune1'],
+    corpus: 'public/data/songs/scott-johnston/sjs.tune1', uadeEnvelopeCorrelation: 0.9986,
+    companions: ['public/data/songs/scott-johnston/smp.tune1'],
     isDefault: true,
   },
   MIDILoriciel: {
     id: 'MIDILoriciel', label: 'MIDI Loriciel', player: 'MIDI-Loriciel', prefixes: ['midi'], voices: 4,
-    corpus: 'public/data/songs/formats/Michel Winogradoff/MIDI.Cartoons 1', uadeEnvelopeCorrelation: 0.9836,
-    companions: ['public/data/songs/formats/Michel Winogradoff/SMPL.Cartoons 1'],
+    corpus: 'public/data/songs/michel-winogradoff/MIDI.Cartoons 1', uadeEnvelopeCorrelation: 0.9836,
+    companions: ['public/data/songs/michel-winogradoff/SMPL.Cartoons 1'],
     isDefault: true,
   },
 };

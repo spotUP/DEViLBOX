@@ -19,7 +19,7 @@ vi.mock('@lib/import/formats/RiffRaffParser', async (importOriginal) => {
   return { ...orig, parseRiffRaffFile: (...a: Parameters<typeof orig.parseRiffRaffFile>) => { sentinel.calls++; return orig.parseRiffRaffFile(...a); } };
 });
 
-const DIR = join(process.cwd(), 'public/data/songs/formats');
+const DIR = join(process.cwd(), 'public/data/songs/riff-raff');
 
 async function load(name: string): Promise<TrackerSong> {
   const { parseModuleToSong } = await import('../parseModuleToSong');

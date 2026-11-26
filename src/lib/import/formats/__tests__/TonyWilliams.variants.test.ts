@@ -20,8 +20,8 @@ import { parseTonyWilliamsFile, isTonyWilliamsFormat } from '@lib/import/formats
 import { walkTonyWilliams } from '@lib/import/formats/tonyWilliamsWalk';
 import { exportNativeSong } from '@lib/export/nativeExportRouter';
 
-const SONGS = ['public/data/songs/Sound Images/Tony Williams/chuckie egg 2.tw'];
-const GEN2 = 'public/data/songs/Sound Images/- unknown/warinthegulf.tw';
+const SONGS = ['public/data/songs/sound-images/Tony Williams/chuckie egg 2.tw'];
+const GEN2 = 'public/data/songs/sound-images/- unknown/warinthegulf.tw';
 
 describe('Tony Williams player variants', () => {
   it.each(SONGS)('%s: TW parser grid has notes on all 4 voices; native export is byte-exact', async (path) => {

@@ -23,9 +23,9 @@ import { parseFredEditorFile } from '../FredEditorParser';
 import { exportFredEditor } from '@/lib/export/FredEditorExporter';
 
 const CORPUS = [
-  'public/data/songs/formats/bomb jack.fred',
-  'public/data/songs/formats/fuzzball-title.fred',
-  'public/data/songs/formats/rebels.fred',
+  'public/data/songs/fredmon/bomb jack.fred',
+  'public/data/songs/fredmon/fuzzball-title.fred',
+  'public/data/songs/fredmon/rebels.fred',
   'public/data/songs/fredmon/fireworks ii.fred',
 ];
 const load = (p: string) => new Uint8Array(readFileSync(join(process.cwd(), p)));

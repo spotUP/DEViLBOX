@@ -14,7 +14,7 @@ import { getNoteTable } from '@/engine/renderer/TrackerGLRenderer';
 import { keyboardPeriod } from '@/engine/keyboardPeriod';
 import { xmNoteToToneJS } from '@/lib/xmConversions';
 
-const PATH = 'public/data/songs/formats/future basketball main.tw';
+const PATH = 'public/data/songs/sound-images/future basketball main.tw';
 const AMIGA_PAL_HALF = 3546895;
 
 describe('Tony Williams octave', () => {

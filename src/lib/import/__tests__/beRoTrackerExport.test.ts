@@ -16,7 +16,7 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 const ROOT = resolve(__dirname, '../../../..');
 const DIR = join(ROOT, 'test-data/berotracker');
 const songs = [
-  join(ROOT, 'public/data/songs/formats/wonderful-dream-landscapes.brt'),
+  join(ROOT, 'public/data/songs/berotracker/wonderful-dream-landscapes.brt'),
   ...(existsSync(DIR) ? readdirSync(DIR).filter((f) => f.endsWith('.brt')).map((f) => join(DIR, f)) : []),
 ].filter((f) => existsSync(f));
 const create = async (): Promise<BeRoTrackerEditModule> =>

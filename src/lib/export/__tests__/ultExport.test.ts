@@ -7,7 +7,7 @@ import { createWavFile } from '@/lib/import/InstrumentConverter';
 import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 import { exportULT } from '../ULTExporter';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/seasons.ult');
+const FIXTURE = join(process.cwd(), 'public/data/songs/ultra-tracker/seasons.ult');
 const ab = (u: Uint8Array) => u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength) as ArrayBuffer;
 const load = async () => {
   const b = readFileSync(FIXTURE);

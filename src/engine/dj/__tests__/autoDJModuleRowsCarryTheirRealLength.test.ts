@@ -5,7 +5,7 @@
  * comes from the track's one analysis summary (playlistMetaFromSummary), the song's real length
  * (trackLengthSec: the render, or the module's order walk past a capped preview render).
  *
- * Real modules (public/data/songs/formats/shortsong1.mod and "a sleep so deep.mod", parsed by the app's
+ * Real modules (public/data/songs/mod/shortsong1.mod and "a sleep so deep.mod", parsed by the app's
  * one parse path). Entry: getAutoDJ()'s own anticipate() - the path every pre-rendered next track takes.
  * Numbers: the row reads the render's length, and the session's planned set counts it instead of 240 s;
  * the analyser's 90 s preview of a longer module writes the module's walk length.
@@ -30,7 +30,7 @@ import type { AutoDJInternals } from './juggleTransitionHarness';
 
 async function parse(file: string) {
   const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-  return parseModuleToSong(new File([readFileSync(resolve(process.cwd(), 'public/data/songs/formats', file))], file));
+  return parseModuleToSong(new File([readFileSync(resolve(process.cwd(), 'public/data/songs/mod', file))], file));
 }
 
 /** A render that sounds like a groove of `seconds`, at 125 BPM. */

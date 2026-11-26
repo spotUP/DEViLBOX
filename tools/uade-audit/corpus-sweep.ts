@@ -48,7 +48,7 @@
  * so one bad file cannot cost the whole sweep.
  *
  * OPTIONS
- *   --dir <path>     corpus root (default public/data/songs/formats)
+ *   --dir <path>     corpus root (default public/data/songs, walked recursively)
  *   --only <a,b>     only paths containing one of these substrings
  *   --secs <n>       seconds to render per song (default 6)
  *   --jobs <n>       parallel worker processes (default 4)
@@ -80,7 +80,7 @@ import {
 } from './soundVerdict';
 
 const SAMPLE_RATE = 44100;
-const DEFAULT_CORPUS = join(PROJECT_ROOT, 'public/data/songs/formats');
+const DEFAULT_CORPUS = join(PROJECT_ROOT, 'public/data/songs');
 const DEFAULT_OUT = join(PROJECT_ROOT, 'test-data/uade-corpus-sweep.json');
 
 // ── Row ───────────────────────────────────────────────────────────────────────

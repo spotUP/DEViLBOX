@@ -7,7 +7,7 @@
  * after the opening ended. The arc is a function of the set's progress: the
  * phase is read when asked.
  *
- * Real module (public/data/songs/formats/shortsong1.mod: its order list,
+ * Real module (public/data/songs/mod/shortsong1.mod: its order list,
  * pattern starts and tempo through the real analysis builder; its audio as
  * the analyser would hear it, rendered to the same walk). Entry: getAutoDJ()'s
  * poll loop with Auto Juggle at its default (MUSICAL), the set phase NOT
@@ -62,7 +62,7 @@ import { DJSessionController, setSessionController } from '../autodj/sessionCont
 import type { DJTrackAnalysis } from '../autodj/types';
 import { setupStandalone, teardownStandalone, runStandalone } from './standaloneJuggleHarness';
 
-const MODULE = 'public/data/songs/formats/shortsong1.mod';
+const MODULE = 'public/data/songs/mod/shortsong1.mod';
 const BAR = 4 * 60 / 125;
 
 async function moduleAnalysis(): Promise<DJTrackAnalysis> {

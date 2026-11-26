@@ -98,8 +98,8 @@ describe('TFMX: a trackstep matrix edit is what the next play plays', { timeout:
   it('a pattern typed on a stopped voice is what the next play plays (mdat.turrican_bonus)', async () => {
     const { openSong } = await import('@/lib/song/openSong');
     const r = await openSong({
-      kind: 'bytes', name: 'mdat.turrican_bonus', bytes: bytesOf('public/data/songs/formats/mdat.turrican_bonus'),
-      companions: new Map([['smpl.turrican_bonus', bytesOf('public/data/songs/formats/smpl.turrican_bonus')]]),
+      kind: 'bytes', name: 'mdat.turrican_bonus', bytes: bytesOf('public/data/songs/tfmx/mdat.turrican_bonus'),
+      companions: new Map([['smpl.turrican_bonus', bytesOf('public/data/songs/tfmx/smpl.turrican_bonus')]]),
     }, { origin: 'mcp' });
     expect(r.ok, JSON.stringify(r)).toBe(true);
 

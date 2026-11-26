@@ -39,7 +39,7 @@ afterAll(() => setGridBaseline(null));
 const BASE = 0x30000;
 const fixtures: Array<[string, (b: ArrayBuffer, n: string) => TrackerSong | Promise<TrackerSong>]> = [
   ['public/data/songs/dave-lowe-new/m-bison.dln', parseDaveLoweNewFile],
-  ['public/data/songs/formats/incredibleshrinkingsphere.dl', parseDaveLoweFile],
+  ['public/data/songs/dave-lowe/incredibleshrinkingsphere.dl', parseDaveLoweFile],
 ];
 
 describe('a Dave Lowe grid edit reaches UADE chip RAM', () => {

@@ -3,18 +3,18 @@
  * fetchCorpus.ts - give every table row that has no corpus song one or two real songs from Modland (the server's own
  * route, /api/modland/search and /download on :3011), so the comparison batch can measure it. A candidate is kept only
  * when the row's own nuade player accepts it (probe verdict Supported) and it is small (<= 1.5 MB). Files go to
- * public/data/songs/formats/<modland filename>; the table's `corpus` is rewritten by hand-free text substitution.
+ * public/data/songs/<row id>/<modland filename>; the table's `corpus` is rewritten by hand-free text substitution.
  *
  *   npx tsx --tsconfig tsconfig.app.json tools/nuade/fetchCorpus.ts [id,...]
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { NuadeHeadless } from '../../src/engine/nuade/nuadeHeadless';
 import { NUADE_FORMAT_LIST } from '../../src/engine/nuade/nuadeFormats';
 import { ROOT } from './nuadeCompare';
 
 const SERVER = 'http://localhost:3011/api/modland';
-const OUT = 'public/data/songs/formats';
+const OUT = 'public/data/songs';
 const MAX_BYTES = 1_500_000;
 const WANT = 2;
 /** Downloads tried per row before giving up (the server rate-limits them). */
@@ -42,8 +42,8 @@ function accepts(nu: NuadeHeadless, id: string, bytes: Uint8Array, name: string)
 const flat = (name: string): string => name.replace(/[\\/]/g, '_');
 
 /** The server rate-limits downloads (429): wait and retry. */
-async function download(path: string): Promise<Uint8Array | null> {
-  const local = join(ROOT, OUT, flat(path.split('/').pop()!));
+async function download(path: string, id: string): Promise<Uint8Array | null> {
+  const local = join(ROOT, OUT, id, flat(path.split('/').pop()!));
   if (existsSync(local)) return new Uint8Array(readFileSync(local));
   for (let attempt = 0; attempt < 8; attempt++) {
     const r = await fetch(`${SERVER}/download?path=${encodeURIComponent(path)}`);
@@ -80,11 +80,12 @@ async function main(): Promise<void> {
           const name = hit.filename.toLowerCase();
           if (!(name.endsWith(`.${ext}`) || name.startsWith(`${ext}.`))) continue;
           if (++tries > MAX_TRIES) break;
-          const bytes = await download(hit.full_path);
+          const bytes = await download(hit.full_path, row.id);
           if (!bytes) continue;
           if (bytes.length > MAX_BYTES || bytes.length < 64) continue;
           if (!accepts(nu, row.id, bytes, hit.filename)) continue;
-          const rel = `${OUT}/${flat(hit.filename)}`;
+          const rel = `${OUT}/${row.id}/${flat(hit.filename)}`;
+          mkdirSync(join(ROOT, OUT, row.id), { recursive: true });
           if (!existsSync(join(ROOT, rel))) writeFileSync(join(ROOT, rel), bytes);
           got.push(rel);
         }
@@ -99,10 +100,11 @@ async function main(): Promise<void> {
       if (got.length >= WANT || ++tries > MAX_TRIES) break;
       if (seen.has(hit.full_path)) continue;
       seen.add(hit.full_path);
-      const bytes = await download(hit.full_path);
+      const bytes = await download(hit.full_path, row.id);
       if (!bytes) continue;
       if (bytes.length > MAX_BYTES || bytes.length < 64 || !accepts(nu, row.id, bytes, hit.filename)) continue;
-      const rel = `${OUT}/${flat(hit.filename)}`;
+      const rel = `${OUT}/${row.id}/${flat(hit.filename)}`;
+          mkdirSync(join(ROOT, OUT, row.id), { recursive: true });
       if (!existsSync(join(ROOT, rel))) writeFileSync(join(ROOT, rel), bytes);
       got.push(rel);
     }

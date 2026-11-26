@@ -21,7 +21,7 @@ import { parseSunTronicFile } from '@/lib/import/formats/SunTronicParser';
 import { parseHunks, parseSunTronicV13Score, HUNK_HEADER } from '@/lib/import/formats/SunTronicV13';
 import { exportAsSunTronic } from '../SunTronicExporter';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/mule.src');
+const FIXTURE = join(process.cwd(), 'public/data/songs/suntronic/mule.src');
 
 function loadModuleBytes(): Uint8Array {
   return new Uint8Array(readFileSync(FIXTURE));

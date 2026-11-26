@@ -23,7 +23,7 @@ import { join } from 'path';
 import { parseSunTronicV13Score } from '@/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../SunTronicPlayer';
 
-const CORPUS = join(__dirname, '../../../../public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(__dirname, '../../../../public/data/songs/suntronic');
 const TICKS = 40;
 const V = 1;
 

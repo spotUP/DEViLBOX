@@ -16,7 +16,7 @@
  * On revert (grid re-encode / no blockRows) the encoder emits a synthesised
  * stream that differs from the source, so no block matches and this test fails.
  *
- * Fixture: public/data/songs/formats/bruno_time.sid2 (real module).
+ * Fixture: public/data/songs/sidmon-2/bruno_time.sid2 (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -24,7 +24,7 @@ import { join } from 'path';
 import { parseSidMon2File } from '../SidMon2Parser';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/bruno_time.sid2');
+const FIXTURE = join(process.cwd(), 'public/data/songs/sidmon-2/bruno_time.sid2');
 
 describe('SidMon II pattern codec', () => {
   it('the variable encoder reproduces every pattern block byte-for-byte', async () => {

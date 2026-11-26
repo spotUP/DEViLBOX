@@ -57,13 +57,13 @@ interface Case {
 // Sites measured with nuade's own render (heardAt: the first 20 ms where the raised note changes the voice). The
 // SoundMon and InStereo sites are tracks other positions play too: the edit must stay at its own position.
 const CASES: Case[] = [
-  { id: 'robhubbard', prefKey: 'robHubbard', file: 'public/data/songs/formats/centurion_battle.rh', pattern: 0, channel: 0, row: 48, swapAt: 2, endAt: 4, heardAt: 2.86 },
-  { id: 'soundmaster', prefKey: 'soundMaster', file: "public/data/songs/formats/rackney'sisland_4.sm", pattern: 12, channel: 1, row: 0, swapAt: 6.5, endAt: 9, heardAt: 7.66 },
-  { id: 'hippel', prefKey: 'hippelCoso', file: 'public/data/songs/formats/prehistoric_tale.hipc', pattern: 3, channel: 3, row: 'first-note', swapAt: 6, endAt: 8.5, heardAt: 6.84 },
-  { id: 'instereo1', prefKey: 'inStereo1', file: 'public/data/songs/formats/fantasi8.is', pattern: 8, channel: 1, row: 0, swapAt: 6.5, endAt: 9, heardAt: 7.68 },
-  { id: 'sidmon2', prefKey: 'sidmon2', file: 'public/data/songs/formats/bruno_time.sid2', pattern: 2, channel: 1, row: 2, swapAt: 14.5, endAt: 17, heardAt: 15.7 },
-  { id: 'mmdc', prefKey: 'mmdc', file: 'public/data/songs/formats/captain planet and the planeteers - title.mmdc', pattern: 0, channel: 1, row: 16, swapAt: 1, endAt: 5, heardAt: 1.55 },
-  { id: 'soundmon', prefKey: 'soundmon', file: 'public/data/songs/formats/antidust.bp3', pattern: 4, channel: 0, row: 0, swapAt: 6.5, endAt: 9, heardAt: 7.68 },
+  { id: 'robhubbard', prefKey: 'robHubbard', file: 'public/data/songs/rob-hubbard/centurion_battle.rh', pattern: 0, channel: 0, row: 48, swapAt: 2, endAt: 4, heardAt: 2.86 },
+  { id: 'soundmaster', prefKey: 'soundMaster', file: "public/data/songs/sound-master/rackney'sisland_4.sm", pattern: 12, channel: 1, row: 0, swapAt: 6.5, endAt: 9, heardAt: 7.66 },
+  { id: 'hippel', prefKey: 'hippelCoso', file: 'public/data/songs/hippel-coso/prehistoric_tale.hipc', pattern: 3, channel: 3, row: 'first-note', swapAt: 6, endAt: 8.5, heardAt: 6.84 },
+  { id: 'instereo1', prefKey: 'inStereo1', file: 'public/data/songs/instereo!/fantasi8.is', pattern: 8, channel: 1, row: 0, swapAt: 6.5, endAt: 9, heardAt: 7.68 },
+  { id: 'sidmon2', prefKey: 'sidmon2', file: 'public/data/songs/sidmon-2/bruno_time.sid2', pattern: 2, channel: 1, row: 2, swapAt: 14.5, endAt: 17, heardAt: 15.7 },
+  { id: 'mmdc', prefKey: 'mmdc', file: 'public/data/songs/octamed-mmdc/captain planet and the planeteers - title.mmdc', pattern: 0, channel: 1, row: 16, swapAt: 1, endAt: 5, heardAt: 1.55 },
+  { id: 'soundmon', prefKey: 'soundmon', file: 'public/data/songs/bp-soundmon-3/antidust.bp3', pattern: 4, channel: 0, row: 0, swapAt: 6.5, endAt: 9, heardAt: 7.68 },
 ];
 
 const SR = 48000;

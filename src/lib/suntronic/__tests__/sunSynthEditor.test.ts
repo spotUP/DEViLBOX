@@ -16,7 +16,7 @@ import type { SunTronicConfig } from '@typedefs/sunTronicInstrument';
 import { parseSunTronicV13Score } from '@/lib/import/formats/SunTronicV13';
 import { parseSunTronicFile } from '@/lib/import/formats/SunTronicParser';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 
 function baseCfg(overrides: Partial<SunTronicConfig> = {}): SunTronicConfig {
   return {

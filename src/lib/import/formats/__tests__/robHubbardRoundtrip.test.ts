@@ -18,14 +18,14 @@
  * encodes the mapped channel rows and asserts the bytes equal the original block.
  * On revert (fixed stub layout) song.uadeVariableLayout is undefined → this fails.
  *
- * Fixture: public/data/songs/formats/centurion_battle.rh (real module).
+ * Fixture: public/data/songs/rob-hubbard/centurion_battle.rh (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseRobHubbardFile } from '../RobHubbardParser';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/centurion_battle.rh');
+const FIXTURE = join(process.cwd(), 'public/data/songs/rob-hubbard/centurion_battle.rh');
 
 describe('Rob Hubbard pattern codec', () => {
   it('the variable encoder reproduces every command block byte-for-byte', async () => {

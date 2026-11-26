@@ -26,7 +26,7 @@ import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import { parseDavidWhittakerFile } from '@/lib/import/formats/DavidWhittakerParser';
 import { walkDavidWhittaker, dwSubsongCount, DW_WALK } from '@/lib/import/formats/DavidWhittakerWasmExtractor';
 
-const FILES = ['public/data/songs/formats/apb.dw', 'public/data/songs/david-whittaker/garfield2+.dw'];
+const FILES = ['public/data/songs/david-whittaker/apb.dw', 'public/data/songs/david-whittaker/garfield2+.dw'];
 const TOLERANCE_MS = 60;
 const WINDOW_SECONDS = 60;
 const MIN_COVERAGE = 0.95;

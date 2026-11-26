@@ -14,7 +14,7 @@ import { setGridBaseline, baselineOf } from '@/lib/song/gridBaseline';
 const diffAt = (a: Uint8Array, b: Uint8Array) => a.reduce<number[]>((l, v, k) => (v !== b[k] ? [...l, k] : l), []);
 
 for (const NAME of ['agony-level1.aam', 'agony-level2.aam']) {
-  const raw = readFileSync(`public/data/songs/formats/${NAME}`);
+  const raw = readFileSync(`public/data/songs/art-and-magic/${NAME}`);
   const bytes = new Uint8Array(raw);
   const load = () => parseArtAndMagicFile(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer, NAME);
 

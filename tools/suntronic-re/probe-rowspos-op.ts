@@ -9,7 +9,7 @@ import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV1
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../..');
-const CORPUS = resolve(REPO, 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = resolve(REPO, 'public/data/songs/suntronic');
 
 const u16 = (b: Uint8Array, o: number): number => ((b[o] ?? 0) << 8) | (b[o + 1] ?? 0);
 

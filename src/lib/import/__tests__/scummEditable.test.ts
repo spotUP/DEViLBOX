@@ -13,7 +13,7 @@ import { noteToPeriod } from '@/lib/amiga/periodNotes';
 import { setGridBaseline, baselineOf } from '@/lib/song/gridBaseline';
 
 const NAME = 'zaktitle.scumm';
-const raw = readFileSync(`public/data/songs/formats/${NAME}`);
+const raw = readFileSync(`public/data/songs/scumm/${NAME}`);
 const bytes = new Uint8Array(raw);
 const load = () => parseSCUMMFile(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer, NAME);
 const diffAt = (a: Uint8Array, b: Uint8Array) => a.reduce<number[]>((l, v, k) => (v !== b[k] ? [...l, k] : l), []);

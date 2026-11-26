@@ -16,7 +16,7 @@
  * the channels stay silent.
  *
  * Fixture (real module, committed):
- *   public/data/songs/formats/SUNTronicTunes/analgestic2.src
+ *   public/data/songs/suntronic/analgestic2.src
  *     → external samples under instr/: perc1.x, perc2.x, bio
  */
 import { describe, it, expect } from 'vitest';
@@ -24,7 +24,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { sunTronicCompanionPaths } from '../SunTronicV13';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 
 function load(name: string): ArrayBuffer {
   const raw = new Uint8Array(readFileSync(join(CORPUS, name)));

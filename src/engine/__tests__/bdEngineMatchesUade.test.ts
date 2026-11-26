@@ -58,7 +58,7 @@ function finished(r: Result): Done {
 }
 
 const SONGS = [
-  'public/data/songs/formats/mickey_mouse.bd',
+  'public/data/songs/ben-daglish/mickey_mouse.bd',
   'public/data/songs/ben-daglish/motorhead-titleandingame.bd',
 ];
 

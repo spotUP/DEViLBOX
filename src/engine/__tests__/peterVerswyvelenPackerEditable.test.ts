@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parsePeterVerswyvelenPackerFile } from '@/lib/import/formats/PeterVerswyvelenPackerParser';
 import { noteToPeriod } from '@/lib/amiga/periodNotes';
 
-const path = 'public/data/songs/formats/zarathrusta title.pvp';
+const path = 'public/data/songs/peter-verswyvelen/zarathrusta title.pvp';
 const load = () => { const b = readFileSync(path); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 const parse = () => parsePeterVerswyvelenPackerFile(load(), 'zarathrusta title.pvp');
 

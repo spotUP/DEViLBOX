@@ -5,7 +5,7 @@ import { join } from 'path';
 import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
 const name = process.argv[2] ?? 'globe.src';
-const b = readFileSync(join(process.cwd(),'public/data/songs/formats/SUNTronicTunes',name));
+const b = readFileSync(join(process.cwd(),'public/data/songs/suntronic',name));
 const score = parseSunTronicV13Score(new Uint8Array(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength)));
 console.log('sampledInstruments', score.sampledInstruments.length);
 const player: any = new SunTronicPlayer(score);

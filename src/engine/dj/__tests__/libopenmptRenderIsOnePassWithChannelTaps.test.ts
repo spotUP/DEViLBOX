@@ -22,7 +22,7 @@ import type { ChannelScopeTrack } from '../channelScopeTrack';
 interface Rendered { left: Float32Array; channelScopes?: ChannelScopeTrack }
 
 function render(file: string, seconds: number): Promise<Rendered> {
-  const b = readFileSync(join(process.cwd(), 'public/data/songs/formats', file));
+  const b = readFileSync(join(process.cwd(), 'public/data/songs/s3m', file));
   const w = new Worker(new URL('@/workers/dj-render.worker.ts', import.meta.url));
   return new Promise((resolve, reject) => {
     w.onmessage = (e: MessageEvent) => {

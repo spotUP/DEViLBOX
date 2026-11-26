@@ -13,7 +13,7 @@ import { buildQuartetGrid, quartetSongBases, QUARTET_ROWS_PER_PATTERN } from '..
 
 const FIXTURES = [
   'public/data/songs/quartet-psg/horror zombies from crypt.sqt',
-  'public/data/songs/formats/warlock_the_avenger.sqt',
+  'public/data/songs/quartet-psg/warlock_the_avenger.sqt',
 ];
 
 async function load(rel: string) {

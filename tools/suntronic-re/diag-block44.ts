@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 import { decodeSunBlockPool, buildPoolRowIndex } from '../../src/lib/import/formats/sunNativeData';
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 const score: any = parseSunTronicV13Score(new Uint8Array(readFileSync(join(CORPUS, 'shades.src'))));
 const pool = decodeSunBlockPool(score);
 const idx = buildPoolRowIndex(score);

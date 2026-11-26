@@ -20,7 +20,7 @@ interface AdPlugModule {
   UTF8ToString(p: number): string;
 }
 
-const DRO_DIR = join(process.cwd(), 'public/data/songs/Ad Lib/DOSBox/_unknown');
+const DRO_DIR = join(process.cwd(), 'public/data/songs/ad-lib/DOSBox/_unknown');
 
 async function loadModule(): Promise<AdPlugModule> {
   const js = readFileSync(join(process.cwd(), 'public/adplug/AdPlugPlayer.js'), 'utf8');

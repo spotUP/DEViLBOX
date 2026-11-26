@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { parseSunTronicV13Score, sunCommandLen, sunPitchToNote } from '../../src/lib/import/formats/SunTronicV13';
 
-const buf = new Uint8Array(readFileSync('/Users/spot/Code/DEViLBOX/public/data/songs/formats/SUNTronicTunes/mule.src'));
+const buf = new Uint8Array(readFileSync('/Users/spot/Code/DEViLBOX/public/data/songs/suntronic/mule.src'));
 const score = parseSunTronicV13Score(buf);
 const h1 = score.h1;
 const sub = score.subsongs[0];

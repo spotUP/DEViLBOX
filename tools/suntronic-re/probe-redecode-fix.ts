@@ -10,7 +10,7 @@ import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser
 import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 import { decodeSunGroup } from '../../src/lib/import/formats/sunGroupCodec';
 
-const CORPUS='public/data/songs/formats/SUNTronicTunes';
+const CORPUS='public/data/songs/suntronic';
 let cells=0, linearOk=0, redecodeOk=0, redecodeBad=0, glideNonlinear=0;
 
 for (const song of readdirSync(CORPUS).filter(f=>f.endsWith('.src'))) {

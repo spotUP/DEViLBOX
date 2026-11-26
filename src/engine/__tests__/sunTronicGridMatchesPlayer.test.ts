@@ -27,7 +27,7 @@ import { SunTronicPlayer } from '@/engine/suntronic/SunTronicPlayer';
 import { addCompanions } from '../../../tools/uade-audit/uadeRenderCore';
 import { compareGridToWalk, walkStats, openUade, PaulaSession, oracleStats, type WalkCell } from './gridOracle';
 
-const DIRS = ['public/data/songs/formats/SUNTronicTunes', 'public/data/songs/SUNTronicTunes'];
+const DIRS = ['public/data/songs/suntronic', 'public/data/songs/suntronic'];
 
 interface Entry { name: string; bytes: Uint8Array }
 

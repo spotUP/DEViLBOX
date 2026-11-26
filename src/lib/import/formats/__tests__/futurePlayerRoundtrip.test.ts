@@ -34,7 +34,7 @@ describeVariableBlockCarrier('futurePlayer', parse);
  * and each "block" was other bytes of the file; a write back would have patched the wrong place.
  */
 describe('futurePlayer carrier addresses', () => {
-  for (const f of ['public/data/songs/formats/hybris.fp', 'public/data/songs/formats/imploder_drums.fp']) {
+  for (const f of ['public/data/songs/future-player/hybris.fp', 'public/data/songs/future-player/imploder_drums.fp']) {
     it(`${f.split('/').pop()}: every carried block is the file's own bytes at its address, and starts at a stream the player runs`, () => {
       const bytes = readFileSync(join(process.cwd(), f));
       const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
@@ -61,7 +61,7 @@ describe('futurePlayer carrier addresses', () => {
 
 describe('Future Player removed notes (rest rewrite)', () => {
   it('removing notes exports them as rests: the notes are gone, the module keeps its length and every other note', async () => {
-    const file = 'public/data/songs/formats/hybris.fp';
+    const file = 'public/data/songs/future-player/hybris.fp';
     const bytes = readFileSync(join(process.cwd(), file));
     const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     const song = parse(buf, file);
@@ -85,7 +85,7 @@ describe('Future Player removed notes (rest rewrite)', () => {
 
 describe('Future Player removed commands (no-op overwrite)', () => {
   it('clearing the transpose, portamento and arpeggio commands exports them as no-ops: none is shown, timing and length unchanged', async () => {
-    const file = 'public/data/songs/formats/hybris.fp';
+    const file = 'public/data/songs/future-player/hybris.fp';
     const bytes = readFileSync(join(process.cwd(), file));
     const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     const song = parse(buf, file);

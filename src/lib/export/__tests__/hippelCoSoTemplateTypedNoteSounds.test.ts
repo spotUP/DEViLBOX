@@ -23,7 +23,7 @@ function playerSubsongCount(b: Uint8Array): number {
 
 describe('Hippel CoSo blank template plays on nuade', () => {
   it('the exporter writes a song table the player accepts when every cell is cleared (the template generator path)', async () => {
-    const fixture = 'public/data/songs/formats/prehistoric_tale.hipc';
+    const fixture = 'public/data/songs/hippel-coso/prehistoric_tale.hipc';
     const song = await parseAs(fixture, readFixture(fixture));
     for (const p of song.patterns) for (const ch of p.channels) ch.rows = ch.rows.map(() => ({ ...EMPTY_CELL }));
     const out = await exportAsHippelCoSo(song);

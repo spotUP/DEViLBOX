@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parseUNICFile } from '@/lib/import/formats/UNICParser';
 import { exportUNIC } from '@/lib/export/UNICExporter';
 
-const FILE = 'public/data/songs/formats/african dreams.unic';
+const FILE = 'public/data/songs/unic-tracker/african dreams.unic';
 const load = async () => {
   const b = readFileSync(FILE);
   const buf = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;

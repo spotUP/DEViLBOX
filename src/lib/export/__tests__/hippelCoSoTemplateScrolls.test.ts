@@ -36,7 +36,7 @@ async function highestRowPlayed(bytes: Uint8Array, seconds: number): Promise<num
 
 describe('Hippel CoSo New Song: the playhead scrolls through the song', () => {
   it('an all-empty song exported from scratch plays one row per step (the template generator path)', async () => {
-    const fixture = 'public/data/songs/formats/prehistoric_tale.hipc';
+    const fixture = 'public/data/songs/hippel-coso/prehistoric_tale.hipc';
     const song = await parseAs(fixture, readFixture(fixture));
     for (const p of song.patterns) for (const ch of p.channels) ch.rows = ch.rows.map(() => ({ ...EMPTY_CELL }));
     const out = await exportAsHippelCoSo(song);

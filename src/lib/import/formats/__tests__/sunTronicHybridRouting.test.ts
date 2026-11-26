@@ -25,7 +25,7 @@ import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 
 function muleBuffer(): ArrayBuffer {
   const bytes = new Uint8Array(
-    readFileSync(join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/mule.src')),
+    readFileSync(join(process.cwd(), 'public/data/songs/suntronic/mule.src')),
   );
   // Copy into a standalone ArrayBuffer (Node may hand back a pooled buffer).
   return bytes.slice().buffer;

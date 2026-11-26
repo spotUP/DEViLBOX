@@ -32,8 +32,8 @@ interface Case {
 }
 
 const CASES: Case[] = [
-  { name: 'InStereo1 fantasi8.is', dir: 'instereo1', stem: 'InStereo1', transform: instereo1Transform, file: 'public/data/songs/formats/fantasi8.is', parse: parseInStereo1File },
-  { name: 'InStereo2 stereo_feeling.is20', dir: 'instereo2', stem: 'InStereo2', transform: instereo2Transform, file: 'public/data/songs/formats/stereo_feeling.is20', parse: parseInStereo2File },
+  { name: 'InStereo1 fantasi8.is', dir: 'instereo1', stem: 'InStereo1', transform: instereo1Transform, file: 'public/data/songs/instereo!/fantasi8.is', parse: parseInStereo1File },
+  { name: 'InStereo2 stereo_feeling.is20', dir: 'instereo2', stem: 'InStereo2', transform: instereo2Transform, file: 'public/data/songs/instereo!-2.0/stereo_feeling.is20', parse: parseInStereo2File },
 ];
 
 describe('InStereo playhead follows the grid row', () => {

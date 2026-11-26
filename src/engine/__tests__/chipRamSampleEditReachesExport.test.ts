@@ -27,7 +27,7 @@ vi.mock('@/engine/uade/liveModuleWrite', () => ({
 }));
 vi.mock('@/engine/uade/UADEEngine', () => ({ UADEEngine: { hasInstance: () => true, getInstance: () => ({}) } }));
 
-const PATH = 'public/data/songs/formats/future basketball main.tw';
+const PATH = 'public/data/songs/sound-images/future basketball main.tw';
 
 function wav16(pcm8: Int8Array, rate: number): ArrayBuffer {
   const n = pcm8.length;

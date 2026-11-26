@@ -28,8 +28,8 @@ import type { HivelyNativeData } from '@/types/tracker';
 
 const FILES = [
   'public/data/songs/ahx/amanda.ahx',
-  'public/data/songs/formats/aces_high.ahx',
-  'public/data/songs/formats/hexplosion.hvl',
+  'public/data/songs/ahx/aces_high.ahx',
+  'public/data/songs/hivelytracker/hexplosion.hvl',
   'public/data/songs/hivelytracker/waiting for a message.hvl',
 ];
 

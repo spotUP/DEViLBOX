@@ -18,7 +18,7 @@ const PAULA_FIRST10 = [
 
 describe('Sonic Arranger octave', () => {
   it('almighty.sa grid notes equal the pitches Paula plays', async () => {
-    const raw = readFileSync('public/data/songs/formats/almighty.sa');
+    const raw = readFileSync('public/data/songs/sonic-arranger/almighty.sa');
     const buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
     const song = await parseSonicArrangerFile(buf, 'almighty.sa');
     const order = song.songPositions?.length ? song.songPositions : song.patterns.map((_, i) => i);

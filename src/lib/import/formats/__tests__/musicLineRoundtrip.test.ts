@@ -15,7 +15,7 @@
  * decompressed PART that differs from the compressed source, so no block matches
  * and this test fails.
  *
- * Fixture: public/data/songs/formats/harmonic disorder.ml (real module).
+ * Fixture: public/data/songs/musicline-editor/harmonic disorder.ml (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -23,7 +23,7 @@ import { join } from 'path';
 import { parseMusicLineFile } from '../MusicLineParser';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/harmonic disorder.ml');
+const FIXTURE = join(process.cwd(), 'public/data/songs/musicline-editor/harmonic disorder.ml');
 
 describe('MusicLine pattern codec', () => {
   it('the variable encoder reproduces every compressed PART block byte-for-byte', () => {

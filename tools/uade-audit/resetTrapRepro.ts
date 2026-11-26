@@ -15,7 +15,7 @@
  *
  *   npx tsx --tsconfig tsconfig.app.json tools/uade-audit/resetTrapRepro.ts \
  *     public/uade/UADE.js public/uade/UADE.wasm \
- *     "public/data/songs/formats/wicked.wb" "public/data/songs/formats/eco.gray"
+ *     "public/data/songs/wally-beben/wicked.wb" "public/data/songs/fred-gray/eco.gray"
  *
  *   PRE=stop|cleanup|render-to-end  runs that call before the reset (none help).
  *

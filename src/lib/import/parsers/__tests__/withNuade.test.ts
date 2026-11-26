@@ -19,7 +19,7 @@ import { NuadeHeadless } from '@/engine/nuade/nuadeHeadless';
 import { setNuadeProbe } from '@/engine/nuade/nuadeProbe';
 
 const ROOT = join(__dirname, '../../../../..');
-const RH = 'public/data/songs/formats/centurion_battle.rh';
+const RH = 'public/data/songs/rob-hubbard/centurion_battle.rh';
 const fileOf = (path: string) => {
   const b = readFileSync(join(ROOT, path));
   return new File([b], path.split('/').pop()!);
@@ -136,7 +136,7 @@ describe('withNuade reachability: parseModuleToSong -> Nuade descriptor', () => 
 
   // NAB-2: Sonic Arranger's 0x4EFA player-binary form has no engine of ours (its loader refuses it); it plays on nuade.
   it('a Sonic Arranger 0x4EFA file plays on nuade at the row\'s own default, the SOARV1.0 file stays on our engine, and UADE can still be chosen', async () => {
-    const SA4 = 'public/data/songs/formats/almighty.sa', SA1 = 'public/data/songs/sonic-arranger/mega end.sa';
+    const SA4 = 'public/data/songs/sonic-arranger/almighty.sa', SA1 = 'public/data/songs/sonic-arranger/mega end.sa';
     useSettingsStore.getState().setFormatEngine('sonicArranger', 'native');
     const variant = await parseModuleToSong(fileOf(SA4));
     expect(variant.nuadePlayerId).toBe('sonicarranger');

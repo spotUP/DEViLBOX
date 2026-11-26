@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser';
 import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
-const path='/Users/spot/Code/DEViLBOX/public/data/songs/formats/SUNTronicTunes/ready';
+const path='/Users/spot/Code/DEViLBOX/public/data/songs/suntronic/ready';
 const ab = readFileSync(path);
 const buffer = ab.buffer.slice(ab.byteOffset, ab.byteOffset+ab.byteLength);
 const song:any = parseSunTronicFile(buffer as ArrayBuffer, 'ready.src');

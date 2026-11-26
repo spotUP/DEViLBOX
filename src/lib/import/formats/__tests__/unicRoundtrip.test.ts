@@ -9,14 +9,14 @@
  *
  * Fix is the clean inverse: encodeUNICCell now uses `noteIdx = xmNote - UNIC_NOTE_OFFSET`.
  *
- * Fixture: public/data/songs/formats/african dreams.unic (real module).
+ * Fixture: public/data/songs/unic-tracker/african dreams.unic (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { isUNICFormat, parseUNICFile } from '../UNICParser';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/african dreams.unic');
+const FIXTURE = join(process.cwd(), 'public/data/songs/unic-tracker/african dreams.unic');
 
 describe('UNIC Tracker pattern codec', () => {
   it('encodeCell is a byte-exact inverse of decodeCell over every pattern cell', async () => {

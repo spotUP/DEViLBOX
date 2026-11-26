@@ -25,7 +25,7 @@ vi.mock('@/lib/songdb', () => ({ computeSongDBHash: () => '', lookupSongDB: asyn
 
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 
-const DIR = resolve(import.meta.dirname, '../../../../public/data/songs/formats');
+const DIR = resolve(import.meta.dirname, '../../../../public/data/songs/tfmx');
 
 /** Notes per voice in one TFMX pattern, read from the raw bytes the way the decoder routes them. */
 function rawNotesPerVoice(mdat: Uint8Array, patternOffset: number): number[] {

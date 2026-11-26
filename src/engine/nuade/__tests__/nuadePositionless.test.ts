@@ -9,7 +9,7 @@ import { songBuffer } from '../../__tests__/workletHarness';
 import { NuadeEngine, type NuadePosition } from '../NuadeEngine';
 import { WASMChannelOutputsEngine } from '@engine/wasm/WASMSingletonBase';
 
-const TF = 'public/data/songs/formats/follin_smallest.tf';
+const TF = 'public/data/songs/follin-player-ii/follin_smallest.tf';
 // The DEViLBOX Tim Follin grid: one row per 50 Hz tick, speed 1.
 const GRID = { initialSpeed: 1, songPositions: [0], patterns: [{ length: 100000 }] as never, restartPosition: 0 };
 

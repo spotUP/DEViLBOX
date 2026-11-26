@@ -72,7 +72,7 @@ describe('SunTronic native pitch/volume (EFFECTS port)', () => {
   });
 
   it('mule.src synth[0]: produces an in-range Paula period + volume', () => {
-    const buf = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/mule.src')));
+    const buf = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/suntronic/mule.src')));
     const s0 = parseSunTronicV13Score(buf).synthInstruments[0];
     expect(s0.volEnv.length).toBeGreaterThan(0);
     const st = createPitchState(24 << 8, 0x40);

@@ -22,7 +22,7 @@ import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 const NAME = 'follin_smallest.tf';
-const raw = readFileSync(`${process.cwd()}/public/data/songs/formats/${NAME}`);
+const raw = readFileSync(`${process.cwd()}/public/data/songs/follin-player-ii/${NAME}`);
 const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
 
 

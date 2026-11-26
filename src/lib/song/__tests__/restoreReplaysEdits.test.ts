@@ -50,7 +50,7 @@ vi.mock('@stores/useInstrumentTypeStore', () => ({
 }));
 
 const NAME = 'anarchy.sid1';
-const FILE = join(__dirname, '../../../../public/data/songs/formats', NAME);
+const FILE = join(__dirname, '../../../../public/data/songs/sidmon-1', NAME);
 const b64 = (u: Uint8Array) => Buffer.from(u).toString('base64');
 
 async function savedProject(editNote: number) {

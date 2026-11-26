@@ -15,7 +15,7 @@
  * On revert (grid re-encode / no blockRows) the encoder emits a synthesised stream
  * that differs from the source, so no block matches and this test fails.
  *
- * Fixture: public/data/songs/formats/prehistoric_tale.hipc (real module).
+ * Fixture: public/data/songs/hippel-coso/prehistoric_tale.hipc (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -26,7 +26,7 @@ import type { TrackerSong } from '@engine/TrackerReplayer';
 import type { HippelCoSoConfig } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/prehistoric_tale.hipc');
+const FIXTURE = join(process.cwd(), 'public/data/songs/hippel-coso/prehistoric_tale.hipc');
 
 describe('Hippel CoSo pattern codec', () => {
   it('the variable encoder reproduces every pattern block byte-for-byte', async () => {

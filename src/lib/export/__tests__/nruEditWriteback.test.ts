@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 
 async function load() {
   const { parseNRUFile } = await import('@lib/import/formats/NRUParser');
-  const raw = readFileSync('public/data/songs/formats/howiedavies.nru');
+  const raw = readFileSync('public/data/songs/noiserunner/howiedavies.nru');
   const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
   return { raw: new Uint8Array(ab), song: (await parseNRUFile(ab, 'howiedavies.nru'))! };
 }

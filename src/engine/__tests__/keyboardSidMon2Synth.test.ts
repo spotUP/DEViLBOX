@@ -34,7 +34,7 @@ import { pinEditPathEngine } from './helpers/pinEditPathEngine';
 pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
 describe('SidMon II keys play the replayer voice of the song instrument', () => {
-  const buf = songBuffer('public/data/songs/formats/bruno_time.sid2');
+  const buf = songBuffer('public/data/songs/sidmon-2/bruno_time.sid2');
 
   it('bruno_time.sid2: a typed key reaches sd2_note_on for the instrument and note of the grid cell, at the song pitch and level', async () => {
     const song = await parseSidMon2File(buf.slice(0), 'bruno_time.sid2');

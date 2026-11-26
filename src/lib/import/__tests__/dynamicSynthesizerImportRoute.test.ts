@@ -2,7 +2,7 @@
  * Dynamic Synthesizer phase A: loading dns.ptc through the app's import entry point (parseModuleToSong) yields the
  * decoder's time-aligned grid with byte-exact stream carriers.
  *
- * Expected values come from the decoder run on public/data/songs/formats/dns.ptc (14096 bytes): fixed-pattern
+ * Expected values come from the decoder run on public/data/songs/dynamic-synthesizer/dns.ptc (14096 bytes): fixed-pattern
  * sequencer (0x60-byte patterns of 48 steps, 100 Hz tick), song speed 3 -> BPM 250. Eight pattern streams at
  * 0x292c + n*0x60 (n = 0..7), twelve song positions of 48 rows = 576 rows. Voice 1 (track 0) starts on row 0 with
  * note 28 and instrument 0, note off on row 5, then note 28 again on row 6. Tracks 4 and 5 never play.
@@ -25,7 +25,7 @@ vi.mock('@lib/import/formats/DynamicSynthesizerParser', async (importOriginal) =
   };
 });
 
-const DIR = join(process.cwd(), 'public/data/songs/formats');
+const DIR = join(process.cwd(), 'public/data/songs/dynamic-synthesizer');
 
 function notesOf(song: TrackerSong, v: number): Array<[number, number, number]> {
   const out: Array<[number, number, number]> = [];

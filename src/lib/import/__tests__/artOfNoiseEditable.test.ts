@@ -25,7 +25,7 @@ const NAME = 'inside.blipp.aon';
 const bytes = new Uint8Array(readFileSync(resolve(__dirname, '../../../../public/data/songs/art-of-noise', NAME)));
 // inside.blipp.aon has no shared stored pattern; action_section.aon shows 8 of its 14 positions from shared ones.
 const SHARED = 'action_section.aon';
-const sharedBytes = new Uint8Array(readFileSync(resolve(__dirname, '../../../../public/data/songs/formats', SHARED)));
+const sharedBytes = new Uint8Array(readFileSync(resolve(__dirname, '../../../../public/data/songs/art-of-noise', SHARED)));
 const load = (b = bytes, name = NAME) => parseModuleToSong(new File([b.slice().buffer as ArrayBuffer], name));
 const exported = async (song: TrackerSong) => new Uint8Array(await (await exportArtOfNoise(song)).data.arrayBuffer());
 const diffAt = (a: Uint8Array, b: Uint8Array) => a.reduce<number[]>((l, v, k) => (v !== b[k] ? [...l, k] : l), []);

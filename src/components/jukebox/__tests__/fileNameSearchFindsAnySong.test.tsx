@@ -17,7 +17,7 @@ const INDEX = {
   dirs: {},
   entries: [{ id: 'david-whittaker', label: 'David Whittaker', formatKey: 'davidWhittaker', files: ['/data/songs/david-whittaker/other.dw'], total: 3, dir: '/data/songs/david-whittaker' }],
 };
-const FILES = { files: [['/data/songs/formats/apb.dw', 'david-whittaker'], ['/data/songs/david-whittaker/other.dw', 'david-whittaker']] };
+const FILES = { files: [['/data/songs/david-whittaker/apb.dw', 'david-whittaker'], ['/data/songs/david-whittaker/other.dw', 'david-whittaker']] };
 
 describe('jukebox file-name search', { timeout: 60000 }, () => {
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); openSong.mockClear(); });
@@ -45,6 +45,6 @@ describe('jukebox file-name search', { timeout: 60000 }, () => {
     await waitFor(() => expect(openSong).toHaveBeenCalled());
     const src = openSong.mock.calls[0]?.[0] as { kind: string; url: string };
     expect(src.kind).toBe('url');
-    expect(src.url).toBe('/data/songs/formats/apb.dw');
+    expect(src.url).toBe('/data/songs/david-whittaker/apb.dw');
   });
 });

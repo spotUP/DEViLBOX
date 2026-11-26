@@ -9,7 +9,7 @@ import { join } from 'path';
 
 export { parseSunTronicFile } from '../SunTronicParser';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 
 export function readFixture(name: string): ArrayBuffer {
   const raw = new Uint8Array(readFileSync(join(CORPUS, name)));

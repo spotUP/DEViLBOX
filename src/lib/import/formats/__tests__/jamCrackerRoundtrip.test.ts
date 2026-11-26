@@ -16,7 +16,7 @@
  * jamcracker-wasm replayer from these raw bytes, so verbatim preservation is what write-back
  * and native export require.
  *
- * Fixture: public/data/songs/formats/analogue_vibes.jam (committed real module).
+ * Fixture: public/data/songs/jamcracker/analogue_vibes.jam (committed real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -24,7 +24,7 @@ import { join } from 'path';
 import { parseJamCrackerFile } from '../JamCrackerParser';
 import '@engine/uade/encoders/index';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/analogue_vibes.jam');
+const FIXTURE = join(process.cwd(), 'public/data/songs/jamcracker/analogue_vibes.jam');
 
 function loadFixture(): ArrayBuffer {
   const b = readFileSync(FIXTURE);

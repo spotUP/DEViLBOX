@@ -11,7 +11,7 @@ const ab = (b: Uint8Array): ArrayBuffer => b.buffer.slice(b.byteOffset, b.byteOf
 const bytes = async (r: { data: Blob }) => new Uint8Array(await r.data.arrayBuffer());
 
 const CASES: Array<{ name: string; file: string; parse: (b: Uint8Array) => Promise<TrackerSong>; exp: (s: TrackerSong) => Promise<{ data: Blob }> }> = [
-  { name: 'STP (version 1 source)', file: 'public/data/songs/formats/noname.stp', parse: (b) => parseSTPFile(ab(b), 'noname.stp'), exp: exportSTP },
+  { name: 'STP (version 1 source)', file: 'public/data/songs/soundtracker-pro-ii/noname.stp', parse: (b) => parseSTPFile(ab(b), 'noname.stp'), exp: exportSTP },
   { name: 'Composer 669 (.667)', file: 'public/data/songs/composer-667/speed fighter.667', parse: async (b) => { const s = await parseComposer667File(b, 'speed fighter.667'); if (!s) throw new Error('parse failed'); return s; }, exp: exportComposer667 },
 ];
 

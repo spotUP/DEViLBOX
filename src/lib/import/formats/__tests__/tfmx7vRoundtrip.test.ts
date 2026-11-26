@@ -13,7 +13,7 @@
  * to the round-trip codec — the grid is built by decodeTFMX7VPattern and tfmx7v has
  * no chip-RAM edit / native export path — so an edited cell arrives carrier-less.
  *
- * Fixture: public/data/songs/formats/ghostbattle_gameover.hip7 (committed real module).
+ * Fixture: public/data/songs/hippel-7v/ghostbattle_gameover.hip7 (committed real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -21,7 +21,7 @@ import { join } from 'path';
 import { parseJochenHippel7VFile } from '../JochenHippel7VParser';
 import { hippelPlayedForTest } from '@/engine/__tests__/helpers/tfmxWalkHost';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/ghostbattle_gameover.hip7');
+const FIXTURE = join(process.cwd(), 'public/data/songs/hippel-7v/ghostbattle_gameover.hip7');
 
 describe('TFMX-7V pattern codec', () => {
   it('encodeCell is a byte-exact inverse of decodeCell over every pattern row', async () => {

@@ -5,7 +5,7 @@ import { join } from 'path';
 import { parseAMSFile } from '@/lib/import/formats/AMSParser';
 import { exportAMS } from '../AMSExporter';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/kernel.ams');
+const FIXTURE = join(process.cwd(), 'public/data/songs/velvet-studio/kernel.ams');
 const load = () => {
   const b = readFileSync(FIXTURE);
   const song = parseAMSFile(new Uint8Array(b), 'kernel.ams')!;

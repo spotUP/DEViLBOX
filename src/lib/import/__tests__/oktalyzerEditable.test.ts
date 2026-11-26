@@ -6,7 +6,7 @@ import { liveEditRoute, sendCellEditsToEngine } from '@/engine/replayer/liveCell
 import { gridOpensInScopeView } from '@/lib/tracker/gridOpensInScopeView';
 import { OktalyzerEngine } from '@/engine/oktalyzer/OktalyzerEngine';
 
-const PATH = 'public/data/songs/formats/45.okta';
+const PATH = 'public/data/songs/oktalyzer/45.okta';
 
 // One reachability test: the corpus song through the importer's entry point, for every extension the format registry routes.
 describe('Oktalyzer editable grid', () => {

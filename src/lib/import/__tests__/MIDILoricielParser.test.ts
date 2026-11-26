@@ -9,7 +9,7 @@ import { resolve } from 'path';
 import { isMIDILoricielFormat, parseMIDILoricielFile } from '../formats/MIDILoricielParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const DIR       = resolve(import.meta.dirname, '../../../../public/data/songs/formats/Michel Winogradoff');
+const DIR       = resolve(import.meta.dirname, '../../../../public/data/songs/michel-winogradoff');
 const MIDI_FILE = resolve(DIR, 'MIDI.Cartoons 2');
 const BANK      = new Map([['SMPL.Cartoons 2', loadAB(resolve(DIR, 'SMPL.Cartoons 2'))]]);
 

@@ -14,7 +14,7 @@ import '@lib/formats/EditableFormatRegistry.builtins';
 import { parseDigitalSymphonyFile } from '@lib/import/formats/DigitalSymphonyParser';
 
 it('an exported Digital Symphony song reopens with the same samples and cells', async () => {
-  const f = 'public/data/songs/formats/drwho_final4.dsym';
+  const f = 'public/data/songs/digital-symphony/drwho_final4.dsym';
   const song = await parseAs(f, readFixture(f));
   const d = listEditableFormats().find((x) => x.formatId === 'digitalSymphony')!;
   const out = await runDescriptorExporter(d, song);

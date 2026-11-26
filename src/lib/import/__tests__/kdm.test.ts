@@ -1,11 +1,10 @@
 /**
  * Ken Silverman KDM: carrier round trip, same-length edits, and one
  * reachability test through parseModuleToSong with a call-count sentinel.
- * Fixtures: public/data/songs/formats/kdmsong.kdm (has fxP) and flysong.kdm (no fxP).
+ * Fixtures: public/data/songs/ken-silverman-kdm/kdmsong.kdm (has fxP) and flysong.kdm (no fxP).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 vi.mock('../formats/KdmParser', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../formats/KdmParser')>();
@@ -17,9 +16,10 @@ import { parseKdmFile } from '../formats/KdmParser';
 import { applyKdmGridEdits, decodeKdmModule, kdmEventCell } from '../formats/kdmGrid';
 import { exportKdm } from '@lib/export/KdmExporter';
 import { WASM_ENGINES, shouldActivate } from '@/engine/replayer/wasmEngineRegistry';
+import { songFile } from '@/test/songPath';
 
 const load = (name: string): Uint8Array =>
-  new Uint8Array(readFileSync(resolve(__dirname, '../../../../public/data/songs/formats', name)));
+  new Uint8Array(readFileSync(songFile(name)));
 
 beforeEach(() => { vi.mocked(parseKdmFile).mockClear(); });
 

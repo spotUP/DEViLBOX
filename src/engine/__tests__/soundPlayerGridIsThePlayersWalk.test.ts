@@ -28,7 +28,7 @@ import {
 import { getCellFileOffset, type UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { SPL_FX } from '@/lib/import/formats/soundPlayerEffectGlyphs';
 
-const DIR = resolve(process.cwd(), 'public/data/songs/formats/Scott Johnston');
+const DIR = resolve(process.cwd(), 'public/data/songs/scott-johnston');
 const SONGS = readdirSync(DIR).filter((f) => f.startsWith('sjs.')).sort();
 
 function load(name: string): { bytes: Uint8Array; ab: ArrayBuffer } {

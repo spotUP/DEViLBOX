@@ -8,7 +8,7 @@ import { jxsEffectToString } from '../jxsEffectGlyphs';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 const FILES = ['doodmars - death.jxs', 'dreamer.jxs', 'jbells.jxs', 'popcorn.jxs', 'waterballet.jxs'];
-const raw = (n: string) => new Uint8Array(readFileSync(`public/data/songs/formats/${n}`));
+const raw = (n: string) => new Uint8Array(readFileSync(`public/data/songs/jaytrax/${n}`));
 const load = (n: string) => {
   const t = parseJxsFile(raw(n), n);
   if (!t) throw new Error('parse failed');

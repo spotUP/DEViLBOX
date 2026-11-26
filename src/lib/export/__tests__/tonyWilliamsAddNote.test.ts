@@ -11,7 +11,7 @@ import { parseTonyWilliamsFile } from '@lib/import/formats/TonyWilliamsParser';
 import { exportTonyWilliams } from './../TonyWilliamsExporter';
 
 const NAME = 'future basketball main.tw';
-const raw = readFileSync(join(process.cwd(), 'public/data/songs/formats', NAME));
+const raw = readFileSync(join(process.cwd(), 'public/data/songs/sound-images', NAME));
 const buf = (): ArrayBuffer => raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
 const run = async (song: Awaited<ReturnType<typeof parseTonyWilliamsFile>>) => {
   const r = await exportTonyWilliams(song);

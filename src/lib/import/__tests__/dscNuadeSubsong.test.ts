@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { songFile } from '../../../test/songPath';
 import { parseModuleToSong } from '../parseModuleToSong';
 import { dscSubsongCount, decodeDscModule } from '../formats/DigitalSonixChromeModule';
 import { subsongStatus } from '@/lib/tracker/subsongSwitch';
@@ -13,7 +13,7 @@ import { useFormatStore } from '@/stores/useFormatStore';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 const NAME = "dragon'sbreath_fanfares.dsc";
-const path = join(process.cwd(), 'public/data/songs/formats', NAME);
+const path = songFile(NAME);
 const bytes = new Uint8Array(readFileSync(path));
 
 describe.skipIf(!existsSync(path))('DSC subsongs on nuade', () => {

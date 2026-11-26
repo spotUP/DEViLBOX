@@ -72,7 +72,7 @@ function scanDrin(h1: Uint8Array) {
   return hits;
 }
 
-const dir = path.resolve(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const dir = path.resolve(process.cwd(), 'public/data/songs/suntronic');
 const targets = process.argv.slice(2);
 const files = targets.length ? targets : ['ready', 'time10.src', 'witõka.src', 'tank', 'Lightforce', 'orbital.src', 'paradroid.01'];
 

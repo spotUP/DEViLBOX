@@ -5,7 +5,7 @@ import { isULTFormat, parseULTFile } from '../formats/ULTParser';
 
 const ULT_FILE = resolve(
   import.meta.dirname,
-  '../../../../public/data/songs/formats/seasons.ult'
+  '../../../../public/data/songs/ultra-tracker/seasons.ult'
 );
 
 function loadFile(path: string): ArrayBuffer {

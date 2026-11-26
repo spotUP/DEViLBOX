@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { parseMusicLineFile } from '@/lib/import/formats/MusicLineParser';
 import { exportMusicLineFile } from '../MusicLineExporter';
 
-const FILES = ['public/data/songs/formats/harmonic disorder.ml', 'public/data/songs/musicline-editor/drax.ml'];
+const FILES = ['public/data/songs/musicline-editor/harmonic disorder.ml', 'public/data/songs/musicline-editor/drax.ml'];
 
 function diffOffsets(a: Uint8Array, b: Uint8Array): number[] {
   const d: number[] = [];

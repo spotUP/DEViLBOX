@@ -8,9 +8,9 @@
  * jukebox), so the table is proved here once and the paths are proved to call
  * it in modlandCompanions.test.ts / companionFetchOnePath.test.ts.
  */
+import { songFile } from '../../../test/songPath';
 import { describe, it, expect } from 'vitest';
 import { existsSync } from 'fs';
-import { join } from 'path';
 import { EXPECTED_PARTNER, resolveCompanions, expectedCompanionNames } from '../companionResolver';
 
 const FORMS = (role: string, tune: string) => [`${role}.${tune}`, `${tune}.${role}`];
@@ -85,9 +85,8 @@ describe('companionResolver: shared banks and special cases', () => {
     expect(resolveCompanions('abc.sci', { siblings: ['abc.sci', 'abcpatch.003'] }).companions).toEqual(['abcpatch.003']);
   });
   it('the corpus holds the files these cases are named after', () => {
-    const dir = join(process.cwd(), 'public/data/songs/formats');
     for (const f of ['bob4e.dum', 'bob4.ins', 'sdr.monsterbusiness_5', 'audiosculpture_smallest.adsc']) {
-      expect(existsSync(join(dir, f)), f).toBe(true);
+      expect(existsSync(songFile(f)), f).toBe(true);
     }
   });
   it('the lone-file prompt names the partner in the module own form, and the shared bank a .dum falls back to', () => {

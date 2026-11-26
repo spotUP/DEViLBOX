@@ -42,7 +42,7 @@ describe('CoSo New Song: typed notes stay in their pattern and voice', () => {
   });
 
   it('the patcher refuses a note edit into a block other cells share and leaves those bytes alone', async () => {
-    const fixture = 'public/data/songs/formats/prehistoric_tale.hipc';
+    const fixture = 'public/data/songs/hippel-coso/prehistoric_tale.hipc';
     const song = await parseAs(fixture, readFixture(fixture));
     const spans = mapHippelCells(song.hippelFileData!, song.instruments.length, 0)!;
     // A note cell whose bytes the module also plays as another cell (a pattern reused by a later step or another voice).
@@ -65,7 +65,7 @@ describe('CoSo New Song: typed notes stay in their pattern and voice', () => {
   });
 
   it('a note edit every cell sharing its block agrees on still patches the loaded module in place', async () => {
-    const fixture = 'public/data/songs/formats/prehistoric_tale.hipc';
+    const fixture = 'public/data/songs/hippel-coso/prehistoric_tale.hipc';
     const song = await parseAs(fixture, readFixture(fixture));
     const spans = mapHippelCells(song.hippelFileData!, song.instruments.length, 0)!;
     // The first note cell, then the same new note in every cell the module plays from those bytes.

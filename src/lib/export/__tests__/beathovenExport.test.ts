@@ -19,7 +19,7 @@ vi.mock('@lib/import/formats/beathovenEdits', async (importOriginal) => {
   return { ...orig, applyBeathovenGridEdits: (...a: Parameters<typeof orig.applyBeathovenGridEdits>) => { sentinel.calls++; return orig.applyBeathovenGridEdits(...a); } };
 });
 
-const FILE = { path: 'public/data/songs/formats/beathoven_smallest.bss', name: 'beathoven_smallest.bss' };
+const FILE = { path: 'public/data/songs/beathoven-synthesizer/beathoven_smallest.bss', name: 'beathoven_smallest.bss' };
 
 async function load(bytes?: Uint8Array, file = FILE): Promise<{ raw: Uint8Array; song: TrackerSong }> {
   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
@@ -105,7 +105,7 @@ describe('Beathoven native export: beathoven_smallest.bss', () => {
 
   it.each([
     FILE,
-    { path: 'public/data/songs/formats/tristar_cracktro.bss', name: 'tristar_cracktro.bss' },
+    { path: 'public/data/songs/beathoven-synthesizer/tristar_cracktro.bss', name: 'tristar_cracktro.bss' },
   ])('writes an instrument edit as the Instrument command record address another command names ($name)', async (file) => {
     const { applyBeathovenGridEdits } = await import('@lib/import/formats/beathovenEdits');
     const { raw, song } = await load(undefined, file);
@@ -140,7 +140,7 @@ describe('Beathoven native export: beathoven_smallest.bss', () => {
   }, 240000);
 
   it('extended engine (tristar_cracktro.bss): an effect edit rewrites the command operand byte, same length, reads back', async () => {
-    const tri = { path: 'public/data/songs/formats/tristar_cracktro.bss', name: 'tristar_cracktro.bss' };
+    const tri = { path: 'public/data/songs/beathoven-synthesizer/tristar_cracktro.bss', name: 'tristar_cracktro.bss' };
     const { raw, song } = await load(undefined, tri);
     const grid = buildBthGrid(raw) as BthGrid;
     // the first effect slot whose operand byte can be edited in place
@@ -190,7 +190,7 @@ describe('Beathoven native export: beathoven_smallest.bss', () => {
   }, 240000);
 
   it('extended engine (tristar_cracktro.bss): a removed note is written as the Hold command, same four bytes', async () => {
-    const tri = { path: 'public/data/songs/formats/tristar_cracktro.bss', name: 'tristar_cracktro.bss' };
+    const tri = { path: 'public/data/songs/beathoven-synthesizer/tristar_cracktro.bss', name: 'tristar_cracktro.bss' };
     const { raw, song } = await load(undefined, tri);
     const grid = buildBthGrid(raw);
     if (typeof grid === 'string') throw new Error(grid);

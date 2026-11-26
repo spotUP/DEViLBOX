@@ -4,7 +4,7 @@ import { parseInfogramesFile } from '@/lib/import/formats/InfogramesParser';
 import { INFOGRAMES_PERIODS } from '@/engine/uade/encoders/InfogramesEncoder';
 import { periodToGridNote } from '@/lib/amiga/periodNotes';
 
-const path = 'public/data/songs/formats/bob4e.dum';
+const path = 'public/data/songs/infogrames/bob4e.dum';
 const load = () => { const b = readFileSync(path); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 
 describe('Infogrames editable grid', () => {

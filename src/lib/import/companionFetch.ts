@@ -6,7 +6,7 @@
  * listing. This module supplies that listing and reads the files. Both loaders
  * used to list a directory their own way: the file browser read the bundled
  * file manifest, which only holds the common module and audio extensions, so
- * in a mixed folder such as songs/formats it never saw WantedTeam.bin, a
+ * in a mixed folder such as a songs/<format> dir it never saw WantedTeam.bin, a
  * `.nt`, a `.ssd` or a `smpl.*` partner. The jukebox read the song index and
  * found them. The same song then loaded with partners from one and without
  * them from the other (2026-10-05).
@@ -19,7 +19,7 @@ import { resolveCompanions, type CompanionListing } from './companionResolver';
 import { sunTronicCompanionPaths } from './formats/SunTronicV13';
 import { listServerDirectory, readServerFile, readStaticFile } from '@/lib/serverFS';
 
-/** Where a load path lists directories and reads files. Paths are relative to public/data, e.g. `songs/formats/`. */
+/** Where a load path lists directories and reads files. Paths are relative to public/data, e.g. `songs/<format>/`. */
 export interface CompanionIO {
   listing(dir: string): Promise<CompanionListing | null>;
   read(path: string): Promise<ArrayBuffer | null>;

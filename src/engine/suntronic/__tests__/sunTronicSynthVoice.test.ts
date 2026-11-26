@@ -171,7 +171,7 @@ describe('SunTronic native wavetable generator (MEGAEFFECTS port)', () => {
     // (tools/suntronic-re/verify-t5-all.ts: 189/228 windows matched, 0 mismatches).
     // Fails on revert: dropping case 5 to the renderSmooth default produces an
     // integrator wave, not this sample slice.
-    const buf = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/analgestic2.src')));
+    const buf = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/suntronic/analgestic2.src')));
     const score = parseSunTronicV13Score(buf);
     const inst = score.synthInstruments.find((s) => s.recordOff === 0x15c0);
     expect(inst?.synthType).toBe(5);
@@ -193,7 +193,7 @@ describe('SunTronic native wavetable generator (MEGAEFFECTS port)', () => {
     // of (wave1, byteLen, D1) — no feedback state — so forcing arpTable=[61]
     // selects d1=61 on the first tick. Fails on revert: any drift in the segment
     // split, step fixed-point (0x8000/div), or index accumulator changes a byte.
-    const buf = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/ox.src')));
+    const buf = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/suntronic/ox.src')));
     const score = parseSunTronicV13Score(buf);
     const rec = score.synthInstruments.find((s) => s.recordOff === 0x15e2);
     expect(rec?.synthType).toBe(3);
@@ -207,7 +207,7 @@ describe('SunTronic native wavetable generator (MEGAEFFECTS port)', () => {
   });
 
   it('mule.src synth[0] (type 2): renders a full 0x40-byte buffer', () => {
-    const buf = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/mule.src')));
+    const buf = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/suntronic/mule.src')));
     const score = parseSunTronicV13Score(buf);
     const s0 = score.synthInstruments[0];
     expect(s0.synthType).toBe(2);

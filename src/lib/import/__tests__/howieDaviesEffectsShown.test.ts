@@ -19,7 +19,7 @@ vi.mock('@lib/import/formats/HowieDaviesParser', async (importOriginal) => {
   return { ...orig, parseHowieDaviesFile: (...a: Parameters<typeof orig.parseHowieDaviesFile>) => { sentinel.calls++; return orig.parseHowieDaviesFile(...a); } };
 });
 
-const DIR = join(process.cwd(), 'public/data/songs/formats');
+const DIR = join(process.cwd(), 'public/data/songs/howie-davies');
 
 async function load(name: string): Promise<TrackerSong> {
   const { parseModuleToSong } = await import('../parseModuleToSong');

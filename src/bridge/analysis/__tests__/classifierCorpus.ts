@@ -37,7 +37,7 @@ export const CORPUS: readonly string[] = [
   'src/__tests__/fixtures/micro15-goto80.mod',
   'public/data/songs/mod/world class dub.mod',
   'public/data/songs/mod/break the box.mod',
-  'public/data/songs/formats/a sleep so deep.mod',
+  'public/data/songs/mod/a sleep so deep.mod',
   'public/data/songs/amigaklang/Virgill-redrum redrum.mod',
   'public/data/songs/amigaklang/JosSs-Cream.mod',
   'public/data/songs/amigaklang/Virgill-80s architecture.mod',
@@ -51,7 +51,7 @@ export const CORPUS: readonly string[] = [
   'src/__tests__/fixtures/classifier-corpus/banana boat ii-jogeir liljedahl.xm',
   // S3M
   'public/data/songs/s3m/andante.s3m',
-  'public/data/songs/formats/nightmare on acid.s3m',
+  'public/data/songs/s3m/nightmare on acid.s3m',
   'src/__tests__/fixtures/classifier-corpus/a touch of spring-purple motion.s3m',
   'src/__tests__/fixtures/classifier-corpus/alien incident - entity-purple motion.s3m',
   // IT
@@ -61,8 +61,8 @@ export const CORPUS: readonly string[] = [
   'src/__tests__/fixtures/classifier-corpus/dirty walk-necros.it',
   // AHX / HVL
   'public/data/songs/ahx/amanda.ahx',
-  'public/data/songs/formats/aces_high.ahx',
-  'public/data/songs/formats/hexplosion.hvl',
+  'public/data/songs/ahx/aces_high.ahx',
+  'public/data/songs/hivelytracker/hexplosion.hvl',
   'public/data/songs/hivelytracker/waiting for a message.hvl',
   // Other Amiga
   'public/data/songs/bp-soundmon-2/nicktune1.bp',

@@ -15,9 +15,9 @@ import { WASMChannelOutputsEngine } from '@engine/wasm/WASMSingletonBase';
 import { registerChannelMeterSink } from '@engine/tone/channelMeterFeed';
 
 const SONGS: Array<[string, string, string]> = [
-  ['mmdc', 'public/data/songs/formats/captain planet and the planeteers - title.mmdc', 'a.mmdc'],
-  ['oktalyzer', 'public/data/songs/formats/45.okta', '45.okta'],
-  ['digmug', 'public/data/songs/formats/cockwise.mug', 'cockwise.mug'],
+  ['mmdc', 'public/data/songs/octamed-mmdc/captain planet and the planeteers - title.mmdc', 'a.mmdc'],
+  ['oktalyzer', 'public/data/songs/oktalyzer/45.okta', '45.okta'],
+  ['digmug', 'public/data/songs/digital-mugician-2/cockwise.mug', 'cockwise.mug'],
 ];
 
 describe('NuadeEngine node is sized by the loaded song', () => {

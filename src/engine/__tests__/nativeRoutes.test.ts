@@ -21,8 +21,8 @@ const CASES: Array<[string, () => Promise<TrackerSong | null>, string]> = [
   // its own WASM engine off (2026-10-05). The file data decides now.
   ['pumatracker/liquid kids - lv1a.puma', async () => (await import('@lib/import/formats/PumaTrackerParser')).parsePumaTrackerFile(bytes('public/data/songs/pumatracker/liquid kids - lv1a.puma'), 'liquid kids - lv1a.puma'), 'PumaTracker'],
   ['actionamics/dynablaster.ast', async () => (await import('@lib/import/formats/ActionamicsParser')).parseActionamicsFile(new Uint8Array(bytes('public/data/songs/actionamics/dynablaster.ast')), 'dynablaster.ast'), 'ActionamicsReplayer'],
-  ['formats/prehistoric_tale.hipc', async () => (await import('@lib/import/formats/HippelCoSoParser')).parseHippelCoSoFile(bytes('public/data/songs/formats/prehistoric_tale.hipc'), 'prehistoric_tale.hipc'), 'Hippel'],
-  ['formats/ghostbattle_gameover.hip7', async () => (await import('@lib/import/formats/JochenHippel7VParser')).parseJochenHippel7VFile(bytes('public/data/songs/formats/ghostbattle_gameover.hip7'), 'ghostbattle_gameover.hip7'), 'Hippel'],
+  ['formats/prehistoric_tale.hipc', async () => (await import('@lib/import/formats/HippelCoSoParser')).parseHippelCoSoFile(bytes('public/data/songs/hippel-coso/prehistoric_tale.hipc'), 'prehistoric_tale.hipc'), 'Hippel'],
+  ['formats/ghostbattle_gameover.hip7', async () => (await import('@lib/import/formats/JochenHippel7VParser')).parseJochenHippel7VFile(bytes('public/data/songs/hippel-7v/ghostbattle_gameover.hip7'), 'ghostbattle_gameover.hip7'), 'Hippel'],
 ];
 
 /**
@@ -32,7 +32,7 @@ const CASES: Array<[string, () => Promise<TrackerSong | null>, string]> = [
  */
 const IMPORTED: Array<[string, string]> = [
   ['public/data/songs/digital-sound-studio/zrimay.dss', 'DssReplayer'],
-  ['public/data/songs/formats/doxtro3.dss', 'DssReplayer'],
+  ['public/data/songs/digital-sound-studio/doxtro3.dss', 'DssReplayer'],
   // Ron Klaren: the replayer had no rk_set_cell, so the parser left it unfed.
   ['public/data/songs/ron-klaren/astra 2.rk', 'RonKlarenReplayer'],
 ];

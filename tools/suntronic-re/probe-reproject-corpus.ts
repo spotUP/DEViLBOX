@@ -8,7 +8,7 @@ import { readFileSync, readdirSync } from 'fs';
 import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser';
 import { reprojectSunGrid } from '../../src/lib/import/formats/sunReproject';
 
-const CORPUS = 'public/data/songs/formats/SUNTronicTunes';
+const CORPUS = 'public/data/songs/suntronic';
 
 let files = 0, filesWithDrift = 0, totalProvd = 0, totalChanged = 0;
 let matchMinus = 0, matchPlus = 0, matchNeither = 0, glideCells = 0, glideNeither = 0;

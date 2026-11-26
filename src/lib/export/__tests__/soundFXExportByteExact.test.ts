@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { parseSoundFXFile } from '@/lib/import/formats/SoundFXParser';
 import { exportSoundFX } from '../SoundFXExporter';
 
-const FIXTURE = 'public/data/songs/formats/operation_stealth.sfx';
+const FIXTURE = 'public/data/songs/soundfx/operation_stealth.sfx';
 
 async function parse(bytes: Uint8Array) {
   return parseSoundFXFile(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, 'operation_stealth.sfx');

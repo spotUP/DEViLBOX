@@ -27,7 +27,7 @@ const ticksOf = (posted: Array<Record<string, unknown>>) => posted.filter((m) =>
 
 describe('David Whittaker reports its play position', { timeout: 60_000 }, () => {
   it('the worklet posts a rising processed-tick count, also after a swapModule', async () => {
-    const f = readFileSync(resolve(process.cwd(), 'public/data/songs/formats/apb.dw'));
+    const f = readFileSync(resolve(process.cwd(), 'public/data/songs/david-whittaker/apb.dw'));
     const bytes = f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
     const h = await openWorklet(worklet);
     await h.send({ type: 'loadModule', moduleData: bytes.slice(0), subsong: 0 });

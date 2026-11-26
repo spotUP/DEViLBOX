@@ -21,7 +21,7 @@ vi.mock('@/lib/songdb', () => ({ computeSongDBHash: () => '', lookupSongDB: asyn
 
 const name = 'analgestic2.src';
 const load = (): ArrayBuffer =>
-  new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes', name))).slice().buffer as ArrayBuffer;
+  new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/suntronic', name))).slice().buffer as ArrayBuffer;
 
 describe('a restored order names only real patterns', () => {
   it('drops entries past the pattern list and keeps the rest in order', async () => {

@@ -7,7 +7,7 @@ import { join } from 'path';
 import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser';
 import { parseSunTronicV13Score, sunPitchToNote } from '../../src/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
-const dir = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const dir = join(process.cwd(), 'public/data/songs/suntronic');
 const files = process.argv[2] ? [process.argv[2]] : readdirSync(dir).filter(f=>f.endsWith('.src'));
 let clean=0,bad=0; const detail:string[]=[];
 for (const name of files) {

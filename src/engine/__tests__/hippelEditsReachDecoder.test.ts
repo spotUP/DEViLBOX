@@ -36,9 +36,9 @@ function file(rel: string): ArrayBuffer {
 async function parse(kind: 'coso' | '7v'): Promise<TrackerSong> {
   if (kind === 'coso') {
     const { parseHippelCoSoFile } = await import('@lib/import/formats/HippelCoSoParser');
-    return parseHippelCoSoFile(file('public/data/songs/formats/prehistoric_tale.hipc'), 'prehistoric_tale.hipc');
+    return parseHippelCoSoFile(file('public/data/songs/hippel-coso/prehistoric_tale.hipc'), 'prehistoric_tale.hipc');
   }
-  return parseHippel7VPlayed(file('public/data/songs/formats/ghostbattle_gameover.hip7'), 'ghostbattle_gameover.hip7');
+  return parseHippel7VPlayed(file('public/data/songs/hippel-7v/ghostbattle_gameover.hip7'), 'ghostbattle_gameover.hip7');
 }
 
 /** A note cell on a track step whose note transpose is not zero. */

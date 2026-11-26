@@ -91,7 +91,7 @@ describe('a dragged loop reaches the libopenmpt song player', () => {
 
   it('the module the player is hot-reloaded with carries the new loop, and nothing else moved', async () => {
     const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
-    const file = readFileSync(resolve(ROOT, 'public/data/songs/formats/a sleep so deep.mod'));
+    const file = readFileSync(resolve(ROOT, 'public/data/songs/mod/a sleep so deep.mod'));
     const bytes = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer;
     const song = await parseWithOpenMPT(bytes, 'a sleep so deep.mod');
     useInstrumentStore.setState({ instruments: song.instruments });

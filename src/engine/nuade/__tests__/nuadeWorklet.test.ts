@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { loadSharedWorkletScripts, startWorklet, songBuffer, stereoOutputs, ROOT, type WorkletMsg, type WorkletProc } from '../../__tests__/workletHarness';
 import { NUADE_IN_MESSAGES, NUADE_OUT_MESSAGES } from '../nuadeProtocol';
 
-const MMDC = 'public/data/songs/formats/captain planet and the planeteers - title.mmdc';
+const MMDC = 'public/data/songs/octamed-mmdc/captain planet and the planeteers - title.mmdc';
 
 interface Rig { proc: WorkletProc; send: (m: unknown) => Promise<void>; posted: WorkletMsg[] }
 

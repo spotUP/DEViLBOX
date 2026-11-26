@@ -26,7 +26,7 @@ import { join } from 'path';
 import { parseSunTronicV13Score } from '@/lib/import/formats/SunTronicV13';
 import { SunTronicNativeRenderer } from '../SunTronicNativeRender';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 const VBLANK = (1024 * 25) / 29; // 882.7586… samples per PAL vblank
 
 function loadSampleData(names: string[]): (Int8Array | null)[] {

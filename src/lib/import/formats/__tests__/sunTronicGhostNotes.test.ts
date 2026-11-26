@@ -34,7 +34,7 @@ import {
 import { SunTronicPlayer } from '../../../../engine/suntronic/SunTronicPlayer';
 import { parseSunTronicFile } from '../SunTronicParser';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 const load = (name: string): Uint8Array => new Uint8Array(readFileSync(join(CORPUS, name)));
 function readFixture(name: string): ArrayBuffer {
   const raw = new Uint8Array(readFileSync(join(CORPUS, name)));

@@ -102,7 +102,7 @@ describe('parseDigitalSymphonyFile — crafted buffer', () => {
 describe('Digital Symphony samples reach the instrument', () => {
   it('drwho_final4.dsym instruments carry their sample audio', async () => {
     const { readFileSync } = await import('fs');
-    const bytes = new Uint8Array(readFileSync('public/data/songs/formats/drwho_final4.dsym'));
+    const bytes = new Uint8Array(readFileSync('public/data/songs/digital-symphony/drwho_final4.dsym'));
     const song = parseDigitalSymphonyFile(bytes, 'drwho_final4.dsym');
     expect(song).not.toBeNull();
     const withAudio = song!.instruments.filter((i) => (i.sample?.audioBuffer?.byteLength ?? 0) > 44);

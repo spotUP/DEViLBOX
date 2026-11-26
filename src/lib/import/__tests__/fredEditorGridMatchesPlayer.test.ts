@@ -84,8 +84,8 @@ function paulaNoteOns(mod: PaulaLogModule, bytes: Uint8Array, name: string, seco
 
 const SONGS = [
   { path: 'public/data/songs/fredmon/fireworks ii.fred', notes: [342, 252, 98, 522] },
-  { path: 'public/data/songs/formats/rebels.fred', notes: [482, 966, 693, 1302] },
-  { path: 'public/data/songs/formats/bomb jack.fred', notes: [190, 258, 336, 0] },
+  { path: 'public/data/songs/fredmon/rebels.fred', notes: [482, 966, 693, 1302] },
+  { path: 'public/data/songs/fredmon/bomb jack.fred', notes: [190, 258, 336, 0] },
 ];
 
 describe('Fred Editor grid matches the replayer', () => {
@@ -128,7 +128,7 @@ describe('Fred Editor grid matches the replayer', () => {
 
   for (const file of ['bomb jack.fred', 'fuzzball-title.fred']) {
     it(`${file}: every Fred Editor note shows the instrument the player uses, and no voice shows a command the player does not execute`, async () => {
-      const bytes = load(`public/data/songs/formats/${file}`);
+      const bytes = load(`public/data/songs/fredmon/${file}`);
       const m = decodeFredModule(bytes);
       const song = await parseFredEditorFile(bytes.slice().buffer as ArrayBuffer, file);
       // Replay of the player's own state: the instrument is the last $83 any earlier line of the voice read.

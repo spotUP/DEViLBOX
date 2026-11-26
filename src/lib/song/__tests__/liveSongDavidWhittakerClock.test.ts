@@ -22,7 +22,7 @@ afterAll(() => restoreFetch());
 
 describe('David Whittaker row clock reaches the engine through the live song', { timeout: 60_000 }, () => {
   it('apb.dw: the clock the parser walked is the clock getLoadArgs hands the engine', async () => {
-    const f = readFileSync(resolve(process.cwd(), 'public/data/songs/formats/apb.dw'));
+    const f = readFileSync(resolve(process.cwd(), 'public/data/songs/david-whittaker/apb.dw'));
     const ab = f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
     const song = await parseDavidWhittakerFile(ab, 'apb.dw');
     const parsed = song.davidWhittakerClock;

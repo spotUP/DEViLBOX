@@ -15,7 +15,7 @@ import { UadeScanClient, type ScanWorkerLike } from '@/engine/uade/UadeScanClien
 import { createUadeWorkletHost, type UadeWorkletHost } from '@/engine/uade/uadeWorkletHost';
 import { uadeTransform } from '@/engine/uade/uadeGlue';
 
-const SONG = 'public/data/songs/formats/45.okta';
+const SONG = 'public/data/songs/oktalyzer/45.okta';
 
 interface FakeWorker extends ScanWorkerLike { terminated: boolean; received: unknown[] }
 

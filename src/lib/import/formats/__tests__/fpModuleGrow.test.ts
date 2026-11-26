@@ -5,7 +5,7 @@ import { FpGrowError, FpHunkModule, cloneHeader, copyStreamRange, fpStreamRanges
 import { FP_WALK, walkFuturePlayer } from '../fpWalk';
 
 // Hybris: a real song with blocks played from many places; the template no longer shares blocks
-const bytes = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/hybris.fp')));
+const bytes = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/future-player/hybris.fp')));
 const rd32 = (b: Uint8Array, o: number) => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
 
 describe('fpModuleGrow', () => {

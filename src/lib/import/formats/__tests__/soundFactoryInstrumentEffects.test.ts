@@ -9,7 +9,7 @@ import { parseSoundFactoryWithEffects } from '../SoundFactoryParser';
 import { exportSoundFactory } from '@/lib/export/SoundFactoryExporter';
 import { SF_FLAG, SF_INSTR_HEADER_SIZE, sfInstrumentPatchStats, type SfInstrParams } from '../soundFactoryInstrumentParams';
 
-const bytes = new Uint8Array(readFileSync('public/data/songs/formats/goldrunner.psf'));
+const bytes = new Uint8Array(readFileSync('public/data/songs/soundfactory/goldrunner.psf'));
 const paramsOf = (song: { instruments: Array<{ metadata?: { soundFactoryInstrument?: { params: Record<string, number>; recordOffset: number } } }> }, i: number) =>
   song.instruments[i].metadata!.soundFactoryInstrument!;
 

@@ -17,7 +17,7 @@
  * On revert (stub layout at offset 0 / MOD codec) the encoder rewrites the stream
  * bytes, so the rest/command/high bytes no longer round-trip and this fails.
  *
- * Fixture: public/data/songs/formats/memphis.glue (real module).
+ * Fixture: public/data/songs/gluemon/memphis.glue (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -25,7 +25,7 @@ import { join } from 'path';
 import { parseGlueMonFile } from '../GlueMonParser';
 import { getCellFileOffset } from '@/engine/uade/UADEPatternEncoder';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/memphis.glue');
+const FIXTURE = join(process.cwd(), 'public/data/songs/gluemon/memphis.glue');
 
 describe('GlueMon pattern codec', () => {
   it('encodeCell is a byte-exact inverse of decodeCell over every pattern-stream byte', () => {

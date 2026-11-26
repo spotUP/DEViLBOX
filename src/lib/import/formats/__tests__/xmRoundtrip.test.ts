@@ -18,7 +18,7 @@
  * On revert (no blockRawBytes carrier) branch 1 fails: encodeVariableBlock falls
  * through to the per-channel packer and no block is byte-exact.
  *
- * Fixture: public/data/songs/formats/*.xm (the encoderRoundtrip xm fixture).
+ * Fixture: public/data/songs/<format>/ .xm files (the encoderRoundtrip xm fixture).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';

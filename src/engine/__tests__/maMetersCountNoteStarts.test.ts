@@ -11,7 +11,7 @@ import { meterFlashCounts } from './meterCountHarness';
 describe('Music Assembler channel meters', { timeout: 60_000 }, () => {
   it('flash on notes the level-jump rule missed', async () => {
     const { proc, send, posted } = await startWorklet('ma', 'Ma');
-    await send({ type: 'loadModule', moduleData: songBuffer('public/data/songs/formats/baseheads.ma') });
+    await send({ type: 'loadModule', moduleData: songBuffer('public/data/songs/music-assembler/baseheads.ma') });
     const { counted, onlyCounted, reports } = meterFlashCounts(proc, posted, 15);
     expect(reports).toBeGreaterThan(100);
     expect(counted).toBeGreaterThan(0);

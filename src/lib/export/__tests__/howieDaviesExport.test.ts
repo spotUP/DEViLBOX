@@ -19,7 +19,7 @@ vi.mock('@lib/import/formats/howieDaviesEdits', async (importOriginal) => {
 });
 
 const FILES = [
-  { path: 'public/data/songs/formats/blazing_thunder.hd', name: 'blazing_thunder.hd' },
+  { path: 'public/data/songs/howie-davies/blazing_thunder.hd', name: 'blazing_thunder.hd' },
 ];
 
 async function load(file: { path: string; name: string }, bytes?: Uint8Array): Promise<{ raw: Uint8Array; song: TrackerSong }> {

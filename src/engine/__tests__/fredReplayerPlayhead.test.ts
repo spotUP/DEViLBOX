@@ -18,7 +18,7 @@ import { ROOT, startWorklet, stereoOutputs, loadSharedWorkletScripts } from './w
 import { fredReplayerTransform } from '@/engine/fred-replayer/FredReplayerEngine';
 import { parseFredEditorFile } from '@/lib/import/formats/FredEditorParser';
 
-const FILE = join(ROOT, 'public/data/songs/formats/bomb jack.fred');
+const FILE = join(ROOT, 'public/data/songs/fredmon/bomb jack.fred');
 const bytes = new Uint8Array(readFileSync(FILE));
 const FRAMES_PER_TICK = 960;   // 48 kHz / 50 Hz
 

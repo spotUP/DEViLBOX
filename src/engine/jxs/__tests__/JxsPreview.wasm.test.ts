@@ -32,7 +32,7 @@ function peakOf(m: any, out: number, blocks: number): number {
 describe('JXS single-note preview (keyboard voice)', () => {
   it('a note of an instrument sounds, a stop silences it, and the song is never started', async () => {
     const m = await loadModule();
-    const bytes = fs.readFileSync(path.join(root, 'public/data/songs/formats/popcorn.jxs'));
+    const bytes = fs.readFileSync(path.join(root, 'public/data/songs/jaytrax/popcorn.jxs'));
     const ptr = m._malloc(bytes.length);
     m.HEAPU8.set(bytes, ptr);
     const out = m._malloc(128 * 8);
@@ -65,7 +65,7 @@ describe('JXS single-note preview (keyboard voice)', () => {
 
   it('an out-of-range instrument is ignored (stays silent)', async () => {
     const m = await loadModule();
-    const bytes = fs.readFileSync(path.join(root, 'public/data/songs/formats/popcorn.jxs'));
+    const bytes = fs.readFileSync(path.join(root, 'public/data/songs/jaytrax/popcorn.jxs'));
     const ptr = m._malloc(bytes.length);
     m.HEAPU8.set(bytes, ptr);
     const out = m._malloc(128 * 8);
@@ -78,7 +78,7 @@ describe('JXS single-note preview (keyboard voice)', () => {
 
   it('the keyboard key for C-2 plays the same sound as raw note 72, not a very low octave', async () => {
     const m = await loadJxsWasm();
-    const bytes = new Uint8Array(fs.readFileSync(path.join(root, 'public/data/songs/formats/popcorn.jxs')));
+    const bytes = new Uint8Array(fs.readFileSync(path.join(root, 'public/data/songs/jaytrax/popcorn.jxs')));
     let instrument = 0, direct: Float32Array = new Float32Array(0);
     for (let i = 1; i <= 12 && !direct.some((v) => v !== 0); i++) { instrument = i; direct = renderNote(m, bytes, i, 72); }
     const key = renderNote(m, bytes, instrument, jxsNoteForKey(36));

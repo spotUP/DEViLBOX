@@ -13,14 +13,14 @@
  * grid loop never sets, so edited cells fall back to the canonical derivation) and carries
  * the effect-arg byte via saEffectArg, which the encoder already emits as byte3.
  *
- * Fixture: public/data/songs/formats/almighty.sa (real module).
+ * Fixture: public/data/songs/sonic-arranger/almighty.sa (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseSonicArrangerFile } from '../SonicArrangerParser';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/almighty.sa');
+const FIXTURE = join(process.cwd(), 'public/data/songs/sonic-arranger/almighty.sa');
 
 describe('Sonic Arranger pattern codec', () => {
   it('encodeCell is a byte-exact inverse of decodeCell over every pattern cell', async () => {

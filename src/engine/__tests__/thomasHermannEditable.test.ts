@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseThomasHermannFile } from '@/lib/import/formats/ThomasHermannParser';
 
-const path = 'public/data/songs/formats/thm.blueangel69';
+const path = 'public/data/songs/thomas-hermann/thm.blueangel69';
 const name = 'thm.blueangel69';
 const load = () => { const b = readFileSync(path); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 

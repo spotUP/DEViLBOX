@@ -65,7 +65,7 @@ describe('Hively: a position matrix edit is what the next play plays', { timeout
     vi.spyOn(HivelyEngine, 'getInstance').mockReturnValue({ setPosition, setTrackStep: () => {} } as never);
   }, 120000);
 
-  for (const rel of ['public/data/songs/ahx/amanda.ahx', 'public/data/songs/formats/hexplosion.hvl']) {
+  for (const rel of ['public/data/songs/ahx/amanda.ahx', 'public/data/songs/hivelytracker/hexplosion.hvl']) {
     it(`track and transpose edits (${basename(rel)})`, async () => {
       await load(rel);
       const { useFormatStore } = await import('@stores/useFormatStore');

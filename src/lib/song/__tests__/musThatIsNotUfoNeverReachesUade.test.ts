@@ -42,7 +42,7 @@ import { openSong } from '@/lib/song/openSong';
 
 describe('a .mus that is not UFO or Karl Morton', () => {
   it('boogie.mus opens as a named refusal and UADE is never asked to load it', async () => {
-    const bytes = new Uint8Array(readFileSync('public/data/songs/formats/boogie.mus'));
+    const bytes = new Uint8Array(readFileSync('public/data/songs/karl-morton/boogie.mus'));
     const file = new File([bytes], 'boogie.mus');
     const r = await openSong({ kind: 'file', file }, { origin: 'dialog' });
     expect(loads).toEqual([]);

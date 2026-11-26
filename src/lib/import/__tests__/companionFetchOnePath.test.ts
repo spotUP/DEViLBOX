@@ -1,7 +1,7 @@
 /**
  * One companion fetch for every in-app load path. The file browser listed a
  * directory from the bundled manifest, which only holds common module and
- * audio extensions, so a Jesper Olsen song in songs/formats loaded without
+ * audio extensions, so a Jesper Olsen song in a songs/<format> dir loaded without
  * WantedTeam.bin and a StarTrekker song without its `.nt`, while the jukebox
  * found both (2026-10-05).
  */
@@ -29,13 +29,13 @@ describe('companionFetch: the file browser and the jukebox read the same partner
   afterEach(() => { vi.unstubAllGlobals(); });
 
   it('finds WantedTeam.bin beside a Jesper Olsen song in a mixed folder', async () => {
-    const found = await gatherCompanions('lollypop-subgame_01.jo', 'songs/formats/', undefined);
+    const found = await gatherCompanions('lollypop-subgame_01.jo', 'songs/', undefined);
     expect([...found.keys()]).toContain('WantedTeam.bin');
     expect(found.get('WantedTeam.bin')!.byteLength).toBeGreaterThan(0);
   });
 
   it('finds the .nt partner of a StarTrekker AM song in a mixed folder', async () => {
-    const found = await gatherCompanions('shortsong1.mod', 'songs/formats', undefined);
+    const found = await gatherCompanions('shortsong1.mod', 'songs', undefined);
     expect([...found.keys()]).toContain('shortsong1.mod.nt');
   });
 
@@ -45,7 +45,7 @@ describe('companionFetch: the file browser and the jukebox read the same partner
   });
 
   it('gives a plain module no partners', async () => {
-    const found = await gatherCompanions('a sleep so deep.mod', 'songs/formats/', undefined);
+    const found = await gatherCompanions('a sleep so deep.mod', 'songs/', undefined);
     expect(found.size).toBe(0);
   });
 });
@@ -53,7 +53,7 @@ describe('companionFetch: the file browser and the jukebox read the same partner
 /**
  * Server listing for a folder the song index does not cover. It read
  * `<parent>/Samples/` blind, so every EdLib .d00 load fired a 404 to
- * /api/demo/songs/Ad Lib/EdLib D00/Samples/ (2026-11-24).
+ * /api/demo/songs/ad-lib/EdLib D00/Samples/ (2026-11-24).
  */
 describe('companionFetch: server listing asks only for folders that exist', () => {
   const tree: Record<string, { name: string; isDirectory: boolean }[]> = {
@@ -84,7 +84,7 @@ describe('companionFetch: server listing asks only for folders that exist', () =
   afterEach(() => { vi.unstubAllGlobals(); });
 
   it('never asks for Samples/ beside an EdLib song', async () => {
-    await appCompanionIO.listing('songs/Ad Lib/EdLib D00/JCH/');
+    await appCompanionIO.listing('songs/ad-lib/EdLib D00/JCH/');
     expect(requested.filter((p) => !(p in tree))).toEqual([]);
   });
 

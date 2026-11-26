@@ -60,7 +60,7 @@ describe('an edited SidMon 1 song still plays, and plays the edit', () => {
   it('a grid edit reaches the replayer row it shows, and the reloaded module', { timeout: 60000 }, async () => {
     loadSharedWorkletScripts();
     const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-    const raw = readFileSync(join(__dirname, '../../../public/data/songs/formats/anarchy.sid1'));
+    const raw = readFileSync(join(__dirname, '../../../public/data/songs/sidmon-1/anarchy.sid1'));
     const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
     const song = await parseModuleToSong(new File([ab], 'anarchy.sid1'), 0);
 
@@ -131,7 +131,7 @@ describe('an edited SidMon 1 song still plays, and plays the edit', () => {
     loadSharedWorkletScripts();
     const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
     const { parseSidMon1File } = await import('@/lib/import/formats/SidMon1Parser');
-    const raw = readFileSync(join(__dirname, '../../../public/data/songs/formats/anarchy.sid1'));
+    const raw = readFileSync(join(__dirname, '../../../public/data/songs/sidmon-1/anarchy.sid1'));
     const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
     const song = await parseModuleToSong(new File([ab], 'anarchy.sid1'), 0);
     const { useFormatStore } = await import('@stores/useFormatStore');

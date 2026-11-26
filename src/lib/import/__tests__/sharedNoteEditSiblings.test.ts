@@ -37,12 +37,12 @@ const FILES: Fmt[] = [
     save: async (song, original) => writeSidMon2NoteEdits(song, original),
   },
   {
-    path: 'public/data/songs/formats/bruno_time.sid2',
+    path: 'public/data/songs/sidmon-2/bruno_time.sid2',
     parse: (b) => parseSidMon2File(b, 'x.sid2'),
     save: async (song, original) => writeSidMon2NoteEdits(song, original),
   },
   {
-    path: 'public/data/songs/formats/perception.ems',
+    path: 'public/data/songs/ems/perception.ems',
     parse: (b) => parseEMSv6File(b, 'x.ems'),
     save: async (song) => {
       const r = await exportEmsV6(song);

@@ -56,7 +56,7 @@ if (engine === 'uade') {
   const sweep = JSON.parse(readFileSync(join(ROOT, 'test-data/uade-corpus-sweep.json'), 'utf8')) as Record<string, { verdict: string; companions?: string[] }>;
   for (const [key, row] of Object.entries(sweep)) {
     if (row.verdict !== 'PLAYS') continue;
-    const file = `public/data/songs/formats/${key}`;
+    const file = `public/data/songs/${key}`;
     if (!existsSync(join(ROOT, file))) continue;
     songs.push({ file, companions: (row.companions ?? []).map((c) => join(dirname(file), c)), args: (c) => [basename(file), 0, false, c.size ? c : undefined, { kind: 'player' }] });
   }

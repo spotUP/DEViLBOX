@@ -27,7 +27,7 @@ vi.mock('@engine/TrackerReplayer', async (orig) => {
   return { ...(await orig<object>()), getTrackerReplayer: () => replayer, peekTrackerReplayer: () => replayer };
 });
 
-const PATH = 'public/data/songs/formats/fantasi8.is';
+const PATH = 'public/data/songs/instereo!/fantasi8.is';
 
 describe('InStereo! 1.0 edit on the own replayer', () => {
   it('editing one position of fantasi8.is on the InStereo replayer leaves the other positions sharing that track unchanged', async () => {

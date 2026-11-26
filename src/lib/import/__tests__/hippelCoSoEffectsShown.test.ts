@@ -22,7 +22,7 @@ const NAME = 'prehistoric_tale.hipc';
 
 async function load() {
   const { parseModuleToSong } = await import('../parseModuleToSong');
-  const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', NAME)));
+  const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/hippel-coso', NAME)));
   const before = sentinel.calls;
   const song = await parseModuleToSong(new File([raw], NAME));
   expect(sentinel.calls).toBeGreaterThan(before);
@@ -42,7 +42,7 @@ describe('Hippel CoSo note parameter effect column', () => {
   });
 
   it('writes an edited parameter back as that one byte, and leaves an unedited song untouched', async () => {
-    const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', NAME)));
+    const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/hippel-coso', NAME)));
     const { rebuildHippelModule } = await import('@/engine/hippel/rebuildHippelModule');
     const { mapHippelCoSoCells, parseHippelCoSoFile } = await import('../formats/HippelCoSoParser');
     const song = await parseHippelCoSoFile(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength), NAME);

@@ -11,7 +11,7 @@ import { exportProTracker4 } from '@lib/export/ProTracker4Exporter';
 import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 
 const load = (name: string): ArrayBuffer => {
-  const f = readFileSync(resolve(process.cwd(), 'public/data/songs/formats', name));
+  const f = readFileSync(resolve(process.cwd(), 'public/data/songs/mod', name));
   return f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
 };
 

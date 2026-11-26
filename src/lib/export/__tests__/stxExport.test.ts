@@ -7,7 +7,7 @@ import { createWavFile } from '@/lib/import/InstrumentConverter';
 import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 import { exportSTX } from '../STXExporter';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/futurebrain.stx');
+const FIXTURE = join(process.cwd(), 'public/data/songs/screamtracker-stmik/futurebrain.stx');
 const ab = (u: Uint8Array) => u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength) as ArrayBuffer;
 const load = () => {
   const b = readFileSync(FIXTURE);

@@ -54,7 +54,7 @@ function expectCarriers(layout: UADEVariablePatternLayout, raw: Uint8Array): voi
 
 describe('riff raff import route', () => {
   it('riffraff_smallest.riff (Side Winder II)', async () => {
-    const { song, raw, layout } = await load('public/data/songs/formats/riffraff_smallest.riff');
+    const { song, raw, layout } = await load('public/data/songs/riff-raff/riffraff_smallest.riff');
     expect(song.numChannels).toBe(4);
     expect(notesPerVoice(song)).toEqual([99, 151, 385, 349]);
     expect(song.patterns.length).toBe(23);

@@ -54,7 +54,7 @@ vi.mock('@/lib/import/prepareModuleImport', async (importOriginal) => {
 });
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
-const MOD_PATH = 'public/data/songs/formats/a sleep so deep.mod';
+const MOD_PATH = 'public/data/songs/mod/a sleep so deep.mod';
 const modBytes = (): ArrayBuffer => {
   const b = readFileSync(resolve(ROOT, MOD_PATH));
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;

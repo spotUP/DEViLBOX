@@ -12,7 +12,7 @@ afterEach(cleanup);
 
 describe('Sound Factory instrument controls in the tracker knob panel', () => {
   it('renders Vibrato and Portamento for a goldrunner.psf instrument and writes a change to soundFactoryInstrument', async () => {
-    const bytes = new Uint8Array(readFileSync('public/data/songs/formats/goldrunner.psf'));
+    const bytes = new Uint8Array(readFileSync('public/data/songs/soundfactory/goldrunner.psf'));
     const song = parseSoundFactoryFile(bytes, 'goldrunner.psf');
     expect(song).not.toBeNull();
     const instrument = (song!.instruments as InstrumentConfig[]).find((i) => i.metadata?.soundFactoryInstrument);

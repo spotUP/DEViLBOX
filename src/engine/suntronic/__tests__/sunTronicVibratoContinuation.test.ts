@@ -26,7 +26,7 @@ import { join } from 'path';
 import { parseSunTronicV13Score } from '@/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../SunTronicPlayer';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/gliders.src');
+const FIXTURE = join(process.cwd(), 'public/data/songs/suntronic/gliders.src');
 const GOLDEN = join(process.cwd(), 'src/engine/suntronic/__tests__/sunTronicNoteTimeline.golden.json');
 
 interface Row { period: number; acc: number; vol: number; flags: number }

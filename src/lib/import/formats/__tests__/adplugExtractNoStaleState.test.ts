@@ -9,7 +9,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { extractAdPlugPatterns, invalidateAdPlugModule } from '../AdPlugWasmExtractor';
 
 const root = path.resolve(__dirname, '../../../../..');
-const adlib = path.join(root, 'public/data/songs/Ad Lib');
+const adlib = path.join(root, 'public/data/songs/ad-lib');
 const SONGS = {
   rad: path.join(adlib, 'Reality AdLib Tracker/Void (AU)/waterfall.rad'),
   a2m: path.join(adlib, 'AdLib Tracker 2/Kvee/the sweetest sin.a2m'),

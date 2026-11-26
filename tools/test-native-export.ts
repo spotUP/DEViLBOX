@@ -2,7 +2,7 @@
 /**
  * test-native-export.ts — Headless round-trip test for native format exporters
  *
- * Loads test files from public/data/songs/formats/, parses them, exports via
+ * Loads test files from public/data/songs/<format>/, parses them, exports via
  * the native exporter, and saves the exported file to test-output/ for manual
  * verification in a player (e.g. UADE, XMPlay, OpenMPT, DeliTracker).
  *
@@ -111,7 +111,11 @@ const FORMATS: FormatEntry[] = [
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 const PROJECT_ROOT = join(import.meta.dirname || __dirname, '..');
-const SONGS_DIR = join(PROJECT_ROOT, 'public/data/songs/formats');
+const SONGS_DIR = join(PROJECT_ROOT, 'public/data/songs');
+/** Every file under SONGS_DIR (one dir per format), as paths relative to it. */
+function listSongs(dir = SONGS_DIR): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? listSongs(join(dir, e.name)) : [join(dir, e.name).slice(SONGS_DIR.length + 1)]);
+}
 const OUTPUT_DIR = join(PROJECT_ROOT, 'test-output/native-export');
 
 function findFormatForFile(filename: string): FormatEntry | null {
@@ -239,7 +243,7 @@ async function main() {
 
   // List mode
   if (args.includes('--list')) {
-    const files = readdirSync(SONGS_DIR).sort();
+    const files = listSongs().sort();
     for (const f of files) {
       const fmt = findFormatForFile(f);
       console.log(`  ${fmt ? '✓' : '·'} ${f.padEnd(45)} ${fmt?.label || '(no exporter)'}`);
@@ -265,7 +269,7 @@ async function main() {
     });
   } else {
     // All files with matching exporters
-    filesToTest = readdirSync(SONGS_DIR)
+    filesToTest = listSongs()
       .filter(f => findFormatForFile(f) !== null)
       .map(f => join(SONGS_DIR, f))
       .sort();

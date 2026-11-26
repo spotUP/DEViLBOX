@@ -19,7 +19,7 @@ vi.mock('@lib/import/formats/riffRaffEdits', async (importOriginal) => {
 });
 
 const FILES = [
-  { path: 'public/data/songs/formats/riffraff_smallest.riff', name: 'riffraff_smallest.riff' },
+  { path: 'public/data/songs/riff-raff/riffraff_smallest.riff', name: 'riffraff_smallest.riff' },
   { path: 'public/data/songs/riff-raff/bombfusion.riff', name: 'bombfusion.riff' },
 ];
 

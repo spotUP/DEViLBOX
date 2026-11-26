@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser';
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 const files = readdirSync(CORPUS).filter(f => /\.(src|sun|tsm|pc)$/i.test(f) || f === 'ready');
 let totalUnprov = 0, totalMismatch = 0, dirty = 0;
 for (const f of files) {

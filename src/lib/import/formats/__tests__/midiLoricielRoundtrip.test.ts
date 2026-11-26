@@ -32,7 +32,7 @@ import {
 import { encodeMIDILoricielEdits, encodeMIDILoricielGridEdits } from '../MIDILoricielEncoder';
 import type { TrackerCell } from '@/types';
 
-const DIR = join(process.cwd(), 'public/data/songs/formats/Michel Winogradoff');
+const DIR = join(process.cwd(), 'public/data/songs/michel-winogradoff');
 const SONGS = readdirSync(DIR).filter((f) => f.startsWith('MIDI.')).map((f) => f.slice(5));
 const load = (tune: string) => ({
   module: new Uint8Array(readFileSync(join(DIR, `MIDI.${tune}`))),

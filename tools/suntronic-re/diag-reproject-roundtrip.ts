@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser';
 import { reprojectSunGrid } from '../../src/lib/import/formats/sunReproject';
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 const name = process.argv[2] ?? 'shades.src';
 const raw = new Uint8Array(readFileSync(join(CORPUS, name)));
 const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength);

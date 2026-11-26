@@ -10,8 +10,8 @@ import { RR_FX } from '@lib/import/formats/commandStreamEffectGlyphs';
 import { cellEffects } from '@lib/import/formats/cellEffectSlots';
 
 const FILES = [
-  { path: 'public/data/songs/formats/riffraff_smallest.riff', name: 'riffraff_smallest.riff' },
-  { path: 'public/data/songs/formats/sidewinder2.riff', name: 'sidewinder2.riff' },
+  { path: 'public/data/songs/riff-raff/riffraff_smallest.riff', name: 'riffraff_smallest.riff' },
+  { path: 'public/data/songs/riff-raff/sidewinder2.riff', name: 'sidewinder2.riff' },
 ];
 
 async function load(file: { path: string; name: string }, bytes?: Uint8Array): Promise<{ raw: Uint8Array; song: TrackerSong }> {

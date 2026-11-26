@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { songFile } from '../../../test/songPath';
 
 vi.mock('@/engine/ToneEngine', () => {
   const engine = {
@@ -38,7 +38,6 @@ vi.mock('@/lib/import/parseModuleToSong', async (importOriginal) => {
 });
 
 const NAME = 'bounty hunter - outro (remixed).mmd3';
-const SONGS = join(__dirname, '../../../../public/data/songs/formats');
 
 function b64(buf: ArrayBuffer | Uint8Array): string {
   return Buffer.from(buf instanceof Uint8Array ? buf : new Uint8Array(buf)).toString('base64');
@@ -49,7 +48,7 @@ async function staleProject() {
   const { parseMEDFile } = await import('@/lib/import/formats/MEDParser');
   const { baselineOf } = await import('@/lib/song/gridBaseline');
   const { makeEmptyTestSnapshot } = await import('@hooks/useProjectPersistence');
-  const raw = readFileSync(join(SONGS, NAME));
+  const raw = readFileSync(songFile(NAME));
   const bytes = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
   const song = parseMEDFile(bytes, NAME);
 
@@ -128,7 +127,7 @@ describe('restoring an autosave', () => {
     const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
     const { baselineOf, hashCell } = await import('@/lib/song/gridBaseline');
     const { restoreFromStoredBytes } = await import('@/lib/song/restoreFromStoredBytes');
-    const raw = readFileSync(join(SONGS, 'popcorn.jxs'));
+    const raw = readFileSync(songFile('popcorn.jxs'));
     const bytes = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
     const decoded = await parseModuleToSong(new File([bytes], 'popcorn.jxs'));
     const jxs = (decoded as unknown as Record<string, unknown>).jxsFileData as ArrayBuffer;

@@ -11,7 +11,7 @@ import { join } from 'path';
 import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser';
 import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 const INSTR = join(CORPUS, 'instr');
 const onDisk = new Set(readdirSync(INSTR).map((f) => f.toLowerCase()));
 const present = (nm: string) => onDisk.has(nm.toLowerCase()) || onDisk.has(`${nm.toLowerCase()}.x`);

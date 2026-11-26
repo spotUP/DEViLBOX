@@ -19,7 +19,7 @@ vi.mock('@stores/useTransportStore', () => ({ useTransportStore: { getState: () 
 import { switchSubsong, uadeSubsongsFallback } from '@/lib/tracker/subsongSwitch';
 import { useFormatStore } from '@/stores/useFormatStore';
 
-const FILE = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../public/data/songs/formats/centurion_battle.rh');
+const FILE = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../public/data/songs/rob-hubbard/centurion_battle.rh');
 
 describe('switching the tune of a non-editable UADE song', () => {
   beforeEach(() => openSong.mockClear());

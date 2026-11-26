@@ -16,7 +16,7 @@ import { parseTonyWilliamsFile } from '@lib/import/formats/TonyWilliamsParser';
 import { exportNativeSong } from '@lib/export/nativeExportRouter';
 import { isReplacedInstrument } from '@/engine/replayer/hybridInstruments';
 
-const PATH = 'public/data/songs/formats/future basketball main.tw';
+const PATH = 'public/data/songs/sound-images/future basketball main.tw';
 
 describe('Tony Williams reachability', () => {
   it('top-level import runs the TW parser; song has 4 voices with notes; native export is byte-exact', async () => {

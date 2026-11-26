@@ -56,7 +56,7 @@ describe('Delta Music 1.0 grid plays what the replayer plays', () => {
   });
 
   it('crusaders1.dm: each voice opens with the notes Paula plays', async () => {
-    const song = await load('public/data/songs/formats/crusaders1.dm');
+    const song = await load('public/data/songs/delta-music/crusaders1.dm');
     expect(channelPitches(song, 0, 16)).toEqual([45, 38, 43, 38, 41, 38, 40, 41, 45, 38, 43, 38, 41, 38, 40, 41]);
     expect(channelPitches(song, 1, 16)).toEqual([14, 26, 14, 38, 14, 12, 38, 17, 16, 14, 38, 14, 12, 38, 17, 16]);
     expect(channelPitches(song, 2, 16)).toEqual([21, 22, 34, 36, 33, 26, 29, 26, 34, 33, 29, 26, 22, 26, 29, 26]);
@@ -69,7 +69,7 @@ describe('Delta Music 1.0 grid plays what the replayer plays', () => {
   });
 
   it('the pattern codec names a cell like the grid and writes every note byte back', async () => {
-    const song = await load('public/data/songs/formats/crusaders1.dm');
+    const song = await load('public/data/songs/delta-music/crusaders1.dm');
     const layout = song.uadePatternLayout;
     if (!layout?.decodeCell) throw new Error('layout incomplete');
     // Note byte 35 (period 904) with instrument 2: grid name B-0 (12), byte kept exactly.

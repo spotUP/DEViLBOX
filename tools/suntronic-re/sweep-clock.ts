@@ -12,7 +12,7 @@ import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV1
 import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
 
 const REPO = process.cwd();
-const CORPUS = resolve(REPO, 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = resolve(REPO, 'public/data/songs/suntronic');
 const GOLDEN = resolve(REPO, 'src/engine/suntronic/__tests__/sunTronicNoteTimeline.golden.json');
 interface Row { period: number; acc: number; vol: number; flags: number }
 const golden = JSON.parse(readFileSync(GOLDEN, 'utf8')) as { modules: Record<string, { tick: number; voices: Row[] }[]> };

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parseJxsFile } from '../JxsParser';
 
 const load = (n: string) => {
-  const t = parseJxsFile(new Uint8Array(readFileSync(`public/data/songs/formats/${n}`)), n);
+  const t = parseJxsFile(new Uint8Array(readFileSync(`public/data/songs/jaytrax/${n}`)), n);
   if (!t) throw new Error('parse failed');
   return t;
 };

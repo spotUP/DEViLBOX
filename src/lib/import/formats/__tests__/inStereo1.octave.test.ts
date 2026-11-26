@@ -19,7 +19,7 @@ const GRID_FIRST10 = [
 ];
 
 describe('InStereo 1 octave', () => {
-  const raw = readFileSync('public/data/songs/formats/fantasi8.is');
+  const raw = readFileSync('public/data/songs/instereo!/fantasi8.is');
   const song = parseInStereo1File(new Uint8Array(raw), 'fantasi8.is')!;
 
   it('fantasi8.is grid notes equal the pitches Paula plays', () => {

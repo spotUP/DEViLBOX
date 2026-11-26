@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { parseGameMusicCreatorFile } from '@/lib/import/formats/GameMusicCreatorParser';
 import { exportGameMusicCreator } from '../GameMusicCreatorExporter';
 
-const FIXTURE = 'public/data/songs/formats/knights_of_sky.gmc';
+const FIXTURE = 'public/data/songs/game-music-creator/knights_of_sky.gmc';
 
 function parse(bytes: Uint8Array) {
   const song = parseGameMusicCreatorFile(bytes, 'knights_of_sky.gmc');

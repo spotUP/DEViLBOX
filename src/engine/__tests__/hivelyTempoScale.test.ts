@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { openWorklet, sameAudio, BLOCK, SAMPLE_RATE, type WorkletHarness } from './helpers/workletHarness';
 import { hivelyTransform } from '@/engine/hively/HivelyEngine';
 
-const FILE = 'public/data/songs/formats/aces_high.ahx';
+const FILE = 'public/data/songs/ahx/aces_high.ahx';
 const worklet = { dir: 'hively', name: 'Hively', factory: 'createHively', transformJs: hivelyTransform };
 const BLOCKS = Math.round((12 * SAMPLE_RATE) / BLOCK); // 12 s of output
 

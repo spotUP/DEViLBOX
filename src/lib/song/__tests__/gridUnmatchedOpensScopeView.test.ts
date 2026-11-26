@@ -20,7 +20,7 @@ vi.mock('@/stores/useNotificationStore', () => ({ notify: { success: vi.fn(), er
 vi.mock('@/lib/songdb', () => ({ computeSongDBHash: () => '', lookupSongDB: async () => null }));
 
 const load = (name: string): ArrayBuffer =>
-  new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes', name))).slice().buffer as ArrayBuffer;
+  new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/suntronic', name))).slice().buffer as ArrayBuffer;
 
 async function apply(name: string) {
   const { parseSunTronicFile } = await import('@/lib/import/formats/SunTronicParser');

@@ -6,7 +6,7 @@ import { parsePTMFile } from '@/lib/import/formats/PTMParser';
 import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 import { exportPTM } from '../PTMExporter';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/rew_vibr.ptm');
+const FIXTURE = join(process.cwd(), 'public/data/songs/protracker-iff/rew_vibr.ptm');
 const ab = (u: Uint8Array) => u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength) as ArrayBuffer;
 const load = async () => {
   const b = readFileSync(FIXTURE);

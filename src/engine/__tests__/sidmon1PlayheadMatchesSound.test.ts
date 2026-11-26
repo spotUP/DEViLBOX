@@ -27,7 +27,7 @@ interface Mod {
 describe('SidMon1Replayer playhead', () => {
   it('is on the row whose note is sounding', async () => {
     loadSharedWorkletScripts();
-    const buf = songBuffer('public/data/songs/formats/anarchy.sid1');
+    const buf = songBuffer('public/data/songs/sidmon-1/anarchy.sid1');
     const song = parseSidMon1File(buf.slice(0), 'anarchy.sid1');
     const layout = song.uadePatternLayout!;
     const cells: { step: number; row: number; note: number; bend: boolean }[][] = [[], [], [], []];

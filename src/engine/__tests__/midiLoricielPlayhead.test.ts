@@ -17,7 +17,7 @@ import {
 import { eaglePlayerGrid } from '@/engine/eagleplayer/EaglePlayerEngine';
 import { tickGridPosition } from '@/lib/tracker/tickGridPosition';
 
-const DIR = 'public/data/songs/formats/Michel Winogradoff';
+const DIR = 'public/data/songs/michel-winogradoff';
 const TUNE = 'Cartoons 2';
 
 describe('MIDI Loriciel playhead on the eagleplayer runner', () => {

@@ -15,8 +15,8 @@ describe('TFMX scope feed per grid track', () => {
     const { proc, send, posted } = await startWorklet('tfmx', 'TFMX');
     await send({
       type: 'loadModule',
-      mdatBuffer: songBuffer('public/data/songs/formats/mdat.turrican_bonus'),
-      smplBuffer: songBuffer('public/data/songs/formats/smpl.turrican_bonus'),
+      mdatBuffer: songBuffer('public/data/songs/tfmx/mdat.turrican_bonus'),
+      smplBuffer: songBuffer('public/data/songs/tfmx/smpl.turrican_bonus'),
       subsong: 0,
     });
     const loaded = posted.find((m) => m.type === 'moduleLoaded') as { voices?: number; scopeChannels?: number } | undefined;

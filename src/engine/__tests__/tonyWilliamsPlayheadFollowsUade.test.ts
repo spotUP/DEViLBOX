@@ -22,7 +22,7 @@ type Wasm = PaulaLogHost & {
   _uade_wasm_enable_paula_log(on: number): void;
 };
 
-const PATH = 'public/data/songs/formats/future basketball main.tw';
+const PATH = 'public/data/songs/sound-images/future basketball main.tw';
 
 describe('Tony Williams playhead follows UADE', { timeout: 120_000 }, () => {
   it('future basketball: every note Paula starts is on a note cell of the row the grid shows at that moment', async () => {

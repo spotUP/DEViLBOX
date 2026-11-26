@@ -12,7 +12,7 @@ import { resolve } from 'path';
 import { parseSoundFactoryWithEffects } from '@/lib/import/formats/SoundFactoryParser';
 
 const ROOT = resolve(__dirname, '../../../..');
-const file = new Uint8Array(readFileSync(resolve(ROOT, 'public/data/songs/formats/goldrunner.psf')));
+const file = new Uint8Array(readFileSync(resolve(ROOT, 'public/data/songs/soundfactory/goldrunner.psf')));
 
 const calls = vi.hoisted(() => [] as string[]);
 const engine = vi.hoisted(() => ({

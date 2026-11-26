@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseHivelyFile } from '@lib/import/formats/HivelyParser';
 import { exportAsHively } from '../HivelyExporter';
+import { songFile } from '../../../test/songPath';
 
-const DIR = 'public/data/songs/formats/';
 const load = (f: string) => {
-  const b = readFileSync(DIR + f);
+  const b = readFileSync(songFile(f));
   const ab = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
   return { b, song: parseHivelyFile(ab, f) };
 };

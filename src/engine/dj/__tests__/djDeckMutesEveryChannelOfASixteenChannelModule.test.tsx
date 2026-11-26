@@ -48,7 +48,7 @@ describe('a rendered DJ deck mutes every channel of a 16-channel module', () => 
     await (await import('@/lib/export/audioEncoders')).encodeFlac([new Float32Array(16)], 44100);
     const restoreWorkers = installInProcessDJRenderWorker();
     const { getDJPipeline } = await import('../DJPipeline');
-    const bytes = readFileSync(join(process.cwd(), 'public/data/songs/formats', SONG));
+    const bytes = readFileSync(join(process.cwd(), 'public/data/songs/s3m', SONG));
     const source = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     await getDJPipeline().loadOrEnqueue(source, SONG, undefined, 'high', undefined, 14);
     restoreWorkers();

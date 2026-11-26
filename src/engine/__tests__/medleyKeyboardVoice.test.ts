@@ -65,7 +65,7 @@ describe('Medley keyboard voice (combat.mso)', () => {
   it('a non-medley song opens no keyboard voice', async () => {
     const nu = await NuadeHeadless.create(RATE);
     const m = nu.m;
-    const bp = new Uint8Array(readFileSync(join(ROOT, 'public/data/songs/formats/antidust.bp3')));
+    const bp = new Uint8Array(readFileSync(join(ROOT, 'public/data/songs/bp-soundmon-3/antidust.bp3')));
     expect(m._nw_key_open(heapBytes(m, bp), bp.length, cstr(m, 'antidust.bp3'), cstr(m, 'soundmon'), 0)).toBe(-4);
   });
 

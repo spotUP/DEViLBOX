@@ -34,7 +34,7 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../../../..');
-const MULE = resolve(REPO, 'public/data/songs/formats/SUNTronicTunes/mule.src');
+const MULE = resolve(REPO, 'public/data/songs/suntronic/mule.src');
 const GOLDEN = resolve(HERE, 'sunTronicWaveBufferOracle.golden.json');
 
 interface Golden {

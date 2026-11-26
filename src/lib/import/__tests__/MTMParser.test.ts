@@ -9,7 +9,7 @@ const COLOR_OF_RAVE = resolve(
 );
 const DREAMER_DREAM = resolve(
   import.meta.dirname,
-  '../../../../public/data/songs/formats/anonymous in 4ce.mtm'
+  '../../../../public/data/songs/multi-tracker/anonymous in 4ce.mtm'
 );
 
 function loadFile(path: string): ArrayBuffer {

@@ -93,7 +93,7 @@ describe('per-channel engine outputs', { timeout: 120000 }, () => {
 describe('TFMX (Hippel) per-voice dub sends', { timeout: 120000 }, () => {
   it('each dub output is its voice at the level it has in the main mix', async () => {
     const { parseHippelCoSoFile } = await import('@lib/import/formats/HippelCoSoParser');
-    const song = await parseHippelCoSoFile(songBuffer('public/data/songs/formats/prehistoric_tale.hipc'), 'prehistoric_tale.hipc');
+    const song = await parseHippelCoSoFile(songBuffer('public/data/songs/hippel-coso/prehistoric_tale.hipc'), 'prehistoric_tale.hipc');
     const { proc, send } = await startWorklet('tfmx', 'TFMX');
     await send({ type: 'loadModule', mdatBuffer: (song.hippelFileData as ArrayBuffer).slice(0), smplBuffer: null });
     await send({ type: 'modulePlay' });
@@ -188,7 +188,7 @@ describe('Cinter4 per-channel dub sends', { timeout: 120000 }, () => {
 describe('UADE isolation slots', { timeout: 120000 }, () => {
   it('take their channels out of the main mix (they played twice)', async () => {
     const { proc, send } = await startWorklet('uade', 'UADE', async (c) => (await import('../uade/UADEEngine')).uadeTransform(c));
-    await send({ type: 'load', buffer: songBuffer('public/data/songs/formats/prehistoric_tale.hipc'), filenameHint: 'prehistoric_tale.hipc', skipScan: true });
+    await send({ type: 'load', buffer: songBuffer('public/data/songs/hippel-coso/prehistoric_tale.hipc'), filenameHint: 'prehistoric_tale.hipc', skipScan: true });
     await send({ type: 'play' });
     const energy = (n: number) => {
       let main = 0, slots = 0;

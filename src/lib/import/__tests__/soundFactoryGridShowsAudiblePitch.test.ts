@@ -28,7 +28,7 @@ const PAL = 3546895;
 
 describe('Sound Factory grid shows the audible pitch', () => {
   it('goldrunner.psf: notes in range, a known cell names its heard note, the instrument plays the replayer rate', async () => {
-    const raw = new Uint8Array(readFileSync('public/data/songs/formats/goldrunner.psf'));
+    const raw = new Uint8Array(readFileSync('public/data/songs/soundfactory/goldrunner.psf'));
     vi.mocked(parseSoundFactoryFile).mockClear();
     const song = await parseModuleToSong(new File([raw], 'goldrunner.psf'));
     expect(vi.mocked(parseSoundFactoryFile)).toHaveBeenCalledTimes(1);

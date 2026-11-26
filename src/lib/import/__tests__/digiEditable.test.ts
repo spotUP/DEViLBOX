@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parseModuleToSong } from '../parseModuleToSong';
 import { setGridBaseline, baselineOf } from '@/lib/song/gridBaseline';
 
-const PATH = 'public/data/songs/formats/the_day_after.digi';
+const PATH = 'public/data/songs/digibooster/the_day_after.digi';
 
 // One reachability test: the corpus DigiBooster 1.x song (packed patterns) through the importer's entry point.
 describe('DigiBooster 1.x editable grid', () => {

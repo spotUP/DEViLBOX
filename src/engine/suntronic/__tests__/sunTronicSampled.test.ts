@@ -29,7 +29,7 @@ import { parseSunTronicV13Score } from '@/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../SunTronicPlayer';
 import { renderSunTronicMix } from '../SunTronicNativeRender';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 
 function loadSampleData(names: string[]): (Int8Array | null)[] {
   return names.map((n) => {

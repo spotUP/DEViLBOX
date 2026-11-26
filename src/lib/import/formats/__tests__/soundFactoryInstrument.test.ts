@@ -10,7 +10,7 @@ import { parseSoundFactoryWithEffects } from '../SoundFactoryParser';
 import { soundFactoryPeriod, soundFactoryGridNote } from '../soundFactoryPitch';
 import { noteToPeriod } from '@/lib/amiga/periodNotes';
 
-const bytes = new Uint8Array(readFileSync('public/data/songs/formats/goldrunner.psf'));
+const bytes = new Uint8Array(readFileSync('public/data/songs/soundfactory/goldrunner.psf'));
 // Header file offsets (sample_length, sampling_period 428 ...) found by scanning the file; data follows 34 header bytes.
 const HEADERS = [280, 326, 396, 466, 3902, 3972, 4042, 4112];
 const AMIGA_CLOCK = 3546895;

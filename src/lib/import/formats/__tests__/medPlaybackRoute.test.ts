@@ -6,13 +6,12 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { parseMEDFile } from '../MEDParser';
+import { songFile } from '../../../../test/songPath';
 
-const SONGS = join(__dirname, '../../../../../public/data/songs/formats');
 
 function parse(name: string) {
-  const bytes = readFileSync(join(SONGS, name));
+  const bytes = readFileSync(songFile(name));
   return parseMEDFile(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, name);
 }
 

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
 const HERE=dirname(fileURLToPath(import.meta.url));
-const CORPUS=resolve(HERE,'../../public/data/songs/formats/SUNTronicTunes');
+const CORPUS=resolve(HERE,'../../public/data/songs/suntronic');
 const data=new Uint8Array(readFileSync(join(CORPUS,'gliders.src')));
 const pl=new SunTronicPlayer(parseSunTronicV13Score(data),{subsong:0});
 const per:number[]=[],p24:number[]=[];

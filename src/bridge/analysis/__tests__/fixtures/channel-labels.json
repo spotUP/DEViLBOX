@@ -59,7 +59,7 @@
   "date": "2026-09-29"
  },
  {
-  "song": "public/data/songs/formats/a sleep so deep.mod",
+  "song": "public/data/songs/mod/a sleep so deep.mod",
   "channels": [
    {
     "label": "drums"
@@ -428,7 +428,7 @@
   "date": "2026-09-29"
  },
  {
-  "song": "public/data/songs/formats/nightmare on acid.s3m",
+  "song": "public/data/songs/s3m/nightmare on acid.s3m",
   "channels": [
    {
     "label": "drums"
@@ -892,7 +892,7 @@
   "date": "2026-09-29"
  },
  {
-  "song": "public/data/songs/formats/aces_high.ahx",
+  "song": "public/data/songs/ahx/aces_high.ahx",
   "channels": [
    {
     "label": "drums"
@@ -911,7 +911,7 @@
   "date": "2026-09-29"
  },
  {
-  "song": "public/data/songs/formats/hexplosion.hvl",
+  "song": "public/data/songs/hivelytracker/hexplosion.hvl",
   "channels": [
    {
     "label": "drums"

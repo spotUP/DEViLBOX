@@ -10,7 +10,7 @@
  * carriers (fields the NRU grid loop never sets, so edited cells fall back to the canonical
  * derivation), and the encoder reproduces all 4 bytes verbatim.
  *
- * Fixture: public/data/songs/formats/howiedavies.nru (real module).
+ * Fixture: public/data/songs/noiserunner/howiedavies.nru (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -18,7 +18,7 @@ import { join } from 'path';
 import { parseNRUFile } from '../NRUParser';
 import { getCellFileOffset } from '@/engine/uade/UADEPatternEncoder';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/howiedavies.nru');
+const FIXTURE = join(process.cwd(), 'public/data/songs/noiserunner/howiedavies.nru');
 
 describe('NRU pattern codec', () => {
   it('encodeCell is a byte-exact inverse of decodeCell over every pattern cell', async () => {

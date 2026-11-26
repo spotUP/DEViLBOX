@@ -37,7 +37,7 @@ describe('the registry hands each engine the tune the grid shows', () => {
 });
 
 describe('Future Player plays the subsong of the song', { timeout: 120_000 }, () => {
-  const FILE = 'public/data/songs/formats/hybris.fp';
+  const FILE = 'public/data/songs/future-player/hybris.fp';
   const SECONDS = 8;
 
   /** Note starts per voice the software Paula counted after `SECONDS` of the song loaded on `subsong`. */

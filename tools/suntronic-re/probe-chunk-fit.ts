@@ -13,7 +13,7 @@ import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../..');
-const CORPUS = resolve(REPO, 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = resolve(REPO, 'public/data/songs/suntronic');
 const GOLDEN = resolve(REPO, 'src/engine/suntronic/__tests__/sunTronicNoteTimeline.golden.json');
 const ECLOCK = 709379, SR = 44100, CH = 128;
 const dE = CH * ECLOCK / SR; // eclocks per 128-chunk (~2058.97)

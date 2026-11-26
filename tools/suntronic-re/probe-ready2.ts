@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { parseSunTronicV13Score, sunCommandLen, sunPitchToNote } from '../../src/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
-const buf = new Uint8Array(readFileSync('/Users/spot/Code/DEViLBOX/public/data/songs/formats/SUNTronicTunes/ready'));
+const buf = new Uint8Array(readFileSync('/Users/spot/Code/DEViLBOX/public/data/songs/suntronic/ready'));
 const s: any = parseSunTronicV13Score(buf);
 const h1 = s.h1; const bmap = s.blockIndexByOffset; const sub = s.subsongs[0];
 const widths = { arpShift: s.arpShift, volSlideRateFromStream: s.volSlideRateFromStream };

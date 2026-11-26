@@ -26,7 +26,7 @@ vi.mock('@/engine/eagleplayer/EaglePlayerEngine', () => ({
   EaglePlayerEngine: { hasInstance: () => true, getInstance: () => ({ loadTune, play }) },
 }));
 
-const DIR = 'public/data/songs/formats/Michel Winogradoff';
+const DIR = 'public/data/songs/michel-winogradoff';
 const TUNE = 'Cartoons 2';
 
 /**

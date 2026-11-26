@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { decodeCoSoGrid, parseHippelCoSoFile } from '@lib/import/formats/HippelCoSoParser';
 
-const REL = 'public/data/songs/formats/prehistoric_tale.hipc';
+const REL = 'public/data/songs/hippel-coso/prehistoric_tale.hipc';
 const file = () => new Uint8Array(readFileSync(resolve(__dirname, '../../../', REL)));
 const u32 = (b: Uint8Array, o: number) => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
 

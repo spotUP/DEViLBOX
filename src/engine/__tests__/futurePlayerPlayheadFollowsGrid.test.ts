@@ -25,7 +25,7 @@ import { fpLayout, fpTickPosition } from '@/lib/import/formats/fpGrid';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 const CASES = [
-  { file: 'public/data/songs/formats/hybris.fp', seconds: 25 },
+  { file: 'public/data/songs/future-player/hybris.fp', seconds: 25 },
   { file: 'public/data/songs/future-player/imploder drums.fp', seconds: 25 },
 ];
 const BLOCK = 128;
@@ -135,7 +135,7 @@ describe('Future Player: the playhead follows the grid', () => {
    * voices on command 13 only through the call-depth check, so they played from row 0.
    */
   it.each([2, 3, 4, 5])('hybris.fp subsong %i: the replayer starts the notes the walk walks, on every voice', async (sub) => {
-    const bytes = new Uint8Array(readFileSync(join(ROOT, 'public/data/songs/formats/hybris.fp')));
+    const bytes = new Uint8Array(readFileSync(join(ROOT, 'public/data/songs/future-player/hybris.fp')));
     const walk = walkFuturePlayer(fpCodeSection(bytes), sub)!;
     expect(walk.stop).toBe('ended');
     const { proc, send, posted } = await startWorklet('futureplayer', 'FuturePlayer');

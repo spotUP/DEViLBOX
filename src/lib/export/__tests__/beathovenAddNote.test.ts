@@ -10,7 +10,7 @@ import type { Pattern } from '@/types';
 import { buildBthGrid } from '@lib/import/formats/beathovenGrid';
 import { applyBeathovenGridEdits } from '@lib/import/formats/beathovenEdits';
 
-const FILES = ['public/data/songs/formats/beathoven_smallest.bss', 'public/data/songs/beathoven-synthesizer/tristar cracktro.bss'];
+const FILES = ['public/data/songs/beathoven-synthesizer/beathoven_smallest.bss', 'public/data/songs/beathoven-synthesizer/tristar cracktro.bss'];
 const clone = (ps: Pattern[]): Pattern[] => structuredClone(ps);
 
 describe.each(FILES)('Beathoven note on an empty row: %s', (file) => {

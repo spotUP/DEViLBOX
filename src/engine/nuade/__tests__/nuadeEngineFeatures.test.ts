@@ -12,7 +12,7 @@ import { registerChannelMeterSink } from '@engine/tone/channelMeterFeed';
 import { createNuadeEditPort } from '../nuadeEditPort';
 import { NuadeCap } from '../nuadeProtocol';
 
-const MMDC = 'public/data/songs/formats/captain planet and the planeteers - title.mmdc';
+const MMDC = 'public/data/songs/octamed-mmdc/captain planet and the planeteers - title.mmdc';
 
 describe('nuade engine features', () => {
   let rig: Rig;

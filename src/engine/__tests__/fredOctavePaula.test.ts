@@ -14,7 +14,7 @@ import { parseFredEditorFile } from '@/lib/import/formats/FredEditorParser';
 import { fredLineToCell, cellToFredLine } from '@/lib/import/formats/fredEditorGrid';
 import { periodToNote } from '@/lib/amiga/periodNotes';
 
-const DIR = join(process.cwd(), 'public/data/songs/formats');
+const DIR = join(process.cwd(), 'public/data/songs/fredmon');
 const FILE = 'bomb jack.fred';
 let restore = () => {};
 let mod: LogModule;

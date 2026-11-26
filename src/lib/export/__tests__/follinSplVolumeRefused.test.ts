@@ -34,7 +34,7 @@ describe('volume edits refused with the build-specific reason', () => {
     expect(Buffer.from(res.data).equals(Buffer.from(raw))).toBe(true);
   });
   it('Sound Programming Language boulderdash.spl', () => {
-    const raw = read('public/data/songs/formats/boulderdash.spl');
+    const raw = read('public/data/songs/sound-programming-language/boulderdash.spl');
     const g = buildSplGrid(raw);
     if (typeof g === 'string') throw new Error(g);
     const patterns = structuredClone(g.patterns);

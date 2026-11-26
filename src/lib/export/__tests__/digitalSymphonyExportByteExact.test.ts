@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { parseDigitalSymphonyFile } from '@/lib/import/formats/DigitalSymphonyParser';
 import { exportDigitalSymphony } from '../DigitalSymphonyExporter';
 
-const FILES = ['public/data/songs/formats/drwho_final4.dsym'];
+const FILES = ['public/data/songs/digital-symphony/drwho_final4.dsym'];
 
 function diffOffsets(a: Uint8Array, b: Uint8Array): number[] {
   const d: number[] = [];

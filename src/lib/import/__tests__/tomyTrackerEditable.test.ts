@@ -14,7 +14,7 @@ import '@/lib/formats/EditableFormatRegistry.builtins';
 import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 
 const NAME = 'irrepressible intro.sg';
-const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', NAME)));
+const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/tomy-tracker', NAME)));
 const load = () => parseTomyTrackerFile(raw.slice().buffer as ArrayBuffer, NAME);
 const diffAt = (a: Uint8Array, b: Uint8Array) => a.reduce<number[]>((l, v, k) => (v !== b[k] ? [...l, k] : l), []);
 

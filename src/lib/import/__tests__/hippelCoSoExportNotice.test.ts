@@ -18,10 +18,10 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import '@lib/formats/EditableFormatRegistry.builtins';
 import { detectNativeFormat } from '@lib/import/prepareModuleImport';
 import { getFormatCapabilities } from '@lib/import/FormatCapabilities';
+import { songFile } from '@/test/songPath';
 
 const CASES: Array<{ file: string; label: string }> = [
   { file: 'prehistoric_tale.hipc', label: 'Hippel-CoSo' },
@@ -38,7 +38,7 @@ const CASES: Array<{ file: string; label: string }> = [
 
 describe('import dialog capability matches the export router', () => {
   it.each(CASES)('$label ($file) reports native export', ({ file, label }) => {
-    const buf = readFileSync(resolve(__dirname, '../../../../public/data/songs/formats', file));
+    const buf = readFileSync(songFile(file));
     const fmt = detectNativeFormat(file, new Uint8Array(buf.buffer, buf.byteOffset, Math.min(128, buf.length)));
     expect(fmt?.label).toBe(label);
     const caps = getFormatCapabilities(fmt!.label, file, fmt!.family);

@@ -119,7 +119,7 @@ const CASES: Case[] = [
     parse: (b) => parseDigitalMugicianFile(ab(b), 'believe.dmu') },
   // Sound Factory: the grid is a fixed row clock (initialSpeed ticks a row, passed as rowStep); off-step notes carry a delay effect. im maien is only 2 order
   // positions on that clock, too short for the walk, so goldrunner (long) stands in.
-  { name: 'Sound Factory (goldrunner.psf)', dir: 'soundfactory', stem: 'SoundFactory2', file: 'public/data/songs/formats/goldrunner.psf',
+  { name: 'Sound Factory (goldrunner.psf)', dir: 'soundfactory', stem: 'SoundFactory2', file: 'public/data/songs/soundfactory/goldrunner.psf',
     transform: emscriptenTransform, voices: 4, gridClock: false, maxOnsetLag: 1, delayEffect: SF_FX_ROW_OFFSET,
     parse: (b) => parseSoundFactoryFile(b, 'goldrunner.psf') as TrackerSong },
   { name: 'Sound Factory (oriental.psf)', dir: 'soundfactory', stem: 'SoundFactory2', file: 'public/data/songs/soundfactory/oriental.psf',
@@ -127,7 +127,7 @@ const CASES: Case[] = [
     parse: (b) => parseSoundFactoryFile(b, 'oriental.psf') as TrackerSong },
   // Ben Daglish: the grid is the walk on a fixed row clock (initialSpeed processed ticks a row, passed to the worklet as rowStep); the worklet has no per-voice buffers and no play
   // message, and the sample's DMA starts on the tick after the note is read (as on the Amiga): onset lag 1.
-  { name: 'Ben Daglish (mickey_mouse.bd)', dir: 'bd', stem: 'Bd', file: 'public/data/songs/formats/mickey_mouse.bd',
+  { name: 'Ben Daglish (mickey_mouse.bd)', dir: 'bd', stem: 'Bd', file: 'public/data/songs/ben-daglish/mickey_mouse.bd',
     transform: emscriptenTransform, voices: 4, gridClock: false, isolate: true, noPlay: true, onsetLagFrames: 960, delayEffect: BD_FX.rowOffset,
     parse: async (b) => { const restore = installWasmNodeFetch('bd', 'Bd'); try { return await parseBenDaglishFile(ab(b), 'mickey_mouse.bd'); } finally { restore(); } } },
 ];

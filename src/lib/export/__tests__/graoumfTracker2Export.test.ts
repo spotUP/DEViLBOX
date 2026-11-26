@@ -5,7 +5,7 @@ import { join } from 'path';
 import { parseGraoumfTracker2File } from '@/lib/import/formats/GraoumfTracker2Parser';
 import { exportGraoumfTracker2 } from '../GraoumfTracker2Exporter';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/gimmekuh.gt2');
+const FIXTURE = join(process.cwd(), 'public/data/songs/graoumf-tracker-2/gimmekuh.gt2');
 const load = () => {
   const b = readFileSync(FIXTURE);
   return { b, song: parseGraoumfTracker2File(new Uint8Array(b), 'gimmekuh.gt2')! };

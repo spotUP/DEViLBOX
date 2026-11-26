@@ -18,7 +18,7 @@ type Msg = { type?: string; songPos?: number; row?: number; speed?: number; leve
 describe('GMC replayer drives the channel meters and the editor position', { timeout: 60_000 }, () => {
   it('the worklet posts the replayer playhead and per-channel levels with note starts', async () => {
     const { proc, send, posted } = await startWorklet('gmc', 'Gmc', gmcTransform);
-    await send({ type: 'loadModule', moduleData: songBuffer('public/data/songs/formats/knights_of_sky.gmc') });
+    await send({ type: 'loadModule', moduleData: songBuffer('public/data/songs/game-music-creator/knights_of_sky.gmc') });
     await send({ type: 'play' });
     const positions: Msg[] = []; const levels: Msg[] = [];
     for (let q = 0; q < (48000 * 6) / 128; q++) {

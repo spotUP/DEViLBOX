@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import { parseIMSFile } from '@/lib/import/formats/IMSParser';
 import { exportIMS } from '../IMSExporter';
 
-const FIXTURE = 'public/data/songs/formats/redoctober-sub-docking.ims';
+const FIXTURE = 'public/data/songs/images-music-system/redoctober-sub-docking.ims';
 
 async function parse(bytes: Uint8Array) {
   return parseIMSFile(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, 'redoctober-sub-docking.ims');

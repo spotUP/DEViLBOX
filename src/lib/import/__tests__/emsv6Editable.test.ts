@@ -10,7 +10,7 @@ import { periodToNote } from '@/lib/amiga/periodNotes';
 import { setGridBaseline, baselineOf } from '@/lib/song/gridBaseline';
 
 const NAME = 'perception.ems';
-const raw = readFileSync(`public/data/songs/formats/${NAME}`);
+const raw = readFileSync(`public/data/songs/ems/${NAME}`);
 const bytes = new Uint8Array(raw);
 const load = () => parseEMSv6File(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer, NAME);
 const diffAt = (a: Uint8Array, b: Uint8Array) => a.reduce<number[]>((l, v, k) => (v !== b[k] ? [...l, k] : l), []);

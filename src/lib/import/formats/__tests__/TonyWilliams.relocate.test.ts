@@ -7,7 +7,7 @@ import { TW_FX } from '../tonyWilliamsEffectGlyphs';
 import { exportTonyWilliams } from '@lib/export/TonyWilliamsExporter';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
-const DIR = 'public/data/songs/formats/';
+const DIR = 'public/data/songs/sound-images/';
 const FILES = ['future basketball main.tw', 'blinkys scary school-sfx.tw'] as const;
 const load = (n: string): ArrayBuffer => { const b = readFileSync(DIR + n); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 const bytesOf = async (s: TrackerSong): Promise<{ data: Uint8Array; warnings: string[] }> => {

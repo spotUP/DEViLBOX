@@ -28,7 +28,7 @@ vi.mock('@/engine/futureplayer/FuturePlayerEngine', () => ({
 vi.mock('@/lib/songdb', () => ({ computeSongDBHash: () => '', lookupSongDB: async () => null }));
 
 const spec: LiveSwapSpec = {
-  file: 'public/data/songs/formats/imploder_drums.fp',
+  file: 'public/data/songs/future-player/imploder_drums.fp',
   worklet: { dir: 'futureplayer', name: 'FuturePlayer', factory: 'createFuturePlayer' },
   start: (module) => [{ type: 'loadTune', buffer: module, subsong: 0 }, { type: 'play' }],
   swapMessage: (module, args) => ({ type: 'swapModule', moduleData: module, subsong: args[0] ?? 0 }),

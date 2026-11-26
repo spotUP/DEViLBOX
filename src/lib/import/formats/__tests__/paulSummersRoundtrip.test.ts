@@ -10,7 +10,7 @@ import { exportPaulSummers } from '@/lib/export/PaulSummersExporter';
 import { encodeVariableBlock } from '@/engine/uade/UADEPatternEncoder';
 import { buildPaulSummersGrid, PAUL_SUMMERS_ROWS_PER_PATTERN } from '../paulSummersGrid';
 
-const FIXTURE = resolve(__dirname, '../../../../../public/data/songs/formats/everton_fc_-_jingles.snk');
+const FIXTURE = resolve(__dirname, '../../../../../public/data/songs/paul-summers/everton_fc_-_jingles.snk');
 
 function load() {
   const b = readFileSync(FIXTURE);

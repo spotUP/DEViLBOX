@@ -72,7 +72,7 @@
  *   tools/uade-audit/corpus-sweep.ts
  *                                — the HEADLESS twin of this script: no browser,
  *                                  no dev server, no sound. Renders every file
- *                                  in public/data/songs/formats through the UADE
+ *                                  in public/data/songs/<format> through the UADE
  *                                  WASM in ~25s and tables refused / silent /
  *                                  instant-end / short / missing-sidecar. Run it
  *                                  FIRST: it tells you which songs are worth

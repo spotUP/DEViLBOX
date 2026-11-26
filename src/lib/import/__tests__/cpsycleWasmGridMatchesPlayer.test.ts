@@ -17,7 +17,7 @@ const trackerNote = (n: number) => (n === 120 ? 97 : n < 120 ? n + 1 : 0);
 
 describe('Psycle wasm grid matches the cpsycle sequencer', () => {
   for (const name of SONGS) {
-    const bytes = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', name)));
+    const bytes = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/psycle', name)));
 
     it(`${name}: every played entry is the grid's note and machine`, async () => {
       const grid = await cpsycleGrid(bytes);

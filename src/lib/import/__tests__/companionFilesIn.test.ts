@@ -76,7 +76,7 @@ describe('partnerlessFilesIn', () => {
   it('the song index offers no song whose partner is missing, and still has an Infogrames row', () => {
     const index = JSON.parse(readFileSync(join(process.cwd(), 'public/data/songs/index.json'), 'utf8')) as { entries: { files: string[]; formatKey: string | null }[] };
     const offered = index.entries.flatMap((e) => e.files);
-    const formats = new Set(readdirSync(join(process.cwd(), 'public/data/songs/formats')));
+    const formats = new Set(readdirSync(join(process.cwd(), 'public/data/songs')));
     for (const f of partnerlessFilesIn({ siblings: [...formats] })) {
       expect(offered).not.toContain(`/data/songs/formats/${f}`);
     }

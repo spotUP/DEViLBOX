@@ -18,7 +18,7 @@ async function loadModule(): Promise<any> {
 }
 
 function openSong(m: any, file: string): void {
-  const bytes = fs.readFileSync(path.join(root, 'public/data/songs/formats', file));
+  const bytes = fs.readFileSync(path.join(root, 'public/data/songs/jaytrax', file));
   const ptr = m._malloc(bytes.length);
   m.HEAPU8.set(bytes, ptr);
   expect(m._jxs_open(ptr, bytes.length, 0)).toBe(1);
@@ -143,7 +143,7 @@ describe('JxsEngine loop', () => {
         .replace(/self\.location\.href/g, "'.'")
         .replace(/_scriptName=globalThis\.document\?\.currentScript\?\.src/, '_scriptName="."');
       await proc.handleMessage({ type: 'init', wasmBinary: fs.readFileSync(path.join(root, 'public/jxs/Jxs.wasm')), jsCode: js });
-      const bytes = fs.readFileSync(path.join(root, 'public/data/songs/formats', song));
+      const bytes = fs.readFileSync(path.join(root, 'public/data/songs/jaytrax', song));
       await proc.handleMessage({ type: 'loadModule', moduleData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length) });
       const newOuts = (): Out => Array.from({ length: 1 + 4 + JXS_MAX_VOICES }, () => [new Float32Array(FRAMES), new Float32Array(FRAMES)]);
       return { proc, voices: proc.voices as number, newOuts };

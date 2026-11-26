@@ -12,7 +12,7 @@ import { readFileSync } from 'fs';
 import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser';
 import { reprojectSunGrid } from '../../src/lib/import/formats/sunReproject';
 
-const CORPUS = 'public/data/songs/formats/SUNTronicTunes';
+const CORPUS = 'public/data/songs/suntronic';
 
 function run(song: string): { total: number; provd: number; changed: number; examples: string[] } {
   const buf = readFileSync(`${CORPUS}/${song}`);

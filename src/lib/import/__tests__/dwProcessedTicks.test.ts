@@ -16,7 +16,7 @@ afterAll(() => restore());
 
 describe('David Whittaker processed ticks (apb.dw)', () => {
   it('every gap between a voice\'s note starts is a multiple of the song speed in processed ticks', async () => {
-    const f = readFileSync(resolve(process.cwd(), 'public/data/songs/formats/apb.dw'));
+    const f = readFileSync(resolve(process.cwd(), 'public/data/songs/david-whittaker/apb.dw'));
     const ab = f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
     const walk = await walkDavidWhittaker(ab.slice(0), 60_000, 0);
     expect(walk.speed).toBe(3);
@@ -36,7 +36,7 @@ describe('David Whittaker processed ticks (apb.dw)', () => {
   });
 
   it('the grid tempo carries the skip: initialBPM = 125 * num / den, speed = the module\'s', async () => {
-    const f = readFileSync(resolve(process.cwd(), 'public/data/songs/formats/apb.dw'));
+    const f = readFileSync(resolve(process.cwd(), 'public/data/songs/david-whittaker/apb.dw'));
     const ab = f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
     const walk = await walkDavidWhittaker(ab.slice(0), 60_000, 0);
     const song = await parseDavidWhittakerFile(ab.slice(0), 'apb.dw', 0, 0);

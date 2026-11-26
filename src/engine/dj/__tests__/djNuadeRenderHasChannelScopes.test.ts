@@ -23,7 +23,7 @@ import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch, aud
 import { NuadeHeadless } from '@/engine/nuade/nuadeHeadless';
 import { setNuadeProbe } from '@/engine/nuade/nuadeProbe';
 
-const MMDC = 'public/data/songs/formats/captain planet and the planeteers - title.mmdc';
+const MMDC = 'public/data/songs/octamed-mmdc/captain planet and the planeteers - title.mmdc';
 const NAME = 'captain planet and the planeteers - title.mmdc';
 const SECONDS = 12;
 

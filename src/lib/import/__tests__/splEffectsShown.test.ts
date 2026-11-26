@@ -1,6 +1,6 @@
 /**
  * Sound Programming Language: the extra note bytes of a note command show in the grid's effect columns (SPL_FX, glyph N)
- * and edits to them write back to the module bytes. Real song: public/data/songs/formats/boulderdash.spl.
+ * and edits to them write back to the module bytes. Real song: public/data/songs/sound-programming-language/boulderdash.spl.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -10,7 +10,7 @@ import { parseSoundProgrammingLanguageFile } from '../formats/SoundProgrammingLa
 import { SPL_FX } from '../formats/commandStreamEffectGlyphs';
 import { cellEffects } from '../formats/cellEffectSlots';
 
-const file = new Uint8Array(readFileSync('public/data/songs/formats/boulderdash.spl'));
+const file = new Uint8Array(readFileSync('public/data/songs/sound-programming-language/boulderdash.spl'));
 
 describe('SPL extra note bytes as effects', () => {
   const grid = buildSplGrid(file);

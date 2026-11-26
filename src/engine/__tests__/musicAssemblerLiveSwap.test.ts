@@ -28,7 +28,7 @@ vi.mock('@/engine/ma/MaEngine', () => ({
 vi.mock('@/lib/songdb', () => ({ computeSongDBHash: () => '', lookupSongDB: async () => null }));
 
 const spec: LiveSwapSpec = {
-  file: 'public/data/songs/formats/baseheads.ma',
+  file: 'public/data/songs/music-assembler/baseheads.ma',
   worklet: { dir: 'ma', name: 'Ma', factory: 'createMa' },
   start: (module) => [{ type: 'loadModule', moduleData: module, subsong: 0 }],
   swapMessage: (module, args) => ({ type: 'swapModule', moduleData: module, subsong: args[0] ?? 0 }),

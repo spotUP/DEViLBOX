@@ -13,9 +13,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
 import { parseModuleToSong } from '../parseModuleToSong';
 import { dedicatedEngineSynthType, KEYBOARD_VOICE_SYNTHS } from '../parsers/withFallback';
+import { songFile } from '@/test/songPath';
 
 const hasPcm = (i: { sample?: { audioBuffer?: ArrayBuffer; url?: string } | null }) =>
   (i.sample?.audioBuffer?.byteLength ?? 0) > 0 || !!i.sample?.url;
@@ -38,7 +38,7 @@ const CORPUS: Array<[string, string, number, number]> = [
 
 describe('dedicated-engine synth instruments keep a keyboard voice', () => {
   it.each(CORPUS)('%s (%s): %i voices, %i silent', async (name, _fmt, voices, silent) => {
-    const b = readFileSync(resolve(import.meta.dirname, '../../../../public/data/songs/formats', name));
+    const b = readFileSync(songFile(name));
     const song = await parseModuleToSong(new File([b], name));
     const noPcm = song.instruments.filter((i) => !hasPcm(i));
     const emptySamplers = noPcm.filter((i) => i.synthType === 'Sampler');

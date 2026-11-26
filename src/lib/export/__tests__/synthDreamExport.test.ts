@@ -22,7 +22,7 @@ const FILES = ['sdr.monsterbusiness_5', 'sdr.nobuddiesland_jigsaw'];
 
 async function load(name: string, bytes?: Uint8Array): Promise<{ raw: Uint8Array; song: TrackerSong }> {
   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-  const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', name)));
+  const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/synth-dream', name)));
   const song = await parseModuleToSong(new File([new Uint8Array(bytes ?? raw)], name));
   return { raw, song };
 }

@@ -3,7 +3,7 @@ import * as path from 'path';
 import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser';
 import { isSunTronicV13Format, parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 
-const dir = path.resolve(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const dir = path.resolve(process.cwd(), 'public/data/songs/suntronic');
 const files = fs.readdirSync(dir).filter((f) => {
   const p = path.join(dir, f);
   return fs.statSync(p).isFile();

@@ -16,7 +16,7 @@ import { parseSunTronicV13Score, sunPitchToNote } from '../../src/lib/import/for
 import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
 
 const name = process.argv[2] ?? 'analgestic2.src';
-const path = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes', name);
+const path = join(process.cwd(), 'public/data/songs/suntronic', name);
 const buf = readFileSync(path);
 const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 

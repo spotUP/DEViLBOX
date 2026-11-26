@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 
-const path = '/Users/spot/Code/DEViLBOX/public/data/songs/formats/SUNTronicTunes/mule.src';
+const path = '/Users/spot/Code/DEViLBOX/public/data/songs/suntronic/mule.src';
 const buf = new Uint8Array(readFileSync(path));
 const score = parseSunTronicV13Score(buf);
 console.log('deltaA', score.deltaA, 'deltaB', score.deltaB, 'blocks', score.blocks.length,

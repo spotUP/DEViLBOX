@@ -42,7 +42,7 @@ const ab = (b: Uint8Array | ArrayBuffer): ArrayBuffer => (b instanceof ArrayBuff
 describe('MMD3 live edit while playing', () => {
   it('a patched cell is heard after hot reload, against the same reload with unchanged bytes', async () => {
     const { Ctor, wasm } = await loadWorklet();
-    const raw = readFileSync(join(process.cwd(), 'public/data/songs/formats', NAME));
+    const raw = readFileSync(join(process.cwd(), 'public/data/songs/octamed-mmd3', NAME));
     const orig = ab(raw);
     const song = await parseModuleToSong(new File([new Uint8Array(raw)], NAME));
 

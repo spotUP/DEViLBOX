@@ -11,7 +11,7 @@ import { noteCellsPerPattern } from '@/lib/tracker/patternNoteCells';
 
 describe('get_pattern_stats wholeSong', () => {
   it('finds the notes of a song that opens with an empty pattern', () => {
-    const bytes = new Uint8Array(readFileSync('public/data/songs/formats/drwho_final4.dsym'));
+    const bytes = new Uint8Array(readFileSync('public/data/songs/digital-symphony/drwho_final4.dsym'));
     const song = parseDigitalSymphonyFile(bytes, 'drwho_final4.dsym');
     expect(song).not.toBeNull();
     const counts = noteCellsPerPattern(song!.patterns);

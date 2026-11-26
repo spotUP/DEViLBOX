@@ -79,7 +79,7 @@ describe('a DJ deck shows one scope per channel the song has', () => {
   }, 600_000);
 
   it('an 8-channel module (andante.s3m) has 8 scopes, channels past the fourth carrying signal', async () => {
-    const { count, peaks } = await deckChannels('public/data/songs/formats/andante.s3m', 'andante.s3m', 30);
+    const { count, peaks } = await deckChannels('public/data/songs/s3m/andante.s3m', 'andante.s3m', 30);
     expect(count).toBe(8);
     expect(Math.max(...peaks.slice(4)), JSON.stringify(peaks)).toBeGreaterThan(0.01);
   }, 600_000);

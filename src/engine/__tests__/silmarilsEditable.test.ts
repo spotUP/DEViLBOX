@@ -4,7 +4,7 @@ import { parseSilmarilsFile } from '@/lib/import/formats/SilmarilsParser';
 import { SIL_PERIODS, encodeSilmarilsCell, decodeSilmarilsCell } from '@/engine/uade/encoders/SilmarilsEncoder';
 import { periodToGridNote } from '@/lib/amiga/periodNotes';
 
-const path = 'public/data/songs/formats/silmarils_smallest.mok';
+const path = 'public/data/songs/silmarils/silmarils_smallest.mok';
 const load = () => { const b = readFileSync(path); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 const noteCell = (song: ReturnType<typeof parseSilmarilsFile>) => {
   for (let p = 0; p < song.patterns.length; p++) {

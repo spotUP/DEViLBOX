@@ -10,9 +10,9 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { RR_FX, HD_FX } from '@lib/import/formats/commandStreamEffectGlyphs';
+import { songFile } from '../../../test/songPath';
 
 const sentinel = vi.hoisted(() => ({ rr: 0, hd: 0 }));
 vi.mock('@lib/import/formats/riffRaffEdits', async (importOriginal) => {
@@ -24,11 +24,10 @@ vi.mock('@lib/import/formats/howieDaviesEdits', async (importOriginal) => {
   return { ...orig, applyHowieDaviesGridEdits: (...a: Parameters<typeof orig.applyHowieDaviesGridEdits>) => { sentinel.hd++; return orig.applyHowieDaviesGridEdits(...a); } };
 });
 
-const DIR = join(process.cwd(), 'public/data/songs/formats');
 
 async function load(name: string, bytes?: Uint8Array): Promise<{ raw: Uint8Array; song: TrackerSong }> {
   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-  const raw = new Uint8Array(readFileSync(join(DIR, name)));
+  const raw = new Uint8Array(readFileSync(songFile(name)));
   return { raw, song: await parseModuleToSong(new File([new Uint8Array(bytes ?? raw)], name)) };
 }
 

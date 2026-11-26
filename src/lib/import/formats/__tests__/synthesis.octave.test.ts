@@ -11,7 +11,7 @@ import { songUsesAmigaPeriods, typingOctaveFor, PROTRACKER_TYPING_OCTAVE, noteTo
 import { keyboardPeriod } from '@/engine/keyboardPeriod';
 import { xmNoteToToneJS } from '@/lib/xmConversions';
 
-const PATH = 'public/data/songs/formats/space_sound.syn';
+const PATH = 'public/data/songs/synthesis/space_sound.syn';
 
 describe('Synthesis space_sound.syn octave', () => {
   it('plays as an Amiga-period song: typing octave and key periods follow the grid note', async () => {

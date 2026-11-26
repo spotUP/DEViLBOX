@@ -11,7 +11,7 @@ import { buildSplGrid, type SplGrid } from '@lib/import/formats/soundProgramming
 import { applySplGridEdits } from '@lib/import/formats/soundProgrammingLanguageEdits';
 import { NuadeHeadless } from '../nuadeHeadless';
 
-const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/boulderdash.spl')));
+const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/sound-programming-language/boulderdash.spl')));
 const SR = 48000;
 
 async function render(data: Uint8Array): Promise<Float32Array[]> {

@@ -16,7 +16,7 @@ const trackerNote = (n: number) => (n === 0 ? 0 : n < 120 ? n + 1 : 97);
 
 describe('Ixalance wasm grid matches the replayer', () => {
   for (const name of SONGS) {
-    const bytes = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', name)));
+    const bytes = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/ixs', name)));
 
     it(`${name}: every played row has the grid's notes and instruments`, async () => {
       const grid = await ixalanceGrid(bytes);

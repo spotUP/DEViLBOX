@@ -17,7 +17,7 @@ vi.mock('@lib/import/formats/SynthDreamParser', async (importOriginal) => {
 describe('sdr.* import route', () => {
   it('parseModuleToSong gives the SynthDream grid and keeps UADE playback', async () => {
     const { parseModuleToSong } = await import('../parseModuleToSong');
-    const raw = readFileSync(join(process.cwd(), 'public/data/songs/formats/sdr.monsterbusiness_5'));
+    const raw = readFileSync(join(process.cwd(), 'public/data/songs/synth-dream/sdr.monsterbusiness_5'));
     const file = new File([new Uint8Array(raw)], 'sdr.monsterbusiness_5');
     const song = await parseModuleToSong(file);
     expect(sentinel.calls).toBeGreaterThan(0);

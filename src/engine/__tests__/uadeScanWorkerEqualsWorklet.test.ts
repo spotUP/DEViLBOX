@@ -23,20 +23,20 @@ import { uadePlayerHint } from '@/lib/import/uadePlayerHint';
  * checkout and does not move when the sweep is re-run.
  */
 const SAMPLE_SONGS = [
-  'public/data/songs/formats/gettysburg.avp',
-  'public/data/songs/formats/terramex.bds',
-  'public/data/songs/formats/apb.dw',
-  'public/data/songs/formats/doxtro3.dss',
-  'public/data/songs/formats/hybris.fp',
-  'public/data/songs/formats/redoctober-sub-docking.ims',
-  'public/data/songs/formats/ikari_warriors.jb',
-  'public/data/songs/formats/cockwise.mug',
-  'public/data/songs/formats/45.okta',
-  'public/data/songs/formats/centurion_battle.rh',
-  'public/data/songs/formats/count_duckula.scr',
-  'public/data/songs/formats/operation_stealth.sfx',
-  'public/data/songs/formats/offroad.jpo',
-  'public/data/songs/formats/dynablaster.ast',
+  'public/data/songs/activision-pro/gettysburg.avp',
+  'public/data/songs/ben-daglish-sid/terramex.bds',
+  'public/data/songs/david-whittaker/apb.dw',
+  'public/data/songs/digital-sound-studio/doxtro3.dss',
+  'public/data/songs/future-player/hybris.fp',
+  'public/data/songs/images-music-system/redoctober-sub-docking.ims',
+  'public/data/songs/jason-brooke/ikari_warriors.jb',
+  'public/data/songs/digital-mugician-2/cockwise.mug',
+  'public/data/songs/oktalyzer/45.okta',
+  'public/data/songs/rob-hubbard/centurion_battle.rh',
+  'public/data/songs/sean-conran/count_duckula.scr',
+  'public/data/songs/soundfx/operation_stealth.sfx',
+  'public/data/songs/steve-turner/offroad.jpo',
+  'public/data/songs/actionamics/dynablaster.ast',
 ];
 const CUSTOM = 'public/data/songs/delitracker-custom/bards tale.cus';
 

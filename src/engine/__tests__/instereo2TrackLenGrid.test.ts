@@ -10,7 +10,7 @@ import { loadSharedWorkletScripts, startWorklet, songBuffer, stereoOutputs } fro
 import { instereo2Transform } from '@/engine/instereo2/InStereo2Engine';
 import { parseInStereo2File } from '@/lib/import/formats/InStereo2Parser';
 
-const FILE = 'public/data/songs/formats/stereo_feeling.is20';
+const FILE = 'public/data/songs/instereo!-2.0/stereo_feeling.is20';
 
 function withTrackLen(src: Uint8Array, len: number): Uint8Array {
   const b = src.slice();

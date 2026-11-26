@@ -24,11 +24,12 @@ import { parseSidMon2File } from '@/lib/import/formats/SidMon2Parser';
 import { serializeSidMon1Config } from '@/engine/sidmon1/SidMon1Synth';
 import { sm1IndexToXM } from '@/engine/uade/encoders/SidMon1Encoder';
 import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+import { songFile } from '@/test/songPath';
 
 // Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
 pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
-const bytes = (n: string) => new Uint8Array(readFileSync(resolve(ROOT, 'public/data/songs/formats', n)));
+const bytes = (n: string) => new Uint8Array(readFileSync(songFile(n)));
 const ab = (u: Uint8Array) => u.slice().buffer as ArrayBuffer;
 
 interface Found { channel: number; row: number; note: number; instrument: number }
@@ -179,7 +180,7 @@ async function sm1VoiceRows(buf: ArrayBuffer, patternDataFileOffset: number, voi
 }
 
 describe('SidMon 1 keyboard preview is the instrument as the song plays it', () => {
-  const buf = songBuffer('public/data/songs/formats/anarchy.sid1');
+  const buf = songBuffer('public/data/songs/sidmon-1/anarchy.sid1');
   // [voice, pattern row]: a bass, two lead notes and a note of another instrument on another voice (anarchy.sid1).
   const cases: Array<[number, number]> = [[0, 252], [1, 264], [2, 259], [3, 97]];
   cases.forEach(([voice, row]) => {
@@ -214,7 +215,7 @@ describe('SidMon 1 keyboard preview is the instrument as the song plays it', () 
 describe('synth voices that already render at the replayer level carry no extra gain', () => {
   it('FC and SidMon 1 synth instruments sit at 0 dB (the voices are the replayer voice, level for level)', async () => {
     const fc = await parseFCFile(ab(bytes('anthrox.fc')), 'anthrox.fc');
-    const sm1 = parseSidMon1File(songBuffer('public/data/songs/formats/anarchy.sid1').slice(0), 'anarchy.sid1');
+    const sm1 = parseSidMon1File(songBuffer('public/data/songs/sidmon-1/anarchy.sid1').slice(0), 'anarchy.sid1');
     for (const [song, type] of [[fc, 'FCSynth'], [sm1, 'SidMon1Synth']] as const) {
       const synths = song.instruments.filter((i) => i.synthType === type);
       expect(synths.length, type).toBeGreaterThan(0);
@@ -231,7 +232,7 @@ describe('SidMon 2 sampler instruments play a typed key at the replayer rate of 
     const src = readFileSync(resolve(ROOT, 'sidmon2-wasm/src/sd2/sidmon2.c'), 'utf8');
     const table = src.match(/s_periods\[\] = \{([\s\S]*?)\};/)![1].split(',').map((v) => parseInt(v.trim(), 10));
     expect(table.length).toBe(73);
-    const song = await parseSidMon2File(songBuffer('public/data/songs/formats/bruno_time.sid2'), 'bruno_time.sid2');
+    const song = await parseSidMon2File(songBuffer('public/data/songs/sidmon-2/bruno_time.sid2'), 'bruno_time.sid2');
     const withSample = song.instruments.filter((i) => i.sample);
     expect(withSample.length).toBeGreaterThan(0);
     withSample.forEach((inst) => {
@@ -246,7 +247,7 @@ describe('SidMon 2 sampler instruments play a typed key at the replayer rate of 
 });
 
 describe('SidMon 2 replayer preview voice (sd2_note_on) is the song voice', () => {
-  const buf = songBuffer('public/data/songs/formats/bruno_time.sid2');
+  const buf = songBuffer('public/data/songs/sidmon-2/bruno_time.sid2');
   async function previewWorklet() {
     const w = await startWorklet('sidmon2', 'Sd2', exposeHeapTransform);
     await w.send({ type: 'loadModule', moduleData: buf.slice(0) });

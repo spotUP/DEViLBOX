@@ -218,26 +218,26 @@ describe('NC-4 verdicts for the table', () => {
 describe('NAB-1 our own engine rendered headless', () => {
   it('renders a dual row\'s song through its real worklet, audibly; a row without a headless engine is null', async () => {
     const { renderOwn, OWN_ENGINES } = await import('../../../tools/nuade/ownRender');
-    const r = await renderOwn('soundmon', 'public/data/songs/formats/antidust.bp3', 5);
+    const r = await renderOwn('soundmon', 'public/data/songs/bp-soundmon-3/antidust.bp3', 5);
     expect(r?.error).toBeUndefined();
     expect(r!.peak).toBeGreaterThan(0.05);
     expect(r!.rms).toBeGreaterThan(0.02);
-    const h = await renderOwn('hippel', 'public/data/songs/formats/prehistoric_tale.hipc', 5);
+    const h = await renderOwn('hippel', 'public/data/songs/hippel-coso/prehistoric_tale.hipc', 5);
     expect(h?.error).toBeUndefined();
     expect(h!.peak).toBeGreaterThan(0.05);
     expect(await renderOwn('fcbsi', 'public/data/songs/future-composer-bsi/newtek.bsi', 2)).toBeNull(); // the TypeScript scheduler: no headless render
     // MusicMaker plays through its worklet (no WASM) from the module its engine builds; SUN-Tronic's engine takes V1.3 score modules
     // and says so for a compiled .sun.
-    const mm = await renderOwn('musicmaker', 'public/data/songs/formats/house2.mm8', 5);
+    const mm = await renderOwn('musicmaker', 'public/data/songs/musicmaker-v8/house2.mm8', 5);
     expect(mm?.error).toBeUndefined();
     expect(mm!.peak).toBeGreaterThan(0.05);
-    expect((await renderOwn('suntronic', 'public/data/songs/formats/msx-cracktro 2.sun', 2))?.error).toMatch(/not a hunk executable/);
+    expect((await renderOwn('suntronic', 'public/data/songs/suntronic/msx-cracktro 2.sun', 2))?.error).toMatch(/not a hunk executable/);
     expect(Object.keys(OWN_ENGINES).every((id) => NUADE_FORMATS[id]?.role === 'dual')).toBe(true);
   }, 60_000);
 
   it('compareSong on a dual row measures both engines against UADE with the same metric', async () => {
     const nu = await NuadeHeadless.create();
-    const c = await compareSong(nu, NUADE_FORMATS.soundmon!, 'public/data/songs/formats/antidust.bp3', 10);
+    const c = await compareSong(nu, NUADE_FORMATS.soundmon!, 'public/data/songs/bp-soundmon-3/antidust.bp3', 10);
     expect(c.correlation).toBeGreaterThan(0.9);
     expect(c.own).toBeGreaterThan(0.85);
     const d = await compareSong(nu, NUADE_FORMATS.mmdc!, NUADE_FORMATS.mmdc!.corpus[0]!, 5);

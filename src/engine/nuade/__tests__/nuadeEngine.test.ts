@@ -9,7 +9,7 @@ import { NuadeEngine } from '../NuadeEngine';
 import { useFormatStore } from '@stores/useFormatStore';
 import { WASMChannelOutputsEngine } from '@engine/wasm/WASMSingletonBase';
 
-const MMDC = 'public/data/songs/formats/captain planet and the planeteers - title.mmdc';
+const MMDC = 'public/data/songs/octamed-mmdc/captain planet and the planeteers - title.mmdc';
 
 describe('NE-3 NuadeEngine', () => {
   let rig: Rig;

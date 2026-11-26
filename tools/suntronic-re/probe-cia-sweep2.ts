@@ -5,7 +5,7 @@ import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV1
 import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../..');
-const CORPUS = resolve(REPO, 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = resolve(REPO, 'public/data/songs/suntronic');
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const golden: any = JSON.parse(readFileSync(resolve(REPO,'src/engine/suntronic/__tests__/sunTronicNoteTimeline.golden.json'),'utf8'));
 function run(name: string, cia: number){

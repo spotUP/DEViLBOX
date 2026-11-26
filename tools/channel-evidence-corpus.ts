@@ -42,12 +42,12 @@ const OUT = resolve(
 const SONGS = [
   'public/data/songs/ahx/amanda.ahx',
   'server/data/modland-cache/files/pub__modules__AHX__Mortimer Twang__jennipha.ahx',
-  'public/data/songs/formats/aces_high.ahx',
-  'public/data/songs/formats/hexplosion.hvl',
-  'public/data/songs/formats/a sleep so deep.mod',
-  'public/data/songs/formats/flo boarding - level 1.xm',
-  'public/data/songs/formats/absm chain mod.it',
-  'public/data/songs/formats/andante.s3m',
+  'public/data/songs/ahx/aces_high.ahx',
+  'public/data/songs/hivelytracker/hexplosion.hvl',
+  'public/data/songs/mod/a sleep so deep.mod',
+  'public/data/songs/xm/flo boarding - level 1.xm',
+  'public/data/songs/impulse-tracker/absm chain mod.it',
+  'public/data/songs/s3m/andante.s3m',
 ];
 
 /** How many order positions to take per song. Enough to catch a channel

@@ -9,12 +9,12 @@ import { join } from 'node:path';
 import { parseTonyWilliamsFile } from '@lib/import/formats/TonyWilliamsParser';
 import { exportTonyWilliams } from './../TonyWilliamsExporter';
 
-const DIR = 'public/data/songs/Sound Images/Tony Williams';
+const DIR = 'public/data/songs/sound-images/Tony Williams';
 const NAMES = ['future basketball main.tw', 'blinkys scary school-sfx.tw', ...(existsSync(join(process.cwd(), DIR)) ? readdirSync(join(process.cwd(), DIR)) : []).filter((f) => f.endsWith('.tw')).map((f) => `@${f}`)];
 
 describe('Tony Williams instrument swap before any Instrument command', () => {
   it.each(NAMES)('%s: every attempt is written and reads back, or refused for the initial instrument', async (name) => {
-    const raw = readFileSync(name.startsWith('@') ? join(process.cwd(), DIR, name.slice(1)) : join(process.cwd(), 'public/data/songs/formats', name));
+    const raw = readFileSync(name.startsWith('@') ? join(process.cwd(), DIR, name.slice(1)) : join(process.cwd(), 'public/data/songs/sound-images', name));
     const buf = (): ArrayBuffer => raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
     const probe = await parseTonyWilliamsFile(buf(), name).catch(() => null);
     if (!probe) return; // the walker does not understand this module (no grid to edit)

@@ -9,7 +9,7 @@ import { buildBthGrid, type BthGrid } from '@lib/import/formats/beathovenGrid';
 import { applyBeathovenGridEdits } from '@lib/import/formats/beathovenEdits';
 
 describe.each(['beathoven_smallest.bss', 'tristar_cracktro.bss'])('Beathoven %s refusals', (name) => {
-  const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', name)));
+  const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/beathoven-synthesizer', name)));
   const find = (g: BthGrid): [number, number, number] => {
     for (let p = 0; p < g.patterns.length; p++) for (let c = 0; c < g.patterns[p].channels.length; c++) {
       const r = g.patterns[p].channels[c].rows.findIndex((x) => x.note > 0 && x.note < 97);

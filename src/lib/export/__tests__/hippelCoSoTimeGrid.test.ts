@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { hippelCoSoModule } from '../HippelCoSoExporter';
 import { parseAs, readFixture } from './exporterHarness.shared';
 
-const FIXTURE = 'public/data/songs/formats/prehistoric_tale.hipc';
+const FIXTURE = 'public/data/songs/hippel-coso/prehistoric_tale.hipc';
 
 /** Rows with a note, per voice, of grid pattern `p`. */
 const noteRows = (song: Awaited<ReturnType<typeof parseAs>>, p: number, ch: number) =>

@@ -19,7 +19,7 @@ import { exportAsFuturePlayer } from '@/lib/export/FuturePlayerExporter';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 const ROOT = process.cwd();
-const FILES = ['public/data/songs/formats/hybris.fp', 'public/data/songs/future-player/imploder drums.fp'];
+const FILES = ['public/data/songs/future-player/hybris.fp', 'public/data/songs/future-player/imploder drums.fp'];
 const ab = (b: Uint8Array): ArrayBuffer => b.slice().buffer as ArrayBuffer;
 const clone = (s: TrackerSong): TrackerSong => ({ ...s, patterns: s.patterns.map((p) => ({ ...p, channels: p.channels.map((c) => ({ ...c, rows: c.rows.map((r) => ({ ...r })) })) })) });
 async function bytesOf(s: TrackerSong): Promise<Uint8Array> {

@@ -23,7 +23,7 @@
  * On revert (no blockRawBytes carrier) branch 1 fails: encodeVariableBlock falls
  * straight through to the lossy packer and no block is byte-exact.
  *
- * Fixture: public/data/songs/formats/seasons.ult (real UltraTracker module).
+ * Fixture: public/data/songs/ultra-tracker/seasons.ult (real UltraTracker module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -32,7 +32,7 @@ import { parseULTFile } from '../ULTParser';
 import { encodeVariableBlock } from '@/engine/uade/UADEPatternEncoder';
 import type { TrackerCell } from '@/types';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/seasons.ult');
+const FIXTURE = join(process.cwd(), 'public/data/songs/ultra-tracker/seasons.ult');
 
 describe('ULT pattern block round-trip', () => {
   it('encodeVariableBlock reproduces every unedited block byte-for-byte', async () => {

@@ -26,7 +26,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseSunTronicFile } from '../SunTronicParser';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 
 function loadModule(name: string): ArrayBuffer {
   const raw = new Uint8Array(readFileSync(join(CORPUS, name)));

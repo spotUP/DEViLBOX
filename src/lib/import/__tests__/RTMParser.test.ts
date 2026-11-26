@@ -9,7 +9,7 @@ const ALFAOMEG = resolve(
 );
 const BRAINSTORM = resolve(
   import.meta.dirname,
-  '../../../../public/data/songs/formats/odyssey.rtm'
+  '../../../../public/data/songs/real-tracker/odyssey.rtm'
 );
 
 function loadFile(path: string): ArrayBuffer {

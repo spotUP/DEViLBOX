@@ -9,7 +9,7 @@ import { readJxsInstrument, writeJxsInstrument, type JxsEdit } from '@/lib/impor
 import { loadJxsWasm, renderNote, differs } from './jxsWasmHarness';
 
 const root = path.resolve(__dirname, '../../../..');
-const FILE = path.join(root, 'public/data/songs/formats/jbells.jxs');
+const FILE = path.join(root, 'public/data/songs/jaytrax/jbells.jxs');
 const RAMP = Int16Array.from({ length: 256 }, (_, k) => k * 120);
 const SQUARE = Int16Array.from({ length: 256 }, (_, k) => (k < 128 ? 20000 : -20000));
 let m: any;

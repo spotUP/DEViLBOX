@@ -16,8 +16,8 @@
  * the encoder cannot reproduce the block bytes.
  *
  * Fixtures (real modules, committed):
- *   public/data/songs/formats/SUNTronicTunes/mule.src   (1 sampled: n-chord.x, rows/pos 32)
- *   public/data/songs/formats/SUNTronicTunes/kompo.pc   (0 sampled / 3 synth, rows/pos 16)
+ *   public/data/songs/suntronic/mule.src   (1 sampled: n-chord.x, rows/pos 32)
+ *   public/data/songs/suntronic/kompo.pc   (0 sampled / 3 synth, rows/pos 16)
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
@@ -25,7 +25,7 @@ import { join } from 'path';
 import { parseSunTronicFile, isSunTronicFormat, isSunTronicRawRip } from '../SunTronicParser';
 import { isSunTronicV13Format, parseSunTronicV13Score, decodeSunSynthInstrument } from '../SunTronicV13';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 const INSTR = join(CORPUS, 'instr');
 
 function loadModule(name: string): ArrayBuffer {

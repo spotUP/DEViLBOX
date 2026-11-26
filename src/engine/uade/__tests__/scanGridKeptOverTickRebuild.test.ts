@@ -40,7 +40,7 @@ describe('generic UADE scan grid', { timeout: 300_000 }, () => {
     };
     const spy = vi.spyOn(UADEEngine, 'getInstance').mockReturnValue(engine as unknown as UADEEngine);
     try {
-      const song = await parseUADEFile(songBuffer('public/data/songs/formats/' + name), name);
+      const song = await parseUADEFile(songBuffer('public/data/songs/future-composer-1.4/' + name), name);
       const perChannel = [0, 0, 0, 0];
       for (const p of song.patterns) p.channels.forEach((c, ch) => {
         for (const r of c.rows) if (r.note > 0 && r.note < 97) perChannel[ch]++;

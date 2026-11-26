@@ -25,7 +25,7 @@ vi.mock('@lib/import/formats/TimFollinParser', async (importOriginal) => {
 describe('Tim Follin .tf import route', () => {
   it('parseModuleToSong gives the Follin grid with byte-exact carriers and keeps UADE playback', async () => {
     const { parseModuleToSong } = await import('../parseModuleToSong');
-    const raw = readFileSync(join(process.cwd(), 'public/data/songs/formats/follin_smallest.tf'));
+    const raw = readFileSync(join(process.cwd(), 'public/data/songs/follin-player-ii/follin_smallest.tf'));
     const song = await parseModuleToSong(new File([new Uint8Array(raw)], 'follin_smallest.tf'));
     expect(sentinel.calls).toBeGreaterThan(0);
     expect(song.gridUnmatchedReason).toBeUndefined();

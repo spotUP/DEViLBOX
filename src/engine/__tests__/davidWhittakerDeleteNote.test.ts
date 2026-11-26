@@ -21,7 +21,7 @@ afterAll(() => { restoreFetch(); setGridBaseline(null); });
 
 describe('David Whittaker: deleted notes', { timeout: 120000 }, () => {
   it('apb.dw: deleting a note leaves a module whose scan still finds the song', async () => {
-    const f = readFileSync(resolve(process.cwd(), 'public/data/songs/formats/apb.dw'));
+    const f = readFileSync(resolve(process.cwd(), 'public/data/songs/david-whittaker/apb.dw'));
     const ab = f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
     const song = await parseDavidWhittakerFile(ab.slice(0), 'apb.dw');
     const layout = (song as unknown as { uadeVariableLayout?: Parameters<typeof patchModuleByVariableLayout>[1] }).uadeVariableLayout;
@@ -43,7 +43,7 @@ describe('David Whittaker: deleted notes', { timeout: 120000 }, () => {
   });
 
   it('apb.dw: deleting the first note of voice 1 is written as a mute; later onsets keep their ticks', async () => {
-    const f = readFileSync(resolve(process.cwd(), 'public/data/songs/formats/apb.dw'));
+    const f = readFileSync(resolve(process.cwd(), 'public/data/songs/david-whittaker/apb.dw'));
     const ab = f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
     const bytes = new Uint8Array(ab);
     const walk = await walkDavidWhittaker(ab.slice(0));

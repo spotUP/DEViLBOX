@@ -28,7 +28,7 @@ vi.mock('@/engine/protracker4/ProTracker4Engine', () => ({
 vi.mock('@/lib/songdb', () => ({ computeSongDBHash: () => '', lookupSongDB: async () => null }));
 
 const spec: LiveSwapSpec = {
-  file: 'public/data/songs/formats/libpt4-pt4x_40.mod',
+  file: 'public/data/songs/mod/libpt4-pt4x_40.mod',
   worklet: { dir: 'protracker4', name: 'ProTracker4', factory: 'createProTracker4', worklet: 'ProTracker4.worklet.js' },
   start: (module) => [{ type: 'loadModule', moduleData: module }],
   swapMessage: (module) => ({ type: 'swapModule', moduleData: module }),

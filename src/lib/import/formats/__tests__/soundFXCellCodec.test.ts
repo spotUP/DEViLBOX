@@ -11,7 +11,7 @@ import { exportSoundFX } from '@/lib/export/SoundFXExporter';
 import { decodeSoundFXCell, encodeSoundFXCell } from '@engine/uade/encoders/soundfxCellCodec';
 
 const FILES = [
-  'public/data/songs/formats/operation_stealth.sfx',
+  'public/data/songs/soundfx/operation_stealth.sfx',
   'public/data/songs/soundfx/batdance.sfx',
   'public/data/songs/soundfx/distancia al ano.sfx',
 ];

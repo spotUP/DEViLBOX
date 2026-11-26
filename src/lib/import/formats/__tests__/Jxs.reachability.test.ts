@@ -18,7 +18,7 @@ import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { parseJxsFile } from '@lib/import/formats/JxsParser';
 import { exportJxs } from '@lib/export/JxsExporter';
 
-const PATH = 'public/data/songs/formats/popcorn.jxs';
+const PATH = 'public/data/songs/jaytrax/popcorn.jxs';
 
 describe('JayTrax reachability', () => {
   it('top-level import runs the JXS parser; native export is byte-exact', async () => {

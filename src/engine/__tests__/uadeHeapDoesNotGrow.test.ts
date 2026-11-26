@@ -21,7 +21,7 @@ const SONGS = [
   DSC + "dragon'sbreath demo 1.dsc",
   'public/data/songs/david-whittaker/garfield2+.dw',
   'public/data/songs/ben-daglish/motorhead-titleandingame.bd',
-  "public/data/songs/formats/dragon'sbreath_fanfares.dsc",
+  "public/data/songs/digital-sonix-and-chrome/dragon'sbreath_fanfares.dsc",
 ];
 const LOADS = 25;
 const WARM_UP = 6;

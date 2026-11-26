@@ -35,7 +35,7 @@ vi.mock('../ToneEngine', () => ({
   getToneEngine: () => ({ getInstrument() {}, connectMeters() {} }),
 }));
 
-const MMDC = 'public/data/songs/formats/captain planet and the planeteers - title.mmdc';
+const MMDC = 'public/data/songs/octamed-mmdc/captain planet and the planeteers - title.mmdc';
 const SECONDS = 30;
 const SR = 48000;
 

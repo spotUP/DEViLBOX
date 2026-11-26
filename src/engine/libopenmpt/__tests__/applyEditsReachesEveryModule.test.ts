@@ -41,7 +41,7 @@ describe('applyEdits message', () => {
     await import(/* @vite-ignore */ workletPath);
 
     const p = new Ctor({});
-    const file = readFileSync(join(process.cwd(), 'public/data/songs/formats/chiptracker.cba'));
+    const file = readFileSync(join(process.cwd(), 'public/data/songs/chuck-biscuits/chiptracker.cba'));
     const buf = (): ArrayBuffer => file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer;
     for (let i = 0; i < 100; i++) {
       try { p.handleMessage_({ data: { cmd: 'play', val: buf() } }); } catch { /* wasm not up yet */ }

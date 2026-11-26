@@ -24,7 +24,7 @@ vi.mock('@engine/TrackerReplayer', async (orig) => {
 });
 
 const ROOT = join(__dirname, '../../..');
-const RH = 'public/data/songs/formats/centurion_battle.rh';
+const RH = 'public/data/songs/rob-hubbard/centurion_battle.rh';
 
 describe('an edit on a nuade-played Rob Hubbard song', () => {
   beforeAll(async () => {

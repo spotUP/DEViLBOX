@@ -103,9 +103,8 @@ const covered = new Set<string>();
  * Most directories hold a single format and become one row. Two shapes break
  * that and both are real:
  *
- *  - `formats/` is the one-song-per-format collection: 165 files that are 165
- *    DIFFERENT formats. Grouped by directory it collapsed into a single
- *    useless row.
+ *  - a few directories still mix formats (misc, unsorted leftovers). Grouped by
+ *    directory they would collapse into one useless row.
  *  - `furnace/` is one format on many machines, each of which plays through
  *    different chip code and breaks independently.
  *

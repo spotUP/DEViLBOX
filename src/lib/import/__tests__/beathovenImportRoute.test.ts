@@ -27,7 +27,7 @@ vi.mock('@lib/import/formats/BeathovenParser', async (importOriginal) => {
   return { ...orig, parseBeathovenFile: (...a: Parameters<typeof orig.parseBeathovenFile>) => { sentinel.calls++; return orig.parseBeathovenFile(...a); } };
 });
 
-const DIR = join(process.cwd(), 'public/data/songs/formats');
+const DIR = join(process.cwd(), 'public/data/songs/beathoven-synthesizer');
 
 function notesOf(song: TrackerSong, v: number): Array<[number, number, number]> {
   const out: Array<[number, number, number]> = [];

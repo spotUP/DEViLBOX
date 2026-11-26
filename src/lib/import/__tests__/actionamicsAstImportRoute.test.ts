@@ -18,7 +18,7 @@ vi.mock('@lib/import/formats/ActionamicsParser', async (importOriginal) => {
   };
 });
 
-const DIR = join(process.cwd(), 'public/data/songs/formats');
+const DIR = join(process.cwd(), 'public/data/songs/actionamics');
 
 describe('actionamics .ast import route', () => {
   it.each(['dynablaster.ast', 'ast.dynablaster'])('%s', async (name) => {

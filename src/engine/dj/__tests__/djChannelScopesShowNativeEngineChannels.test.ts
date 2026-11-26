@@ -38,7 +38,7 @@ describe('DJ deck channel scopes show a native engine\'s channels', () => {
     await (await import('@/lib/export/audioEncoders')).encodeFlac([new Float32Array(16)], 44100);
     const restoreWorkers = installInProcessDJRenderWorker();
     const { getDJPipeline } = await import('../DJPipeline');
-    const bytes = readFileSync(join(process.cwd(), 'public/data/songs/formats', SONG));
+    const bytes = readFileSync(join(process.cwd(), 'public/data/songs/mod', SONG));
     const source = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     const result = await getDJPipeline().loadOrEnqueue(source, SONG, undefined, 'high', undefined, 30);
     restoreWorkers();

@@ -18,7 +18,7 @@ vi.mock('@lib/import/formats/soundProgrammingLanguageEdits', async (importOrigin
   return { ...orig, applySplGridEdits: (...a: Parameters<typeof orig.applySplGridEdits>) => { sentinel.calls++; return orig.applySplGridEdits(...a); } };
 });
 
-const FILE = { path: 'public/data/songs/formats/boulderdash.spl', name: 'boulderdash.spl' };
+const FILE = { path: 'public/data/songs/sound-programming-language/boulderdash.spl', name: 'boulderdash.spl' };
 
 async function load(bytes?: Uint8Array): Promise<{ raw: Uint8Array; song: TrackerSong }> {
   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');

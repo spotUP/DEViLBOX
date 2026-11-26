@@ -15,7 +15,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { isSupportedByHeader } from '@/lib/import/FormatRegistry';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 
 describe('isSupportedByHeader — content fallback for extensionless songs', () => {
   it('accepts a real SunTronic V1.3 header (only the first 0x200 bytes)', () => {

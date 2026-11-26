@@ -8,7 +8,7 @@
  * preserves the exact source period in cell.period and the encoder writes it back verbatim
  * (falling back to the canonical note->period only when an edit has invalidated the period).
  *
- * Fixture: public/data/songs/formats/operation_stealth.sfx (committed real module).
+ * Fixture: public/data/songs/soundfx/operation_stealth.sfx (committed real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -17,7 +17,7 @@ import { parseSoundFXFile } from '../SoundFXParser';
 import { getCellFileOffset } from '@engine/uade/UADEPatternEncoder';
 import { xmNoteToPeriod } from '@engine/uade/encoders/MODEncoder';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/operation_stealth.sfx');
+const FIXTURE = join(process.cwd(), 'public/data/songs/soundfx/operation_stealth.sfx');
 
 describe('SoundFX pattern codec', () => {
   it('encodeCell is a byte-exact inverse of decodeCell over the whole pattern region', async () => {

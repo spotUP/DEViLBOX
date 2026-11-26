@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { isSunTronicV13Format } from '../../src/lib/import/formats/SunTronicV13';
 import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser';
-const p1='/Users/spot/Code/DEViLBOX/public/data/songs/SUNTronicTunes/ready';
+const p1='/Users/spot/Code/DEViLBOX/public/data/songs/suntronic/ready';
 const buf = new Uint8Array(readFileSync(p1));
 console.log('isV13:', isSunTronicV13Format(buf));
 const ab = readFileSync(p1);

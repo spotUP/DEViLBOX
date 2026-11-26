@@ -35,7 +35,7 @@ import { join } from 'path';
 import { parseSunTronicV13Score } from '@/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../SunTronicPlayer';
 
-const CORPUS = join(__dirname, '../../../../public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(__dirname, '../../../../public/data/songs/suntronic');
 const LOOP_TICK = 2555;      // sequence wraps here (probe-poswrap: pos 31 -> 0)
 const PROBE_TICK = 2570;     // 15 ticks into the 2nd loop
 

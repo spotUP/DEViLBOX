@@ -26,7 +26,7 @@ function diffOffsets(a: Uint8Array, b: Uint8Array): number[] {
 }
 
 describe.each(FIXTURES)('Digital Mugician export %s', (name) => {
-  const raw = new Uint8Array(readFileSync(`public/data/songs/formats/${name}`));
+  const raw = new Uint8Array(readFileSync(`public/data/songs/digital-mugician-2/${name}`));
 
   it('unedited export is byte-exact', async () => {
     const out = await exportBytes(await parse(raw, name));

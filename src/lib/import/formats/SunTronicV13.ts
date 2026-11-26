@@ -1,7 +1,7 @@
 /**
  * SunTronicV13.ts — SunTronic V1.3 "Delirium module" hunk/score codec.
  *
- * The V1.3 generation (public/data/songs/formats/SUNTronicTunes/) is a 2-hunk
+ * The V1.3 generation (public/data/songs/suntronic/) is a 2-hunk
  * AmigaOS executable: hunk#0 = 436-byte DeliTracker wrapper ("DELIRIUM"
  * signature + "$VER: SunTronic music module V1.3"), hunk#1 = CHIP hunk with
  * the replayer code AND the per-song score fused into one blob.

@@ -58,7 +58,7 @@ describe('Digital Mugician grid plays what the replayer plays', () => {
 
 
   it('Mugician II (cockwise.mug): seven voices; the hardware voices open with the notes Paula plays', async () => {
-    const song = await load('public/data/songs/formats/cockwise.mug');
+    const song = await load('public/data/songs/digital-mugician-2/cockwise.mug');
     expect(song.numChannels).toBe(7);
     expect(song.patterns[0].channels).toHaveLength(7);
 
@@ -78,7 +78,7 @@ describe('Digital Mugician grid plays what the replayer plays', () => {
   });
 
   it('Mugician I (flight.dmu): four voices open with the notes Paula plays', async () => {
-    const song = await load('public/data/songs/formats/flight.dmu');
+    const song = await load('public/data/songs/digital-mugician/flight.dmu');
     expect(song.numChannels).toBe(4);
     const paula = [
       [39, 29, 29, 39, 39, 29, 39, 29, 39, 39, 29, 39, 29, 39, 29, 29],

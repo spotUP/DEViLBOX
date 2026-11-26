@@ -44,7 +44,7 @@ vi.mock('@/hooks/audio/usePatternPlayback', () => ({ usePatternPlayback: () => {
 vi.mock('@/lib/hvscApi', () => ({ downloadHVSCFile: vi.fn() }));
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
-const MOD_PATH = 'public/data/songs/formats/a sleep so deep.mod';
+const MOD_PATH = 'public/data/songs/mod/a sleep so deep.mod';
 const modBytes = (): ArrayBuffer => {
   const b = readFileSync(resolve(ROOT, MOD_PATH));
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
@@ -92,7 +92,7 @@ describe('openSong entry points', { timeout: 120000 }, () => {
     const mod = modBytes();
     const INDEX = {
       gaps: [], dirs: [],
-      entries: [{ id: 'protracker', label: 'ProTracker', formatKey: 'protracker', files: ['/data/songs/formats/a sleep so deep.mod'], total: 1, dir: 'formats' }],
+      entries: [{ id: 'protracker', label: 'ProTracker', formatKey: 'protracker', files: ['/data/songs/mod/a sleep so deep.mod'], total: 1, dir: 'formats' }],
     };
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (String(url).endsWith('/data/songs/index.json')) return new Response(JSON.stringify(INDEX));

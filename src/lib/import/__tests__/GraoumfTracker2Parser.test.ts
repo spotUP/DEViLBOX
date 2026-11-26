@@ -9,7 +9,7 @@ const LIVING_ON_VIDEO = resolve(
 );
 const GIMMEKUH = resolve(
   import.meta.dirname,
-  '../../../../public/data/songs/formats/gimmekuh.gt2'
+  '../../../../public/data/songs/graoumf-tracker-2/gimmekuh.gt2'
 );
 
 function loadFile(path: string): Uint8Array {

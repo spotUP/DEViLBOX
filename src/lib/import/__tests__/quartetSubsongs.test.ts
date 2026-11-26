@@ -21,7 +21,7 @@ const scanGrid = vi.hoisted(() => ({ name: 'uade-scan-grid', patterns: [], instr
 vi.mock('@lib/import/formats/UADEParser', () => ({ parseUADEFile: vi.fn(async () => scanGrid) }));
 
 const NAME = 'warlock_the_avenger.sqt';
-const bytes = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', NAME)));
+const bytes = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/quartet-psg', NAME)));
 const open = (subsong?: number): Promise<TrackerSong> =>
   parseModuleToSong(new File([bytes.slice()], NAME), subsong) as Promise<TrackerSong>;
 

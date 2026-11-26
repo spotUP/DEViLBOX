@@ -163,8 +163,8 @@ describe('Dave Lowe grid re-encode of a short channel and of a repeated instrume
   });
 
   it('parser records both: padding cells of a short channel and untouched sections of both corpus songs', async () => {
-    const mb = read('public/data/songs/formats/m-bison.dln');
-    const sphere = read('public/data/songs/formats/incredibleshrinkingsphere.dl');
+    const mb = read('public/data/songs/dave-lowe-new/m-bison.dln');
+    const sphere = read('public/data/songs/dave-lowe/incredibleshrinkingsphere.dl');
     const bison = parseDaveLoweNewFile(mb.slice(0), 'm-bison.dln');
     const sph = await parseDaveLoweFile(sphere.slice(0), 'incredibleshrinkingsphere.dl');
     expect(sph.patterns.some((p) => p.channels.some((c) => c.rows.some((r) => r.dlPadding)))).toBe(true);

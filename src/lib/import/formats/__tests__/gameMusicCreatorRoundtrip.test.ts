@@ -14,7 +14,7 @@
  * to the canonical note→period + effect-map derivation), and the encoder reproduces them
  * verbatim on every path.
  *
- * Fixture: public/data/songs/formats/knights_of_sky.gmc (real module).
+ * Fixture: public/data/songs/game-music-creator/knights_of_sky.gmc (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -22,7 +22,7 @@ import { join } from 'path';
 import { getCellFileOffset } from '@/engine/uade/UADEPatternEncoder';
 import { parseGameMusicCreatorFile } from '../GameMusicCreatorParser';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/knights_of_sky.gmc');
+const FIXTURE = join(process.cwd(), 'public/data/songs/game-music-creator/knights_of_sky.gmc');
 
 describe('Game Music Creator pattern codec', () => {
   it('GMC edit/export round-trip is byte-exact over pattern data', () => {

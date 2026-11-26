@@ -27,7 +27,7 @@ vi.mock('@engine/TrackerReplayer', async (orig) => {
   return { ...(await orig<object>()), getTrackerReplayer: () => replayer, peekTrackerReplayer: () => replayer };
 });
 
-const PATH = 'public/data/songs/formats/fantasi8.is';
+const PATH = 'public/data/songs/instereo!/fantasi8.is';
 
 describe('InStereo! 1.0 grid edit reaches the bytes the engine plays', () => {
   it('a store cell edit reaches the running replayer (sentinel) and the next-play module; unedited is byte-identical', async () => {

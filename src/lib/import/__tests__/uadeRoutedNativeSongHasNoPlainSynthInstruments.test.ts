@@ -33,7 +33,7 @@ vi.mock('../parsers/withFallback', async (orig) => {
   };
 });
 
-const PATH = 'public/data/songs/formats/the punisher - title.psa';
+const PATH = 'public/data/songs/professional-sound-artists/the punisher - title.psa';
 
 describe('UADEParser native route (Professional Sound Artists)', () => {
   it('leaves no plain Synth instrument on the routed native song', async () => {

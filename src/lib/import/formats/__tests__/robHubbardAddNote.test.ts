@@ -19,7 +19,7 @@ async function paula(bytes: Uint8Array): Promise<string[]> {
   return out;
 }
 
-const FILE = 'public/data/songs/formats/centurion_battle.rh';
+const FILE = 'public/data/songs/rob-hubbard/centurion_battle.rh';
 
 describe('Rob Hubbard: a note on a blank row', { timeout: 60000 }, () => {
   const bytes = new Uint8Array(readFileSync(FILE));

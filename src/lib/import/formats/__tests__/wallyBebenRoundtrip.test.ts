@@ -9,14 +9,14 @@
  * MOD-style single-effect view) and restores it on encode. Note bytes (0x00-0x23) already
  * round-tripped (b -> b+13 -> b); new/edited rest cells still collapse to the canonical 0x24.
  *
- * Fixture: public/data/songs/formats/wicked.wb (committed real module).
+ * Fixture: public/data/songs/wally-beben/wicked.wb (committed real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseWallyBebenFile } from '../WallyBebenParser';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/wicked.wb');
+const FIXTURE = join(process.cwd(), 'public/data/songs/wally-beben/wicked.wb');
 
 function loadFixture(): ArrayBuffer {
   const b = readFileSync(FIXTURE);

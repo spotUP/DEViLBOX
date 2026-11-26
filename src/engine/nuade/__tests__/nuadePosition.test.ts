@@ -8,7 +8,7 @@ import { songBuffer } from '../../__tests__/workletHarness';
 import { NuadeEngine, type NuadePosition } from '../NuadeEngine';
 import { WASMChannelOutputsEngine } from '@engine/wasm/WASMSingletonBase';
 
-const MMDC = 'public/data/songs/formats/captain planet and the planeteers - title.mmdc';
+const MMDC = 'public/data/songs/octamed-mmdc/captain planet and the planeteers - title.mmdc';
 // A grid shaped like a tracker song: 64 orders of 64 rows, 6 ticks per row.
 const GRID = { initialSpeed: 6, songPositions: Array.from({ length: 64 }, (_, i) => i), patterns: Array.from({ length: 64 }, () => ({ length: 64 })) as never, restartPosition: 0 };
 

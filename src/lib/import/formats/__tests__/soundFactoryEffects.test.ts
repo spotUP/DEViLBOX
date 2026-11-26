@@ -13,7 +13,7 @@ import { SF_MAX_EFFECT_SLOTS } from '../soundFactoryGrid';
 import type { TrackerCell } from '@/types';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/goldrunner.psf');
+const FIXTURE = join(process.cwd(), 'public/data/songs/soundfactory/goldrunner.psf');
 const load = () => new Uint8Array(readFileSync(FIXTURE));
 const SLOT_TYP = ['effTyp', 'effTyp2', 'effTyp3', 'effTyp4', 'effTyp5', 'effTyp6', 'effTyp7', 'effTyp8'] as const;
 const SLOT_VAL = ['eff', 'eff2', 'eff3', 'eff4', 'eff5', 'eff6', 'eff7', 'eff8'] as const;
@@ -84,7 +84,7 @@ describe('Sound Factory effect commands on goldrunner.psf', () => {
   });
 
   it('every Sound Factory module in the corpus places all of its effect operands', () => {
-    const dirs = ['public/data/songs/formats', 'public/data/songs/soundfactory'];
+    const dirs = ['public/data/songs/soundfactory', 'public/data/songs/soundfactory'];
     let files = 0, effects = 0;
     for (const d of dirs) {
       for (const f of readdirSync(join(process.cwd(), d)).filter((n) => n.toLowerCase().endsWith('.psf'))) {

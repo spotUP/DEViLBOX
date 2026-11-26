@@ -20,7 +20,7 @@ vi.mock('@/engine/jxs/JxsEngine', () => ({ JxsEngine: { hasInstance: () => true,
 import { useFormatStore } from '@stores/useFormatStore';
 import { JxsControls } from '../JxsControls';
 
-const FILE = path.resolve(__dirname, '../../../../../public/data/songs/formats/jbells.jxs');
+const FILE = path.resolve(__dirname, '../../../../../public/data/songs/jaytrax/jbells.jxs');
 const INSTRUMENT = 4; // "bass": audible, plays its own wave
 let m: any;
 let original: Uint8Array;

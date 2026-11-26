@@ -15,14 +15,14 @@
  * which sets no such fields, so an edited grid cell arrives carrier-less and keeps the
  * canonical (lossy) derivation.
  *
- * Fixture: public/data/songs/formats/noname.stp (real module).
+ * Fixture: public/data/songs/soundtracker-pro-ii/noname.stp (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseSTPFile } from '../STPParser';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/noname.stp');
+const FIXTURE = join(process.cwd(), 'public/data/songs/soundtracker-pro-ii/noname.stp');
 
 describe('SoundTracker Pro II pattern codec', () => {
   it('encodeCell is a byte-exact inverse of decodeCell over every pattern cell', async () => {

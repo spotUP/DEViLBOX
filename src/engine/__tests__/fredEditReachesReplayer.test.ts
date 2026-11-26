@@ -42,7 +42,7 @@ vi.mock('@engine/TrackerReplayer', async (orig) => {
 
 const bytes = (p: string) => new Uint8Array(readFileSync(resolve(ROOT, p)));
 const settle = () => new Promise((r) => setTimeout(r, 20));
-const REBELS = 'public/data/songs/formats/rebels.fred';
+const REBELS = 'public/data/songs/fredmon/rebels.fred';
 const FIREWORKS = 'public/data/songs/fredmon/fireworks ii.fred';
 /** Lab2_PeriodTable. */
 const PERIODS = [

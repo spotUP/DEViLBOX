@@ -11,7 +11,7 @@ import { encodeRobHubbardPattern } from '@/engine/uade/encoders/RobHubbardEncode
 import { setGridBaseline, baselineOf } from '@/lib/song/gridBaseline';
 
 const NAME = 'count_duckula.scr';
-const raw = readFileSync(`public/data/songs/formats/${NAME}`);
+const raw = readFileSync(`public/data/songs/sean-conran/${NAME}`);
 const bytes = new Uint8Array(raw);
 const load = () => parseSeanConranFile(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer, NAME);
 const diffAt = (a: Uint8Array, b: Uint8Array) => a.reduce<number[]>((l, v, k) => (v !== b[k] ? [...l, k] : l), []);

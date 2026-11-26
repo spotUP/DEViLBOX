@@ -22,7 +22,7 @@ const empty = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0
 describe('Composer 670 volume column', () => {
   it('shows the note volume nibble through the import route (amnesia_credits.c67)', async () => {
     const { parseModuleToSong } = await import('../parseModuleToSong');
-    const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/amnesia_credits.c67')));
+    const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/composer-670-cdfm/amnesia_credits.c67')));
     const before = sentinel.calls;
     const song = await parseModuleToSong(new File([raw], 'amnesia_credits.c67'));
     expect(sentinel.calls).toBeGreaterThan(before);

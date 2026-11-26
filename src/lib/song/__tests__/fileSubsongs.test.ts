@@ -89,7 +89,7 @@ describe('a tick that ends one pass and starts the next fits the effect columns'
 });
 
 describe('David Whittaker apb.dw: 8 subsongs', { timeout: 120_000 }, () => {
-  const REL = 'public/data/songs/formats/apb.dw';
+  const REL = 'public/data/songs/david-whittaker/apb.dw';
   let restore = () => {};
   beforeAll(() => { restore = installDwNodeFetch(); });
   afterAll(() => restore());
@@ -176,7 +176,7 @@ async function unchangedAfterExport(original: ArrayBuffer): Promise<boolean> {
 }
 
 describe('Future Player hybris.fp: 6 subsongs', { timeout: 180_000 }, () => {
-  const REL = 'public/data/songs/formats/hybris.fp';
+  const REL = 'public/data/songs/future-player/hybris.fp';
   it('scans six, opens subsong 3 with the grid of its walk, and its export keeps the bytes and takes an edit', async () => {
     const bytes = bytesOf(REL);
     expect(await scanFileSubsongs('hybris.fp', bytes)).toEqual({ count: 6, first: 0 });

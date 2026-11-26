@@ -17,7 +17,7 @@ import { renderSunSynthPreview } from '../SunTronicVoiceRenderer';
 
 function mule() {
   const buf = new Uint8Array(
-    readFileSync(join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/mule.src')),
+    readFileSync(join(process.cwd(), 'public/data/songs/suntronic/mule.src')),
   );
   return parseSunTronicV13Score(buf);
 }

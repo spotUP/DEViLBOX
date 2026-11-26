@@ -9,6 +9,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import '@/stores/useTrackerStore';
 import { readFileSync } from 'node:fs';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { songFile } from '../../test/songPath';
 
 const live: { song: unknown } = { song: null };
 vi.mock('../ToneEngine', () => {
@@ -30,10 +31,9 @@ vi.mock('../libopenmpt/medModuleEdits', async (orig) => {
   return { ...real, applyMedModuleEdits: (...a: Parameters<typeof real.applyMedModuleEdits>) => { sentinel.calls++; return real.applyMedModuleEdits(...a); } };
 });
 
-const SONGS = 'public/data/songs/formats/';
 async function load(name: string) {
   const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-  const raw = readFileSync(SONGS + name);
+  const raw = readFileSync(songFile(name));
   return { raw, song: await parseModuleToSong(new File([new Uint8Array(raw)], name)) };
 }
 /** The replayer's song: its patterns are the store's, as in the app. */

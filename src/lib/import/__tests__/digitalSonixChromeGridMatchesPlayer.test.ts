@@ -138,7 +138,7 @@ describe('Digital Sonix & Chrome grid matches the player', () => {
   }, 120_000);
 
   it('importing a .dsc file (the app entry point) gives the decoded grid of the chosen subsong, nuade attached for audio', async () => {
-    const fanfares = new Uint8Array(readFileSync(join(process.cwd(), "public/data/songs/formats/dragon'sbreath_fanfares.dsc")));
+    const fanfares = new Uint8Array(readFileSync(join(process.cwd(), "public/data/songs/digital-sonix-and-chrome/dragon'sbreath_fanfares.dsc")));
     const viaApp = await parseModuleToSong(new File([load().slice().buffer as ArrayBuffer], NAME));
     expect(viaApp.name).toContain('[Digital Sonix & Chrome]');
     expect(gridPitches(viaApp).map((c) => c.length)).toEqual([98, 130, 141, 200]);

@@ -10,6 +10,7 @@ import { parseThomasHermannFile } from '@/lib/import/formats/ThomasHermannParser
 import { exportNativeSong } from '@/lib/export/nativeExportRouter';
 import { getCellFileOffset } from '@/engine/uade/UADEPatternEncoder';
 import { setGridBaseline, baselineOf } from '@/lib/song/gridBaseline';
+import { songFile } from '@/test/songPath';
 
 const CASES: { name: string; file: string; parse: (b: ArrayBuffer, n: string) => TrackerSong | Promise<TrackerSong> }[] = [
   { name: 'PSA', file: 'the punisher - title.psa', parse: parsePSAFile },
@@ -18,7 +19,7 @@ const CASES: { name: string; file: string; parse: (b: ArrayBuffer, n: string) =>
 const diffAt = (a: Uint8Array, b: Uint8Array) => a.reduce<number[]>((l, v, k) => (v !== b[k] ? [...l, k] : l), []);
 
 for (const c of CASES) {
-  const raw = readFileSync(`public/data/songs/formats/${c.file}`);
+  const raw = readFileSync(songFile(c.file));
   const bytes = new Uint8Array(raw);
   const ab = () => raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
   const exportBytes = async (song: TrackerSong) => {

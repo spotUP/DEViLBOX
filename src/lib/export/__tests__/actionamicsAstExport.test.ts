@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const PATH = join(process.cwd(), 'public/data/songs/formats/dynablaster.ast');
+const PATH = join(process.cwd(), 'public/data/songs/actionamics/dynablaster.ast');
 
 async function load(bytes?: Uint8Array) {
   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');

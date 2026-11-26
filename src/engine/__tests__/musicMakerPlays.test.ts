@@ -22,7 +22,7 @@ import { musicMakerWorkletModule } from '@lib/import/formats/MusicMakerParser';
 import { playingEngineFor } from '@/engine/replayer/NativeEngineRouting';
 
 const ROOT = process.cwd();
-const DIR = resolve(ROOT, 'public/data/songs/formats/MusicMaker V8 Old/- unknown');
+const DIR = resolve(ROOT, 'public/data/songs/musicmaker-v8/old/- unknown');
 
 type Voice = { cur: unknown; outPeriod: number; outVol: number };
 type Proc = {

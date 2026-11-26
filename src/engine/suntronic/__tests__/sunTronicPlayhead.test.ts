@@ -51,7 +51,7 @@ class FakeNode {
   disconnect() {}
 }
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 const SAMPLE_RATE = 44100;
 
 beforeAll(() => { vi.stubGlobal('AudioWorkletNode', FakeNode); vi.useFakeTimers(); });

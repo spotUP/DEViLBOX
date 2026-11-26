@@ -25,7 +25,7 @@ vi.mock('@engine/TrackerReplayer', async (orig) => {
   return { ...(await orig<object>()), getTrackerReplayer: () => replayer, peekTrackerReplayer: () => replayer };
 });
 
-const PATH = 'public/data/songs/formats/45.okta';
+const PATH = 'public/data/songs/oktalyzer/45.okta';
 
 describe('Oktalyzer grid edit reaches the bytes the engine plays', () => {
   it('a store cell edit reaches the running replayer (sentinel) and the next-play module; unedited is byte-identical', async () => {

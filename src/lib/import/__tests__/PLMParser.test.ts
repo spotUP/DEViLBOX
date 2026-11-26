@@ -9,7 +9,7 @@ const BLOODY_MARY = resolve(
 );
 const CALM = resolve(
   import.meta.dirname,
-  '../../../../public/data/songs/formats/parity_error.plm'
+  '../../../../public/data/songs/disorder-tracker-2/parity_error.plm'
 );
 
 function loadFile(path: string): ArrayBuffer {

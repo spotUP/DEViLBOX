@@ -4,7 +4,7 @@ import {
   locateAamLayout, readAamTrackList, aamUsedPatterns, aamPatternOffset, splitAamPattern, encodeAamCommands,
 } from '../ArtAndMagicParser';
 
-const FILES = ['public/data/songs/formats/agony-level1.aam', 'public/data/songs/formats/agony-level2.aam'];
+const FILES = ['public/data/songs/art-and-magic/agony-level1.aam', 'public/data/songs/art-and-magic/agony-level2.aam'];
 
 describe.each(FILES)('Art and Magic layout + note-stream codec: %s', (path) => {
   const b = new Uint8Array(readFileSync(path));

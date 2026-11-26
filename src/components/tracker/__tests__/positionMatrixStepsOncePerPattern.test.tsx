@@ -180,7 +180,7 @@ describe('position matrix steps once per pattern played, never per row', () => {
   });
 
   const songs: Array<{ path: string; type: string; mode: string; view: () => Promise<React.FC> }> = [
-    { path: 'public/data/songs/formats/hexplosion.hvl', type: 'HVL', mode: 'hively',
+    { path: 'public/data/songs/hivelytracker/hexplosion.hvl', type: 'HVL', mode: 'hively',
       view: async () => (await import('@components/hively/HivelyView')).HivelyView as React.FC },
     { path: 'public/data/songs/ahx/amanda.ahx', type: 'AHX', mode: 'hively',
       view: async () => (await import('@components/hively/HivelyView')).HivelyView as React.FC },

@@ -10,7 +10,7 @@ import { parseWallyBebenFile } from '@lib/import/formats/WallyBebenParser';
 import { exportWallyBeben } from '../WallyBebenExporter';
 import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 
-const FILES = ['public/data/songs/formats/wicked.wb'];
+const FILES = ['public/data/songs/wally-beben/wicked.wb'];
 const fresh = (f: string) => { const s = parseWallyBebenFile(load(f), 'wicked.wb'); setGridBaseline(baselineOf(s.patterns)); return s; };
 const load = (f: string) => { const b = readFileSync(join(process.cwd(), f)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 

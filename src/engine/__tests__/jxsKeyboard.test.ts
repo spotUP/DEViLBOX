@@ -22,7 +22,7 @@ vi.mock('@/utils/audio-context', async (orig) => {
 describe('JayTrax keyboard', () => {
   it('imported instruments keep a keyboard voice; a key reaches the engine with the instrument and note', async () => {
     const name = 'popcorn.jxs';
-    const b = readFileSync(resolve(import.meta.dirname, '../../../public/data/songs/formats', name));
+    const b = readFileSync(resolve(import.meta.dirname, '../../../public/data/songs/jaytrax', name));
     const song = await parseModuleToSong(new File([b], name));
     const inst = song.instruments.find((i) => i.synthType === 'JxsSynth');
     expect(inst, 'import keeps JxsSynth').toBeDefined();

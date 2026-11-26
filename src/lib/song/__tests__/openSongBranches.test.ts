@@ -131,7 +131,7 @@ describe('every branch behind openSong is reached through it', { timeout: 120000
   });
 
   it('a .dbx project opens through openSong and applies as a project', async () => {
-    const mod = 'public/data/songs/formats/a sleep so deep.mod';
+    const mod = 'public/data/songs/mod/a sleep so deep.mod';
     expect((await open('a sleep so deep.mod', bytesOf(mod))).ok).toBe(true);
     const patterns = useTrackerStore.getState().patterns;
     const instruments = useInstrumentStore.getState().instruments;

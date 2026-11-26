@@ -16,7 +16,7 @@ import { BD_FX } from '../benDaglishEffectGlyphs';
 import { SF_FX_ROW_OFFSET, SF_MAX_EFFECT_SLOTS } from '../soundFactoryGrid';
 import { tokenizeSoundFactory } from '../soundFactoryStream';
 
-const DIRS = ['public/templates', 'public/data/songs/formats', 'public/data/songs/soundfactory'];
+const DIRS = ['public/templates', 'public/data/songs/soundfactory', 'public/data/songs/soundfactory'];
 const SLOT_TYP = ['effTyp', 'effTyp2', 'effTyp3', 'effTyp4', 'effTyp5', 'effTyp6', 'effTyp7', 'effTyp8'] as const;
 const SLOT_VAL = ['eff', 'eff2', 'eff3', 'eff4', 'eff5', 'eff6', 'eff7', 'eff8'] as const;
 const SHOWN = ['note', 'instrument', 'note2', 'instrument2', 'delay2', ...SLOT_TYP, ...SLOT_VAL] as const;
@@ -25,7 +25,7 @@ const corpus = (): Array<{ name: string; bytes: Uint8Array }> => DIRS.flatMap((d
   readdirSync(join(process.cwd(), d)).filter((n) => n.toLowerCase().endsWith('.psf'))
     .map((n) => ({ name: n, bytes: new Uint8Array(readFileSync(join(process.cwd(), d, n))) })));
 
-const GOLD = (): Uint8Array => new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/goldrunner.psf')));
+const GOLD = (): Uint8Array => new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/soundfactory/goldrunner.psf')));
 const exportBytes = async (song: SoundFactoryParse['song']): Promise<Uint8Array> => new Uint8Array(await (await exportSoundFactory(song)).data.arrayBuffer());
 const field = (cell: TrackerCell, k: string): number => (cell as unknown as Record<string, number | undefined>)[k] ?? 0;
 const setField = (cell: TrackerCell, k: string, v: number): void => { (cell as unknown as Record<string, number>)[k] = v; };

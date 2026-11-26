@@ -42,7 +42,7 @@ describe('note removal by merging the length into the held note', () => {
     expect(wrote).toBeGreaterThanOrEqual(1);
   });
   it('Sound Programming Language: boulderdash.spl', () => {
-    const raw = read('public/data/songs/formats/boulderdash.spl');
+    const raw = read('public/data/songs/sound-programming-language/boulderdash.spl');
     const g = buildSplGrid(raw) as SplGrid;
     const wrote = sweep(raw, g, (p) => applySplGridEdits(raw, p), (d) => buildSplGrid(d) as SplGrid);
     expect(wrote).toBeGreaterThanOrEqual(1);

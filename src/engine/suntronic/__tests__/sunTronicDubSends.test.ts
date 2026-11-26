@@ -20,7 +20,7 @@ import { parseSunTronicV13Score } from '@/lib/import/formats/SunTronicV13';
 import { SunTronicNativeRenderer } from '../SunTronicNativeRender';
 import { ROOT, loadSharedWorkletScripts, stereoOutputs } from '@engine/__tests__/workletHarness';
 
-const CORPUS = join(ROOT, 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(ROOT, 'public/data/songs/suntronic');
 const CHUNK = 2048;
 
 type Proc = { port: { onmessage: ((e: { data: unknown }) => void) | null }; process(i: Float32Array[][], o: Float32Array[][]): boolean };

@@ -5,7 +5,7 @@ import { setGridBaseline, baselineOf } from '@/lib/song/gridBaseline';
 import { decodeMmdcStream, encodeMmdcStream, indexMmdc } from '../formats/mmdcCodec';
 
 const FILES = [
-  'public/data/songs/formats/captain planet and the planeteers - title.mmdc',
+  'public/data/songs/octamed-mmdc/captain planet and the planeteers - title.mmdc',
   'public/data/songs/octamed-mmdc/knightmare - ingame 3.mmdc',
 ];
 

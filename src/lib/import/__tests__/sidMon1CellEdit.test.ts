@@ -16,7 +16,7 @@ const NAME = 'myfunnymazea.sid';
 const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/sidmon-1', NAME)));
 // myfunnymazea has no effect rows; anarchy.sid1 has 324 bend rows (3xx), no speed rows: speed is written on a blank note row.
 const NAME2 = 'anarchy.sid1';
-const raw2 = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', NAME2)));
+const raw2 = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/sidmon-1', NAME2)));
 const load = () => parseSidMon1File(raw.slice().buffer as ArrayBuffer, NAME);
 
 describe('SidMon 1 cell edits reach the bytes', () => {

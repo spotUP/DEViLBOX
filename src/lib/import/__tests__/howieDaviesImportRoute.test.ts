@@ -54,7 +54,7 @@ function expectCarriers(layout: UADEVariablePatternLayout, raw: Uint8Array): voi
 
 describe('howie davies import route', () => {
   it('blazing_thunder.hd (Blazing Thunder)', async () => {
-    const { song, raw, layout } = await load('public/data/songs/formats/blazing_thunder.hd');
+    const { song, raw, layout } = await load('public/data/songs/howie-davies/blazing_thunder.hd');
     expect(song.numChannels).toBe(4);
     expect([0, 1, 2, 3].map((v) => playedNotes(song, v).length)).toEqual([473, 1221, 620, 802]);
     expect(song.patterns.length).toBe(43);

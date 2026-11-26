@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { parseSunTronicV13Score, sunCommandLen } from '../../src/lib/import/formats/SunTronicV13';
 
-const dir = '/Users/spot/Code/DEViLBOX/public/data/songs/SUNTronicTunes';
+const dir = '/Users/spot/Code/DEViLBOX/public/data/songs/suntronic';
 const files = readdirSync(dir).filter(f => {
   const p = `${dir}/${f}`;
   try { return statSync(p).isFile(); } catch { return false; }

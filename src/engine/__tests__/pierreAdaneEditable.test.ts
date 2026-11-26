@@ -4,7 +4,7 @@ import { parsePierreAdaneFile } from '@/lib/import/formats/PierreAdaneParser';
 import { encodePierreAdaneCell, decodePierreAdaneCell } from '@/engine/uade/encoders/PierreAdaneEncoder';
 import { periodToGridNote } from '@/lib/amiga/periodNotes';
 
-const path = 'public/data/songs/formats/Ivanhoe_ivanhoe - bonus.pap';
+const path = 'public/data/songs/pierre-adane-packer/Ivanhoe_ivanhoe - bonus.pap';
 const load = () => { const b = readFileSync(path); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 const noteCell = (song: ReturnType<typeof parsePierreAdaneFile>) => {
   for (let p = 0; p < song.patterns.length; p++) {

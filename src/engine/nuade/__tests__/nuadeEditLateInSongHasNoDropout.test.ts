@@ -28,8 +28,8 @@ const SWAP_AT_S = 180;
 const AFTER_S = 3;
 
 const CASES = [
-  { id: 'soundmon', file: 'public/data/songs/formats/antidust.bp3' },
-  { id: 'sidmon2', file: 'public/data/songs/formats/bruno_time.sid2' },
+  { id: 'soundmon', file: 'public/data/songs/bp-soundmon-3/antidust.bp3' },
+  { id: 'sidmon2', file: 'public/data/songs/sidmon-2/bruno_time.sid2' },
 ];
 
 interface Rig { proc: WorkletProc; send: (m: unknown) => Promise<void>; posted: WorkletMsg[] }

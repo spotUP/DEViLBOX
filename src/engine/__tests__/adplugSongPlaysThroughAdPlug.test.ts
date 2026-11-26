@@ -58,7 +58,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TrackerReplayer, type TrackerSong } from '../TrackerReplayer';
 
-const RAD = resolve(__dirname, '../../../public/data/songs/Ad Lib/Reality AdLib Tracker/Void (AU)/waterfall.rad');
+const RAD = resolve(__dirname, '../../../public/data/songs/ad-lib/Reality AdLib Tracker/Void (AU)/waterfall.rad');
 
 function adplugSong(): TrackerSong {
   const rows = Array.from({ length: 4 }, () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }));

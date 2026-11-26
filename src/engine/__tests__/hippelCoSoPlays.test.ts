@@ -39,7 +39,7 @@ beforeAll(() => {
 
 describe('a Hippel CoSo song', { timeout: 60000 }, () => {
   it('routes to the TFMX decoder and renders sound', async () => {
-    const file = readFileSync(resolve(ROOT, 'public/data/songs/formats/prehistoric_tale.hipc'));
+    const file = readFileSync(resolve(ROOT, 'public/data/songs/hippel-coso/prehistoric_tale.hipc'));
     const { parseHippelCoSoFile } = await import('@lib/import/formats/HippelCoSoParser');
     const song = await parseHippelCoSoFile(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength), 'prehistoric_tale.hipc');
 

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parseCDFM67File } from '@lib/import/formats/CDFM67Parser';
 import { exportCDFM67 } from '../CDFM67Exporter';
 
-const FILE = 'public/data/songs/formats/amnesia_credits.c67';
+const FILE = 'public/data/songs/composer-670-cdfm/amnesia_credits.c67';
 const load = () => {
   const b = readFileSync(FILE);
   return { b, song: parseCDFM67File(new Uint8Array(b), 'amnesia_credits.c67')! };

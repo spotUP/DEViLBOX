@@ -548,7 +548,7 @@ export const TOUR_SCRIPT: TourStep[] = [
     narration: 'This is the tracker. A pattern editor for making music. Let me load an AHX chiptune.',
     action: async () => {
       switchView('tracker');
-      await loadTrackerSong('/data/songs/formats/aces_high.ahx');
+      await loadTrackerSong('/data/songs/ahx/aces_high.ahx');
     },
     postDelay: 800,
   },

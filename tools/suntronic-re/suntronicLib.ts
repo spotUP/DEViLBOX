@@ -4,7 +4,7 @@
  * Contains:
  *  - parseHunks(): minimal AmigaOS hunk-executable walker (seed for the Phase 2
  *    parser — one implementation, later re-imported from src).
- *  - corpus listing for public/data/songs/formats/SUNTronicTunes/.
+ *  - corpus listing for public/data/songs/suntronic/.
  *  - renderWithCompanions(): headless UADE render that injects the instr/*.x
  *    sidecars into MEMFS via _uade_wasm_add_extra_file (the same mechanism the
  *    app uses), without modifying tools/uade-audit/uadeRenderCore.ts.
@@ -22,7 +22,7 @@ import {
 
 export const CORPUS_DIR = join(
   PROJECT_ROOT,
-  'public/data/songs/formats/SUNTronicTunes',
+  'public/data/songs/suntronic',
 );
 export const INSTR_DIR = join(CORPUS_DIR, 'instr');
 

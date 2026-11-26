@@ -12,7 +12,7 @@ import { join } from 'path';
 import { SUNTRONIC_V13_TEMPLATE } from '../sunTronicV13Template';
 import { deriveSunTronicV13Template } from '../../../tools/suntronic-re/templateDerive';
 
-const MULE = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/mule.src');
+const MULE = join(process.cwd(), 'public/data/songs/suntronic/mule.src');
 
 describe('SUNTRONIC_V13_TEMPLATE (golden)', () => {
   it('matches a fresh derivation from mule.src', () => {

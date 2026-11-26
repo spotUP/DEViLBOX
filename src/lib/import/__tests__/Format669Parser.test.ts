@@ -5,7 +5,7 @@ import { is669Format, parse669File } from '../formats/Format669Parser';
 
 const FONETAG = resolve(
   import.meta.dirname,
-  '../../../../public/data/songs/formats/fonetag.669'
+  '../../../../public/data/songs/composer-669/fonetag.669'
 );
 const SPEED_FIGHTER = resolve(
   import.meta.dirname,

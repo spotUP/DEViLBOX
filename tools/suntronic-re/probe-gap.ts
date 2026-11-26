@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { parseSunTronicV13Score, decodeSunBlock } from '../../src/lib/import/formats/SunTronicV13';
-const buf = new Uint8Array(readFileSync('/Users/spot/Code/DEViLBOX/public/data/songs/formats/SUNTronicTunes/mule.src'));
+const buf = new Uint8Array(readFileSync('/Users/spot/Code/DEViLBOX/public/data/songs/suntronic/mule.src'));
 const score = parseSunTronicV13Score(buf);
 console.log('block: idx off notes rows byteSize');
 score.blocks.forEach((b,i)=>console.log(`  fp${i} 0x${b.h1Offset.toString(16)} n=${b.noteCount} rows=${b.rowCount} sz=${b.byteSize}`));

@@ -4,7 +4,7 @@ import { parseMajorTomFile } from '@/lib/import/formats/MajorTomParser';
 import { MAJORTOM_PERIODS } from '@/engine/uade/encoders/MajorTomEncoder';
 import { periodToGridNote } from '@/lib/amiga/periodNotes';
 
-const path = 'public/data/songs/formats/pseudofever.arp';
+const path = 'public/data/songs/major-tom/pseudofever.arp';
 const load = () => { const b = readFileSync(path); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 
 describe('Major Tom editable grid', () => {

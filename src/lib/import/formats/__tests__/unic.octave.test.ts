@@ -11,7 +11,7 @@ import { periodToNote, noteToPeriod } from '@/lib/amiga/periodNotes';
 
 describe('UNIC octave', () => {
   it('african dreams.unic grid notes equal the periods Paula plays', async () => {
-    const raw = readFileSync('public/data/songs/formats/african dreams.unic');
+    const raw = readFileSync('public/data/songs/unic-tracker/african dreams.unic');
     const buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
     const song = await parseUNICFile(buf, 'african dreams.unic');
     const hist = new Map<number, number>();

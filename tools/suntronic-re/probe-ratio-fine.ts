@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
 const HERE=dirname(fileURLToPath(import.meta.url)),REPO=resolve(HERE,'../..');
-const CORPUS=resolve(REPO,'public/data/songs/formats/SUNTronicTunes');
+const CORPUS=resolve(REPO,'public/data/songs/suntronic');
 const golden=JSON.parse(readFileSync(resolve(REPO,'src/engine/suntronic/__tests__/sunTronicNoteTimeline.golden.json'),'utf8'));
 function run(name:string,P:number,phase:number):number{
   const data=new Uint8Array(readFileSync(resolve(CORPUS,name)));

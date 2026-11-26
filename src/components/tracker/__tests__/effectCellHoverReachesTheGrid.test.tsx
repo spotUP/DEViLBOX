@@ -40,7 +40,7 @@ import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { editRowTop } from '@/lib/tracker/editRowAnchor';
 import { describeEffectSlot } from '@/utils/effectCellDescription';
 
-const PATH = 'public/data/songs/formats/future basketball main.tw';
+const PATH = 'public/data/songs/sound-images/future basketball main.tw';
 const WIDTH = 1900;
 const HEIGHT = 600;
 

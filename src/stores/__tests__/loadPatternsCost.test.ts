@@ -15,7 +15,7 @@ import { useCursorStore } from '@/stores/useCursorStore';
 import { parseMusicAssemblerFile } from '@/lib/import/formats/MusicAssemblerParser';
 
 describe('loadPatterns on a 343-pattern song', () => {
-  const bytes = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/baseheads.ma')));
+  const bytes = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/music-assembler/baseheads.ma')));
 
   it('does not deep-walk the new patterns (their cells are not frozen by the store)', () => {
     const song = parseMusicAssemblerFile(bytes, 'baseheads.ma')!;

@@ -39,8 +39,8 @@ describe('TFMX: a wait edit lays the time grid out again (mdat.turrican_bonus)',
   it('the command after an edited wait moves by the wait delta', async () => {
     const { openSong } = await import('@/lib/song/openSong');
     const r = await openSong({
-      kind: 'bytes', name: 'mdat.turrican_bonus', bytes: bytesOf('public/data/songs/formats/mdat.turrican_bonus'),
-      companions: new Map([['smpl.turrican_bonus', bytesOf('public/data/songs/formats/smpl.turrican_bonus')]]),
+      kind: 'bytes', name: 'mdat.turrican_bonus', bytes: bytesOf('public/data/songs/tfmx/mdat.turrican_bonus'),
+      companions: new Map([['smpl.turrican_bonus', bytesOf('public/data/songs/tfmx/smpl.turrican_bonus')]]),
     }, { origin: 'mcp' });
     expect(r.ok, JSON.stringify(r)).toBe(true);
 

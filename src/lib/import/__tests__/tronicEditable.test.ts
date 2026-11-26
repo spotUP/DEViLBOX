@@ -12,7 +12,7 @@ import { setGridBaseline, baselineOf } from '@/lib/song/gridBaseline';
 import { periodToNote } from '@/lib/amiga/periodNotes';
 
 const load = (name: string) => {
-  const raw = readFileSync(`public/data/songs/formats/${name}`);
+  const raw = readFileSync(`public/data/songs/tronic/${name}`);
   return { bytes: new Uint8Array(raw), song: parseTronicFile(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer, name) };
 };
 const diffAt = (a: Uint8Array, b: Uint8Array) => a.reduce<number[]>((l, v, k) => (v !== b[k] ? [...l, k] : l), []);

@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { songFile } from '@/test/songPath';
 
 const ROOT = resolve(__dirname, '../../..');
 const BLOCK = 128;
@@ -59,7 +60,7 @@ const CASES = [
 describe('seekFrames then play on a real worklet', () => {
   for (const c of CASES) {
     it(`${c.name}: the first block after the seek is the song's block at the target`, async () => {
-      const data = new Uint8Array(readFileSync(resolve(ROOT, `public/data/songs/formats/${c.song}`)));
+      const data = new Uint8Array(readFileSync(songFile(c.song)));
       const ref = await makeProc(c.dir, c.file, c.js, data);
       await ref.handleMessage({ type: 'play' });
       const blocks: Float32Array[] = [];

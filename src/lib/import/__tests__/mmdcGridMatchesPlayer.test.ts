@@ -22,7 +22,7 @@ import { parseMMDCFile } from '../formats/MMDCParser';
 import { unpackMmdc } from '../formats/mmdcCodec';
 
 const FILES = [
-  'public/data/songs/formats/captain planet and the planeteers - title.mmdc',
+  'public/data/songs/octamed-mmdc/captain planet and the planeteers - title.mmdc',
   'public/data/songs/OctaMED MMDC/Ratt/captain planet and the planeteers - 1.mmdc',
   'public/data/songs/OctaMED MMDC/Ratt/captain planet and the planeteers - 3.mmdc',
   'public/data/songs/OctaMED MMDC/Ratt/captain planet and the planeteers - 5.mmdc',

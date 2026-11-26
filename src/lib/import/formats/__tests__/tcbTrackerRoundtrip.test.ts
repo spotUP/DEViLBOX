@@ -10,7 +10,7 @@
  * encodeTCBTrackerCell now takes the song's noteOffset and inverts the note byte exactly,
  * and decodeCell shows the pitch bends 1-10 as portamento; the stored bytes decide which nibble an unedited cell writes back, so the codec is byte-exact.
  *
- * Fixture: public/data/songs/formats/cannonfodder.tcb (committed real module).
+ * Fixture: public/data/songs/tcb-tracker/cannonfodder.tcb (committed real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -19,7 +19,7 @@ import { parseTCBTrackerFile } from '../TCBTrackerParser';
 import { encodeTCBTrackerCell } from '@engine/uade/encoders/TCBTrackerEncoder';
 import { getCellFileOffset } from '@engine/uade/UADEPatternEncoder';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/cannonfodder.tcb');
+const FIXTURE = join(process.cwd(), 'public/data/songs/tcb-tracker/cannonfodder.tcb');
 
 function loadFixture(): Uint8Array {
   const b = readFileSync(FIXTURE);

@@ -4,7 +4,7 @@
  * subsong count through the shared model (song.fileSubsongs), and an edit in subsong 1 reaches exactly one
  * pattern-row byte in the export; the unedited export is byte-identical.
  *
- * No fixture in public/data/songs/formats holds more than one subsong (all five have S = 1), so the test
+ * No fixture in public/data/songs/jaytrax holds more than one subsong (all five have S = 1), so the test
  * builds one from popcorn.jxs: a second 16564 byte subsong block is inserted whose channel 0 plays pattern 3
  * for 16 rows, and the header's subsong count is bumped.
  */
@@ -22,7 +22,7 @@ import { exportJxs } from '@lib/export/JxsExporter';
 import { jxsLayout, JXS_SUBSONG_BYTES } from '@lib/import/formats/jxsInstrument';
 import { decodeJxsModule, jxsSubsongAudible } from '@lib/import/formats/jxsGrid';
 
-const PATH = 'public/data/songs/formats/popcorn.jxs';
+const PATH = 'public/data/songs/jaytrax/popcorn.jxs';
 
 function twoSubsongs(raw: Uint8Array): Uint8Array {
   const lay = jxsLayout(raw)!;

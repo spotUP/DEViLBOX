@@ -13,7 +13,7 @@ vi.mock('@/engine/uade/UADEEngine', () => ({
   }) },
 }));
 
-const path = 'public/data/songs/formats/the punisher - title.psa';
+const path = 'public/data/songs/professional-sound-artists/the punisher - title.psa';
 const load = () => { const b = readFileSync(path); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 
 describe('PSA editable grid', () => {

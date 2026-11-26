@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { parseHunks, parseSunTronicV13Score, sunCommandLen, type SunCmdWidths } from '../../src/lib/import/formats/SunTronicV13';
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 const files = readdirSync(CORPUS).filter(f=>statSync(join(CORPUS,f)).isFile());
 function walkModule(f:string){
   const buf=new Uint8Array(readFileSync(join(CORPUS,f)));

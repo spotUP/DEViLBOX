@@ -17,7 +17,7 @@
 | Test (CI mode, headless) | `npm run test:ci` |
 | Build production | `npm run build` |
 | Deploy | `git push origin main` (CI build + server pull auto — never `gh-pages`) |
-| Sound check (headless, silent, resumable) | `npm run sound-check` — tables every song in `public/data/songs/formats` via UADE WASM; rows to `test-data/uade-corpus-sweep.json` |
+| Sound check (headless, silent, resumable) | `npm run sound-check` — tables every song under `public/data/songs` (recursive, one dir per format) via UADE WASM; rows to `test-data/uade-corpus-sweep.json` |
 | Sync preset banks (clone/pull devilbox-presets into public/data/presets) | `npm run presets:sync` |
 | Format status tracker | `npx tsx tools/format-server.ts &` (serve on :4444) |
 | BossGame .fur opens+plays in Furnace 0.6.8.3 (headless, resumable; `--only <name>`, `--failed`) | `nice -n 19 npx tsx tools/bossgame-furnace-check.ts` -> `test-data/bossgame-furnace-check.json` |

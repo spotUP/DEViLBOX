@@ -6,7 +6,7 @@ import { exportTonyWilliams } from '@lib/export/TonyWilliamsExporter';
 import { encodeVariableBlock } from '@/engine/uade/UADEPatternEncoder';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
-const PATH = 'public/data/songs/formats/future basketball main.tw';
+const PATH = 'public/data/songs/sound-images/future basketball main.tw';
 const load = (): ArrayBuffer => { const b = readFileSync(PATH); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 const bytesOf = async (s: TrackerSong): Promise<Uint8Array> => new Uint8Array(await (await exportTonyWilliams(s)).data.arrayBuffer());
 
@@ -82,7 +82,7 @@ describe('Tony Williams corpus', () => {
   });
 
   it('blinkys scary school-sfx (sound-effect build, one block per voice, unused 4th voice) decodes and a note edit round-trips', async () => {
-    const f = readFileSync('public/data/songs/formats/blinkys scary school-sfx.tw');
+    const f = readFileSync('public/data/songs/sound-images/blinkys scary school-sfx.tw');
     const buf = f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
     const song = await parseTonyWilliamsFile(buf, 'blinkys scary school-sfx.tw');
     const notes = [0, 1, 2, 3].map((c) => song.patterns.reduce((n, p) => n + p.channels[c]!.rows.filter((x) => x.note > 0 && x.note < 80).length, 0));

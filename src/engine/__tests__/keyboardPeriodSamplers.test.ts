@@ -20,6 +20,7 @@ import { keyboardPeriod, gridNoteOfName } from '@/engine/keyboardPeriod';
 import { cellPeriod } from '@/lib/amiga/periodNotes';
 import { xmNoteToToneJS } from '@/lib/xmConversions';
 import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+import { songFile } from '@/test/songPath';
 
 // Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
 pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
@@ -39,7 +40,7 @@ describe('keyboardPeriod', () => {
   });
 
   it.each(SONGS)('%s: every period-playback Sampler plays the period of the grid note a key stands for', async (name) => {
-    const f = readFileSync(resolve(ROOT, 'public/data/songs/formats', name));
+    const f = readFileSync(songFile(name));
     const song = await parseModuleToSong(new File([f], name) as never);
     const insts = song.instruments.filter((i) => i.synthType === 'Sampler' && i.metadata?.modPlayback?.usePeriodPlayback);
     expect(insts.length, 'the song has period-playback Samplers').toBeGreaterThan(0);

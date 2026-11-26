@@ -14,7 +14,7 @@ import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
 
 const name = process.argv[2] ?? 'analgestic2.src';
 const focusPos = process.argv[3] !== undefined ? parseInt(process.argv[3], 10) : -1;
-const path = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes', name);
+const path = join(process.cwd(), 'public/data/songs/suntronic', name);
 const buf = readFileSync(path);
 const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 

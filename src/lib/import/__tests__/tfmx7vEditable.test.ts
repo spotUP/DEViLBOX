@@ -50,7 +50,7 @@ import { liveEditRoute } from '@/engine/replayer/liveCellEdits';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 
 const NAME = 'ghostbattle_gameover.hip7';
-const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', NAME)));
+const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/hippel-7v', NAME)));
 const diffAt = (a: Uint8Array, b: Uint8Array) => a.reduce<number[]>((l, v, k) => (v !== b[k] ? [...l, k] : l), []);
 /** The swap runs after a debounce and a lazy import: wait for the engine to be handed a module, not a fixed time (a loaded machine is slower). */
 const settle = async () => {

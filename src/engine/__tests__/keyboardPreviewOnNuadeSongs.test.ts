@@ -76,7 +76,7 @@ interface Case {
 
 const CASES: Case[] = [
   {
-    id: 'soundmon', prefKey: 'soundmon', file: 'public/data/songs/formats/antidust.bp3', synthType: 'SoundMonSynth',
+    id: 'soundmon', prefKey: 'soundmon', file: 'public/data/songs/bp-soundmon-3/antidust.bp3', synthType: 'SoundMonSynth',
     worklet: ['soundmon', 'SoundMon', emscriptenTransform], fileDataKey: 'soundMonFileData',
     engine: async () => (await import('@/engine/soundmon/SoundMonEngine')).SoundMonEngine as never,
     synth: async (config) => {
@@ -87,7 +87,7 @@ const CASES: Case[] = [
     },
   },
   {
-    id: 'sidmon2', prefKey: 'sidmon2', file: 'public/data/songs/formats/bruno_time.sid2', synthType: 'SidMonSynth',
+    id: 'sidmon2', prefKey: 'sidmon2', file: 'public/data/songs/sidmon-2/bruno_time.sid2', synthType: 'SidMonSynth',
     worklet: ['sidmon2', 'Sd2', exposeHeapTransform], fileDataKey: 'sd2FileData',
     engine: async () => (await import('@/engine/sidmon2/Sd2Engine')).Sd2Engine as never,
     synth: async (config) => {

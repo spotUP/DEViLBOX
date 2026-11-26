@@ -18,7 +18,7 @@ vi.mock('@lib/import/formats/timFollinEdits', async (importOriginal) => {
   return { ...orig, applyTimFollinGridEdits: (...a: Parameters<typeof orig.applyTimFollinGridEdits>) => { sentinel.calls++; return orig.applyTimFollinGridEdits(...a); } };
 });
 
-const FILE = { path: 'public/data/songs/formats/follin_smallest.tf', name: 'follin_smallest.tf' };
+const FILE = { path: 'public/data/songs/follin-player-ii/follin_smallest.tf', name: 'follin_smallest.tf' };
 
 async function load(bytes?: Uint8Array): Promise<{ raw: Uint8Array; song: TrackerSong }> {
   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');

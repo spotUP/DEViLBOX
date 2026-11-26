@@ -84,7 +84,7 @@ describe('Rob Hubbard playhead follows UADE', { timeout: 120_000 }, () => {
   });
 
   it('centurion_battle: the rows line up through the song end', async () => {
-    const r = await playAndCompare('public/data/songs/formats/centurion_battle.rh', 5);
+    const r = await playAndCompare('public/data/songs/rob-hubbard/centurion_battle.rh', 5);
     expect(r.wrong.slice(0, 5)).toEqual([]);
     expect(r.checked).toBeGreaterThan(20);
   });

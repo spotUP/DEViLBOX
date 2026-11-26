@@ -18,7 +18,7 @@ import { loadSharedWorkletScripts, startWorklet, songBuffer } from '@/engine/__t
 import { parseSidMon1File } from '../SidMon1Parser';
 import { sm1IndexToXM } from '@/engine/uade/encoders/SidMon1Encoder';
 
-const SONG = 'public/data/songs/formats/anarchy.sid1';
+const SONG = 'public/data/songs/sidmon-1/anarchy.sid1';
 interface Mod {
   _malloc(n: number): number;
   _player_render(ptr: number, frames: number): number;

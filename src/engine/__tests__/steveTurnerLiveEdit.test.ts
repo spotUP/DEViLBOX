@@ -26,7 +26,7 @@ vi.mock('@engine/TrackerReplayer', async (orig) => {
   return { ...(await orig<object>()), getTrackerReplayer: () => replayer, peekTrackerReplayer: () => replayer };
 });
 
-const PATH = 'public/data/songs/formats/offroad.jpo';
+const PATH = 'public/data/songs/steve-turner/offroad.jpo';
 
 describe('Steve Turner grid edit reaches the bytes the engine plays', () => {
   it('a store note edit changes only its note byte in the next-play module, and a reload shows it', async () => {

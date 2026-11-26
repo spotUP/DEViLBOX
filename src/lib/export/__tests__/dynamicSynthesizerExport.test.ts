@@ -21,7 +21,7 @@ const NAME = 'dns.ptc';
 
 async function load(bytes?: Uint8Array): Promise<{ raw: Uint8Array; song: TrackerSong }> {
   const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-  const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', NAME)));
+  const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/dynamic-synthesizer', NAME)));
   const song = await parseModuleToSong(new File([new Uint8Array(bytes ?? raw)], NAME));
   return { raw, song };
 }

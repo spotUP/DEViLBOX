@@ -5,11 +5,11 @@ import { isSTPFormat, parseSTPFile } from '../formats/STPParser';
 
 const JUNGLE = resolve(
   import.meta.dirname,
-  '../../../../public/data/songs/formats/noname.stp'
+  '../../../../public/data/songs/soundtracker-pro-ii/noname.stp'
 );
 const THIS_IS_4_U = resolve(
   import.meta.dirname,
-  '../../../../public/data/songs/formats/noname.stp'
+  '../../../../public/data/songs/soundtracker-pro-ii/noname.stp'
 );
 
 function loadFile(path: string): ArrayBuffer {

@@ -7,7 +7,7 @@ import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 import { getCellFileOffset } from '@/engine/uade/UADEPatternEncoder';
 import { exportFAR } from '../FARExporter';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/m31.far');
+const FIXTURE = join(process.cwd(), 'public/data/songs/farandole-composer/m31.far');
 const load = async () => {
   const b = readFileSync(FIXTURE);
   const ab = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;

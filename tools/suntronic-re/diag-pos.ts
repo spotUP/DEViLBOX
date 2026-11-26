@@ -3,7 +3,7 @@ import { join } from 'path';
 import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser';
 import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
-const path = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/analgestic2.src');
+const path = join(process.cwd(), 'public/data/songs/suntronic/analgestic2.src');
 const buf = readFileSync(path);
 const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 const song: any = parseSunTronicFile(ab, 'analgestic2.src');

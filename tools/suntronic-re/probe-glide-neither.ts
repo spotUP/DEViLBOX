@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser';
 const clamp=(n:number)=>n<=0?0:n>96?96:n;
 for (const song of ['shades.src']) {
-  const buf = readFileSync(`public/data/songs/formats/SUNTronicTunes/${song}`);
+  const buf = readFileSync(`public/data/songs/suntronic/${song}`);
   const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
   const ts = parseSunTronicFile(ab, song);
   const nat = ts.sunTronicNative!;

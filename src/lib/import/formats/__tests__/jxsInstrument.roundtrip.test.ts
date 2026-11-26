@@ -10,7 +10,7 @@ import {
   JXS_RANGES, jxsLayout, readJxsArpeggio, readJxsInstrument, writeJxsInstrument, type JxsScalars, type JxsSlot,
 } from '../jxsInstrument';
 
-const dir = path.resolve(__dirname, '../../../../../public/data/songs/formats');
+const dir = path.resolve(__dirname, '../../../../../public/data/songs/jaytrax');
 const load = (f: string): Uint8Array => new Uint8Array(fs.readFileSync(path.join(dir, f)));
 
 const SCALAR_AT: Record<keyof JxsScalars, [number, 2 | 4]> = {

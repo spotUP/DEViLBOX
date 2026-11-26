@@ -81,7 +81,7 @@ describe('Jason Brooke reachability and the non-driver placeholder', () => {
   });
 
   it('sjs.jb (not a driver module) keeps the placeholder; a note edit is not written', async () => {
-    const { bytes, buf } = read('public/data/songs/formats/Scott Johnston/sjs.jb');
+    const { bytes, buf } = read('public/data/songs/scott-johnston/sjs.jb');
     const song = parseJasonBrookeFile(buf, 'sjs.jb');
     expect(song.uadeVariableLayout).toBeUndefined();
     setGridBaseline(baselineOf(song.patterns));

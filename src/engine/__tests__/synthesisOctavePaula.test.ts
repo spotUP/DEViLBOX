@@ -14,7 +14,7 @@ import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import { parseSynthesisFile } from '@/lib/import/formats/SynthesisParser';
 import { encodeSynthesisCell } from '@/engine/uade/encoders/SynthesisEncoder';
 
-const DIR = join(process.cwd(), 'public/data/songs/formats');
+const DIR = join(process.cwd(), 'public/data/songs/synthesis');
 const FILE = 'space_sound.syn';
 let restore = () => {};
 let mod: LogModule;

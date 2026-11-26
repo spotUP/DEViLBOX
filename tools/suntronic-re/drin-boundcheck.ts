@@ -43,7 +43,7 @@ function extractHunks(buf: Uint8Array): { data: Uint8Array; fileOffset: number; 
 const REF_DRIN_SIG = [0x42,0x45,0x1a,0x28,0x00,0x0e];
 const MAIN=0xe94d, VERSA=0xe74d;
 
-const dir = path.resolve(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const dir = path.resolve(process.cwd(), 'public/data/songs/suntronic');
 const files = process.argv.slice(2).length ? process.argv.slice(2)
   : ['ready','time10.src','witõka.src','tank','Lightforce','orbital.src','paradroid.01','Bio-1.src','sound1.s'];
 

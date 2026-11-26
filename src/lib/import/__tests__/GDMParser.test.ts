@@ -9,7 +9,7 @@ const MARSHMELLOW = resolve(
 );
 const RAINY = resolve(
   import.meta.dirname,
-  "../../../../public/data/songs/formats/breakin's chipsong.gdm"
+  "../../../../public/data/songs/general-digimusic/breakin's chipsong.gdm"
 );
 
 function loadFile(path: string): ArrayBuffer {

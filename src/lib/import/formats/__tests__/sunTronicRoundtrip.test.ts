@@ -33,7 +33,7 @@ import { join } from 'path';
 import { encodeVariableBlock } from '@/engine/uade/UADEPatternEncoder';
 import { parseSunTronicFile } from '../SunTronicParser';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes/mule.src');
+const FIXTURE = join(process.cwd(), 'public/data/songs/suntronic/mule.src');
 
 function loadModule(): ArrayBuffer {
   const raw = new Uint8Array(readFileSync(FIXTURE));

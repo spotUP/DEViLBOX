@@ -37,7 +37,7 @@ vi.mock('@lib/import/formats/SoundProgrammingLanguageParser', async (importOrigi
   };
 });
 
-const DIR = join(process.cwd(), 'public/data/songs/formats');
+const DIR = join(process.cwd(), 'public/data/songs/sound-programming-language');
 
 function notesOf(song: TrackerSong, v: number): Array<[number, number, number]> {
   const out: Array<[number, number, number]> = [];

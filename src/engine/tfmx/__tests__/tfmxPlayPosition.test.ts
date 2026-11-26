@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { parseTFMXFile } from '@/lib/import/formats/TFMXParser';
 import { tfmxGridPositionAt } from '@/engine/tfmx/tfmxPlayPosition';
 
-const bytes = readFileSync('public/data/songs/formats/mdat.turrican_bonus');
+const bytes = readFileSync('public/data/songs/tfmx/mdat.turrican_bonus');
 const song = parseTFMXFile(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, 'mdat.turrican_bonus');
 
 describe('TFMX: the grid follows the decoder position (mdat.turrican_bonus)', () => {

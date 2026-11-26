@@ -24,7 +24,7 @@ describe('.mus routing', () => {
 
   it('does not send boogie.mus (not UFO bytes) to UADE', async () => {
     const { tryRouteFormat } = await import('../parsers/AmigaFormatParsers');
-    const bytes = new Uint8Array(readFileSync('public/data/songs/formats/boogie.mus'));
+    const bytes = new Uint8Array(readFileSync('public/data/songs/karl-morton/boogie.mus'));
     const out = await tryRouteFormat(ab(bytes), 'boogie.mus', 'boogie.mus', {} as never, 0);
     expect(out).toBeNull();
     expect(parseUADEFile).not.toHaveBeenCalled();

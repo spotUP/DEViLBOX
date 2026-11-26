@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parseAdPlugFile } from '@lib/import/formats/AdPlugParser';
 import { exportToRAD } from '../AdPlugExporter';
 
-const dir = 'public/data/songs/Ad Lib/Reality AdLib Tracker/';
+const dir = 'public/data/songs/ad-lib/Reality AdLib Tracker/';
 const load = (rel: string) => {
   const b = new Uint8Array(readFileSync(dir + rel));
   return { b, ab: b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer };

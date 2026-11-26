@@ -12,14 +12,14 @@
  * carriers (fields the QC grid loop never sets, so edited cells fall back to the canonical
  * derivation), and the encoder reproduces all 4 bytes verbatim.
  *
- * Fixture: public/data/songs/formats/synth_corn.emod (real module).
+ * Fixture: public/data/songs/quadra-composer/synth_corn.emod (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseQuadraComposerFile } from '../QuadraComposerParser';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/synth_corn.emod');
+const FIXTURE = join(process.cwd(), 'public/data/songs/quadra-composer/synth_corn.emod');
 
 describe('QuadraComposer pattern codec', () => {
   it('encodeCell is a byte-exact inverse of decodeCell over every pattern cell', async () => {

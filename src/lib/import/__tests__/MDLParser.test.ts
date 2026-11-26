@@ -5,7 +5,7 @@ import { isMDLFormat, parseMDLFile } from '../formats/MDLParser';
 
 const MAYDAY = resolve(
   import.meta.dirname,
-  '../../../../public/data/songs/formats/mayday.mdl'
+  '../../../../public/data/songs/digi-trakker/mayday.mdl'
 );
 const FOUR_S = resolve(
   import.meta.dirname,

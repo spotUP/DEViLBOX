@@ -44,7 +44,7 @@ describe('Face The Music edit -> export -> import', () => {
     expect(Array.from(encodeFtmEventStream(rows, 2))).toEqual([0xF0, 2, 0x00, 2, 0x00, 4]);
   });
 
-  for (const rel of ['public/data/songs/face-the-music/rock.ftm', 'public/data/songs/formats/staticoscillations.ftm']) {
+  for (const rel of ['public/data/songs/face-the-music/rock.ftm', 'public/data/songs/face-the-music/staticoscillations.ftm']) {
     it(`${rel.split('/').pop()}: re-imports as the edited grid`, async () => {
       const { file, song } = load(rel);
       const pats = song.patterns;

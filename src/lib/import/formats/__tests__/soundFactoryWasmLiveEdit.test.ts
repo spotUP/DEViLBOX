@@ -10,7 +10,7 @@ import { resolve } from 'path';
 import { parseSoundFactoryWithEffects } from '../SoundFactoryParser';
 
 const ROOT = resolve(__dirname, '../../../../..');
-const file = new Uint8Array(readFileSync(resolve(ROOT, 'public/data/songs/formats/goldrunner.psf')));
+const file = new Uint8Array(readFileSync(resolve(ROOT, 'public/data/songs/soundfactory/goldrunner.psf')));
 
 async function loadModule(): Promise<any> {
   const src = readFileSync(resolve(ROOT, 'public/soundfactory/SoundFactory2.js'), 'utf8');

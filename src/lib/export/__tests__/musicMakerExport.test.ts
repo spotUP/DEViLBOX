@@ -4,8 +4,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseMusicMakerSongFile, buildMusicMakerGrid, decodeMusicMakerSong } from '@lib/import/formats/MusicMakerParser';
 import { exportNativeSong } from '@lib/export/nativeExportRouter';
+import { songFile } from '../../../test/songPath';
 
-const DIR = join(process.cwd(), 'public/data/songs/formats/MusicMaker V8 Old/- unknown');
+const DIR = join(process.cwd(), 'public/data/songs/musicmaker-v8/old/- unknown');
 const rd = (n: string) => new Uint8Array(readFileSync(join(DIR, n)));
 const load = (n = 'moveback') => {
   const raw = rd(n + '.sdata');
@@ -70,7 +71,7 @@ describe('Music Maker edit reaches the bytes the engine plays', () => {
 describe('Music Maker IFF (.mm4/.mm8) is editable', () => {
   const FILES = ['easystyleofmsx.mm4', 'house2.mm8'];
   const loadIff = async (n: string) => {
-    const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', n)));
+    const raw = new Uint8Array(readFileSync(songFile(n)));
     const { parseMusicMaker4VFile, parseMusicMaker8VFile } = await import('@lib/import/formats/MusicMakerParser');
     const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
     return { raw, song: n.endsWith('.mm4') ? parseMusicMaker4VFile(ab, n) : parseMusicMaker8VFile(ab, n) };

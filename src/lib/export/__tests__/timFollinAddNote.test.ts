@@ -10,7 +10,7 @@ import type { Pattern } from '@/types';
 import { buildTimFollinGrid } from '@lib/import/formats/timFollinGrid';
 import { applyTimFollinGridEdits } from '@lib/import/formats/timFollinEdits';
 
-const FILES = ['public/data/songs/formats/follin_smallest.tf', 'public/data/songs/follin-player-ii/sly spy title.tf'];
+const FILES = ['public/data/songs/follin-player-ii/follin_smallest.tf', 'public/data/songs/follin-player-ii/sly spy title.tf'];
 const clone = (ps: Pattern[]): Pattern[] => structuredClone(ps);
 
 describe.each(FILES)('Tim Follin note on an empty row: %s', (file) => {

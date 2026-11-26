@@ -26,7 +26,7 @@ import { openUade, PaulaSession } from './gridOracle';
 
 const SECS = 30;
 const TICKS = SECS * 50 - 50;
-const SONG = 'public/data/songs/formats/anarchy.sid1';
+const SONG = 'public/data/songs/sidmon-1/anarchy.sid1';
 
 interface Mod {
   _malloc(n: number): number;

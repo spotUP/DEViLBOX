@@ -14,7 +14,7 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 const INSTR = join(CORPUS, 'instr');
 
 // Filenames present in instr/, lowercased basenames.

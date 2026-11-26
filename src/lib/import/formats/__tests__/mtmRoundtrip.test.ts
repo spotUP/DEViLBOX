@@ -15,14 +15,14 @@
  * round-trip codec — the editor grid is built by the parser's own track loop (no
  * carriers), so an edited cell arrives carrier-less and keeps the canonical derivation.
  *
- * Fixture: public/data/songs/formats/anonymous in 4ce.mtm (real module).
+ * Fixture: public/data/songs/multi-tracker/anonymous in 4ce.mtm (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseMTMFile } from '../MTMParser';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/anonymous in 4ce.mtm');
+const FIXTURE = join(process.cwd(), 'public/data/songs/multi-tracker/anonymous in 4ce.mtm');
 
 describe('MultiTracker pattern codec', () => {
   it('encodeCell is a byte-exact inverse of decodeCell over every pattern cell', async () => {

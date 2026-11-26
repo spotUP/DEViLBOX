@@ -22,7 +22,7 @@ beforeAll(() => { restoreFetch = installDwNodeFetch(); });
 afterAll(() => restoreFetch());
 
 const apb = () => {
-  const f = readFileSync(resolve(process.cwd(), 'public/data/songs/formats/apb.dw'));
+  const f = readFileSync(resolve(process.cwd(), 'public/data/songs/david-whittaker/apb.dw'));
   return f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
 };
 const tickMsgs = (posted: Array<Record<string, unknown>>) => posted.filter((m) => m.type === 'playTick');

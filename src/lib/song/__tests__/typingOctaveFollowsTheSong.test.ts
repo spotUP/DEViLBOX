@@ -44,7 +44,7 @@ const periodOfZ = (): number => {
 describe('the typing octave follows the opened song', { timeout: 120000 }, () => {
   it('MOD and Jeroen Tel types ProTracker notes, XM keeps its default, a hand change lasts until the next load', async () => {
     useEditorStore.getState().setCurrentOctave(4);
-    expect((await open('public/data/songs/formats/a sleep so deep.mod')).ok).toBe(true);
+    expect((await open('public/data/songs/mod/a sleep so deep.mod')).ok).toBe(true);
     expect(useEditorStore.getState().currentOctave).toBe(2);
     expect(periodOfZ()).toBe(428); // pt2-clone: Z = C-2 = 428
     expect(noteToPeriod(gridNoteOfName(`C${2 + NOTE_MAP.q.octaveOffset}`))).toBe(214); // Q = C-3
@@ -56,7 +56,7 @@ describe('the typing octave follows the opened song', { timeout: 120000 }, () =>
     expect(useEditorStore.getState().currentOctave).toBe(2);
     expect(periodOfZ()).toBe(428);
 
-    expect((await open('public/data/songs/formats/flo boarding - level 1.xm')).ok).toBe(true);
+    expect((await open('public/data/songs/xm/flo boarding - level 1.xm')).ok).toBe(true);
     expect(useEditorStore.getState().currentOctave).toBe(4);
   });
 

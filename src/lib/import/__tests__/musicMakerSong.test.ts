@@ -1,7 +1,7 @@
 /**
  * MusicMaker V8 song decoding (MusicMakerParser's native half).
  *
- * Corpus: public/data/songs/formats/MusicMaker V8 Old/- unknown/ - moveback
+ * Corpus: public/data/songs/musicmaker-v8/old/- unknown/ - moveback
  * (4-voice STD) and best of guitars (EXT, 7 voices). Facts below were read
  * from the files with the layout in MusicMaker4.asm / MusicMaker8.asm and
  * cross-checked in lock-step against UADE running the author's players
@@ -16,7 +16,7 @@ import {
 } from '../formats/MusicMakerParser';
 import { resolveCompanions } from '../companionResolver';
 
-const DIR = resolve(process.cwd(), 'public/data/songs/formats/MusicMaker V8 Old/- unknown');
+const DIR = resolve(process.cwd(), 'public/data/songs/musicmaker-v8/old/- unknown');
 const bytes = (name: string) => new Uint8Array(readFileSync(resolve(DIR, name)));
 
 describe('MusicMaker song type', () => {

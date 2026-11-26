@@ -16,7 +16,7 @@ import {
 } from '../../src/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
 
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 const load = (name: string): Uint8Array => new Uint8Array(readFileSync(join(CORPUS, name)));
 
 /** Grid note per key. The value is the FIRST note byte in the group (mirrors

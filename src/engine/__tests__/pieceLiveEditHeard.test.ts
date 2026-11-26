@@ -29,7 +29,7 @@ vi.mock('@engine/piece/pieceEditWasm', async (orig) => {
   return { ...real, pieceEditModule: () => create(), pieceEditCells: (b: Uint8Array, e: Parameters<typeof real.pieceEditCells>[1]) => real.pieceEditCells(b, e, create) };
 });
 
-const SONG = 'public/data/songs/formats/piece-ff-prelude.pmd';
+const SONG = 'public/data/songs/pmd/piece-ff-prelude.pmd';
 type PieceProc = { _piece_ticks(): number };
 
 describe('P/ECE live edit', () => {

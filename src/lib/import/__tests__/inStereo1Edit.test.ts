@@ -20,7 +20,7 @@ vi.mock('@lib/import/formats/InStereo1Parser', async (importOriginal) => {
   return { ...orig, parseInStereo1File: (...a: Parameters<typeof orig.parseInStereo1File>) => { sentinel.calls++; return orig.parseInStereo1File(...a); } };
 });
 
-const PATH = 'public/data/songs/formats/fantasi8.is';
+const PATH = 'public/data/songs/instereo!/fantasi8.is';
 const NAME = 'fantasi8.is';
 
 async function load(bytes?: Uint8Array): Promise<{ raw: Uint8Array; song: TrackerSong }> {

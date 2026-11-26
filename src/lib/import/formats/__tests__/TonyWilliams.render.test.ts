@@ -9,7 +9,7 @@ const NAME = 'future basketball main.tw';
 /** A length-changing edit that keeps every note: repeat a duration command (sticky duration, same value). UADE is the oracle. */
 describe('Tony Williams relocation renders the same in UADE', () => {
   it('a duplicated duration command (+2 bytes, tail moved) plays the same samples as the original', async () => {
-    const orig = new Uint8Array(readFileSync('public/data/songs/formats/' + NAME));
+    const orig = new Uint8Array(readFileSync('public/data/songs/sound-images/' + NAME));
     const walk = walkTonyWilliams(orig, 0)!;
     const ev = walk.events.find((e) => e.cmd.op >= 0xe0)!;
     const dup = Uint8Array.of(ev.cmd.op, ev.cmd.op);

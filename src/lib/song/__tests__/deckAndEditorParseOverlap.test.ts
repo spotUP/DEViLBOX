@@ -37,7 +37,7 @@ import { openDeckTrack } from '@/lib/song/openSong';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 
 const file = (): File => {
-  const p = path.resolve(__dirname, '../../../../public/data/songs/formats/bob4e.dum');
+  const p = path.resolve(__dirname, '../../../../public/data/songs/infogrames/bob4e.dum');
   return new File([new Uint8Array(fs.readFileSync(p))], 'bob4e.dum');
 };
 const until = async (cond: () => boolean): Promise<void> => {

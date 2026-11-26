@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
 import { SunTronicPlayer } from '../../src/engine/suntronic/SunTronicPlayer';
 
-const path = '/Users/spot/Code/DEViLBOX/public/data/songs/SUNTronicTunes/ready';
+const path = '/Users/spot/Code/DEViLBOX/public/data/songs/suntronic/ready';
 const buf = new Uint8Array(readFileSync(path));
 const score = parseSunTronicV13Score(buf);
 console.log('arpShift', score.arpShift, 'drinLen', score.drin?.length, 'drinNonzero',

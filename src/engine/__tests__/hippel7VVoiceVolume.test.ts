@@ -22,7 +22,7 @@ import { parseHippel7VPlayed } from './helpers/tfmxWalkHost';
 
 const ROOT = resolve(__dirname, '../../..');
 const QUIET = 'public/data/songs/hippel-7v/lethalxcess-intro.hip7';
-const GOOD = 'public/data/songs/formats/ghostbattle_gameover.hip7';
+const GOOD = 'public/data/songs/hippel-7v/ghostbattle_gameover.hip7';
 
 function file(rel: string): ArrayBuffer {
   const b = readFileSync(resolve(ROOT, rel));

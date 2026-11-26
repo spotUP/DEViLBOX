@@ -6,7 +6,7 @@
  * calls (TFMXDecoder.cpp), so a tick lasts (speed + 1) * 50 / rateHz jiffies; the cursor drifted
  * by that factor (turrican_bonus: speed 4, five times too fast).
  *
- * Fixture: public/data/songs/formats/mdat.turrican_bonus (tempo word 4, no CIA, no EFFE0002).
+ * Fixture: public/data/songs/tfmx/mdat.turrican_bonus (tempo word 4, no CIA, no EFFE0002).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -15,7 +15,7 @@ import { parseTFMXFile } from '../TFMXParser';
 
 describe('TFMX timing table units', () => {
   it('totals the decoder song length in 50 Hz jiffies', () => {
-    const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats/mdat.turrican_bonus')));
+    const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/tfmx/mdat.turrican_bonus')));
     const song = parseTFMXFile(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer, 'mdat.turrican_bonus');
     const native = song.tfmxNative!;
     const table = song.tfmxTimingTable!;

@@ -44,7 +44,7 @@ describe('NV-3 shim exports', () => {
   it('the edit slot is probed and unwritten: state readable, cell and instrument writes return -ENOSYS', async () => {
     const nu = await NuadeHeadless.create();
     expect(nu.m._nw_caps()).toBe(0); // no song: nothing to read
-    nu.open(readFileSync(join(ROOT, 'public/data/songs/formats/antidust.bp3')), 'antidust.bp3', 'soundmon');
+    nu.open(readFileSync(join(ROOT, 'public/data/songs/bp-soundmon-3/antidust.bp3')), 'antidust.bp3', 'soundmon');
     expect(nu.caps & NUADE_CAP_STATE_READ).toBe(NUADE_CAP_STATE_READ);
     expect(nu.caps & NUADE_CAP_CELL_WRITE).toBe(0);
     expect(nu.m._nw_cell_write(0, 0, 0, 0, 0)).toBe(-52);
@@ -65,7 +65,7 @@ describe('NV-4 committed binary', () => {
 
   it('renders antidust.bp3 byte-identical to the native build of the same pin (20 s, 1024-frame blocks, 48 kHz)', async () => {
     const nu = await NuadeHeadless.create(48000);
-    nu.open(readFileSync(join(ROOT, 'public/data/songs/formats/antidust.bp3')), 'antidust.bp3', '');
+    nu.open(readFileSync(join(ROOT, 'public/data/songs/bp-soundmon-3/antidust.bp3')), 'antidust.bp3', '');
     expect(nu.playerId).toBe('soundmon');
     expect(nu.start(nu.defaultSubsong)).toBe(true);
     const hash = createHash('sha256');

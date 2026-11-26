@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const DIR = 'public/data/songs/formats';
+const DIR = 'public/data/songs';
 const OUT = path.join(ROOT, 'test-data/editability-census.json');
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : process.env.CENSUS_ONLY;

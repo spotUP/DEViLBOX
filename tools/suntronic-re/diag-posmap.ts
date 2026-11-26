@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseSunTronicFile } from '../../src/lib/import/formats/SunTronicParser';
 import { parseSunTronicV13Score } from '../../src/lib/import/formats/SunTronicV13';
-const CORPUS = join(process.cwd(), 'public/data/songs/formats/SUNTronicTunes');
+const CORPUS = join(process.cwd(), 'public/data/songs/suntronic');
 const raw = new Uint8Array(readFileSync(join(CORPUS, 'shades.src')));
 const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength);
 const song: any = parseSunTronicFile(ab, 'shades.src');

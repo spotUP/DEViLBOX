@@ -12,7 +12,7 @@
  * carriers (fields the parser's channelRows grid loop never sets, so edited cells fall back to
  * the canonical derivation), and encodeSTMCell reproduces all 4 bytes verbatim.
  *
- * Fixture: public/data/songs/formats/slideshow i.stm (real module).
+ * Fixture: public/data/songs/scream-tracker-2/slideshow i.stm (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -20,7 +20,7 @@ import { join } from 'path';
 import { parseSTMFile } from '../STMParser';
 import { getCellFileOffset } from '@/engine/uade/UADEPatternEncoder';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/slideshow i.stm');
+const FIXTURE = join(process.cwd(), 'public/data/songs/scream-tracker-2/slideshow i.stm');
 
 describe('ScreamTracker 2 (STM) pattern codec', () => {
   it('encodeCell is a byte-exact inverse of decodeCell over every pattern cell', async () => {

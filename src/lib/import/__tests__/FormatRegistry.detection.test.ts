@@ -93,7 +93,7 @@ describe('FORMAT_REGISTRY — detection functions reject zero-filled buffers', (
     // were never editable.
     const { readFile } = await import('node:fs/promises');
     const { isSunTronicFormat } = await import('@/lib/import/formats/SunTronicParser');
-    const data = await readFile('public/data/songs/formats/SUNTronicTunes/mule.src');
+    const data = await readFile('public/data/songs/suntronic/mule.src');
     expect(isSunTronicFormat(new Uint8Array(data))).toBe(true);
   });
 

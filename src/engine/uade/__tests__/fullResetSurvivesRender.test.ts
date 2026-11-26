@@ -52,12 +52,12 @@ describe('UADE full reset after a rendered song', () => {
     const said: string[] = [];
     const mod = (await loadUADEModule(false, (line) => { said.push(line); })) as ResetModule;
     expect(mod._uade_wasm_init(48000)).toBe(0);
-    expect(loadSong(mod, 'public/data/songs/formats/wicked.wb')).toBe(0);
+    expect(loadSong(mod, 'public/data/songs/wally-beben/wicked.wb')).toBe(0);
     expect(render(mod, 8)).toBeGreaterThan(0.005);
 
     expect(mod._uade_wasm_full_reset(), 'full_reset returned an error').toBe(0);
 
-    expect(loadSong(mod, 'public/data/songs/formats/eco.gray'), said.join(' / ')).toBe(0);
+    expect(loadSong(mod, 'public/data/songs/fred-gray/eco.gray'), said.join(' / ')).toBe(0);
     expect(render(mod, 4), 'the song after the reset is silent').toBeGreaterThan(0.005);
     expect(said.filter((s) => /forbidden|Expected score name|unguarded exit|Only stereo/.test(s))).toEqual([]);
   }, 120_000);
