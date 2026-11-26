@@ -2233,7 +2233,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     description: 'CDFM Composer 670 — native parser or libopenmpt',
     family: 'pc-tracker',
     matchMode: 'extension',
-    extRegex: /\.(c67|670)$/i,
+    extRegex: /\.c67$/i,
     prefKey: 'cdfm67',
     nativeParser: { module: '@lib/import/formats/CDFM67Parser', parseFn: 'parseCDFM67File', detectFn: 'isCDFM67Format' },
     libopenmptFallback: true,
