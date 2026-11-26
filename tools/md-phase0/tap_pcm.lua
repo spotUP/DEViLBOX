@@ -16,9 +16,9 @@ if zd then
   local function w8(o, d) out:write(string.format("%.6f Z %X %02X\n", now(), o, d & 0xff)) end
   taps[#taps+1] = z:install_write_tap(0x4000, 0x4003, "ymz80", w8)
   taps[#taps+1] = z:install_write_tap(0x7F11, 0x7F11, "psgz80", w8)
-  taps[#taps+1] = z:install_write_tap(0x0E02, 0x0E0F, "pcmz80", function(o, d) out:write(string.format("%.6f P %X %02X\n", now(), o, d & 0xff)) end)
+  taps[#taps+1] = z:install_write_tap(0x0E02, 0x0E1F, "pcmz80", function(o, d) out:write(string.format("%.6f P %X %02X\n", now(), o, d & 0xff)) end)
 else out:write("# no :genesis_snd_z80 device\n") end
-taps[#taps+1] = m:install_write_tap(0xA00E02, 0xA00E0F, "pcm68k", function(o, d, mk)
+taps[#taps+1] = m:install_write_tap(0xA00E02, 0xA00E1F, "pcm68k", function(o, d, mk)
   if (mk & 0xff00) ~= 0 then out:write(string.format("%.6f Q %X %02X\n", now(), o & ~1, (d >> 8) & 0xff)) end
   if (mk & 0x00ff) ~= 0 then out:write(string.format("%.6f Q %X %02X\n", now(), o | 1, d & 0xff)) end
 end)

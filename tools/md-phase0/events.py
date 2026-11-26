@@ -1,7 +1,7 @@
 # YM2612 + SN76489 register writes -> one event per line: "<sec> <chan> <event> <value>".
 # Input: a MAME tap.lua log (tools/md-phase0/tap.lua) or a .vgm file (Furnace -vgmout), so both sides decode alike.
 # Times start at the first FM key-on of the file. Events: FMn KEYON/KEYOFF, FMn FREQ <hz> (on every F-number write),
-# PSGn FREQ <hz>, PSGn ATT <0..15>, NOISE MODE <latch byte low 3 bits>. Usage: events.py <tap.txt|song.vgm>
+# PSGn FREQ <hz>, PSGn ATT <0..15>, NOISE MODE <latch byte low 3 bits>. DAC KEYON <block or PCM n> with --pcm (sample starts). Usage: events.py <tap.txt|song.vgm> [--pcm]
 import struct, sys
 
 YM_CLK, SN_CLK = 7670454, 3579545
@@ -10,7 +10,10 @@ CH = {0: 1, 1: 2, 2: 3, 4: 4, 5: 5, 6: 6}
 def writes_tap(path):
     for line in open(path):
         if line.startswith('#') or len(line.split()) != 4: continue  # MAME stops mid-line
-        t, _cpu, a, v = line.split(); a = int(a, 16); v = int(v, 16)
+        t, cpu, a, v = line.split(); a = int(a, 16); v = int(v, 16)
+        if cpu in 'PQ':
+            if cpu == 'Q': yield float(t), 'pcm', a & 0xff, v  # 68k writes to the MDSDRV Z80 PCM mailbox (mdssub.inc z_pcm1..3)
+            continue
         if a in (0xC00011, 0x7F11): yield float(t), 'sn', 0, v
         else: yield float(t), 'ym', a & 3, v
 
@@ -28,13 +31,19 @@ def writes_vgm(path):
         elif c == 0x67: p += 6 + struct.unpack_from('<I', b, p + 2)[0]
         elif 0x70 <= c <= 0x7F: s += c - 0x6F
         elif 0x80 <= c <= 0x8F: s += c - 0x80
+        elif c in (0x93, 0x95): yield s / 44100, 'pcm', c, b[p + 1] if c == 0x95 else 0; p += LEN[c]  # DAC stream start
         elif c in LEN: p += LEN[c]
         else: raise SystemExit(f'vgm command {c:02x} at {p - 1:x}')
 
-def events(path):
+def events(path, pcm=False):
     ym = {}; hi = {}; lat = None; per = {}; out = []; key = {}
     src = writes_vgm(path) if path.endswith('.vgm') else writes_tap(path)
     for t, chip, a, v in src:
+        if chip == 'pcm':
+            # One DAC channel for both sides: Furnace -vgmout puts PCM1 and PCM2 (softPCM) on one DAC stream, so only the
+            # union of sample starts compares. MDSDRV key-on = 68k st.b to zp_key_on of z_pcm1/2/3 ($0e08/$0e10/$0e18).
+            if pcm and (a in (0x93, 0x95) or (a in (0x08, 0x10, 0x18) and v == 0xFF)): out.append((t, 'DAC', 'KEYON', v if a in (0x93, 0x95) else a >> 3))
+            continue
         if chip == 'sn':
             if v & 0x80: lat = v
             if lat is None: continue
@@ -64,8 +73,8 @@ def events(path):
         elif 0xA0 <= r <= 0xA2:
             k = port * 3 + r - 0xA0; h = hi.get(k, 0); blk = (h >> 3) & 7; fn = ((h & 7) << 8) | v
             out.append((t, f'FM{k + 1}', 'FREQ', round(fn * YM_CLK / 144 / 2 ** (21 - blk), 2)))
-    t0 = next((e[0] for e in out if e[2] == 'KEYON'), 0)
+    t0 = next((e[0] for e in out if e[2] == 'KEYON' and e[1] != 'DAC'), 0)
     return [(round(e[0] - t0, 5), *e[1:]) for e in out]
 
 if __name__ == '__main__':
-    for e in events(sys.argv[1]): print(*e)
+    for e in events(sys.argv[1], '--pcm' in sys.argv[2:]): print(*e)

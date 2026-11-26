@@ -2,7 +2,7 @@
 // -> compare with the Furnace CLI -vgmout register stream of the same song (both decoded by tools/md-phase0/events.py).
 // Usage: nice -n 19 npx tsx --tsconfig tsconfig.app.json tools/md-rom-check.ts [--only <name>] [--failed] [--seconds N]
 // Results: test-data/md-rom-check.json (skips songs whose input hash matches a recorded verdict).
-// pass = the ROM wrote YM2612 key-ons in MAME. keyOnMatch = matched FM/PSG key-on/att-from-silence starts (same channel,
+// pass = the ROM wrote YM2612 key-ons in MAME. keyOnMatch = matched FM/PSG key-on/att-from-silence starts and DAC sample starts (PCM1+PCM2 as one DAC channel) (same channel,
 // within 30 ms, counted both ways) / max(Furnace starts, MAME starts), so missing and extra starts both lower it (both streams start at their first FM key-on). Needs mame and the Furnace CLI (FURNACE_CLI overrides the path).
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -30,7 +30,7 @@ const failedOnly = args.includes('--failed');
 const SECONDS = args.includes('--seconds') ? Number(args[args.indexOf('--seconds') + 1]) : 10;
 
 const decode = (file: string): Ev[] =>
-  execFileSync('python3', ['-I', EVENTS, file], { encoding: 'utf8', maxBuffer: 1 << 28 }).split('\n').filter(Boolean).map((l) => { const [t, ch, ev, v] = l.split(' '); return { t: Number(t), ch, ev, v }; });
+  execFileSync('python3', ['-I', EVENTS, file, '--pcm'], { encoding: 'utf8', maxBuffer: 1 << 28 }).split('\n').filter(Boolean).map((l) => { const [t, ch, ev, v] = l.split(' '); return { t: Number(t), ch, ev, v }; });
 /** Note starts: FM key-on, PSG attenuation leaving 15 (silence). */
 const starts = (e: Ev[]): Ev[] => { const last: Record<string, number> = {}; return e.filter((x) => { if (x.ev === 'KEYON') return true; if (x.ev !== 'ATT') return false; const was = last[x.ch] ?? 15; last[x.ch] = Number(x.v); return was === 15 && Number(x.v) < 15; }); };
 
@@ -39,7 +39,7 @@ function runMame(rom: Uint8Array, dir: string, seconds: number): Ev[] {
   execFileSync('mame', ['genesis', '-cart', path.join(dir, 'p.rom'), '-video', 'none', '-sound', 'none', '-nothrottle', '-seconds_to_run', String(seconds), '-autoboot_script', TAP, '-cfg_directory', path.join(dir, 'cfg'), '-nvram_directory', path.join(dir, 'nv'), '-skip_gameinfo'],
     { env: { ...process.env, TAPOUT: path.join(dir, 'raw') }, stdio: 'ignore', timeout: (seconds + 60) * 1000 });
   const lines = readFileSync(path.join(dir, 'raw'), 'utf8').split('\n');
-  writeFileSync(path.join(dir, 'tap'), lines.filter((l) => !/ [PQ] /.test(l)).join('\n'));
+  writeFileSync(path.join(dir, 'tap'), lines.filter((l) => !/ P /.test(l)).join('\n')); // Q = 68k PCM mailbox writes: DAC starts
   return decode(path.join(dir, 'tap'));
 }
 
@@ -57,7 +57,7 @@ for (const name of names) {
     const song = furnaceToMds(m);
     const rom = buildMdRom(PLAYER, song.seq, song.pcm);
     const raw = runMame(rom, dir, SECONDS), all = starts(raw);
-    const got = all.filter((e) => e.ev === 'KEYON');
+    const got = all.filter((e) => e.ev === 'KEYON' && e.ch !== 'DAC');
     v = { inputHash, pass: got.length > 0, seconds: SECONDS, romBytes: rom.length, lossy: song.lossy, mameKeyOns: got.length };
     if (existsSync(FURNACE)) try {
       execFileSync(FURNACE, ['-console', '-nostatus', '-nocontrols', '-noreport', '-loglevel', 'error', '-loops', '0', '-vgmout', path.join(dir, 'f.vgm'), path.join(SONGS, `${name}.fur`)], { stdio: 'ignore', timeout: 120000 });
