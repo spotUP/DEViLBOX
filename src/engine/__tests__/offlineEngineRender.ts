@@ -15,6 +15,18 @@ import type { ToneEngine } from '@engine/ToneEngine';
 export type Stereo = [Float32Array, Float32Array];
 export type PlayOnEngine = (engine: ToneEngine, cfg: InstrumentConfig, Tone: typeof import('tone')) => void | Promise<void>;
 
+/**
+ * Load the engine's module graph once, in a beforeAll with its own timeout. The first import of ToneEngine in a
+ * worker transforms the whole graph (measured ~48 s under load, a warm render ~1.7 s); inside a test it ate the
+ * 60 s budget, and the timed-out render kept running into the next test's fresh context ("Attempting to connect
+ * nodes from different contexts"). vi.resetModules in renderOnEngine keeps the transform cache, so later imports are fast.
+ */
+export const WARM_ENGINE_TIMEOUT_MS = 300_000;
+export async function warmEngineModules(): Promise<void> {
+  installRealWebAudio();
+  await Promise.all([import('tone'), import('@engine/ToneEngine'), import('@stores/useInstrumentStore'), import('@stores/instrument/presetOps')]);
+}
+
 export async function renderOnEngine(config: InstrumentConfig, play: PlayOnEngine, secs: number, sampleRate: number): Promise<Stereo> {
   vi.resetModules();
   forgetAudioGlobals(); // a fresh engine on this render's OfflineAudioContext, not the previous render's

@@ -7,9 +7,10 @@
  * pattern playback exactly 6 dB quieter than the key preview (WobbleBass "weaker, missing attack") and collapsed
  * every channel strip to mono. Real ToneEngine on node-web-audio-api, rendered offline.
  */
-import { describe, it, expect } from 'vitest';
+import { beforeAll, describe, it, expect } from 'vitest';
 import type { InstrumentConfig } from '@typedefs/instrument';
-import { renderOnEngine, type PlayOnEngine, type Stereo } from './offlineEngineRender';
+import { tapChannelStages, type ChannelStageDiag } from './channelStageDiag';
+import { renderOnEngine, warmEngineModules, WARM_ENGINE_TIMEOUT_MS, type PlayOnEngine, type Stereo } from './offlineEngineRender';
 
 const SR = 48000;
 const SECS = 1.2;
@@ -30,17 +31,23 @@ const NOTE_AT = 0.1;
 const NOTE_LEN = 0.6;
 const span = (x: Float32Array) => rms(x, Math.floor(SR * NOTE_AT), Math.floor(SR * (NOTE_AT + NOTE_LEN)));
 
+beforeAll(warmEngineModules, WARM_ENGINE_TIMEOUT_MS);
+
 describe('a Tone.js synth on a tracker channel plays at key-preview level', () => {
   it.each(['WobbleBass', 'Synth'])('%s: the channel note is within 0.5 dB of the key preview', async (synthType) => {
     const key = await render(synthType, (engine, cfg) => {
       engine.triggerNoteAttack(cfg.id, 'C3', NOTE_AT, 1, cfg, undefined, false, false); // as useNoteInput's keydown
       engine.triggerNoteRelease(cfg.id, 'C3', NOTE_AT + NOTE_LEN, cfg);
     });
-    const channel = await render(synthType, (engine, cfg) => {
+    let diag: ChannelStageDiag | undefined;
+    const channel = await render(synthType, async (engine, cfg, Tone) => {
       engine.triggerNote(cfg.id, 'C3', NOTE_LEN, NOTE_AT, 1, cfg, false, false, 0); // as the replayer's channel 0
+      diag = await tapChannelStages(engine, Tone, cfg.id, 0, NOTE_AT, NOTE_AT + NOTE_LEN);
     });
     const keyLevel = span(key[0]);
     expect(keyLevel, 'the key preview sounds').toBeGreaterThan(1e-3);
+    // WOBBLE-CI: CI (Linux x64) renders this channel note silent; name the quiet stage before the assertion fails.
+    if (!(Math.abs(db(span(channel[0]), keyLevel)) < 0.5)) console.error(`${diag?.report(channel[0])}\n[WOBBLE-DIAG] ${synthType} channel rms=${span(channel[0])} key rms=${keyLevel}`);
     expect(Math.abs(db(span(channel[0]), keyLevel)), 'channel minus key, dB').toBeLessThan(0.5);
   }, 60000);
 

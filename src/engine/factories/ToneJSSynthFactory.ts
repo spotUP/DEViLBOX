@@ -72,7 +72,7 @@ function polyWrapper(synth: Tone.PolySynth): Tone.ToneAudioNode {
     triggerRelease: (note: string, time?: number) => synth.triggerRelease(note, time),
     releaseAll: () => synth.releaseAll(),
     connect: (dest: Tone.InputNode) => synth.connect(dest),
-    disconnect: () => synth.disconnect(),
+    disconnect: (dest?: Tone.InputNode) => synth.disconnect(dest),
     dispose: () => synth.dispose(),
     volume: synth.volume,
   } as unknown as Tone.ToneAudioNode, synth);
@@ -103,7 +103,7 @@ export function createDuoSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     triggerRelease: (time?: number) => synth.triggerRelease(time),
     releaseAll: () => { try { synth.triggerRelease(); } catch { /* ignore */ } },
     connect: (dest: Tone.InputNode) => synth.connect(dest),
-    disconnect: () => synth.disconnect(),
+    disconnect: (dest?: Tone.InputNode) => synth.disconnect(dest),
     dispose: () => synth.dispose(),
     volume: synth.volume,
   } as unknown as Tone.ToneAudioNode, synth);
@@ -133,7 +133,7 @@ export function createPluckSynth(config: InstrumentConfig): Tone.ToneAudioNode {
       synth.triggerAttack(note as string, time),
     releaseAll: () => {},
     connect: (dest: Tone.InputNode) => synth.connect(dest),
-    disconnect: () => synth.disconnect(),
+    disconnect: (dest?: Tone.InputNode) => synth.disconnect(dest),
     dispose: () => synth.dispose(),
     volume: synth.volume,
   } as unknown as Tone.ToneAudioNode, synth);
@@ -338,7 +338,7 @@ export function createSuperSaw(config: InstrumentConfig): Tone.ToneAudioNode {
       synth.releaseAll();
     },
     connect: (dest: Tone.InputNode) => chorus.connect(dest),
-    disconnect: () => chorus.disconnect(),
+    disconnect: (dest?: Tone.InputNode) => chorus.disconnect(dest),
     dispose: () => {
       synth.dispose();
       filter.dispose();
@@ -459,7 +459,7 @@ export function createOrgan(config: InstrumentConfig): Tone.ToneAudioNode {
     },
     releaseAll: () => synth.releaseAll(),
     connect: (dest: Tone.InputNode) => output.connect(dest),
-    disconnect: () => output.disconnect(),
+    disconnect: (dest?: Tone.InputNode) => output.disconnect(dest),
     dispose: () => {
       synth.dispose();
       rotary?.dispose();
@@ -577,7 +577,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
         },
         releaseAll: () => { try { synth.triggerRelease(); } catch { /* ignore */ } },
         connect: (dest: Tone.InputNode) => output.connect(dest),
-        disconnect: () => output.disconnect(),
+        disconnect: (dest?: Tone.InputNode) => output.disconnect(dest),
         dispose: () => {
           synth.dispose();
           saturation?.dispose();
@@ -694,7 +694,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
           try { noise.triggerRelease(); } catch { /* ignore */ }
         },
         connect: (dest: Tone.InputNode) => output.connect(dest),
-        disconnect: () => output.disconnect(),
+        disconnect: (dest?: Tone.InputNode) => output.disconnect(dest),
         dispose: () => {
           body.dispose();
           noise.dispose();
@@ -865,7 +865,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
           });
         },
         connect: (dest: Tone.InputNode) => output.connect(dest),
-        disconnect: () => output.disconnect(),
+        disconnect: (dest?: Tone.InputNode) => output.disconnect(dest),
         dispose: () => {
           noise.dispose();
           burstNoises.forEach(burst => burst.dispose());
@@ -973,7 +973,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
           try { noise.triggerRelease(); } catch { /* ignore */ }
         },
         connect: (dest: Tone.InputNode) => output.connect(dest),
-        disconnect: () => output.disconnect(),
+        disconnect: (dest?: Tone.InputNode) => output.disconnect(dest),
         dispose: () => {
           synth.dispose();
           noise.dispose();
@@ -1094,7 +1094,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
           try { noise.triggerRelease(); } catch { /* ignore */ }
         },
         connect: (dest: Tone.InputNode) => highpass.connect(dest),
-        disconnect: () => highpass.disconnect(),
+        disconnect: (dest?: Tone.InputNode) => highpass.disconnect(dest),
         dispose: () => {
           noise.dispose();
           filter1.dispose();
@@ -1176,7 +1176,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
           try { synth.triggerRelease(); } catch { /* ignore */ }
         },
         connect: (dest: Tone.InputNode) => filter.connect(dest),
-        disconnect: () => filter.disconnect(),
+        disconnect: (dest?: Tone.InputNode) => filter.disconnect(dest),
         dispose: () => {
           synth.dispose();
           filter.dispose();
@@ -1283,7 +1283,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
           // One-shot, nothing to release
         },
         connect: (dest: Tone.InputNode) => output.connect(dest),
-        disconnect: () => output.disconnect(),
+        disconnect: (dest?: Tone.InputNode) => output.disconnect(dest),
         dispose: () => {
           osc1.stop();
           osc2.stop();
@@ -1387,7 +1387,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
         triggerRelease: () => { /* one-shot */ },
         releaseAll: () => { /* one-shot */ },
         connect: (dest: Tone.InputNode) => output.connect(dest),
-        disconnect: () => output.disconnect(),
+        disconnect: (dest?: Tone.InputNode) => output.disconnect(dest),
         dispose: () => {
           osc1.stop();
           osc2.stop();
@@ -1453,7 +1453,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
           try { noise.triggerRelease(); } catch { /* ignore */ }
         },
         connect: (dest: Tone.InputNode) => filter.connect(dest),
-        disconnect: () => filter.disconnect(),
+        disconnect: (dest?: Tone.InputNode) => filter.disconnect(dest),
         dispose: () => {
           noise.dispose();
           filter.dispose();
@@ -1569,7 +1569,7 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
         triggerRelease: () => { /* one-shot */ },
         releaseAll: () => { /* one-shot */ },
         connect: (dest: Tone.InputNode) => output.connect(dest),
-        disconnect: () => output.disconnect(),
+        disconnect: (dest?: Tone.InputNode) => output.disconnect(dest),
         dispose: () => {
           oscillators.forEach(osc => {
             osc.stop();
@@ -1653,7 +1653,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
         try { noise.triggerRelease(); } catch { /* ignore */ }
       },
       connect: (dest: Tone.InputNode) => bitCrusher.connect(dest),
-      disconnect: () => bitCrusher.disconnect(),
+      disconnect: (dest?: Tone.InputNode) => bitCrusher.disconnect(dest),
       dispose: () => {
         noise.dispose();
         bitCrusher.dispose();
@@ -1777,7 +1777,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
       lastArpNote = null;
     },
     connect: (dest: Tone.InputNode) => bitCrusher.connect(dest),
-    disconnect: () => bitCrusher.disconnect(),
+    disconnect: (dest?: Tone.InputNode) => bitCrusher.disconnect(dest),
     dispose: () => {
       if (arpeggioEngine) {
         arpeggioEngine.dispose();
@@ -1863,7 +1863,7 @@ export function createPWMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     },
     releaseAll: () => synth.releaseAll(),
     connect: (dest: Tone.InputNode) => chorus.connect(dest),
-    disconnect: () => chorus.disconnect(),
+    disconnect: (dest?: Tone.InputNode) => chorus.disconnect(dest),
     dispose: () => {
       synth.dispose();
       filter.dispose();
@@ -1951,7 +1951,7 @@ export function createStringMachine(config: InstrumentConfig): Tone.ToneAudioNod
     },
     releaseAll: () => synth.releaseAll(),
     connect: (dest: Tone.InputNode) => chorus.connect(dest),
-    disconnect: () => chorus.disconnect(),
+    disconnect: (dest?: Tone.InputNode) => chorus.disconnect(dest),
     dispose: () => {
       synth.dispose();
       chorus.dispose();

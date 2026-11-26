@@ -313,7 +313,7 @@ export function createFormantSynth(config: InstrumentConfig): Tone.ToneAudioNode
     },
     releaseAll: () => synth.releaseAll(),
     connect: (dest: Tone.InputNode) => output.connect(dest),
-    disconnect: () => output.disconnect(),
+    disconnect: (dest?: Tone.InputNode) => output.disconnect(dest),
     dispose: () => {
       synth.dispose();
       f1.dispose();
@@ -691,7 +691,7 @@ export function createWobbleBass(config: InstrumentConfig): Tone.ToneAudioNode {
       activeNotes.clear();
     },
     connect: (dest: Tone.InputNode) => output.connect(dest),
-    disconnect: () => output.disconnect(),
+    disconnect: (dest?: Tone.InputNode) => output.disconnect(dest),
     dispose: () => {
       osc1.dispose();
       osc2.dispose();

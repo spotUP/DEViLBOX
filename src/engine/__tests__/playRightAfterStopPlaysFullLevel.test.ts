@@ -10,10 +10,11 @@
  * channel's instrument is built before Stop, as earlier playback leaves it in a session, so Stop's fade reaches the
  * instance that plays the note. Real ToneEngine on node-web-audio-api, rendered offline.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { beforeAll, describe, it, expect, vi } from 'vitest';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { ToneEngine } from '@engine/ToneEngine';
-import { renderOnEngine, type PlayOnEngine, type Stereo } from './offlineEngineRender';
+import { tapChannelStages, type ChannelStageDiag } from './channelStageDiag';
+import { renderOnEngine, warmEngineModules, WARM_ENGINE_TIMEOUT_MS, type PlayOnEngine, type Stereo } from './offlineEngineRender';
 
 const SR = 48000;
 const SECS = 0.8;
@@ -59,17 +60,25 @@ const starts: Record<string, (engine: ToneEngine) => Promise<void>> = {
   'ToneEngine.start': (engine) => engine.start(),
 };
 
+beforeAll(warmEngineModules, WARM_ENGINE_TIMEOUT_MS);
+
 describe('Play right after Stop plays the first note at full level', () => {
   it.each(['Synth', 'WobbleBass'].flatMap((s) => Object.keys(starts).map((how) => [s, how])))(
     '%s, started by %s: the first note onset is within 0.5 dB of a play without Stop',
     async (synthType, how) => {
-      const plain = await render(synthType, (engine, cfg) => note(engine, cfg));
+      let diag: ChannelStageDiag | undefined;
+      const plain = await render(synthType, async (engine, cfg, Tone) => {
+        note(engine, cfg);
+        diag = await tapChannelStages(engine, Tone, cfg.id, 0, NOTE_AT, NOTE_AT + NOTE_LEN);
+      });
       const restarted = await render(synthType, async (engine, cfg) => {
         engine.stop();
         await starts[how](engine);
         note(engine, cfg);
       });
       const level = onset(plain[0]);
+      // WOBBLE-CI: CI (Linux x64) renders this channel note silent; name the quiet stage before the assertion fails.
+      if (!(level > 1e-3)) console.error(`${diag?.report(plain[0])}\n[WOBBLE-DIAG] ${synthType} (${how}) plain onset rms=${level}`);
       expect(level, 'the note sounds without Stop').toBeGreaterThan(1e-3);
       expect(Math.abs(db(onset(restarted[0]), level)), 'restarted minus plain onset, dB').toBeLessThan(0.5);
     },
