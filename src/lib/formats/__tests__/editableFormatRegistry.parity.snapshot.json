@@ -187,7 +187,7 @@
   ],
   "Ben Daglish SID|.xyz|amiga-native": [
     1,
-    0,
+    1,
     1,
     0
   ],
@@ -372,8 +372,8 @@
     0
   ],
   "Darius Zendeh|.xyz|uade-only": [
-    0,
-    0,
+    1,
+    1,
     1,
     0
   ],
@@ -1117,7 +1117,7 @@
   ],
   "Kris Hatlelid|.xyz|amiga-native": [
     1,
-    0,
+    1,
     1,
     0
   ],
@@ -1603,13 +1603,13 @@
   ],
   "Professional Sound Artists|.psa|amiga-native": [
     1,
-    0,
+    1,
     1,
     0
   ],
   "Professional Sound Artists|.xyz|amiga-native": [
     1,
-    0,
+    1,
     1,
     0
   ],
@@ -2233,7 +2233,7 @@
   ],
   "Tronic|.xyz|amiga-native": [
     1,
-    0,
+    1,
     1,
     0
   ],

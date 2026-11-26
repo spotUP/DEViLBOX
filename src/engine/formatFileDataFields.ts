@@ -109,6 +109,9 @@ export const FILE_DATA_FIELDS = [
   'activisionProFileData',
   'synthesisFileData',
   'dssFileData',
+  'xmfFileData',               // Uint8Array; XMF exporter patches edited cells into it
+  'radFileData',               // Uint8Array; AdPlug RAD exporter patches edited cells into it
+  'zoundMonitorFileData',      // Uint8Array; ZoundMonitor exporter patches edited cells into it
   'soundFactoryFileData',
   'faceTheMusicFileData',
   'symphonieFileData',

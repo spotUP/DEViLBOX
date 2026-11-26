@@ -14,7 +14,8 @@ afterEach(cleanup);
 beforeEach(() => useAudioStore.getState().setMasterEffects([]));
 
 function clickBrowserEffect(label: string): void {
-  const buttons = screen.getAllByText(label).map((el) => el.closest('button')).filter(Boolean) as HTMLButtonElement[];
+  // Each browser row carries its own Add button (0b8bbf312); the row itself is not clickable.
+  const buttons = screen.getAllByTitle(`Add ${label}`);
   fireEvent.click(buttons[buttons.length - 1]);
 }
 

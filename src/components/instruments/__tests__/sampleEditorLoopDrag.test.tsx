@@ -63,7 +63,7 @@ describe('sample editor loop handles', () => {
     const invalidate = invalidateInstrument;
     invalidate.mockClear();
     const { container } = render(<Harness id={1} />);
-    const canvas = container.querySelector('canvas[width]') as HTMLCanvasElement;
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement;
     expect(canvas).toBeTruthy();
     // wait for the buffer to decode: the loop handle only exists then. The decoded
     // buffer is what renders the Slicer button, so wait for that, not a fixed delay
