@@ -6,8 +6,13 @@
  * pattern blocks into standard TrackerSong patterns.
  *
  * Export strategy:
- *   1. If `steveTurnerFileData` exists, return it verbatim. Any live edits
- *      made via UADE chip RAM patching are already baked into this buffer.
+ *   1. If `steveTurnerFileData` exists: that module with each edited grid note
+ *      written into the note byte ($00-$7F, XM note = byte + 13) that played it
+ *      (the layout's `noteBytes`). Same length, byte-exact where nothing was
+ *      edited. A note where no note byte plays (an empty row, an instrument
+ *      trigger $B0-$CF), a removed note, an instrument change and two different
+ *      edits of one shared byte (a block played more than once) are warnings,
+ *      not written: they need the block stream to grow.
  *   2. If no original binary is available, encode pattern data using the
  *      Steve Turner variable-length encoder as a best-effort fallback.
  *
@@ -16,6 +21,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { encodeSteveTurnerPattern } from '@/engine/uade/encoders/SteveTurnerEncoder';
+import { editedCells } from '@/lib/song/gridBaseline';
 
 // ── Result type ─────────────────────────────────────────────────────────────
 
@@ -53,8 +59,33 @@ export async function exportSteveTurner(
   const fileData = song.steveTurnerFileData;
   if (fileData && fileData.byteLength > 0) {
     const baseName = sanitizeName(song.name);
+    const out = new Uint8Array(fileData.slice(0));
+    const at = new Map((song.uadeVariableLayout?.noteBytes ?? []).map((n) => [`${n.pattern}:${n.channel}:${n.row}`, n]));
+    const written = new Map<number, number>();
+    for (const { pattern, row, channel, cell } of editedCells(song.patterns)) {
+      const where = `pattern ${pattern} voice ${channel + 1} row ${row}`;
+      const n = at.get(`${pattern}:${channel}:${row}`);
+      if (!n) {
+        if (cell.note !== 0) warnings.push(`${where}: a note where the player runs no note byte is not written`);
+        continue;
+      }
+      // shortcut: only the pitch byte is written; an instrument change needs a $D0 select byte inserted (stream growth).
+      if (cell.note === n.note) continue;
+      const nb = cell.note - 13;
+      if (cell.note === 0 || nb < 0 || nb > 0x7f) {
+        warnings.push(`${where}: note ${cell.note} has no note byte ($00-$7F); not written`);
+        continue;
+      }
+      const prior = written.get(n.offset);
+      if (prior !== undefined && prior !== nb) {
+        warnings.push(`${where}: shares its note byte with an earlier edit (a block played more than once); not written`);
+        continue;
+      }
+      out[n.offset] = nb;
+      written.set(n.offset, nb);
+    }
     return {
-      data: new Blob([fileData], { type: 'application/octet-stream' }),
+      data: new Blob([out], { type: 'application/octet-stream' }),
       filename: deriveFilename(baseName),
       warnings,
     };

@@ -160,7 +160,7 @@ registerEditableFormat({ formatId: "soundfx", label: "Sound-FX", newSong: { temp
 registerEditableFormat({ formatId: "soundMaster", label: "Sound Master", newSong: { template: "templates/soundMaster.sm3" }, patternCodec: { kind: "fixed" }, exporter: { module: "SoundMasterExporter", fn: "exportSoundMaster", byLayout: true } });
 registerEditableFormat({ formatId: "soundMon", label: "SoundMon", patternCodec: { kind: "fixed" }, newSong: { template: "templates/soundmon.bp" }, exporter: { module: "SoundMonExporter", fn: "exportAsSoundMon" } });
 registerEditableFormat({ formatId: "startrekkerAM", label: "", patternCodec: { kind: "fixed" } });
-registerEditableFormat({ formatId: "steveTurner", label: "", patternCodec: { kind: "variable" } });
+registerEditableFormat({ formatId: "steveTurner", label: "", patternCodec: { kind: "variable" }, exporter: { module: "SteveTurnerExporter", fn: "exportSteveTurner", byLayout: true } });
 registerEditableFormat({ formatId: "stk", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "stm", label: "Scream Tracker 2", patternCodec: { kind: "fixed" }, exporter: { module: "STMExporter", fn: "exportSTM", byLayout: true } });
 registerEditableFormat({ formatId: "stp", label: "", newSong: { template: "templates/stp.stp", name: "SoundTracker Pro II" }, patternCodec: { kind: "fixed" }, exporter: { module: "STPExporter", fn: "exportSTP", byLayout: true } });
