@@ -53,6 +53,38 @@ describe('Furnace C64 effects in GoatTracker song data', () => {
   });
 });
 
+describe('Furnace arpeggio macro steps below C-0 in GoatTracker wave programs', () => {
+  it('slides to the frequency under GT\'s note table (PICOHOTCREDITS drum: -45 semitones played SID frequency 5, Furnace 221)', async () => {
+    const b = readFileSync(path.resolve(__dirname, '../../../../../public/data/songs/furnace/c64/PICOHOTCREDITS.fur'));
+    const m = await parseFurnaceSong(b.buffer.slice(b.byteOffset, b.byteOffset + b.length) as ArrayBuffer);
+    const g = furnaceToGoatTracker(m, 0);
+    expect(g.lossy.join('|')).not.toMatch(/below C-0/);
+    const wl = g.song.tables[0].left, wr = g.song.tables[0].right, sl = g.song.tables[3].left, sr = g.song.tables[3].right;
+    const own = g.song.instruments[3].ptr[0]; // Furnace ins 2: arpeggio macro 0,-5,...,-45
+    const freq = (n: number) => 440 * 2 ** ((n - 57) / 12) * 16777216 / 985248;
+    let low = 0;
+    for (const [note, ins, cmd, data] of g.song.patterns.flat()) {
+      if (note < 0x60 || note > 0xbc) continue;
+      // Play the note's wave program (its own, or the one a set-wave-pointer command names) and track the SID frequency.
+      const n0 = note - 0x60, start = cmd === 8 ? data : ins === 3 ? own : 0;
+      if (!start || (cmd === 8 && ins !== 3)) continue;
+      let f = freq(n0), least = f;
+      for (let i = start - 1; wl[i] !== 0xff; i++) {
+        const r = wr[i];
+        if (wl[i] === 0xf1 || wl[i] === 0xf2) f += (wl[i] === 0xf1 ? 1 : -1) * ((sl[r - 1] << 8) | sr[r - 1]);
+        else if (r !== 0x80) {
+          const n = r > 0x80 ? r & 0x7f : n0 + r > 95 ? n0 + r - 128 : n0 + r;
+          expect(n).toBeGreaterThanOrEqual(0); // a note row under C-0 reads past the frequency table
+          f = freq(n);
+        }
+        least = Math.min(least, f);
+      }
+      if (n0 < 45) { low++; expect(Math.abs(least - freq(n0 - 45))).toBeLessThan(1.5); }
+    }
+    expect(low).toBeGreaterThan(0);
+  });
+});
+
 describe('Furnace E1xy/E2xy note-row slides in GoatTracker wave programs', () => {
   it('follows Furnace\'s linear-pitch slide per tick (yeah! voice 3 E2FC glided 1114 vs 999 one tick in)', async () => {
     const b = readFileSync(path.resolve(__dirname, '../../../../../public/data/songs/furnace/c64/yeah!.fur'));

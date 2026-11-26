@@ -132,7 +132,7 @@ export const fineCutoffByte = (type: number, v: number): number => ((((type & 7)
 /** One instrument: ADSR, wave program (waveform + gate, arpeggio), pulse program, filter program, from the
  * instrument and its arp / wave / duty / cutoff / filter mode / resonance macros. */
 function instrumentOf(ins: FurnaceInstrument | undefined, idx: number, tables: GTSongData['tables'], lossy: Lossy,
-  version: number, multiplyRel: boolean, voices: number): GTInstrument {
+  version: number, multiplyRel: boolean, voices: number, downRows: Set<number>): GTInstrument {
   const g = emptyGTInstrument();
   const c = ins?.c64;
   if (!ins || !c) return g;
@@ -160,6 +160,7 @@ function instrumentOf(ins: FurnaceInstrument | undefined, idx: number, tables: G
   const wav = macroTrack(mac(MACRO_WAVE), version, baseWave, false, (_, v) => v & 15, lossy, 'wave');
   const ws = schedule([arp, wav], lossy, 'wave/arpeggio');
   const waveRows: Array<[number, number]> = [];
+  const down: number[] = [];
   for (let t = 0; t < ws.end; t++) {
     const w = (at(wav, t, baseWave) << 4) | ctl;
     // Right column: $80 keeps the pitch, below $80 is a note offset (mod 128), $81-$DF an absolute GT note.
@@ -170,11 +171,13 @@ function instrumentOf(ins: FurnaceInstrument | undefined, idx: number, tables: G
         const n = arpNv(0, v);
         if (n < 1 || n > 95) lossy.add('fixed arpeggio note outside GT range');
         r = 0x80 | Math.min(95, Math.max(1, n));
-      } else r = v & 0x7f;
+      } else { r = v & 0x7f; if (v < 0) down.push(t); }
     }
     waveRows.push([w >= 0x10 ? w : 0xe0 | w, r]);
   }
   g.ptr[0] = program(0, waveRows, ws.loop);
+  // The row byte alone cannot tell -45 from +83; floorProgram needs the sign.
+  for (const t of down) downRows.add(g.ptr[0] - 1 + t);
 
   const duty = macroTrack(mac(MACRO_DUTY), version, c.duty, !c.dutyIsAbs,
     c.dutyIsAbs ? (_, v) => v & 4095 : (p, v) => (p - (multiplyRel ? s8(v) * 4 : v)) & 4095, lossy, 'duty');
@@ -223,6 +226,7 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
   const lossy = new Lossy();
   const tables: GTSongData['tables'] = [0, 1, 2, 3].map(() => ({ left: [] as number[], right: [] as number[] }));
   if (m.instruments.length > GT_MAX_INSTR - 1) lossy.add('instruments past 63', m.instruments.length - (GT_MAX_INSTR - 1));
+  const downRows = new Set<number>();
   const instruments: GTInstrument[] = [emptyGTInstrument()];
   const multiplyRel = /multiplyRel=true/.test(m.chipFlags?.[0] ?? '');
   // Voices each instrument plays on (bit per SID voice), for the filter routing mask.
@@ -230,7 +234,7 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
   for (let ch = 0; ch < 3; ch++) for (let o = 0; o < s.ordersLen; o++) {
     for (const cell of m.patterns.get(`${subsong}_${ch}_${s.orders[ch]?.[o] ?? 0}`)?.rows ?? []) if (cell && cell.instrument >= 0) voices[cell.instrument] |= 1 << ch;
   }
-  for (let i = 0; i < Math.min(m.instruments.length, GT_MAX_INSTR - 1); i++) instruments.push(instrumentOf(m.instruments[i], i, tables, lossy, m.version, multiplyRel, voices[i]));
+  for (let i = 0; i < Math.min(m.instruments.length, GT_MAX_INSTR - 1); i++) instruments.push(instrumentOf(m.instruments[i], i, tables, lossy, m.version, multiplyRel, voices[i], downRows));
   // GT's note table is A-4 = 440 Hz.
   if (Math.abs((m.tuning ?? 440) - 440) > 0.5) lossy.add(`tuning ${m.tuning} Hz (GT plays A-4 = 440 Hz)`);
 
@@ -380,6 +384,45 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
     } else if (mac) lossy.add('pitch macro with a stepping wave/arpeggio program');
     return pos;
   };
+  // Wave program for a note whose instrument arpeggio steps below C-0, GT's lowest note: a relative row there indexes past the
+  // frequency table (PICOHOTCREDITS drum, -45 semitones: SID frequency 5 where Furnace plays 221). Copy of the instrument's program
+  // with each such row replaced by a slide row ($F1/$F2) from the previous tick's frequency to Furnace's. 0: the instrument's own program is right.
+  // shortcut: one-shot programs with the same waveform on the replaced row only; a looping one or a waveform change there is reported lossy.
+  const floorProgs = new Map<string, number>();
+  const floorProgram = (ins: number, note: number): number => {
+    const key = `${ins}_${note}`;
+    const have = floorProgs.get(key);
+    if (have !== undefined) return have;
+    const tb = tables[0], own = instruments[ins + 1].ptr[0] - 1;
+    // Row's note: null keeps the pitch, $81-$DF is absolute, below $80 is an offset mod 128 (player.s mt_wavefreq).
+    const rowNote = (i: number): number | null => { const r = tb.right[i]; return r === 0x80 ? null : r > 0x80 ? r & 0x7f : note + (downRows.has(i) ? r - 128 : r); };
+    let end = Math.max(0, own), pos = 0;
+    while (end < tb.left.length && tb.left[end] !== 0xff) end++;
+    const low = (i: number): boolean => { const n = rowNote(i); return i > own && tb.left[i] < 0xf0 && n !== null && n < 0; };
+    if (own >= 0 && Array.from({ length: end - own }, (_, k) => own + k).some(low)) {
+      if (tb.right[end]) lossy.add('looping arpeggio below C-0');
+      else if (tb.left.length + end - own + 1 > 255) lossy.add('arpeggio below C-0 (GT table full)');
+      else {
+        pos = tb.left.length + 1;
+        let cur = Math.round(sidFreq(note));
+        for (let i = own; i < end; i++) {
+          const l = tb.left[i], r = tb.right[i], n = rowNote(i);
+          if (low(i) && l === tb.left[i - 1]) {
+            const d = Math.round(sidFreq(n ?? 0)) - cur;
+            cur += d;
+            if (d) { tb.left.push(d > 0 ? 0xf1 : 0xf2); tb.right.push(speedRow(Math.abs(d))); } else { tb.left.push(l); tb.right.push(0x80); }
+          } else {
+            if (low(i)) lossy.add('arpeggio below C-0 on a waveform change');
+            tb.left.push(l); tb.right.push(r);
+            if (n !== null) cur = Math.round(sidFreq(n));
+          }
+        }
+        tb.left.push(0xff); tb.right.push(0);
+      }
+    }
+    floorProgs.set(key, pos);
+    return pos;
+  };
   const slices = Math.ceil(s.patLen / GT_MAX_ROWS);
   for (let ch = 0; ch < 3; ch++) {
     for (let o = 0; o < s.ordersLen; o++) {
@@ -439,6 +482,11 @@ export function furnaceToGoatTracker(m: FurnaceModule, subsong: number): GoatSon
             if (note !== GT_REST && note !== GT_KEYOFF && ci >= 0 && ci < GT_MAX_INSTR - 1 && macroOf(m.instruments[ci], MACRO_PITCH)) {
               if (cmd) lossy.add('pitch macro on a row with a wave command (dropped)');
               else { cmd = 8; data = pitchRef(ci, lastNote[ch]); }
+            }
+            if (note !== GT_REST && note !== GT_KEYOFF && ci >= 0 && ci < GT_MAX_INSTR - 1) {
+              const fp = floorProgram(ci, lastNote[ch]);
+              if (fp && cmd) lossy.add('arpeggio below C-0 on a row with a command (dropped)');
+              else if (fp) { cmd = 8; data = fp; }
             }
           }
           if (first && r === 0) { cmd = funk ? CMD_FUNKTEMPO : CMD_SETTEMPO; data = funk || tempo; }
