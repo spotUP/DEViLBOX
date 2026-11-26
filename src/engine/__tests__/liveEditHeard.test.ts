@@ -51,7 +51,14 @@ vi.mock('@/lib/songdb', () => ({ computeSongDBHash: () => '', lookupSongDB: asyn
 
 const ROOT = process.cwd();
 const SONGS = join(ROOT, 'public/data/songs');
-const WASM_BUNDLES: Array<[string, string]> = [['davidwhittaker', 'DavidWhittaker'], ['bd', 'Bd'], ['tfmx', 'TFMX'], ['pxtone', 'Pxtone'], ['digmug', 'DigMugEdit'], ['ixalance', 'IxalanceEdit'], ['cpsycle', 'CpsycleEdit']];
+const WASM_BUNDLES: Array<[string, string]> = [['davidwhittaker', 'DavidWhittaker'], ['bd', 'Bd'], ['tfmx', 'TFMX'], ['pxtone', 'Pxtone'], ['digmug', 'DigMugEdit'], ['ixalance', 'IxalanceEdit'], ['cpsycle', 'CpsycleEdit'], ['eupmini', 'EupminiEdit']];
+
+// The app's module graph is transformed on first import (minutes on a busy machine, nice 19): paid here, under its
+// own limit, not inside the first row's 180 s. applySong awaits the AutoDub import after setPatternOrder.
+beforeAll(async () => {
+  await Promise.all([import('@/lib/song/songBranches'), import('@/engine/dub/AutoDub'), import('@/lib/song/liveSong'),
+    import('@/engine/replayer/liveCellEdits'), import('@/engine/replayer/editedModuleForPlay')]);
+}, 900000);
 
 beforeAll(() => {
   const g = globalThis as Record<string, unknown>;
@@ -65,6 +72,18 @@ beforeAll(() => {
       if (m) return new Response(readFileSync(join(ROOT, 'public', dir, m[1])), { status: 200 });
     }
     throw new Error(`unexpected fetch in test: ${url}`);
+  });
+  // The OpenMPT soundlib (C++ importers/exporters in wasm): the app injects its glue by <script> tag, which happy-dom
+  // does not run. Evaluate the glue here and answer the tag's onload, as freshSongModuleCarriesSamples.test.ts does.
+  const wasmBinary = readFileSync(join(ROOT, 'public/openmpt/OpenMPTSoundlib.wasm'));
+  (0, eval)(readFileSync(join(ROOT, 'public/openmpt/OpenMPTSoundlib.js'), 'utf8') + '\n;globalThis.__osl = createOpenMPTSoundlib;');
+  const real = (g as { __osl: (o: object) => Promise<unknown> }).__osl;
+  g.createOpenMPTSoundlib = (o: object) => real({ ...o, wasmBinary });
+  const append = document.head.appendChild.bind(document.head);
+  vi.spyOn(document.head, 'appendChild').mockImplementation(<T extends Node>(node: T): T => {
+    if (!(node instanceof HTMLScriptElement) || !node.src.includes('OpenMPTSoundlib')) return append(node);
+    queueMicrotask(() => node.onload?.(new Event('load')));
+    return node;
   });
 });
 
@@ -80,6 +99,7 @@ files.sort();
 /** The song of each format the table runs (an explicit file wins over the registry's extension match). */
 const FILE: Record<string, string> = {
   suntronic: 'SUNTronicTunes/mule.src',
+  eupmini: 'euphony/Mondschein/Mondschein.eup',
   // the walker reads the song player; the sfx-only blinkys file is a variant it does not parse
   tonyWilliams: 'formats/future basketball main.tw',
   robHubbard: files.find((f) => f.endsWith('.rh')) ?? '',
@@ -113,6 +133,10 @@ const FILE: Record<string, string> = {
   emsv6: 'formats/perception.ems',
   fashionTracker: 'fashion-tracker/ivory tover ii.ex',
   mcmd: 'formats/ep-trmonsterbusiness.mcmd',
+  // name order finds other songs first: these are the corpus songs with the format's own magic
+  fmTracker: 'fm-tracker/fm dance.fmt',
+  cdfm67: 'formats/amnesia_credits.c67',
+  // name order finds other songs first: these are the corpus songs with the format's own magic
   // tracked songs: an untracked local download (OctaMED MMDC/, NSF/!DPCM Sample Collection!/sd2.dmc, Nintendo Sound Format/Smam/jam.nsf) sorts first and changes the row
   med: 'formats/bounty hunter - outro (remixed).mmd3',
   sidmon2: 'formats/bruno_time.sid2',
@@ -158,23 +182,19 @@ const UNCONFIRMED: string[] = [];
  * open units of G19: measure them where the engine runs (MCP get_audio_level on the live app).
  */
 export const UNMEASURED: Record<string, string> = {
+  goatTracker: 'import falls to the UADE scan (parseUADEFile) in node; plays in the GTUltra worklet; its LIVE_EDIT and ADD_ON_EMPTY_ROW rows are measured by goatTrackerLiveEditHeard.test.ts (OWN_TEST, OWN_ADD_TEST)',
+  nru: 'no real song exists to measure with: the only corpus .nru (formats/howiedavies.nru) is an Amiga executable (hunk 000003f3), not a NoiseRunner module (no M.K. at 1080), and modland has no NoiseRunner directory (2026-11-26, 404)',
+  karlMorton: 'no real song exists to measure with: public/data/songs and test-data hold no Karl Morton (SONG chunk) module (first samurai.mus is another format), and modland has no Karl Morton directory (2026-11-26, 404)',
+  anders0land: 'no corpus song: the only match is an NSF (hot.nsf) that content detection misnames; it imports through the sc68/gme path with no notes',
   dmf: 'import needs the Furnace WASM (FurnaceFileOps.js) the node run cannot load',
   ned: 'import needs the Furnace WASM (FurnaceFileOps.js) the node run cannot load',
   famitracker: 'import needs the Furnace WASM (FurnaceFileOps.js) the node run cannot load',
   dsm: 'no corpus song: the only .dsm files are Technocop 6502 assembly source (NSF/Music Source Code/Technocop), not DSIK modules; detectFormatFromContent has no .dsm case and returns the name match',
-  steveTurner: 'import needs an AudioContext (ToneEngine)',
-  goatTracker: 'import needs an AudioContext (ToneEngine)', anders0land: 'import needs an AudioContext (ToneEngine)',
-  fmTracker: 'import needs an AudioContext (ToneEngine)', imagoOrpheus: 'import needs an AudioContext (ToneEngine)',
-  cdfm67: 'import needs an AudioContext (ToneEngine)', karlMorton: 'import needs an AudioContext (ToneEngine)',
-  madTracker2: 'import needs an AudioContext (ToneEngine)', nru: 'import needs an AudioContext (ToneEngine)',
-  iffSmus: 'import needs an AudioContext (ToneEngine)',
-  digitalSymphony: 'import needs the OpenMPT WASM the node run cannot load', graoumfTracker2: 'import needs the OpenMPT WASM the node run cannot load',
-  symphoniePro: 'import needs the OpenMPT WASM the node run cannot load', digiBoosterPro: 'import needs the OpenMPT WASM the node run cannot load',
-  chuckBiscuits: 'import needs the OpenMPT WASM the node run cannot load', gameMusicCreator: 'import needs the OpenMPT WASM the node run cannot load',
-  soundfx: 'import needs the OpenMPT WASM the node run cannot load',
-  ams: 'import needs the OpenMPT WASM the node run cannot load',
   monotone: 'no corpus song: the only .mon files are Maniacs of Noise (content detection says so)',
-  piece: 'no corpus song: the only .pmd files are PiyoPiyo (content detection says so); P/ECE songs live in test-data/piece (pieceGridMatchesPlayer.test.ts)',
+  pt3: 'plays in the aylet Z80 worklet; its LIVE_EDIT row is measured by pt3LiveEditLands.test.ts (OWN_TEST)',
+  piece: 'plays in the PieceEngine worklet, not the import path this table renders; its LIVE_EDIT row is measured by pieceLiveEditHeard.test.ts (OWN_TEST)',
+  beRoTracker: 'plays in the BeRoTracker worklet, not the import path this table renders; its LIVE_EDIT row is measured by beRoTrackerLiveEditHeard.test.ts (OWN_TEST)',
+  t0ast: 'no corpus song (test-data/t0ast is git-ignored Modland) and it plays in the T0ast worklet; its LIVE_EDIT and ADD_ON_EMPTY_ROW rows are measured by t0astLiveEditHeard.test.ts (OWN_TEST, OWN_ADD_TEST)',
   iceTracker: 'the registry match is an instrument file, no corpus module',
   musicMaker: 'the song needs its instrument companion file, not in the corpus folder',
   stoneTracker: 'the song needs its sample bank companion file, not in the corpus folder',
@@ -212,6 +232,20 @@ function companionsOf(rel: string): Map<string, ArrayBuffer> | undefined {
     .filter(([, p]) => existsSync(p));
   return found.length ? new Map(found.map(([n, p]) => [n, new Uint8Array(readFileSync(p)).buffer as ArrayBuffer])) : undefined;
 }
+
+/** UNMEASURED formats whose LIVE_EDIT row a test of their own measures in the real worklet and WASM. */
+const OWN_TEST: Record<string, string> = {
+  piece: 'src/engine/__tests__/pieceLiveEditHeard.test.ts',
+  beRoTracker: 'src/engine/__tests__/beRoTrackerLiveEditHeard.test.ts',
+  pt3: 'src/engine/__tests__/pt3LiveEditLands.test.ts',
+  t0ast: 'src/engine/__tests__/t0astLiveEditHeard.test.ts',
+  goatTracker: 'src/engine/__tests__/goatTrackerLiveEditHeard.test.ts',
+};
+/** UNMEASURED formats whose ADD_ON_EMPTY_ROW row a test of their own measures (live and through the exporter). */
+const OWN_ADD_TEST: Record<string, string> = {
+  t0ast: 'src/engine/__tests__/t0astLiveEditHeard.test.ts',
+  goatTracker: 'src/engine/__tests__/goatTrackerLiveEditHeard.test.ts',
+};
 
 async function load(rel: string): Promise<{ bytes: Uint8Array; name: string }> {
   const bytes = new Uint8Array(readFileSync(join(SONGS, rel)));
@@ -399,8 +433,8 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
 
 describe('the live-edit table is complete', () => {
   it('has a row for every format with a corpus song, and none for a format without one', () => {
-    expect(Object.keys(LIVE_EDIT).sort()).toEqual(rows.map((r) => r.key).sort());
-    expect(Object.keys(ADD_ON_EMPTY_ROW).sort()).toEqual(rows.map((r) => r.key).sort());
+    expect(Object.keys(LIVE_EDIT).sort()).toEqual([...rows.map((r) => r.key), ...Object.keys(OWN_TEST)].sort());
+    expect(Object.keys(ADD_ON_EMPTY_ROW).sort()).toEqual([...rows.map((r) => r.key), ...Object.keys(OWN_ADD_TEST)].sort());
   });
 });
 
