@@ -109,6 +109,17 @@ describe('writeTadSong echo header', () => {
     expect(song.warnings.some((w) => /\(Drums\): .*volume/.test(w))).toBe(false);
   }, 60000);
 
+  // A note on the loop row keys on in Furnace: the piece before `L` must not be slurred into it (MM8_Frost_Man lost 5 KONs at 12.8 s).
+  it('keys on a note that starts on the loop row', async () => {
+    const buf = readFileSync(resolve(DIR, 'MM8_Frost_Man.fur'));
+    const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    const song = writeTadSong({ native: buildFurnaceNativeData(module), subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: 'MM8_Frost_Man' });
+    const chan = (c: string) => song.mml.split('\n').filter((l) => l.startsWith(`${c} `)).map((l) => l.slice(2)).join(' ');
+    // Channels 1, 2, 5, 6, 7 key a note on at the loop row (Furnace NOTE_ON at 12.8 s); D and H hold theirs across it.
+    for (const c of ['A', 'B', 'E', 'F', 'G']) { expect(chan(c)).toMatch(/ L /); expect(chan(c)).not.toMatch(/&\s+L\s/); }
+    expect(chan('H')).toMatch(/& L @\d+ b%/);
+  }, 60000);
+
   // snes.cpp:152-172: a constant special macro sets echo (bit 2) and pitch modulation (bit 4); no warning for it.
   it('carries constant special macros as echo and pitch modulation', async () => {
     let checked = 0;

@@ -502,8 +502,12 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       const cl = cell(ch, r.pos, r.row);
       if (r.row === 0 || i === loopRow) cuts.push(out.length);
       if (r.row % 16 === 0 || i === loopRow) bars.push(out.length);
+      // A row that keys a new note on must not slur the previous piece into it: a loop point, tempo or FIR command
+      // between them would otherwise drop the key-on (MM8_Frost_Man lost 5 KONs at its loop point on the first pass).
+      const keysOn = !!cl && cl.note >= 0 && cl.note < 180 && !legatoOn
+        && !cl.effects.some((e) => (e.cmd === 0x03 || e.cmd === 0xea || e.cmd === 0xed) && e.val > 0);
       if (i === loopRow) {
-        flush(true); out.push('L');
+        flush(!keysOn); out.push('L');
         // The loop point joins two instrument states, so the compiler narrows the note range to the overlap of both
         // (bytecode.rs:1768 InstrumentState::Multiple); naming the instrument again keeps the full range.
         // A gain macro or sustain release clears curIns (the next note names the instrument again), so the loop uses the last
@@ -513,10 +517,10 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         if (relTok) out.push(relTok);
         cuts.push(out.length); bars.push(out.length);
       }
-      if (r.timer && c === tempoCh) { flush(true); out.push(`T${r.timer}`); }
+      if (r.timer && c === tempoCh) { flush(!keysOn); out.push(`T${r.timer}`); }
       // One tap step per row (a 38xx blend, or a plain 30xx-37xx jump): the taps are not tied to a cell, so a blend runs on rows without one.
       if (!sfx && r.echo.live && r.firSteps?.length && c === tempoCh) {
-        flush(true);
+        flush(!keysOn);
         for (const [tap, v] of r.firSteps) out.push(`\\ftap ${tap},${v}`);
       }
       let relCut = false, delayUsed = 0, cutAt = 0, retrig = 0, relAt = -1, soAt = -1;

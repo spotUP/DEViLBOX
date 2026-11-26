@@ -2,8 +2,9 @@
  * Headless check, SNES Terrific Audio Driver route: .fur -> tadSongWriter -> tad-compiler wasm -> DEViLBOX player .sfc
  * -> Mesen2 (--testRunner, no window) with a write tap on the SPC700's $F2/$F3 (S-DSP address/data) -> KON ($4C) events
  * per voice, stamped in SPC cycles. Reference: the Furnace CLI's `-view commands` NOTE_ON per channel and tick (tick / hz s).
- * keyOnMatch = share of Furnace NOTE_ONs (first SECONDS - 1 s) whose channel has a KON within 30 ms; both sides start at
- * their first note. pass = the ROM keyed voices on. Not a CI test: it runs only when tools/snes-rom-check.ts sets SNES_ROM_CHECK
+ * Both sides are counted over the same window (first SECONDS - 1 s, each from its first note). keyOnMatch is symmetric like
+ * md-rom-check: min(Furnace NOTE_ONs with a KON within 30 ms, KONs with a NOTE_ON within 30 ms) / max(NOTE_ONs, KONs), so
+ * missing and extra key-ons both lower it. pass = the ROM keyed voices on. Not a CI test: it runs only when tools/snes-rom-check.ts sets SNES_ROM_CHECK
  * (vitest, because tadAudioRam.ts imports a Vite `?raw` asset). Results: test-data/snes-rom-check.json, skips recorded hashes.
  */
 import { describe, it } from 'vitest';
@@ -29,7 +30,7 @@ const FAILED = process.env.SNES_FAILED === '1';
 const BOOT_MARGIN = 8;
 const SPC_HZ = 2048000; // Mesen2 spc.cycle rate (measured: 409126 cycles over 12 NTSC frames)
 
-interface Verdict { inputHash: string; pass: boolean; seconds: number; warnings?: string[]; konEvents?: number; furnaceNoteOns?: number; keyOnMatch?: number; perChannel?: string; error?: string }
+interface Verdict { inputHash: string; pass: boolean; seconds: number; warnings?: string[]; konEvents?: number; romKeyOns?: number; furnaceNoteOns?: number; keyOnMatch?: number; perChannel?: string; error?: string }
 type Ev = { t: number; ch: number };
 
 function mesenKeyOns(rom: Uint8Array, dir: string): Ev[] {
@@ -66,7 +67,7 @@ describe.runIf(process.env.SNES_ROM_CHECK === '1')('snes-rom-check', () => {
     const { default: create } = await import('../../../../../public/tad/tad-compiler.js');
     const results: Record<string, Verdict> = existsSync(RESULTS) ? JSON.parse(readFileSync(RESULTS, 'utf8')) : {};
     const toolHash = createHash('sha1');
-    for (const f of ['src/lib/export/tad/tadSongWriter.ts', 'src/lib/export/tad/tadProjectBuilder.ts', 'public/tad/player-devilbox-lorom.sfc', 'public/tad/tad_compiler.wasm']) toolHash.update(readFileSync(path.join(ROOT, f)));
+    for (const f of ['src/lib/export/tad/tadSongWriter.ts', 'src/lib/export/tad/tadProjectBuilder.ts', 'src/lib/export/tad/__tests__/snesRomCheck.test.ts', 'public/tad/player-devilbox-lorom.sfc', 'public/tad/tad_compiler.wasm']) toolHash.update(readFileSync(path.join(ROOT, f)));
     const tool = toolHash.digest('hex');
     const names = readdirSync(SONGS).filter((f) => f.endsWith('.fur')).map((f) => f.slice(0, -4))
       .filter((n) => !ONLY || n === ONLY).filter((n) => !FAILED || results[n]?.pass === false);
@@ -89,12 +90,17 @@ describe.runIf(process.env.SNES_ROM_CHECK === '1')('snes-rom-check', () => {
           const g0 = got[0]?.t ?? 0, w0 = want0[0]?.t ?? 0;
           const g = got.map((e) => ({ t: e.t - g0, ch: e.ch }));
           const want = want0.map((e) => ({ t: e.t - w0, ch: e.ch })).filter((e) => e.t < SECONDS - 1);
-          const hitOf = (w: Ev) => g.some((x) => x.ch === w.ch && Math.abs(x.t - w.t) < 0.03);
-          const hit = want.filter(hitOf).length;
-          const per = Array.from({ length: 8 }, (_, c) => { const w = want.filter((e) => e.ch === c); return w.length ? `${c}:${w.filter(hitOf).length}/${w.length}` : ''; }).filter(Boolean).join(' ');
-          Object.assign(v, { furnaceNoteOns: want.length, keyOnMatch: want.length ? Math.round((hit / want.length) * 10000) / 100 : 0, perChannel: per });
+          const have = g.filter((e) => e.t < SECONDS - 1);
+          const near = (a: Ev, b: Ev[]) => b.some((x) => x.ch === a.ch && Math.abs(x.t - a.t) < 0.03);
+          const hitOf = (w: Ev) => near(w, g);
+          const hit = Math.min(want.filter((w) => near(w, have)).length, have.filter((e) => near(e, want)).length);
+          const denom = Math.max(want.length, have.length);
+          // per channel: NOTE_ONs hit / NOTE_ONs, then KONs in the window on that voice
+          const per = Array.from({ length: 8 }, (_, c) => { const w = want.filter((e) => e.ch === c); const k = have.filter((e) => e.ch === c).length; return w.length || k ? `${c}:${w.filter(hitOf).length}/${w.length}k${k}` : ''; }).filter(Boolean).join(' ');
+          Object.assign(v, { romKeyOns: have.length, furnaceNoteOns: want.length, keyOnMatch: denom ? Math.round((hit / denom) * 10000) / 100 : 0, perChannel: per });
           if (process.env.SNES_DIAG) console.log(`[ROM] ${name} ${g.slice(0, 40).map((e) => `${e.ch}@${e.t.toFixed(2)}`).join(' ')} | FUR ${want.slice(0, 40).map((e) => `${e.ch}@${e.t.toFixed(2)}`).join(' ')}`);
           if (process.env.SNES_DIAG) for (const w of want) if (!hitOf(w)) console.log(`[MISS] ${name} ch${w.ch} ${w.t.toFixed(3)} nearest ${g.filter((x) => x.ch === w.ch).map((x) => x.t - w.t).sort((a, b) => Math.abs(a) - Math.abs(b))[0]?.toFixed(3) ?? 'none'}`);
+          if (process.env.SNES_DIAG) for (const e of have) if (!near(e, want)) console.log(`[EXTRA] ${name} ch${e.ch} ${e.t.toFixed(3)}`);
         }
       } catch (e) {
         v = { inputHash, pass: false, seconds: SECONDS, error: e instanceof Error ? e.message : String(e) };
