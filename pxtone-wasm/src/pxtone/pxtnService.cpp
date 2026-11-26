@@ -878,12 +878,13 @@ pxtnERR pxtnService::_io_UNIT_num_r    ( void* desc, int32_t* p_num )
 // save               //////////////////
 ////////////////////////////////////////
 
-pxtnERR pxtnService::write( void* desc, bool b_tune, uint16_t exe_ver )
+pxtnERR pxtnService::write( void* desc, bool b_tune, uint16_t exe_ver, int32_t rough_in )
 {
 	if( !_b_init ) return pxtnERR_INIT;
 
 //	bool     b_ret = false;
-	int32_t  rough = b_tune ? 10 : 1;
+	// DEViLBOX: a song loaded from a .pttune already holds tune clocks; dividing them again by 10 zeroes them.
+	int32_t  rough = rough_in > 0 ? rough_in : ( b_tune ? 10 : 1 );
 	uint16_t rrr   =            0;
 	pxtnERR  res   = pxtnERR_VOID;
 

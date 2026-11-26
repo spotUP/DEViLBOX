@@ -318,7 +318,8 @@ EXPORT int pxtone_write(void) {
     g_outfile.cap = 1 << 16; g_outfile.pos = 0; g_outfile.size = 0;
     g_outfile.data = (uint8_t *)malloc((size_t)g_outfile.cap);
     if (!g_outfile.data) return -2;
-    pxtnERR err = g_pxtn->write(&g_outfile, g_is_tune, g_exe_ver);
+    /* rough 1: a .pttune source is already at tune resolution (pxtnService::write would divide by 10 again) */
+    pxtnERR err = g_pxtn->write(&g_outfile, g_is_tune, g_exe_ver, 1);
     return err == pxtnOK ? g_outfile.size : -3 - (int)err;
 }
 EXPORT const uint8_t *pxtone_write_data(void) { return g_outfile.data; }
@@ -420,8 +421,8 @@ EXPORT int pxtone_grid_set_note(int rpb, int unit, int row, int note) {
     }
     int32_t key = (note + 38) * 256;
     int32_t prev = value_at(unit, EVENTKIND_KEY, clock, 0x6000);
-    bool own = has_event(clock, unit, EVENTKIND_KEY);
-    if (!has_event(clock, unit, EVENTKIND_ON)) {
+    bool own = has_event(unit, EVENTKIND_KEY, clock);
+    if (!has_event(unit, EVENTKIND_ON, clock)) {
         int dur = row_clock(row + 1, rpb) - clock;
         if (pxtone_add_event(clock, unit, EVENTKIND_ON, dur < 1 ? 1 : dur) != 0) return -2;
     }
@@ -431,7 +432,7 @@ EXPORT int pxtone_grid_set_note(int rpb, int unit, int row, int note) {
         /* restore the earlier pitch at the next ON of this unit unless it carries its own KEY */
         for (const EVERECORD *r = g_pxtn->evels->get_Records(); r; r = r->next)
             if (r->unit_no == unit && r->kind == EVENTKIND_ON && r->clock > clock) {
-                if (!has_event(r->clock, unit, EVENTKIND_KEY)) pxtone_add_event(r->clock, unit, EVENTKIND_KEY, prev);
+                if (!has_event(unit, EVENTKIND_KEY, r->clock)) pxtone_add_event(r->clock, unit, EVENTKIND_KEY, prev);
                 break;
             }
     }

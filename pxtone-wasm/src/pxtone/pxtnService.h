@@ -162,7 +162,7 @@ public :
 	pxtnERR init_collage ( int32_t fix_evels_num );
 	bool    clear        ();
 
-	pxtnERR write        ( void* desc, bool bTune, uint16_t exe_ver );
+	pxtnERR write        ( void* desc, bool bTune, uint16_t exe_ver, int32_t rough = 0 ); // rough 0: 10 for a tune, 1 for a project
 	pxtnERR read         ( void* desc );
 
 	bool    AdjustMeasNum();
