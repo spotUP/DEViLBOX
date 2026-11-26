@@ -16,7 +16,7 @@ import { buildMdRom } from '../src/lib/export/md/mdRom';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SONGS = path.join(ROOT, 'public/data/songs/furnace/genesis');
 const RESULTS = path.join(ROOT, 'test-data/md-rom-check.json');
-const PLAYER = readFileSync(path.join(ROOT, 'public/md/player.bin'));
+const PLAYER = readFileSync(process.env.MD_PLAYER ?? path.join(ROOT, 'public/md/player.bin')); // MD_PLAYER: bisect a driver build
 const TAP = path.join(ROOT, 'tools/md-phase0/tap_pcm.lua');
 const EVENTS = path.join(ROOT, 'tools/md-phase0/events.py');
 const FURNACE = process.env.FURNACE_CLI ?? '/Applications/Furnace.app/Contents/MacOS/furnace';
@@ -56,21 +56,26 @@ for (const name of names) {
     const m = await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
     const song = furnaceToMds(m);
     const rom = buildMdRom(PLAYER, song.seq, song.pcm);
-    const raw = runMame(rom, dir, SECONDS), all = starts(raw);
+    // events.py shifts MAME time to the first FM key-on (~1.06 s of boot), so MAME runs 2 s past the window: a start near the
+    // window end was cut on the ROM side only (MegadriveOverdrive 8.933 s miss moved to 10.933 s with --seconds 12).
+    const raw = runMame(rom, dir, SECONDS + 2), all = starts(raw);
     const got = all.filter((e) => e.ev === 'KEYON' && e.ch !== 'DAC');
     v = { inputHash, pass: got.length > 0, seconds: SECONDS, romBytes: rom.length, lossy: song.lossy, mameKeyOns: got.length };
     if (existsSync(FURNACE)) try {
       execFileSync(FURNACE, ['-console', '-nostatus', '-nocontrols', '-noreport', '-loglevel', 'error', '-loops', '0', '-vgmout', path.join(dir, 'f.vgm'), path.join(SONGS, `${name}.fur`)], { stdio: 'ignore', timeout: 120000 });
-      const want = starts(decode(path.join(dir, 'f.vgm'))).filter((e) => e.t < SECONDS - 1);
-      const have = all.filter((e) => e.t < SECONDS - 1);
+      const ref = starts(decode(path.join(dir, 'f.vgm'))), want = ref.filter((e) => e.t < SECONDS - 1);
+      const have = all.filter((e) => e.t < SECONDS - 1); // same window as want; edge partners are found in the other side's unclipped list
       const near = (a: Ev, b: Ev[]) => b.some((x) => x.ch === a.ch && Math.abs(x.t - a.t) < 0.03);
       // Symmetric: missing (Furnace start with no MAME start) and extra (MAME start with no Furnace start) both lower the score.
-      const hit = Math.min(want.filter((w) => near(w, have)).length, have.filter((g) => near(g, want)).length);
+      // A pair split by the window edge (one start just inside, its partner just past it) is dropped from both sides, so it is neither a
+      // miss nor an extra (Ruby 8.97-9.0 s, newer_song_lol); min() still stops two starts sharing one partner from both counting.
+      const w2 = want.filter((w) => near(w, have) || !near(w, all)), h2 = have.filter((g) => near(g, want) || !near(g, ref));
+      const hit = Math.min(w2.filter((w) => near(w, have)).length, h2.filter((g) => near(g, want)).length);
       if (process.env.MD_DIAG_CH) { const f = (e: Ev[]) => e.filter((x) => x.ch === process.env.MD_DIAG_CH && x.ev !== 'FREQ' && x.t >= Number(process.env.MD_DIAG_T0 ?? 0) && x.t < Number(process.env.MD_DIAG_T1 ?? 1.5)).map((x) => `${x.t.toFixed(3)}:${x.ev}:${x.v}`).join(' '); console.log(`[EV-F] ${f(decode(path.join(dir, 'f.vgm')))}`); console.log(`[EV-M] ${f(raw)}`); }
       if (process.env.MD_DIAG) for (const w of want) if (!all.some((g) => g.ch === w.ch && Math.abs(g.t - w.t) < 0.03)) console.log(`[MISS] ${name} ${w.ch} ${w.t.toFixed(3)} ${w.ev} ${w.v} nearest ${all.filter((g) => g.ch === w.ch).map((g) => g.t - w.t).sort((x, y) => Math.abs(x) - Math.abs(y))[0]?.toFixed(3) ?? 'none'}`);
-      if (process.env.MD_DIAG) for (const g of have) if (!near(g, want)) console.log(`[EXTRA] ${name} ${g.ch} ${g.t.toFixed(3)} ${g.ev} ${g.v}`);
-      const denom = Math.max(want.length, have.length);
-      Object.assign(v, { furnaceKeyOns: want.length, mameStarts: have.length, keyOnMatch: denom ? Math.round((hit / denom) * 10000) / 100 : 0 });
+      if (process.env.MD_DIAG) for (const g of have) if (!near(g, ref)) console.log(`[EXTRA] ${name} ${g.ch} ${g.t.toFixed(3)} ${g.ev} ${g.v}`);
+      const denom = Math.max(w2.length, h2.length);
+      Object.assign(v, { furnaceKeyOns: w2.length, mameStarts: h2.length, keyOnMatch: denom ? Math.round((hit / denom) * 10000) / 100 : 0 });
     } catch (e) {
       // The ROM ran; only the reference is missing (e.g. the Furnace CLI is older than the .fur format version): keep the ROM verdict.
       v.error = `no reference: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`;
