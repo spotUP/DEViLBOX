@@ -1,0 +1,473 @@
+#!/usr/bin/env python3
+# Copyright (c) 2024 Damien Ciabrini
+# This file is part of ngdevkit
+#
+# ngdevkit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# ngdevkit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with ngdevkit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""soundtool.py - generate command data for z80 and m68k."""
+
+import argparse
+import re
+import sys
+import glob
+import os
+import wave
+from operator import itemgetter
+
+# Special handling for YAML: try to import ruamel.yaml first,
+# because it's better at keeping comments in YAML files, and
+# default to yaml if not found, as they are API-compatible.
+try:
+    import ruamel.yaml
+    _yaml = "ruamel"
+except ImportError:
+    import yaml
+    _yaml = "PyYAML"
+
+def yaml_load_all(f):
+    if _yaml == "ruamel":
+        return ruamel.yaml.YAML().load_all(f)
+    else:
+        return yaml.safe_load_all(f)
+
+def yaml_load(f):
+    if _yaml == "ruamel":
+        return ruamel.yaml.YAML().load(f)
+    else:
+        return yaml.safe_load(f)
+
+def yaml_dump(data, end, f):
+    if _yaml == "ruamel":
+        return ruamel.yaml.YAML().dump(data, stream=f)
+    else:
+        return yaml.dump(data, end=end, stream=f)
+
+
+VERBOSE = False
+
+
+def error(s):
+    sys.exit("error: " + s)
+
+
+def dbg(s):
+    if VERBOSE:
+        print(s, file=sys.stderr)
+
+def mkid(x):
+    return re.sub(r"\W|^(?=\d)", "_", x).lower()
+
+
+def load_sound_desc(descfile):
+    descdata = open(descfile,'r').read()
+    comments = [l for l in descdata.split('\n') if re.search(r'^#', l)]
+    header = "\n".join(comments)
+    yamldata = sum(list(yaml_load_all(descdata)), [])
+    return header+"\n", yamldata
+
+
+def generate_sound_desc(entries, header, desc, output):
+    def merge_descs(a,b):
+        atype = list(a.keys())[0]
+        adata = a[atype]
+        btype = list(b.keys())[0]
+        bdata = b[btype]
+        return {atype: {**adata, **bdata}}
+
+    def detect_adpcm_type(f):
+        try:
+            w = wave.open(f, 'rb')
+            assert w.getnchannels() == 1, "Only mono WAV file is supported"
+            assert w.getsampwidth() == 2, "Only 16bits per sample is supported"
+            assert w.getcomptype() == 'NONE', "Only uncompressed WAV file is supported"
+            wavrate = w.getframerate()
+            return "adpcm_a" if wavrate == 18500 else "adpcm_b"
+        except Exception as e:
+            return ""
+
+    existing_data = {}
+    for i in desc:
+        itemtype = list(i.keys())[0]
+        itemdata = i[itemtype]
+        existing_data[itemdata['name']] = i
+
+    read_data = []
+    for e in entries:
+        if os.path.isdir(e):
+            e=os.path.join(e,'**')
+        for f in glob.iglob(e, recursive=True):
+            if not os.path.isfile(f):
+                continue
+            if os.path.splitext(f)[1] not in ('.fur', '.adpcma', '.adpcmb', '.wav'):
+                continue
+            if f.endswith('fur'):
+                # Furnace module
+                uri='file://'+f
+                name=mkid(os.path.splitext(os.path.basename(f))[0])
+                read_data.append([name, {'furnace': {'name': name, 'uri': uri}}])
+            else:
+                # individual sample
+                # TODO improve the logic
+                sfxtype=''
+                if '.adpcma' in f.lower():
+                    sfxtype = 'adpcm_a'
+                elif '.adpcmb' in f.lower():
+                    sfxtype = 'adpcm_b'
+                elif '.wav' in f.lower():
+                    sfxtype = detect_adpcm_type(f)
+                    if not sfxtype:
+                        error("could not autodetect a suitable ADPCM format for '%s'"%f)
+                uri='file://'+f
+                name=mkid(os.path.splitext(os.path.basename(f))[0])
+                sfx = {'name': name, 'uri': uri}
+                sfxdir=os.path.basename(os.path.dirname(f))
+                m = re.match(r'^([1-6])(_x)?$',sfxdir)
+                if m:
+                    sfx['channel']=int(m[1])
+                    if m[2]:
+                        sfx['exclusive']=True
+                read_data.append([name, {sfxtype: sfx}])
+
+    result_data = []
+    # reconcile existing data and read data
+    for n, data in read_data:
+        if n in existing_data.keys():
+            result_data.append(merge_descs(existing_data[n], data))
+        else:
+            result_data.append(data)
+
+    # sort result_data to get a consistent output on update
+    result_keys = [next(iter(x.keys())) for x in result_data]
+    decorated_data = [((type, data[type]['channel'], data[type]['name']), data) for type, data in zip(result_keys, result_data)]
+    decorated_data.sort(key=itemgetter(0))
+    sorted_data = [data for key, data in decorated_data]
+
+    # save sound map description
+    print(header, end='', file=output)
+    yaml_dump(sorted_data, end='', f=output)
+
+
+
+def parse_cmd(i):
+    k=list(i.keys())[0]
+    v=i[k]
+    stype='music' if k == 'nss' else k
+    return stype, v
+
+
+def group_assets(desc):
+    # sort sound assets by ROM target (fixed or banked)
+    grouped_musics = {}
+    grouped_sfxs = {}
+    for d in desc:
+        dtype = next(iter(d))
+        dmap = grouped_musics if dtype == 'furnace' else grouped_sfxs
+        dloc = d[dtype].get('bank', -1)
+        data = dmap.get(dloc, [])
+        data.append(d)
+        dmap[dloc] = data
+    return grouped_musics, grouped_sfxs
+
+
+def dump_m68k_commands(desc, f):
+    grouped_musics, grouped_sfxs = group_assets(desc)
+
+    print('#ifndef _SND_COMMANDS_', file=f)
+    print('#define _SND_COMMANDS_ 1', file=f)
+    print('', file=f)
+    print("/* macros definitions for music and sfx commands", file=f)
+    print(" * generated by soundtool.py (ngdevkit)", file=f)
+    print(" */", file=f)
+    print('', file=f)
+
+    print('#ifndef _SND_CMD_BASE_GENERATED', file=f)
+    print('#define _SND_CMD_BASE_GENERATED 4', file=f)
+    print('#endif', file=f)
+    print('', file=f)
+    nb_music=sum([1 if 'furnace' in x else 0 for x in desc])
+    print('#define SND_NB_MUSIC (%d)'%nb_music, file=f)
+    nb_fx=len(desc)-nb_music
+    print('#define SND_NB_FX (%d)'%nb_fx, file=f)
+    print('#define SND_LAST (_SND_CMD_BASE_GENERATED + %d - 1)'%len(desc), file=f)
+    print('', file=f)
+
+    cmd_offset = 0
+    grouped_musics, grouped_sfxs = group_assets(desc)
+
+    for group in sorted(iter(grouped_musics)):
+        for data in grouped_musics[group]:
+            name='SND_MUSIC_%s'%data['furnace']['name'].upper()
+            print('#define %s (_SND_CMD_BASE_GENERATED + %d)'%(name, cmd_offset), file=f)
+            cmd_offset += 1
+
+    for group in sorted(iter(grouped_sfxs)):
+        for data in grouped_sfxs[group]:
+            sfx_type = next(x for x in data)
+            name='SND_SFX_%s'%data[sfx_type]['name'].upper()
+            print('#define %s (_SND_CMD_BASE_GENERATED + %d)'%(name, cmd_offset), file=f)
+            cmd_offset += 1
+
+    print('', file=f)
+    print('#endif /* _SND_COMMANDS_ */', file=f)
+
+
+def dump_z80_commands(desc, f):
+    def print_jp_cmd(stype, data, bank):
+        stype='sfx' if 'adpcm' in stype else 'music'
+        name=data['name']
+        print('        jp      %s_%s'%(stype,name), file=f)
+
+    def print_music_cmd(stype, data, bank):
+        name=data['name']
+        print('music_%s::'%name, file=f)
+        if bank >= 0:
+            print('        call    snd_stream_stop', file=f)
+            print('        ld      bc, #bank_table+%d*4'%bank, file=f)
+            print('        call    bank_switch', file=f)
+        print('        ld      bc, #instruments_%s'%name, file=f)
+        print('        ld      de, #nss_%s'%name, file=f)
+        print('        call    snd_stream_play', file=f)
+        print('        ret', file=f)
+        print('', file=f)
+
+    def print_sfx_cmd(stype, data, bank):
+        name=data['name']
+        channel=data.get('channel', 6)-1
+        snd_func_name='snd_%s_play'%stype
+        exclusive=data.get('exclusive', False)
+        if exclusive:
+            snd_func_name+='_exclusive'
+        ucname=name.upper()
+        print('sfx_%s::'%name, file=f)
+        print('        ld      ix, #sfx_%s_data'%name, file=f)
+        print('        call    %s'%snd_func_name, file=f)
+        print('        ret', file=f)
+        print('sfx_%s_data:'%name, file=f)
+        print('        .db     %s_START_LSB, %s_START_MSB ; start>>8 in VROM'%(ucname,ucname), file=f)
+        print('        .db     %s_STOP_LSB, %s_STOP_MSB   ; stop>>8 in VROM'%(ucname,ucname), file=f)
+        print('        .db     0x%02x ; channel'%channel, file=f)
+        print('        .db     0xda ; l/r output + volume', file=f)
+        print('        .db     0x%02x ; channel (bit)'%(1<<channel), file=f)
+        print('', file=f)
+
+    def print_banks(banks):
+        def bank_windows(bank):
+            windows = []
+            offset = 0x8000 + (0x8000 * bank)
+            for w in (0x4000, 0x2000, 0x1000, 0x0800):
+                windows.insert(0, offset // w)
+                offset = offset + w
+            return windows
+
+        print('        .macro bank_table', file=f)
+        print('bank_table::', file=f)
+        for b in banks:
+            w = bank_windows(b)
+            data = ", ".join(["0x%02x"%w for w in bank_windows(b)])
+            start = 0x8000 * b
+            stop = start + 0x7fff
+            print('        .db     %s ; bank %d: [0x%05x..0x%05x]'%(data, b, start, stop), file=f)
+        print('        .endm', file=f)
+        print('', file=f)
+
+    def print_asset(name, func, desc, bank):
+        print('        .macro %s'%name, file=f)
+        for d in desc:
+            stype, data = parse_cmd(d)
+            func(stype, data, bank)
+        print('        .endm', file=f)
+        print('', file=f)
+
+    print(";;; macros definitions for music and sfx commands", file=f)
+    print(";;; generated by soundtool.py (ngdevkit)", file=f)
+    print('', file=f)
+
+    grouped_musics, grouped_sfxs = group_assets(desc)
+
+    # Jump table macros
+    for group in sorted(iter(grouped_musics)):
+        suffix = "" if group == -1 else "_bank%d"%group
+        print_asset("jmptable_music"+suffix, print_jp_cmd, grouped_musics[group], group)
+
+    for group in sorted(iter(grouped_sfxs)):
+        suffix = "" if group == -1 else "_bank%d"%group
+        print_asset("jmptable_sfx"+suffix, print_jp_cmd, grouped_sfxs[group], group)
+
+    if (grouped_musics or grouped_sfxs):
+        print('        .macro generated_commands_jmptable_entries', file=f)
+        for group in sorted(iter(grouped_musics)):
+            suffix = "" if group == -1 else "_bank%d"%group
+            print('        %s'%("jmptable_music"+suffix,), file=f)
+        for group in sorted(iter(grouped_sfxs)):
+            suffix = "" if group == -1 else "_bank%d"%group
+            print('        %s'%("jmptable_sfx"+suffix,), file=f)
+        print('        .endm', file=f)
+        print('', file=f)
+
+    banks = list(set([x[next(iter(x))]['bank'] for x in desc if 'bank' in x[next(iter(x))]]))
+
+    if banks:
+        print_banks(banks)
+
+    # command macros
+    for group in sorted(iter(grouped_musics)):
+        suffix = "" if group == -1 else "_bank%d"%group
+        print_asset("commands_music"+suffix, print_music_cmd, grouped_musics[group], group)
+
+    for group in sorted(iter(grouped_sfxs)):
+        suffix = "" if group == -1 else "_bank%d"%group
+        print_asset("commands_sfx"+suffix, print_sfx_cmd, grouped_sfxs[group], group)
+
+    if (grouped_musics or grouped_sfxs):
+        print('        .macro generated_commands_implementation', file=f)
+        if banks:
+            print('        bank_table', file=f)
+        for group in sorted(iter(grouped_musics)):
+            suffix = "" if group == -1 else "_bank%d"%group
+            print('        %s'%("commands_music"+suffix,), file=f)
+        for group in sorted(iter(grouped_sfxs)):
+            suffix = "" if group == -1 else "_bank%d"%group
+            print('        %s'%("commands_sfx"+suffix,), file=f)
+        print('        .endm', file=f)
+        print('', file=f)
+
+
+def dump_makefile(desc, f):
+    print("# dependencies for generated sound assets", file=f)
+    print("# generated by soundtool.py (ngdevkit)", file=f)
+
+    grouped_musics, _ = group_assets(desc)
+
+    # Jump table macros
+    groups = sorted(iter(grouped_musics))
+    use_bank = any([g>=0 for g in groups])
+
+    if use_bank:
+        print("\n# this sound driver use banks, force size of the fixed part")
+        print("$(MROM1): MROMPADSIZE=32768", file=f)
+
+    for group in groups:
+        atype="Z80 bank %d"%group if group >= 0 else "fixed Z80 ROM"
+        print("\n#\n# assets for %s\n#\n"%atype, file=f)
+
+        drv="SOUND_DRIVER"
+        bank="SOUND_DRIVER_BANK%d"%group
+
+        # fixed ROM: group == -1
+        if group >= 0:
+            print("Z80_BANK_LDFLAGS+=-b BANK%d=0x8000\n"%group, file=f)
+            print("%s?=$(SOUND_DRIVER:%%.ihx=%%_%d.bank.bin)"%(bank, group), file=f)
+            print("$(%s): Z80_BANK_LDFLAGS=-b BANK%d=0x8000"%(bank, group), file=f)
+            print("$(MROM1): $(SOUND_DRIVER_BANK%d)"%(group), file=f)
+
+        for mod in grouped_musics[group]:
+            mtype="BANK%d"%group if group >= 0 else "FIXED"
+            gtype="BANK%d_MUSIC"%group if group >= 0 else "MUSIC"
+            uri=mod['furnace']['uri']
+            path=uri.split("://")[1]
+            filename=os.path.splitext(os.path.basename(path))[0]
+            for ntype in ("instruments", "nss"):
+                print("")
+                if group >= 0:
+                    print("$(BUILDDIR_NSS)/%s-%s.s: NSS_FLAGS=-b %d"%(ntype, filename, group), file=f)
+                print("$(BUILDDIR_NSS)/%s-%s.s: %s"%(ntype, filename, path), file=f)
+                print("$(%s): $(BUILDDIR_NSS)/%s-%s.rel"%(drv, ntype, filename), file=f)
+                if group >= 0:
+                    print("$(%s): $(BUILDDIR_NSS)/%s-%s.rel"%(bank, ntype, filename), file=f)
+
+
+
+def main():
+    global VERBOSE
+    parser = argparse.ArgumentParser(
+        description="Manage ADPCM sample offsets in VROMs")
+
+    paction = parser.add_argument_group("action")
+    pmode = paction.add_mutually_exclusive_group(required=True)
+    pmode.add_argument("-c", "--c-header", action="store_const",
+                       const="c-header", dest="action",
+                       help="output m68k C header for sound commands")
+    pmode.add_argument("-z", "--z80", action="store_const",
+                       const="z80", dest="action",
+                       help="output z80 action table and commands implementation")
+    pmode.add_argument("-m", "--makefile", action="store_const",
+                       const="makefile", dest="action",
+                       help="output makefile dependencies for music assets")
+    pmode.add_argument("-g", "--generate", action="store_const",
+                       const="generate", dest="action",
+                       help="generate a template sound map to be customized by user")
+
+    parser.add_argument("FILE", nargs="*",
+                        help="Input sound assets directories for the --generate action")
+    parser.add_argument("-s", "--soundmap", nargs="+",
+                        dest="soundmap",
+                        help="Input soundmap to be used by action")
+
+    parser.add_argument("-o", "--output",
+                        dest="output",
+                        help="Output file path, contents depends on the action")
+
+    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true",
+                        default=False, help="print details of processing")
+
+    arguments = parser.parse_args()
+    VERBOSE = arguments.verbose
+
+    if arguments.action in ['c-header', 'z80']:
+        if not arguments.soundmap:
+            error('option --soundmap is required for action --%s'%arguments.action)
+
+    header = """# sound assets map
+# generated by soundtool.py (ngdevkit)
+# you can add your customization below
+# ---
+"""
+    desc = []
+
+    if arguments.output:
+        # When the generate option is used and the output already exists on disk,
+        # soundtool performs an update action:
+        #   . it only keeps data for sound files passed in input arguments.FILE
+        #   . it keeps any customization found in the existing desc for those sound files
+        if arguments.action == 'generate' and os.path.isfile(arguments.output):
+            header, desc = load_sound_desc(arguments.output)
+        output = open(arguments.output, 'w')
+    else:
+        output = sys.__stdout__
+
+    # Generate sound map from files on disk
+    if arguments.action == 'generate':
+        generate_sound_desc(arguments.FILE, header, desc, output)
+        sys.exit(0)
+
+    # Otherwise load a sound map from the input yaml file
+    for smap in arguments.soundmap:
+        with open(smap, 'r') as f:
+            desc.extend(yaml_load(f.read()))
+
+    # generate z80 macros
+    if arguments.action == 'z80':
+        dump_z80_commands(desc, output)
+
+    # generate m68k header
+    if arguments.action == 'c-header':
+        dump_m68k_commands(desc, output)
+
+    # generate m68k header
+    if arguments.action == 'makefile':
+        dump_makefile(desc, output)
+
+
+if __name__ == "__main__":
+    main()
