@@ -131,6 +131,11 @@ music_play:
 	xor a, a
 	call music_jump_channels_order_and_pattern
 
+	; DEViLBOX: music_update decrements tic before it processes line 0, so without
+	; this line 0 lasts speed_1 - 1 tics and every later line starts a tic early
+	; (measured against Furnace: line 1 at tic 5 of a speed 6 song)
+	inc (iy + music_state.tic)
+
 	;
 	; init channel type data
 	;

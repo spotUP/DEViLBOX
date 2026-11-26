@@ -108,6 +108,7 @@ for (const file of walk(SONGS)) {
       const tone = pairs.filter(([w]) => w.ch !== 'NOISE' && w.hz > 0);
       const cents = (w: Start, g: Start) => Math.round(1200 * Math.log2(g.hz / w.hz));
       const inTune = tone.filter(([w, g]) => Math.abs(cents(w, g!)) < 50).length;
+      if (detail) for (const w of want) if (!pairs.some(([p]) => p === w)) console.log(`  missed ${w.t.toFixed(3)} ${w.ch} att ${w.v} ${w.hz.toFixed(1)} Hz; nearest MAME ${got.filter((g) => g.ch === w.ch).map((g) => g.t - w.t).sort((a, b) => Math.abs(a) - Math.abs(b))[0]?.toFixed(3)} s`);
       if (detail) for (const [w, g] of tone) if (Math.abs(cents(w, g!)) >= 50) console.log(`  ${w.t.toFixed(3)} ${w.ch} want ${w.hz.toFixed(1)} got ${g!.hz.toFixed(1)} Hz (${cents(w, g!)} cents)`);
       const pct = (a: number, b: number) => (b ? Math.round((a / b) * 10000) / 100 : 0);
       Object.assign(v, { furnaceStarts: want.length, keyOnMatch: pct(pairs.length, want.length), pitchMatch: pct(inTune, tone.length) });
