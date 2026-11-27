@@ -201,7 +201,8 @@ describe('loops, fills and transformer patterns', () => {
     const ft = await run('fillTrade', { material: { fill } });
     expect(ft.result.completed).toBe(true);
     const jumps = ft.sink.applied.filter((a) => a.action.type === 'JumpToBar');
-    expect(jumps.length).toBe(3);
+    // g g f g f f: the second of the back-to-back fills would re-cue B while it is heard - blocked (DJ-F, no audible seek).
+    expect(jumps.length).toBe(2);
     expect(jumps.every((j) => j.action.deck === 'B' && j.action.targetPosition === fill.startSec)).toBe(true);
     const db = await run('drumBassTrade');
     const types = db.sink.applied.map((a) => a.action.type);

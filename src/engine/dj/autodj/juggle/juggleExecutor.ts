@@ -106,6 +106,7 @@ export function cutTimings(trace: readonly JuggleTraceEntry[], startBeat: number
     ...(t.reason ? { reason: t.reason } : {}),
   }));
 }
+const SEEK_TYPES = new Set<DJJuggleAction['type']>(['JumpToBar', 'JumpToBeat', 'TriggerCue']);
 const FX_TYPES = new Set<DJJuggleAction['type']>(['EchoThrow', 'ReverbThrow', 'FilterIn', 'FilterOut']);
 
 export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts: JuggleExecutionOptions): JuggleExecution {
@@ -160,6 +161,8 @@ export function executeJuggle(pattern: DJJugglePattern, startBeat: number, opts:
       if (n > maxCuts) return `excessive cut frequency (${n} in one beat)`;
       cutsInBeat.set(key, n);
     }
+    // DJ-F: a cue jump of a heard deck is a skip in the track (and a platter jump); only a silent deck is re-cued.
+    if (SEEK_TYPES.has(action.type) && action.deck !== 'BOTH' && st.audible[action.deck]) return `deck ${action.deck} is heard: a seek would skip, what plays holds`;
     if (action.type === 'CutOut') {
       const target = action.deck === 'A' ? 'B' : 'A';
       if (action.deck !== 'BOTH' && !st.playing[target]) return 'would silence both decks';

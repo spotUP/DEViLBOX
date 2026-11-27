@@ -144,7 +144,10 @@ export function createDeckJuggleSink(): JuggleActionSink & { lastCrossfader: () 
           if (action.targetPosition === undefined) break;
           const want = deckPosition(o) + (action.beats ?? 0) * info.beatSec;
           const error = want - deckPosition(d);
-          if (deckPlaying(d) && Math.abs(error) <= info.beatSec / 2) bendToPhase(d, error);
+          const cf = useDJStore.getState().crossfaderPosition;
+          const heard = d === 'A' ? cf < 0.999 : cf > 0.001;
+          // DJ-F: a heard copy is only ever bent (a seek would skip); the layer's phase check skips it if still off.
+          if (deckPlaying(d) && (Math.abs(error) <= info.beatSec / 2 || heard)) bendToPhase(d, error);
           else seekDeckAudio(d, Math.max(0, want));
           break;
         }
