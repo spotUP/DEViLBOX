@@ -12,11 +12,14 @@ cd "$ROOT/public/nes/famistudio"
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
 ENG="$ROOT/third-party/famistudio"
 # Variants: player.nes (NROM), player-vrc6.nes (mapper 24, -D VRC6=1: 2A03 + 3 VRC6 channels) and
-# player-fme7.nes (mapper 69, -D FME7=1, fs-fme7.cfg: 24 KB music at $6000 for 2A03 songs past the 16 KB NROM area).
-for V in "" vrc6 fme7; do
+# player-fme7.nes (mapper 69, -D FME7=1, fs-fme7.cfg: 24 KB music at $6000 for 2A03 songs past the 16 KB NROM area),
+# player-vrc6w.nes (mapper 24, -D VRC6W=1, same fs-fme7.cfg layout: 24 KB music at $6000 for VRC6 songs past 16 KB; the
+# $6000-$7FFF part is copied from ROM bank 3 to PRG RAM at reset, see player.s).
+for V in "" vrc6 fme7 vrc6w; do
 CFG=fs.cfg; DEF=""; OUT="player"
 if [ "$V" = vrc6 ]; then DEF="-D VRC6=1"; OUT="player-$V"; fi
 if [ "$V" = fme7 ]; then DEF="-D FME7=1"; OUT="player-$V"; CFG=fs-fme7.cfg; fi
+if [ "$V" = vrc6w ]; then DEF="-D VRC6=1 -D VRC6W=1"; OUT="player-$V"; CFG=fs-fme7.cfg; fi
 ca65 -g $DEF -I "$ENG" --bin-include-dir "$ENG" --bin-include-dir "$ROOT/public/nes" player.s -o "$W/p.o"
 ld65 -C $CFG -Ln "$W/p.lbl" -m "$W/p.map" "$W/p.o" -o $OUT.nes
 grep -A3 "^CODE " "$W/p.map" | head -2 || true
@@ -26,7 +29,7 @@ lab = {}
 for line in open(sys.argv[1]):
     m = re.match(r'^al\s+([0-9A-Fa-f]+)\s+\.(\w+)', line)
     if m: lab[m.group(2)] = int(m.group(1), 16)
-fme7 = sys.argv[4] == 'fme7'
+fme7 = sys.argv[4] in ('fme7', 'vrc6w')  # music at $6000, fs-fme7.cfg layout
 music = 0x6000 if fme7 else 0x8000
 assert lab['fs_music'] == music and lab['fs_dpcm'] == 0xC000, lab
 h = hashlib.sha1()

@@ -848,6 +848,9 @@ famistudio_chn_volume_track:      .res FAMISTUDIO_NUM_CHANNELS
 .if FAMISTUDIO_USE_VOLUME_SLIDES
 famistudio_chn_volume_slide_step:   .res FAMISTUDIO_NUM_VOLUME_SLIDES
 famistudio_chn_volume_slide_target: .res FAMISTUDIO_NUM_VOLUME_SLIDES
+; DEViLBOX: 16-bit step (lo byte = 1/4096 volume per frame) and the fraction below the 4.4 track, for Furnace F3xx/F4xx fine slides.
+famistudio_chn_volume_slide_step_lo: .res FAMISTUDIO_NUM_VOLUME_SLIDES
+famistudio_chn_volume_slide_frac:    .res FAMISTUDIO_NUM_VOLUME_SLIDES
 .endif
 .endif
 .if FAMISTUDIO_USE_VIBRATO || FAMISTUDIO_USE_ARPEGGIO
@@ -1472,6 +1475,8 @@ ldx #0
 @set_volume_slides:
     sta famistudio_chn_volume_slide_step, x
     sta famistudio_chn_volume_slide_target, x
+    sta famistudio_chn_volume_slide_step_lo, x
+    sta famistudio_chn_volume_slide_frac, x
     inx
     cpx #FAMISTUDIO_NUM_VOLUME_SLIDES
     bne @set_volume_slides
@@ -4143,9 +4148,24 @@ famistudio_update:
     jmp @pitch_env_read_value 
 
 @pitch_env_set_repeat:
+    bit @pitch_env_type
+    bmi @pitch_relative_wide ; DEViLBOX: relative envelopes carry no repeats; $01-$7F = 16-bit step (lo, hi) follows
     iny
     ora @pitch_env_type ; This is going to set the relative flag in the hi-bit.
     sta famistudio_pitch_env_repeat,x
+    jmp @pitch_env_next_store_ptr
+
+@pitch_relative_wide: ; Furnace pitch macros on low triangle notes step the period by more than 63 per frame
+    iny
+    lda (@pitch_env_ptr),y
+    clc
+    adc famistudio_pitch_env_value_lo,x
+    sta famistudio_pitch_env_value_lo,x
+    iny
+    lda (@pitch_env_ptr),y
+    adc famistudio_pitch_env_value_hi,x
+    sta famistudio_pitch_env_value_hi,x
+    iny
 
 @pitch_env_next_store_ptr:
     tya 
@@ -4155,7 +4175,9 @@ famistudio_update:
     inx 
 
     cpx #FAMISTUDIO_NUM_PITCH_ENVELOPES
-    bne @pitch_env_process
+    beq @pitch_env_done ; DEViLBOX: the wide relative step put @pitch_env_process out of branch range
+    jmp @pitch_env_process
+@pitch_env_done:
 
 .if FAMISTUDIO_USE_SLIDE_NOTES
 ;----------------------------------------------------------------------------------------------------------------------
@@ -4214,8 +4236,13 @@ famistudio_update:
 
 @volume_side_process:
     lda famistudio_chn_volume_slide_step,x
+    ora famistudio_chn_volume_slide_step_lo,x
     beq @volume_slide_next
-    clc 
+    clc
+    lda famistudio_chn_volume_slide_frac,x
+    adc famistudio_chn_volume_slide_step_lo,x
+    sta famistudio_chn_volume_slide_frac,x
+    lda famistudio_chn_volume_slide_step,x ; carry from the fraction goes into the 4.4 track below
     bmi @negative_volume_slide
     
 @positive_volume_slide:
@@ -4253,6 +4280,7 @@ famistudio_update:
     sta famistudio_chn_volume_track,x
     lda #0
     sta famistudio_chn_volume_slide_step,x
+    sta famistudio_chn_volume_slide_step_lo,x
 
 @volume_slide_next:
     inx 
@@ -5641,6 +5669,8 @@ famistudio_advance_channel:
     .if FAMISTUDIO_USE_VOLUME_SLIDES
         lda #0
         sta famistudio_chn_volume_slide_step,x
+        sta famistudio_chn_volume_slide_step_lo,x
+        sta famistudio_chn_volume_slide_frac,x
     .endif
     bcc @read_byte
 .endif
@@ -5932,7 +5962,10 @@ famistudio_advance_channel:
 .endif
 
 .if FAMISTUDIO_USE_VOLUME_SLIDES
-@opcode_volume_slide:
+@opcode_volume_slide: ; DEViLBOX: step lo, step hi, target (the fraction is kept: Furnace keeps chan.volume's)
+    lda (@channel_data_ptr),y
+    iny
+    sta famistudio_chn_volume_slide_step_lo, x
     lda (@channel_data_ptr),y
     iny
     sta famistudio_chn_volume_slide_step, x

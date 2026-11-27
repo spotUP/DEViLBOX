@@ -12,18 +12,15 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync,
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseFurnaceSong } from '../src/lib/import/formats/FurnaceSongParser';
-import { buildFamistudioRom, furnaceToFamistudio, type FamistudioMeta, type PitchLossySpan } from '../src/lib/export/nes/famistudioSong';
+import { buildFamistudioRom, famistudioPlayerName, furnaceToFamistudio, NES_SYSTEM, type FamistudioMeta, type PitchLossySpan } from '../src/lib/export/nes/famistudioSong';
 import { APU_RANGES, mesen } from '../src/lib/export/__tests__/nesMesenHarness';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SONGS = path.join(ROOT, 'public/data/songs/furnace/nes');
 const RESULTS = path.join(ROOT, 'test-data/nes-famistudio-check.json');
-const PLAYER = readFileSync(path.join(ROOT, 'public/nes/famistudio/player.nes'));
-const META: FamistudioMeta = JSON.parse(readFileSync(path.join(ROOT, 'public/nes/famistudio/player.json'), 'utf8'));
-const PLAYER_VRC6 = readFileSync(path.join(ROOT, 'public/nes/famistudio/player-vrc6.nes'));
-const META_VRC6: FamistudioMeta = JSON.parse(readFileSync(path.join(ROOT, 'public/nes/famistudio/player-vrc6.json'), 'utf8'));
-const PLAYER_FME7 = readFileSync(path.join(ROOT, 'public/nes/famistudio/player-fme7.nes'));
-const META_FME7: FamistudioMeta = JSON.parse(readFileSync(path.join(ROOT, 'public/nes/famistudio/player-fme7.json'), 'utf8'));
+const playerImage = (name: string): [Buffer, FamistudioMeta] => [readFileSync(path.join(ROOT, `public/nes/famistudio/${name}.nes`)),
+  JSON.parse(readFileSync(path.join(ROOT, `public/nes/famistudio/${name}.json`), 'utf8')) as FamistudioMeta];
+const [PLAYER, META] = playerImage('player');
 const CPU_NTSC = 1789773;
 // Tick marker at NMI entry (vector at $FFFA), not META.tickAddr (after famistudio_update): the harness drops writes before
 // the first marker, which would lose the first update (note attacks, the $4003 period-high write).
@@ -135,7 +132,7 @@ function apuStates(writes: Array<Array<[number, number]>>): ChState[][] {
 const FURNACE_CLOCK = [CPU_NTSC, 4433618.75 * 3 / 8, 4433618.75 * 2 / 5];
 
 interface FirstBad { frame: number; field: string; expected: string; got: string; row?: string }
-interface ChannelVerdict { ch: string; bad: number; first?: FirstBad; label?: 'driver limit' | 'converter bug'; why?: string }
+interface ChannelVerdict { ch: string; bad: number; first?: FirstBad; big?: number; bigFirst?: FirstBad; label?: 'driver limit' | 'converter bug'; why?: string }
 const CH_NAMES = ['pulse1', 'pulse2', 'triangle', 'noise', 'dpcm'];
 // triangle `lin` is the counter's on/off (always 1 while the channel sounds): a held counter's value (control bit set) is inaudible; a finite one shows as sounding -> silent transitions.
 const FIELDS: Array<keyof NonNullable<ChState>> = ['period', 'vol', 'duty', 'sweep', 'lin', 'mode'];
@@ -192,7 +189,12 @@ function lockstep(ref: ChState[][], got: ChState[][], rd: DpcmFrame[], gd: DpcmF
       for (const f of FIELDS) {
         let x = a[f];
         if (f === 'period' && ch !== 3 && refClock !== CPU_NTSC) x = Math.round((a.period + 1) * CPU_NTSC / refClock) - 1; // PAL/Dendy reference, same frequency
-        if (x !== b[f]) { note(t, f, fmt(a), fmt(b)); break; }
+        if (x !== b[f]) {
+          note(t, f, fmt(a), fmt(b));
+          // audible pitch error: >= 50 cents on a tone channel, any index change on noise (rounding by one period is a few cents)
+          if (f === 'period' && (ch === 3 || Math.abs(1200 * Math.log2((x + 1) / (b.period + 1))) >= 50)) { v.big = (v.big ?? 0) + 1; v.bigFirst ??= { frame: t, field: f, expected: fmt(a), got: fmt(b), row: rowOf(t) }; }
+          break;
+        }
       }
     }
     out.push(v);
@@ -203,17 +205,20 @@ function lockstep(ref: ChState[][], got: ChState[][], rd: DpcmFrame[], gd: DpcmF
 /** "driver limit" when the exporter's own lossy record explains the first bad field; otherwise "converter bug". */
 function labelChannels(chs: ChannelVerdict[], song: { lossy: string[]; pitchLossy: PitchLossySpan[] }): void {
   // expansion-chip / subsong notes describe other channels, never an APU-channel mismatch
-  const has = (re: RegExp): string | undefined => song.lossy.find((l) => !/^(expansion chip|other subsongs)/.test(l) && re.test(l));
+  // An entry naming a channel ("effect 11 on DPCM", "... on noise", "DPCM ...") excuses that channel only.
+  const has = (re: RegExp, i: number): string | undefined => song.lossy.find((l) => !/^(expansion chip|other subsongs)/.test(l) && re.test(l)
+    && (/ on DPCM|^DPCM/.test(l) ? i === 4 : / on noise/.test(l) ? i === 3 : /^effect 19/.test(l) ? i === 2 : true));
   const byField: Record<string, RegExp> = {
-    period: /slide|vibrato|pitch|arp|tempo|tick rate|clamped|sample|note outside/i, sounding: /note cut|dropped to fit|tempo|tick rate|DPCM|past 63|delay/i,
-    vol: /volume|envelope|macro|tempo|tick rate/i, duty: /duty|macro/i, sweep: /sweep|effect/i, lin: /volume|macro|note cut|tempo|tick rate|effect/i, mode: /noise|effect|macro/i,
-    start: /DPCM|tempo|tick rate|dropped|past/i, rate: /DPCM|effect/i, length: /DPCM|cut/i, play: /DPCM|tempo|tick rate/i,
+    // Each field is excused only by entries that change that field (Furnace NES 12xx duty, 13xy/14xy sweep, 19xx triangle linear counter, 11xx/18xx DPCM).
+    period: /slide|vibrato|pitch|arp|tempo|tick rate|note outside/i, sounding: /note cut|dropped to fit|tempo|tick rate|DPCM|delay|effect 19/i,
+    vol: /volume|vol macro|envelope|tempo|tick rate/i, duty: /duty|start phase|effect 12/i, sweep: /sweep|effect 1[34]/i, lin: /volume|vol macro|note cut|tempo|tick rate|effect 19/i, mode: /noise/i,
+    start: /DPCM|tempo|tick rate/i, rate: /DPCM/i, length: /DPCM/i, play: /DPCM|tempo|tick rate/i,
   };
   chs.forEach((c, i) => {
     if (!c.first) return;
     const f = c.first;
     const span = song.pitchLossy.some((sp) => sp.ch === i && f.frame >= sp.from - 1 && f.frame <= sp.to + 1);
-    const hit = span ? 'pitchLossy span' : has(byField[f.field] ?? /$^/);
+    const hit = span ? 'pitchLossy span' : has(byField[f.field] ?? /$^/, i);
     c.label = hit ? 'driver limit' : 'converter bug';
     if (hit) c.why = hit;
   });
@@ -231,8 +236,9 @@ for (const name of names) {
   let v: Verdict;
   try {
     const m = await parseFurnaceSong(fur.buffer.slice(fur.byteOffset, fur.byteOffset + fur.length));
+    if (m.systems[0] !== NES_SYSTEM) { console.log(`[SKIP] ${name}: first chip is system ${m.systems[0]}, not NES 2A03 (not an input for this check)`); delete results[name]; writeResults(results); continue; }
     const song = furnaceToFamistudio(m, 0, META.dpcmCap);
-    const [player, meta]: [Buffer, FamistudioMeta] = song.vrc6 ? [PLAYER_VRC6, META_VRC6] : song.fme7 ? [PLAYER_FME7, META_FME7] : [PLAYER, META];
+    const [player, meta] = playerImage(famistudioPlayerName(song));
     if (song.music.length > meta.musicCap) console.log(`  [SIZE] ${song.music.length} B > cap ${meta.musicCap}: header+instruments=${song.sizes.header} sampleTable=${song.sizes.samples} envelopes=${song.sizes.envelopes} streams(pulse1/pulse2/tri/noise/dpcm...)=${song.sizes.streams.join('/')}`);
     const rom = buildFamistudioRom(player, meta, song, { title: m.name || name, author: m.author });
     if (OUT) writeFileSync(path.join(OUT, `${name}.nes`), rom);
@@ -258,7 +264,8 @@ for (const name of names) {
     const gotD = dpcmFrames(run.writes);
     // Frame 0 = first frame any channel starts sounding (tone or DPCM start) on each side; the constant difference is the printed offset.
     const lag = firstOn(got, gotD) - firstOn(ref, refD);
-    const channels = lockstep(ref, got, refD, gotD, lag, FURNACE_CLOCK[Number(/clockSel=(\d)/.exec(m.chipFlags?.[0] ?? '')?.[1] ?? 0)] ?? CPU_NTSC, rowOf);
+    const refClock = FURNACE_CLOCK[Number(/clockSel=(\d)/.exec(m.chipFlags?.[0] ?? '')?.[1] ?? 0)] ?? CPU_NTSC;
+    const channels = lockstep(ref, got, refD, gotD, lag, refClock, rowOf);
     labelChannels(channels, song);
     if (song.vrc6) {
       // No Furnace reference exists for VRC6 (-vgmout has no VRC6 command): report what the ROM writes per VRC6 channel (Mesen bus writes).
@@ -274,7 +281,10 @@ for (const name of names) {
       console.log(names.map((n, c) => `  ${n}: first sounding frame ${on[c][0] ?? 'never'}, ${on[c].length} sounding frames, ${periods[c].size} distinct periods`).join('\n'));
     }
     if (DUMP) for (let t = DUMP[0]; t <= DUMP[1] && t < ref.length; t++) console.log(t, ref[t].map((x) => (x ? `${x.period}/${x.vol}` : '-').padStart(8)).join(' '), ' | ', (got[t + lag] ?? []).map((x) => (x ? `${x.period}/${x.vol}` : '-').padStart(8)).join(' '));
-    const wantHz = song.firstNotes[0] >= 0 ? Math.round(440 * 2 ** ((song.firstNotes[0] - 57) / 12)) : undefined;
+    // Furnace's own first pulse 1 pitch: a note-number formula guessed the octave (2x off). The reference periods are on the
+    // song's clock (PAL oby1 / the_best-1990 / turtle_byte), the ROM's on NTSC: rescale to Hz on the reference clock.
+    const refHz = sounding(refWrites).firstHz;
+    const wantHz = refHz === undefined ? undefined : Math.round(refHz * refClock / CPU_NTSC);
     v = { inputHash, pass: channels.every((c) => c.bad === 0) && run.writes.length >= refEnd + lag, channels, ticks: run.writes.length, got: run.writes.flat().length, sounding: s.frames, hasNotes: song.channelsWithNotes, firstHz: s.firstHz, wantHz, romBytes: rom.length, songBytes: song.music.length, dpcmBytes: song.dpcm.length, lossy: song.lossy, lag };
     console.log(`  frames=${refEnd} offset(ROM-Furnace first sound)=${lag}`);
   } catch (e) {
@@ -283,7 +293,7 @@ for (const name of names) {
   results[name] = v;
   writeResults(results);
   for (const label of ['driver limit', 'converter bug'] as const) {
-    for (const c of (v.channels ?? []).filter((x) => x.label === label)) console.log(`  [${label.toUpperCase()}] ${c.ch} bad=${c.bad} first: frame ${c.first!.frame} ${c.first!.row ?? ''} field=${c.first!.field} expected{${c.first!.expected}} got{${c.first!.got}}${c.why ? ` (lossy: ${c.why})` : ''}`);
+    for (const c of (v.channels ?? []).filter((x) => x.label === label)) console.log(`  [${label.toUpperCase()}] ${c.ch} bad=${c.bad} big=${c.big ?? 0}${c.bigFirst ? ` bigFirst: frame ${c.bigFirst.frame} ${c.bigFirst.row ?? ''} {${c.bigFirst.expected}} got{${c.bigFirst.got}}` : ''} first: frame ${c.first!.frame} ${c.first!.row ?? ''} field=${c.first!.field} expected{${c.first!.expected}} got{${c.first!.got}}${c.why ? ` (lossy: ${c.why})` : ''}`);
   }
   console.log(`${v.pass ? '[OK]' : '[FAIL]'} ${name} frames=${v.ticks} sound=${v.sounding.join('/')} notes=${v.hasNotes.map((n) => (n ? 1 : 0)).join('')} song=${v.songBytes ?? '-'}B dpcm=${v.dpcmBytes ?? '-'}B lossy=${v.lossy?.length ?? '-'} lag=${v.lag ?? '-'} driverLimit=${(v.channels ?? []).filter((c) => c.label === 'driver limit').length} converterBug=${(v.channels ?? []).filter((c) => c.label === 'converter bug').length}${v.error ? ` error=${v.error}` : ''}`);
 }

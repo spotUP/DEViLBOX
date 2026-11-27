@@ -6,7 +6,7 @@ import { fetchNesPlayer } from './nesCartridge';
 import { buildNsfe } from './nsfe';
 import { NES_REGIONS, type NesRegion, type NesSubsongInput } from './nesStream';
 import { isSunsoft, nesChipsOf, withClockSel, type NesRegionChoice, type NesRomInfo, type NesRomResult } from './nesExport';
-import { buildFamistudioRom, furnaceToFamistudio, type FamistudioMeta } from './famistudioSong';
+import { buildFamistudioRom, famistudioPlayerName, furnaceToFamistudio, type FamistudioMeta } from './famistudioSong';
 import { liveFurnaceModule } from '../liveFurModule';
 import { switchSubsong } from '../../tracker/subsongSwitch';
 import { orderPassLength } from '../orderPassLength';
@@ -66,8 +66,9 @@ export async function exportNesFamistudioRom(title: string, author?: string): Pr
   };
   const [plain, live] = await Promise.all([load('player'), liveFurnaceModule()]);
   const song = furnaceToFamistudio(live.module, live.subsong, plain.meta.dpcmCap);
-  // 2A03 + VRC6: the mapper-24 build of the same engine; 2A03 music past 16 KB: the FME-7 build (24 KB at $6000)
-  const { player, meta } = song.vrc6 ? await load('player-vrc6') : song.fme7 ? await load('player-fme7') : plain;
+  // 2A03 + VRC6: the mapper-24 build of the same engine; music past 16 KB: the 24 KB builds at $6000 (FME-7 / VRC6 + PRG RAM)
+  const name = famistudioPlayerName(song);
+  const { player, meta } = name === 'player' ? plain : await load(name);
   const rom = buildFamistudioRom(new Uint8Array(player), meta, song, { title, author });
   return { rom, warnings: [...live.warnings, ...song.lossy.map((l) => `Not carried to the FamiStudio engine: ${l}`)] };
 }

@@ -26,7 +26,9 @@ FAMISTUDIO_EXP_VRC6              = 1     ; -D VRC6=1: mapper-24 board, 2A03 + 3 
 .include "famistudio_ca65.s"
 
 .segment "HEADER"
-.ifdef VRC6
+.ifdef VRC6W
+    .byte "NES", $1a, 4, 1, $80, $10, 0, 0, 0, 0, 0, 0, 0, 0   ; mapper 24, 64 KB PRG, 8 KB PRG RAM at $6000
+.elseif .defined(VRC6)
     .byte "NES", $1a, 2, 1, $80, $10, 0, 0, 0, 0, 0, 0, 0, 0   ; mapper 24
 .elseif .defined(FME7)
     .byte "NES", $1a, 4, 1, $50, $40, 0, 0, 0, 0, 0, 0, 0, 0   ; mapper 69, 64 KB PRG
@@ -97,13 +99,43 @@ fs_dpcm:
 fs_reset:
     sei
     cld
-.ifdef VRC6
+.ifdef VRC6W
+; -D VRC6W=1 (player-vrc6w.nes, fs-fme7.cfg layout): music past 16 KB spans $6000-$BFFF. The engine reads song data through
+; plain pointers, so the first 8 KB lives in PRG RAM: ROM bank 3 is mapped at $C000 once and copied to $6000-$7FFF here.
+; 8 KB banks: 0-2 filler, 3 = music $6000 image, 4-5 (16 KB bank 2) = music $8000, 6 = DPCM $C000, 7 = fixed $E000.
+    lda #2
+    sta $8000                   ; 16 KB bank 2 (8 KB banks 4-5) at $8000 = music $8000-$BFFF
+    lda #$a4
+    sta $b003                   ; PRG RAM on, normal CHR banking, horizontal mirroring
+    lda #3
+    sta $c000                   ; music $6000 image at $C000 for the copy
+    ldy #0
+    sty $00
+    sty $02
+    lda #$c0
+    sta $01
+    lda #$60
+    sta $03
+    ldx #32
+:   lda ($00),y
+    sta ($02),y
+    iny
+    bne :-
+    inc $01
+    inc $03
+    dex
+    bne :-
+    lda #6
+    sta $c000                   ; 8 KB bank 6 at $C000 = DPCM; $E000 is fixed to the last bank
+.elseif .defined(VRC6)
     lda #0
     sta $8000                   ; 16 KB bank 0 at $8000 = music
     lda #2
     sta $c000                   ; 8 KB bank 2 at $C000 = DPCM; $E000 is fixed to the last bank
     lda #$24
     sta $b003                   ; normal CHR banking, horizontal mirroring like the NROM header
+.endif
+.ifdef VRC6
     ldx #3
 :   txa
     sta $d000,x                 ; CHR 1 KB banks 0-3 / 4-7 = the 8 KB CHR

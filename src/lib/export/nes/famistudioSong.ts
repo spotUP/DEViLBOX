@@ -24,7 +24,7 @@ export interface PitchLossySpan { ch: number; from: number; to: number }
 export interface FamistudioSong { /** Initial tempo accumulator (8.8; 0x600 = engine default). */ tempoAcc?: number; music: Uint8Array; dpcm: Uint8Array; lossy: string[]; pitchLossy: PitchLossySpan[]; channelsWithNotes: boolean[]; firstNotes: number[]; firstNoteFrames: number[];
   /** Bytes of each music-area part: song header + instrument table, DPCM sample table, envelopes, and one entry per channel stream. */ sizes: { header: number; samples: number; envelopes: number; streams: number[] }
   /** The song carries the three VRC6 channels: it needs the mapper-24 player (player-vrc6.nes / .json). */ vrc6?: boolean
-  /** Music past 16 KB, assembled for $6000: it needs the FME-7 player (player-fme7.nes / .json). */ fme7?: boolean
+  /** Music past 16 KB, assembled for $6000: 2A03 songs need the FME-7 player, VRC6 songs player-vrc6w (famistudioPlayerName). */ fme7?: boolean
   /** Furnace A-4 tuning (Hz); buildFamistudioRom retunes the player's note table to it. */ tuning?: number
   /** Furnace 2A03 clock (clockSel): the note table rounds on its grid. */ clock?: number }
 
@@ -38,7 +38,7 @@ class Lossy {
 
 const VRC6_SYSTEM = 0x88; // Furnace file system id: VRC6 (channels 5-7 after the five 2A03 ones: pulse, pulse, saw)
 const VRC6_SAW_INS = 26; // Furnace instrument type DIV_INS_VRC6_SAW
-const NES_SYSTEM = 0x06; // Furnace file system id (FurnaceSongParser.ts:172)
+export const NES_SYSTEM = 0x06; // Furnace file system id (FurnaceSongParser.ts:172)
 const CHANNELS = 5; // square 1, square 2, triangle, noise, DPCM (FamiStudio 2A03 order = Furnace order)
 const DPCM_CH = 4;
 const NOISE_CH = 3;
@@ -78,6 +78,14 @@ export function encodeEnvelope(values: number[], loop: number, release: number, 
   let prevVal = 192 + clampEnv(values[0]) + 1;
   const allowRle = !relative;
   for (let j = 0; j < values.length; j++) {
+    // A relative pitch step past +-63 goes out as 0x01, lo, hi (patched famistudio_ca65.s @pitch_relative_wide; relative envelopes have no RLE).
+    if (kind === 'pitch' && relative && clampEnv(values[j]) !== values[j]) {
+      if (j === loop) ptrLoop = data.length;
+      const w = Math.max(-32768, Math.min(32767, values[j]));
+      data.push(0x01, w & 0xff, (w >> 8) & 0xff);
+      prevVal = -1;
+      continue;
+    }
     const val = 192 + clampEnv(values[j]);
     if (prevVal !== val || !allowRle || j === loop || (allowReleases && j === release) || j === values.length - 1 || (relCount === 127 && kind === 'pitch')) {
       if (relCount !== 0) {
@@ -96,7 +104,7 @@ export function encodeEnvelope(values: number[], loop: number, release: number, 
     } else relCount++;
   }
   if (ptrLoop < 0 || foundRelease) {
-    if (kind === 'pitch' && relative && data[data.length - 1] !== 192) data.push(192);
+    if (kind === 'pitch' && relative && (prevVal < 0 || data[data.length - 1] !== 192)) data.push(192); // prevVal < 0: ends on a wide step, whose hi byte can read 192
     ptrLoop = data.length - 1;
   }
   data.push(0, ptrLoop);
@@ -240,7 +248,7 @@ export function overrideValue(env: { vals: number[]; loop: number; rel: boolean 
   if (k < 0 || !L) return 0;
   if (!env.rel) { const i = idx(k); return clampEnv(env.vals[i < 0 ? L - 1 : i]); }
   let sum = 0;
-  for (let i = 0; i <= k; i++) { const j = idx(i); if (j < 0) break; sum += clampEnv(env.vals[j]); }
+  for (let i = 0; i <= k; i++) { const j = idx(i); if (j < 0) break; sum += env.vals[j]; } // relative steps past +-63 play wide (encodeEnvelope)
   return sum;
 }
 
@@ -264,8 +272,7 @@ export function mergeVibratoPitch(vib: number[], mac: { vals: number[]; loop: nu
     if (mac.relative) macAbs += i >= 0 ? mac.vals[i] : 0;
     else macAbs = i >= 0 ? mac.vals[i] : mac.vals[len - 1] ?? 0;
     const total = macAbs + vib[f % vib.length];
-    let d = total - prev;
-    if (Math.abs(d) > 63) { lossy.add('vibrato + pitch macro step past 63 period units (clamped)'); d = Math.sign(d) * 63; }
+    const d = total - prev;
     deltas.push(d);
     prev += d;
   }
@@ -334,20 +341,20 @@ const scaleVol = (vol: number, env: number, flags: { newVolumeScaling?: unknown;
 
 /** Music bytes the NROM player holds at $8000 (musicCap in player.json). */
 const MUSIC_CAP = 16384;
-/** 2A03 songs past MUSIC_CAP go to the FME-7 player: 24 KB of music at $6000 (player-fme7.json musicAddr / musicCap). */
+/** Songs past MUSIC_CAP go to 24 KB of music at $6000: the FME-7 player (2A03) or player-vrc6w (VRC6, $6000-$7FFF in PRG RAM). */
 const FME7_MUSIC_ADDR = 0x6000;
 const FME7_MUSIC_CAP = 0x6000;
 
 export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2000): FamistudioSong {
-  // The loop pass (end-of-song state at the loop target) is tried first in each music area and kept only when it fits
-  // with nothing dropped: it never moves a song to another area. Then note cuts cost 2 bytes per row, a held 01/02 slide
+  // The loop pass (end-of-song state at the loop target) is tried first in each music area and kept on as many channels
+  // as fit with nothing else dropped: it never moves a song to another area. Then note cuts cost 2 bytes per row, a held 01/02 slide
   // 3 extra bytes per note; when the song is over the cap, drop cuts first, then held slides (the notes then play
   // unslid), then both.
   // Macro phase copies past the 64-instrument cap: the least-used instruments fall back to one copy.
   const noPhase = new Set<number>();
   // Per-note arp override at the note's own phase for instruments that lost their phase copies: kept only when the song still fits the first music area.
   let phaseArp = false;
-  const conv = (cuts: boolean, held: boolean, b: number, loop: boolean): FamistudioSong => {
+  const conv = (cuts: boolean, held: boolean, b: number, loop: number): FamistudioSong => {
     for (;;) {
       const stat: PhaseStat = { over: false, uses: new Map(), copies: new Map() };
       const song = convert(m, subsong, dpcmCap, cuts, held, b, loop, noPhase, stat, phaseArp);
@@ -363,17 +370,24 @@ export function furnaceToFamistudio(m: FurnaceModule, subsong = 0, dpcmCap = 0x2
   const fit = (): FamistudioSong => {
     let base = 0x8000;
     let cap = MUSIC_CAP;
-    let song = conv(true, true, base, true);
-    if (song.music.length > cap) song = conv(true, true, base, false);
-    // shortcut: VRC6 songs stay on the 16 KB mapper-24 player; give player-vrc6 a second music bank when one needs it.
-    if (song.music.length > cap && !song.vrc6) {
+    let song = conv(true, true, base, Infinity);
+    // Over the cap: keep the loop pass on as many channels as fit, dropping it from the last channel down. A channel without
+    // it replays first-pass bytes after the loop, so off 60 Hz (song length not whole frames) its arp / vibrato / macro
+    // envelopes play the first pass's sub-frame phase (Famitune1, 56 Hz: every 7th 00xy note a step off for 12 frames).
+    // shortcut: the third pass on replays the loop pass's phases (the phase moves on each pass), needs an engine tick at the song rate.
+    for (let k = song.sizes.streams.length - 1; k >= 0 && song.music.length > cap; k--) {
+      const n = song.sizes.streams.length;
+      song = conv(true, true, base, k);
+      if (k > 0 && song.music.length <= cap) song.lossy.push(`song loop pass kept on channels 1-${k} of ${n} only (music area full): the others replay first-pass phases after the loop`);
+    }
+    if (song.music.length > cap) {
       base = FME7_MUSIC_ADDR;
       cap = FME7_MUSIC_CAP;
-      song = conv(true, true, base, true);
+      song = conv(true, true, base, Infinity);
     }
     for (const [cuts, held] of [[true, true], [false, true], [true, false], [false, false]]) {
       if (song.music.length <= cap) break;
-      song = conv(cuts, held, base, false);
+      song = conv(cuts, held, base, 0);
       if (!cuts) song.lossy.push(`note cut EC dropped to fit the ${cap / 1024} KiB music area`);
       if (!held) song.lossy.push(`01/02 slide held over later notes dropped to fit the ${cap / 1024} KiB music area`);
     }
@@ -509,7 +523,7 @@ export function bestSlideStep(o: { rawFrom: number; fromPeriod: number; toPeriod
   return [sign * best, bestCost];
 }
 
-function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean, base: number, withLoop: boolean, noPhase: Set<number> = new Set(), stat?: PhaseStat, withPhaseArp = true): FamistudioSong {
+function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: boolean, withHeld: boolean, base: number, loopChannels: number, noPhase: Set<number> = new Set(), stat?: PhaseStat, withPhaseArp = true): FamistudioSong {
   const lossy = new Lossy();
   const pitchLossy: PitchLossySpan[] = [];
   const s = m.subsongs[subsong];
@@ -557,34 +571,46 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
 
   // Frame at which each row starts (speed effects in any channel apply to all; tick rate scales frames per tick).
   const rowFrame: number[][] = [], rowFrameT: number[][] = [], rowSpeed: number[][] = [];
-  let songEndT = 0;
+  // Per row, as Furnace counts it: ticks (speed entry) and virtual tempo [N, D] from that row on.
+  const rowTk: number[][] = [], rowVt: number[][][] = [];
+  let songEndT = 0, vt0 = [1, 1];
   {
     let f = 0, cur = 0;
     let sp = [...speeds];
+    // FDxx / FExx set the virtual tempo numerator / denominator from their row on (playback.cpp, zero ignored): the row
+    // lasts speed x D / N ticks. rowSpeed holds that length in start-tempo speed units (speed x start tempo / row tempo).
+    let vtN = s.virtualTempo > 0 && s.virtualTempoD > 0 ? s.virtualTempo : 1, vtD = vtN === 1 ? 1 : s.virtualTempoD, loopVt = '';
+    const vtFx = (o: number, r: number): void => { for (const e of rowFx(o, r)) { if (e.type === 0xfd && e.value > 0) vtN = e.value; if (e.type === 0xfe && e.value > 0) vtD = e.value; } };
     const grooves = m.grooves ?? [];
+    vt0 = [vtN, vtD];
     const perTick = 60 / (s.hz > 0 ? s.hz : 60) * vtScale;
     for (let o = 0; o < endOrder; o++) {
-      rowFrame.push([]); rowFrameT.push([]); rowSpeed.push([]);
+      rowFrame.push([]); rowFrameT.push([]); rowSpeed.push([]); rowTk.push([]); rowVt.push([]);
       for (let r = 0; r < orderLen[o]; r++) {
         for (const e of rowFx(o, r)) {
           // playback.cpp 0x09/0x0f: with grooves, 09xx selects groove xx (a copy) and restarts it; 0Fxx sets entry 0.
           if (e.type === 0x09 && grooves.length) { if (e.value < grooves.length) { sp = grooves[e.value].val.slice(0, Math.max(1, grooves[e.value].len)); cur = 0; } }
           else if (e.type === 0x09 && e.value > 0) sp[0] = e.value;
           if (e.type === 0x0f && e.value > 0) sp[sp.length === 2 && !grooves.length ? 1 : 0] = e.value;
-          if (e.type === 0xfd || e.type === 0xfe) lossy.add(`virtual tempo change ${e.type === 0xfd ? 'FD' : 'FE'}xx (ignored: rows keep the song start tempo)`);
         }
+        vtFx(o, r);
+        if (o === loopOrder && r === 0) loopVt = `${vtN}/${vtD}`;
+        const len = sp[cur] * (vtD / vtN) / vtScale;
         rowFrame[o].push(Math.round(f)); rowFrameT[o].push(f);
-        rowSpeed[o].push(sp[cur]);
-        f += sp[cur] * perTick;
+        rowSpeed[o].push(len); rowTk[o].push(sp[cur]); rowVt[o].push([vtN, vtD]);
+        f += len * perTick;
         cur = (cur + 1) % sp.length;
       }
     }
     songEndT = f;
+    // shortcut: the loop pass reuses the first pass's row times; a tempo the loop row does not set again stays lossy.
+    vtFx(loopOrder, 0);
+    if (`${vtN}/${vtD}` !== loopVt) lossy.add('virtual tempo FDxx/FExx at the song end differs from the loop target (rows after the loop keep the first pass tempo)');
   }
   // The engine adds a 8.8 step of 256 x tempo / 150 per frame and starts a row when the integer part reaches the speed.
   // A rounded step drifts a row by a frame every few hundred rows (virtual tempo 155/112: step 354.29), so speeds and
   // tempo are scaled by the smallest q that makes the step whole (speed bit 7 = paused: speed x q <= 127).
-  const maxSpd = Math.max(1, ...rowSpeed.flat());
+  const maxSpd = Math.ceil(Math.max(1, ...rowSpeed.flat()));
   const qMin = tempoBase < 32 ? Math.ceil(32 / tempoBase) : 1;
   const stepFits = (q: number): boolean => 256 * tempoBase * q / 150 < (256 - maxSpd * q) * 256;
   let spdMul = qMin;
@@ -598,7 +624,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   // speed op lands only where the byte must change. spdOut = byte per row on channel 0 (-1 = none); kept only when a
   // replay of the driver (acc >= speed -> new row, acc -= speed; acc += 2 per frame) matches every row on both passes.
   let spdOut: number[][] | null = null;
-  if ((m.grooves ?? []).length && tempoBase === 150 && spdMul === 1) {
+  if ((m.grooves ?? []).length && tempoBase === 150 && spdMul === 1 && rowSpeed.every((row) => row.every(Number.isInteger))) {
     const k = 2, out = rowSpeed.map((row) => row.map(() => -1));
     const rowLen = (sb: number, ph: number): number => Math.max(1, Math.ceil((sb - ph) / k));
     let sb = -1, ph = 0;
@@ -620,6 +646,41 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         ph += rowLen(sb, ph) * k - sb;
       }
     if (ok) { spdOut = out; spdMul = k; }
+  }
+  // Speed byte per row. A row under a mid-song FDxx/FExx tempo is rarely a whole count of tempo steps (Byte-Sized Bop:
+  // 155/112 then FD68, 6 x 7 x 155 / 104 = 62.6), so each byte is the rounded running total less what was sent: every row
+  // starts within a tempo step of its Furnace time and nothing drifts. Whole lengths give the same bytes as before.
+  const spdByte: number[][] = [];
+  { let want = 0, sent = 0; for (const row of rowSpeed) spdByte.push(row.map((v) => { want += v * spdMul; const b = Math.round(want) - sent; sent += b; return b; })); }
+  // A tempo change mid-song (60 Hz): Furnace starts rows on whole frames (playback.cpp: accumulator += N per frame, one
+  // tick per D, the leftover kept over an FDxx/FExx and over the loop), so the rounded total above is a frame off on some
+  // rows and the loop pass has its own phase (Byte-Sized Bop: DPCM hit a frame early at 6671). Replay Furnace's counter
+  // over both passes, then the driver's (row when acc >= speed x 256, acc -= that, acc += step per frame; start
+  // residue as tempoAcc below), and give each row a byte that starts the next row on Furnace's frame.
+  let spdByte2 = spdByte;
+  const stepRaw = 256 * tempoBase * spdMul / 150;
+  if (!spdOut && Math.abs((s.hz > 0 ? s.hz : 60) - 60) < 0.5 && Math.abs(stepRaw - Math.round(stepRaw)) < 1e-6 && new Set(rowVt.flat().map(String)).size > 1) {
+    const step = Math.round(stepRaw), rows: Array<[number, number]> = [];
+    for (let o = 0; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) rows.push([o, r]);
+    const n1 = rows.length;
+    for (let o = loopOrder; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) rows.push([o, r]);
+    rows.push([loopOrder, 0]);
+    const fr: number[] = [];
+    let acc = 0, ticks = 1, [n, d] = vt0, frame = 0;
+    for (const [o, r] of rows) {
+      for (;; frame++) { acc += n; let hit = false; while (acc >= d && !hit) { acc -= d; hit = --ticks <= 0; } if (hit) break; }
+      fr.push(frame++); ticks = rowTk[o][r]; [n, d] = rowVt[o][r];
+    }
+    const p1 = rowSpeed.map((row) => [...row]), p2 = rowSpeed.map((row) => [...row]);
+    let res = step - 256 * spdMul;
+    for (let i = 0; i + 1 < rows.length; i++) {
+      const [o, r] = rows[i], top = res + (fr[i + 1] - fr[i]) * step;
+      const lo = Math.floor((top - step) / 256) + 1, hi = Math.min(127, Math.floor(top / 256));
+      if (lo > hi) lossy.add('row longer than the FamiStudio speed range (virtual tempo FDxx/FExx)');
+      const x = Math.max(1, Math.min(hi, Math.max(lo, Math.round(rowSpeed[o][r] * spdMul))));
+      (i < n1 ? p1 : p2)[o][r] = x; res = top - 256 * x;
+    }
+    spdByte.splice(0, spdByte.length, ...p1); spdByte2 = p2;
   }
 
   // Instruments by first use; envelopes deduplicated by content.
@@ -722,6 +783,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   // forceVol: the channel is converted again with the volume cache unknown at the loop target (see the loop-row check).
   let forceVol = false;
   for (let ch = 0; ch < NCH; ch++) {
+    const withLoop = ch < loopChannels; // this channel gets the loop pass
     const chMark = { envs: envs.length, ins: insMap.size, pl: pitchLossy.length, lossy: lossy.save() };
     const out: number[] = [];
     const fx: Array<[number, number]> = [];
@@ -736,17 +798,25 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
     // Furnace duty is channel state a duty macro writes (nes.cpp chan.duty); FamiStudio's 0x4f value (famistudio_duty_cycle) is what a note of a duty-macro-less instrument plays.
     let furDuty = 0, fsDuty = 0, dutyMac: { vals: number[]; loop: number; t: number } | null = null;
     let vibPos = 0, vibFrame = 0; // Furnace's vibratoPos (64-step sine) at the row start
+    // Furnace's arpStage at the row start. It only moves on ticks with a running 00xy and is never reset unless
+    // resetArpPhaseOnNewNote / rowResetsArpPos (playback.cpp), so a new note under a running arp keeps the phase.
+    // shortcut: assumes arpSpeed 1 (E0xx unsupported) and ignores the portaSpeed pause; upgrade when a song needs it.
+    let arpPos = 0, arpFrame = 0;
     let curInsIdx = -1, curNote = 0, vibXY = 0, vibOn = -1, slideEnv = -1, envCarry = 0, ovr: { vals: number[]; loop: number; rel: boolean; at: number } | null = null, arpXY = 0, arpOn = -1, keyOff = false, noteArp: number[] | null = null, insArp: { vals: number[]; loop: number } | null = null, fineRaw = 128, fineSent = 0;
     // Furnace 01xx/02xx is channel state (playback.cpp portaSpeed): it keeps sliding every new note until x00, another
     // slide effect, or the slide reaching its target (note 0 / 179, targetResetsSlides).
     let heldSlide: [number, number] | null = null;
     const efx: Array<[number, number]> = [];
     const tonal = ch < 3 || ch === 5 || ch === 6; // VRC6 pulses share the 2A03 pulse period (divider 16); the saw (14) keeps no vibrato or slides
-    const seq: Array<{ cell?: FurnacePatternCell; frame: number; t: number }> = [];
-    for (let o = 0; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: rowFrame[o][r], t: rowFrameT[o][r] });
+    // tk: the Furnace engine tick that runs the row. Under a virtual tempo N/D the row counter steps N/D times per tick
+    // (playback.cpp tempoAccum), so the row runs on the first tick whose count passes its start: ceil(t / perTick + D / N) - 1,
+    // not round(t) (Bop pulse1 order 1 rows 64 -> 72 are 34 ticks apart, round(t) says 35). Per-tick state (vibratoPos) counts tk.
+    const rowTick = (t: number, o: number, r: number): number => Math.ceil(t / perTick + rowVt[o][r][1] / rowVt[o][r][0] - 1e-9) - 1;
+    const seq: Array<{ cell?: FurnacePatternCell; frame: number; t: number; tk: number }> = [];
+    for (let o = 0; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: rowFrame[o][r], t: rowFrameT[o][r], tk: rowTick(rowFrameT[o][r], o, r) });
     // The loop pass (orders loopOrder..end again, after the song end): rows played with the end-of-song state.
     const n1 = seq.length, loopRi = orderLen.slice(0, loopOrder).reduce((a, b) => a + b, 0);
-    for (let o = loopOrder; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) seq.push({ cell: cellAt(ch, o, r), frame: Math.round(rowFrameT[o][r] + songEndT - rowFrameT[loopOrder][0]), t: rowFrameT[o][r] + songEndT - rowFrameT[loopOrder][0] });
+    for (let o = loopOrder; o < endOrder; o++) for (let r = 0; r < orderLen[o]; r++) { const t = rowFrameT[o][r] + songEndT - rowFrameT[loopOrder][0]; seq.push({ cell: cellAt(ch, o, r), frame: Math.round(t), t, tk: rowTick(t, o, r) }); }
     /** End of the pass row i belongs to: look-aheads stop there, as the first pass always did. */
     const lim = (i: number): number => (i < n1 ? n1 : seq.length);
     /** Frames until the next note or slide effect on this channel (how long a slide runs). */
@@ -797,9 +867,9 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
       return JSON.stringify([envMode, lenIdx, furLive ? furVol : null, hwVol, ch === 0 && !spdOut ? lastSpd : null,
         !bakeLive ? null : !hwVol && baked && bake ? [bake.vol, bake.vals, bake.held, Math.min(seq[ri].frame - bake.frame, bake.vals.length - 1)] : !hwVol && baked,
         slideOps, slLive ? slVol : null, slideOps.length ? slStep : null, lastIns, lastVol, empty,
-        vibLive ? [vibPos, (vibXY & 15) > 0 ? seq[ri].frame - vibFrame : 0] : null, insLive ? curInsIdx : null, noteLive ? curNote : null,
+        vibLive ? [vibPos, (vibXY & 15) > 0 ? seq[ri].tk - vibFrame : 0] : null, insLive ? curInsIdx : null, noteLive ? curNote : null,
         // slideEnv / envCarry stay out of this state: with them in, turtle_byte pulse2 instrument-9 arpeggios played a frame off (637, 9231).
-        vibXY, vibOn, arpXY, arpOn, offLive ? keyOff : null, noteArp, fineRaw, fineSent, heldSlide]);
+        vibXY, vibOn, arpXY, arpXY !== 0 ? (arpPos + seq[ri].tk - arpFrame) % 3 : null, arpOn, offLive ? keyOff : null, noteArp, fineRaw, fineSent, heldSlide]);
     };
     // Song loop: Furnace keeps the end-of-song state (fine pitch, arp, vibrato, slides, volume) at the loop target, while
     // the stream's 0x42 jump replays first-pass bytes. Each channel converts the loop pass with the end-of-song state;
@@ -843,8 +913,9 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         let delay = 0, noAttack = false, envTo = 0, slide: number[] | null = null, rowByte: number[] | null = null;
         if (ch === 7 && o === 0 && r === 0) ops.push(0x55, 1); // saw volume shift: full (x4), so 0-15 spans the saw's 0-60
         if (ch === 0) {
-          const sb = spdOut ? spdOut[o][r] : rowSpeed[o][r] !== lastSpd || (o === loopOrder && r === 0) ? rowSpeed[o][r] * spdMul : -1;
-          if (sb >= 0) { ops.push(0x46, Math.min(255, sb)); lastSpd = rowSpeed[o][r]; }
+          const sp = (pass2 ? spdByte2 : spdByte)[o][r];
+          const sb = spdOut ? spdOut[o][r] : sp !== lastSpd || (o === loopOrder && r === 0) ? sp : -1;
+          if (sb >= 0) { ops.push(0x46, Math.min(255, sb)); lastSpd = sp; }
         }
         // Furnace EDxx postpones the channel's whole row (playback.cpp processRow after rowDelay), and the engine's 0x47 stops
         // reading the row until the delay ends, so every op after this point goes behind 0x47 (Bop pulse1 order 4 row 47:
@@ -859,12 +930,15 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
         if (cell) {
           if (cell.instrument >= 0) { curIns = m.instruments[cell.instrument]; curInsIdx = cell.instrument; }
           // Furnace steps vibratoPos by the rate each tick (a new note zeroes it unless continuousVibrato) while the depth is above 0; the elapsed ticks run with the previous 04xy.
-          if ((vibXY & 15) > 0) vibPos = (vibPos + (vibXY >> 4) * Math.round((seq[ri].frame - vibFrame) / perTick)) & 63;
-          vibFrame = seq[ri].frame;
+          if ((vibXY & 15) > 0) vibPos = (vibPos + (vibXY >> 4) * (seq[ri].tk - vibFrame)) & 63;
+          vibFrame = seq[ri].tk;
+          if (arpXY !== 0) arpPos = (arpPos + seq[ri].tk - arpFrame) % 3;
+          arpFrame = seq[ri].tk;
+          if (m.compatFlags?.rowResetsArpPos) arpPos = 0;
           // The loop target is entered again with the end-of-song state: its effects are sent there even when they match the first pass.
           const atLoop = o === loopOrder && r === 0;
           if (atLoop) { fineSent = NaN; vibOn = -2; arpOn = -2; fsDuty = -1; } // -2 / -1: override state unknown, sent either way (the loop pass enters with the duty the song end left)
-          let fxChanged = false, fineHere = false, slideFx = 0, slideVal = 0, volSlide = -1, cutTicks = 0;
+          let fxChanged = false, fineHere = false, slideFx = 0, slideVal = 0, volSlide: number | null = null, cutTicks = 0;
           for (const e of cell.effects) {
             if (e.type < 0) continue;
             const t = e.type, v = Math.max(0, e.value); // an effect with no value byte plays as xx = 00 (Furnace playback.cpp)
@@ -876,7 +950,9 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             else if (t === 0x04 && tonal) { if (v !== vibXY || atLoop) fxChanged = true; vibXY = v; }
             else if (SLIDE_FX.has(t) && tonal) { slideFx = t; slideVal = v; }
             else if (t === 0xe5 && tonal) { fineRaw = v; fineHere = true; }
-            else if (t === 0x0a && ch !== DPCM_CH && ch !== 2) volSlide = v;
+            // volSlide = Furnace chan.volSpeed (1/256 volume per tick, playback.cpp): 0Axy y wins over x; F3xx / F4xx are 64 times finer.
+            else if (t === 0x0a && ch !== DPCM_CH && ch !== 2) volSlide = v & 15 ? -(v & 15) * 64 : (v >> 4) * 64;
+            else if ((t === 0xf3 || t === 0xf4) && ch !== DPCM_CH && ch !== 2) volSlide = t === 0xf3 ? v : -v;
             else if (t === 0xec && ch !== DPCM_CH) cutTicks = v;
             else if (t === 0xed && ch !== DPCM_CH) delay = v;
             else if (t === 0x12 && (ch === 5 || ch === 6)) ops.push(0x4f, v & 7); // VRC6 duty 0-7
@@ -951,7 +1027,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             for (let L = 1; L <= 240; L++) if (Math.abs(((L * macroRate) / 3) - Math.round((L * macroRate) / 3)) < 1e-6) { len = L; break; }
             // Counted from the row's exact time like the vibrato below: a row off the frame grid (56 Hz) holds its tick on another frame.
             const ph = seq[ri].t - seq[ri].frame;
-            return Array.from({ length: len }, (_, f) => steps[tickAtFrame(f, macroRate, ph) % 3]);
+            return Array.from({ length: len }, (_, f) => steps[(tickAtFrame(f, macroRate, ph) + arpPos) % 3]);
           };
           // Vibrato (04xy): looping absolute pitch envelope, a sine over 64/x ticks. Depth y is y/16 semitone in linear
           // pitch (measured with furnace -vgmout), so the amplitude in period units follows the playing note.
@@ -960,6 +1036,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
           // Furnace zeroes vibratoPos only when the note is committed (playback.cpp "commit note on"); a 03xx (xx > 0) on a
           // keyed-on channel clears doNote ("if (chan[i].keyOn) chan[i].doNote=false"), so a porta target keeps the phase.
           // The driver agrees: a 0x43 no-attack note leaves the pitch envelope running (only an attack or 0x49 restarts it).
+          if (n > 0 && m.compatFlags?.resetArpPhaseOnNewNote) arpPos = 0;
           if (n > 0 && !m.compatFlags?.continuousVibrato && !(keyOnBefore && slideFx === 0x03 && slideVal > 0)) vibPos = 0;
           if (tonal && (fxChanged || n > 0)) {
             // Speed is exact (a snapped speed changes the vibrato rate audibly); identical rounded envelopes share one id.
@@ -1033,7 +1110,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                 // step without fine pitch; unroll the loop if a song shows audible drift.
                 let relSum = 0;
                 const relStep = (v: number): number => { const d = off(relSum + v) - off(relSum); relSum += v; return d; };
-                const toPeriod = (v: number): number => { const d = rel ? relStep(v) : off(v); if (Math.abs(d) > 63) lossy.add('pitch macro step past 63 period units (clamped)'); return d; };
+                const toPeriod = (v: number): number => { const d = rel ? relStep(v) : off(v); if (!rel && Math.abs(d) > 63) lossy.add('pitch macro step past 63 period units (clamped)'); return d; };
                 // An ADSR/LFO pitch macro in absolute mode is a position curve: FamiStudio's +-63 range only holds per-frame
                 // steps, so send the differences of the period offsets as a relative envelope.
                 const ex = expandProcMacro(pm, m.version);
@@ -1054,7 +1131,6 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
                     for (const k = tickAtFrame(f, macroRate, rowPh); tick < k;) sum += at(++tick);
                     const o = off(sum);
                     if (P + o > 2047 || P + o < 0) break;
-                    if (Math.abs(o - prev) > 63) lossy.add('pitch macro step past 63 period units (clamped)');
                     deltas.push(o - prev); prev = o;
                   }
                   pid = pitchPid(deltas.length ? deltas : [0], -1, true);
@@ -1116,12 +1192,13 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               if (c !== lastVol) { ops.push(0x70 | c); lastVol = c; } // lastVol stays under 15, so the next baked note sends 15 again
             } else if (!hwVol && !(baked && n === 0) && cell.volume !== lastVol) { ops.push(0x70 | furVol); lastVol = cell.volume; } }
           }
-          if (volSlide >= 0) {
-            const x = volSlide >> 4, y = volSlide & 15;
-            // Furnace keeps the 0Axy slide running across rows until 0A00; FamiStudio's slide stops on a volume set, so it is re-sent after each one.
-            slideOps = x > 0 ? [0x51, clamp8(x * 4 * perFrame) & 0xff, 240] : y > 0 ? [0x51, -clamp8(y * 4 * perFrame) & 0xff, 0] : [];
-            ops.push(...(slideOps.length ? slideOps : [0x51, 0, 0]));
-            slStep = x > 0 ? x / 4 : -y / 4;
+          if (volSlide !== null) {
+            // Furnace keeps the slide running across rows until 0A00; FamiStudio's slide stops on a volume set, so it is re-sent after each one.
+            // The patched 0x51 takes a 16-bit step in 1/4096 volume per frame (lo, hi) and the target (famistudio_ca65.s @opcode_volume_slide).
+            const s = Math.max(-32768, Math.min(32767, Math.round(volSlide * 16 * perFrame)));
+            slideOps = s ? [0x51, s & 0xff, (s >> 8) & 0xff, s > 0 ? 240 : 0] : [];
+            ops.push(...(slideOps.length ? slideOps : [0x51, 0, 0, 0]));
+            slStep = volSlide / 256;
             lastVol = -1;
           }
           if (n > 0) {
@@ -1151,7 +1228,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
             const fsVol = hwVol || baked ? 15 : furVol;
             if (hwVol || baked ? lastVol !== 15 : lastVol !== -1 && lastVol !== furVol) { ops.push(0x70 | fsVol); lastVol = fsVol; }
           }
-          if (volSlide < 0 && slideOps.length && (cell.volume >= 0 || n > 0)) { ops.push(...slideOps); lastVol = -1; }
+          if (volSlide === null && slideOps.length && (cell.volume >= 0 || n > 0)) { ops.push(...slideOps); lastVol = -1; }
           // Slides: 0x50 step,from,to replaces the note byte (it attacks the note); 0x43 first keeps a held note from retriggering.
           if (tonal && src > 0 && slideFx) {
             const pFrom = pulsePeriod;
@@ -1228,7 +1305,10 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               }
               return true;
             };
-            if (curveMiss && n > 0 && (vibOn === -1 || (vibOn >= 0 && vibOn === slideEnv)) && playsOut()) {
+            // A no-note 01/02 slide plays its start note without attack (0x43), like a no-attack 03 (Byte-Sized Bop triangle 02xx).
+            // shortcut: under a vibrato / pitch-macro override the slide stays a 0x50 (summing the override in per frame
+            // measured worse on Bop pulse1/2: 166/343 -> 205/407).
+            if (curveMiss && (n > 0 || noAttack) && (vibOn === -1 || vibOn === slideEnv) && playsOut()) {
               const rowPh = seq[ri].t - seq[ri].frame, raw = pulsePeriodRaw(from), base = pFrom(from) + (fineSent || 0), d: number[] = [];
               const start = envCarry;
               // span 240 = no next note or slide in sight: the envelope must reach the target (it then holds), else it
@@ -1238,7 +1318,7 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
               for (let f = 0; f < Math.max(1, span(ri)); f++) {
                 u = Math.min(totalUnits, units * (tickAtFrame(f, macroRate, rowPh) + 1));
                 const o = roundOnClock(raw * 2 ** (-((to > from ? u : -u) + fineRaw - 128) / 1536), clock) - 1 - base;
-                if (Math.abs(o - prev) > 63 || base + o < 1 || base + o > 2047) { d.length = 0; break; }
+                if (base + o < 1 || base + o > 2047) { d.length = 0; break; } // steps past +-63 go out wide (encodeEnvelope)
                 d.push(o - prev); prev = o;
                 if (open && u >= totalUnits) break;
               }
@@ -1420,6 +1500,10 @@ function convert(m: FurnaceModule, subsong: number, dpcmCap: number, withCuts: b
   });
   return { music, dpcm: Uint8Array.from(dpcm), sizes: { header: smpOff, samples: envOff - smpOff, envelopes: streamAddr[0] - base - envOff, streams: streams.map((st) => st.length) }, lossy: lossy.list(), pitchLossy, tempoAcc, channelsWithNotes, firstNotes, firstNoteFrames, tuning: m.tuning, clock, vrc6 };
 }
+
+/** Player image for the song (public/nes/famistudio/<name>.nes / .json): VRC6 on mapper 24, music at $6000 on the 24 KB builds. */
+export const famistudioPlayerName = (song: Pick<FamistudioSong, 'vrc6' | 'fme7'>): string =>
+  song.vrc6 ? (song.fme7 ? 'player-vrc6w' : 'player-vrc6') : song.fme7 ? 'player-fme7' : 'player';
 
 /** On-screen text slot: uppercase ASCII 0x20-0x5F (the player font), space padded to `len`. */
 export function famistudioText(s: string, len: number): Uint8Array {
