@@ -36,7 +36,7 @@ export interface EncoderFixture {
 export const ENCODER_FIXTURES: EncoderFixture[] = [
   // activisionPro left the harness: since 8c7aedfa0 its grid is the replayer's event stream and
   // cell edits are written into the event bytes by the module model, not by a UADE cell layout.
-  { formatId: "aProSys", fixture: "public/data/songs/aprosys/action.aps", kind: "fixed" },
+  { formatId: "aProSys", fixture: "public/data/songs/AProSys/action.aps", kind: "fixed" },
   { formatId: "peterVerswyvelenPacker", fixture: "public/data/songs/peter-verswyvelen/zarathrusta title.pvp", kind: "fixed" },
   { formatId: "dariusZendeh", fixture: "public/data/songs/darius-zendeh/crash and burn.dz", kind: "fixed", parser: { module: "@lib/import/formats/DariusZendehParser", parseFn: "parseDariusZendehFile" } },
   { formatId: "tronic", fixture: "public/data/songs/tronic/crystal.dp", kind: "fixed" },

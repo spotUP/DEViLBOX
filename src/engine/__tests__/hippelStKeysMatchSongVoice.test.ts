@@ -19,7 +19,7 @@ import { fundamentalHz } from './keyboardPreviewHarness';
 const SONGS: Array<[string, string]> = [
   ['hippel-st', 'crown arabia.hst'], ['hippel-st', 'crown england.hst'], ['hippel-st', 'crown japan.hst'],
   ['hippel-st', 'crown russia.hst'], ['hippel-st', 'crown viking.hst'], ['hippel-st', 'demo music10.sog'],
-  ['formats', 'astaroth.sog'], ['hippel-st-coso', 'ghostbattle titletune.soc'],
+  ['hippel-st', 'astaroth.sog'], ['hippel-st-coso', 'ghostbattle titletune.soc'],
 ];
 
 const SR = 48000;

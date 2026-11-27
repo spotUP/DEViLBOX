@@ -31,12 +31,13 @@ import { serializeTFMXConfig, hippelKeyNoteByte } from '@/engine/tfmx/TFMXSynth'
 import { HivelySynth, hvlNoteForKey } from '@/engine/hively/HivelySynth';
 import { hivelyTransform } from '@/engine/hively/HivelyEngine';
 import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+import { songFile } from '@/test/songPath';
 
 // Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
 pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
 
-const corpus = (n: string, dir = 'formats') => {
-  const f = readFileSync(resolve(ROOT, 'public/data/songs', dir === 'formats' ? 'formats' : dir, n));
+const corpus = (n: string, dir?: string) => {
+  const f = readFileSync(dir ? resolve(ROOT, 'public/data/songs', dir, n) : songFile(n));
   return f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
 };
 /** The Emscripten glue of the replayer wasm, made loadable in a worklet scope. */

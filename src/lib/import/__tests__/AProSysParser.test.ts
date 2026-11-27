@@ -1,5 +1,5 @@
 /**
- * AProSysParser tests on the real corpus (public/data/songs/aprosys): every song parses, has 4 channels,
+ * AProSysParser tests on the real corpus (public/data/songs/AProSys): every song parses, has 4 channels,
  * at least one pattern with a note, and no invented instrument name (the format stores none).
  */
 import { describe, it, expect } from 'vitest';
@@ -7,7 +7,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isAProSysFormat, parseAProSysFile } from '../formats/AProSysParser';
 
-const DIR = join(__dirname, '../../../../public/data/songs/aprosys/Petter A. Urkedal');
+const DIR = join(__dirname, '../../../../public/data/songs/AProSys/Petter A. Urkedal');
 const FILES = readdirSync(DIR).filter((f) => f.toLowerCase().endsWith('.aps'));
 
 describe('isAProSysFormat', () => {

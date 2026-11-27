@@ -74,7 +74,6 @@ registerEditableFormat({ formatId: "dtm_204", label: "", patternCodec: { kind: "
 registerEditableFormat({ formatId: "dtm_pt", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "earAche", label: "EarAche", newSong: { template: "templates/earAche.ea", name: "EarAche" }, patternCodec: { kind: "fixed" }, exporter: { module: "EarAcheExporter", fn: "exportEarAche", byLayout: true } });
 registerEditableFormat({ formatId: "faceTheMusic", label: "", newSong: { template: "templates/faceTheMusic.ftm", name: "Face the Music" }, patternCodec: { kind: "variable" }, exporter: { module: "FaceTheMusicExporter", fn: "exportFaceTheMusic", byLayout: true } });
-registerEditableFormat({ formatId: "etx", label: "EasyTrax", patternCodec: { kind: "fixed" }, exporter: { module: "EasyTraxExporter", fn: "exportEasyTrax", byLayout: true } });
 registerEditableFormat({ formatId: "far", label: "Farandole Composer", patternCodec: { kind: "fixed" }, exporter: { module: "FARExporter", fn: "exportFAR", byLayout: true } });
 registerEditableFormat({ formatId: "fredEditor", label: "Fred Editor", newSong: { template: "templates/fredEditor.fred" }, patternCodec: { kind: "variable" }, exporter: { module: "FredEditorExporter", fn: "exportFredEditor", byLayout: true } });
 registerEditableFormat({ formatId: "futureComposer", label: "Future Composer", patternCodec: { kind: "fixed" }, newSong: { template: "templates/futurecomposer.fc" } });

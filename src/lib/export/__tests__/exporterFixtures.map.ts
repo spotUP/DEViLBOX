@@ -150,7 +150,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   sonicArrangerSas: 'public/data/songs/speedy-a1-system/digital voyage.sas',
   robHubbardST: 'public/data/songs/rob-hubbard-st/battleships.rho',
   artAndMagic: 'public/data/songs/art-and-magic/agony-level1.aam',
-  aProSys: 'public/data/songs/aprosys/action.aps',
+  aProSys: 'public/data/songs/AProSys/action.aps',
   benDaglish: 'public/data/songs/ben-daglish/motorhead-titleandingame.bd',
   synthDream: 'public/data/songs/synth-dream/sdr.monsterbusiness_5',
   dynamicSynthesizer: 'public/data/songs/dynamic-synthesizer/dns.ptc',

@@ -13,7 +13,7 @@ vi.mock('@/engine/uade/UADEEngine', () => ({
   }) },
 }));
 
-const path = 'public/data/songs/aprosys/action.aps';
+const path = 'public/data/songs/AProSys/action.aps';
 const load = () => { const b = readFileSync(path); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
 // action.aps step 0, voice 0: cell note 9, track 0x20 (tracks section at 860); the order list plays steps 8..23 at octave 0.
 const TRACK0 = 860 + 0x20 * 4;

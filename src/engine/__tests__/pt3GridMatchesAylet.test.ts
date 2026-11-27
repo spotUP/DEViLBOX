@@ -21,7 +21,7 @@ async function aylet(): Promise<Aylet> {
   const factory = new Function(js + '; return createAylet;')() as (o: object) => Promise<Aylet>;
   return factory({ wasmBinary: readFileSync(resolve(ROOT, 'public/aylet/Aylet.wasm')), print() {}, printErr() {} });
 }
-const song = (name: string) => { const b = readFileSync(resolve(ROOT, 'public/data/songs/pt3', name)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.length); };
+const song = (name: string) => { const b = readFileSync(resolve(ROOT, 'public/data/songs/PT3', name)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.length); };
 const periodToXm = (p: number) => Math.round(12 * Math.log2(1773400 / (16 * p) / 440)) + 58;
 
 describe('PT3 grid matches the Bulba player in aylet', () => {
