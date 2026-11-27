@@ -392,6 +392,8 @@ export interface TrackerSong {
   ayFileData?: ArrayBuffer;
   /** PT3 on aylet: song pattern -> rows x 3 module offsets of the note byte (-1: no note byte on that line) */
   pt3NoteOffsets?: number[][][];
+  /** PT3 module inside ayFileData (an .ay EMUL tune whose memory block holds the module): file offset and length */
+  pt3ModuleAt?: { offset: number; length: number; z80Addr: number };
   /** Whole Studio Pixel PiyoPiyo .pmd for PiyoPiyoEngine worklet playback */
   piyoPiyoFileData?: ArrayBuffer;
   /** MusicMaker V8 song + instruments as one FORM/MMV8 IFF for MusicMakerEngine worklet playback */
