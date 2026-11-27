@@ -220,7 +220,7 @@ const makeDefaultDeckState = (): DeckState => ({
   pitchOffset: 0,
   effectiveBPM: 125,
   repitchLock: false,
-  keyLockEnabled: true,
+  keyLockEnabled: false,  // Owner 2026-11-27: off by default; the stretcher colours the sound even at pitch 0 (row 248)
   eqLow: 0,
   eqMid: 0,
   eqHigh: 0,

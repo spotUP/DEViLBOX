@@ -1,8 +1,10 @@
 /**
- * KEYLOCK-DEFAULT-ON (owner 2026-10-12: "key lock is so good now it should be on by default").
+ * KEYLOCK-DEFAULT-OFF (owner 2026-11-27, row 248: the stretcher colours the DJ sound even at
+ * pitch 0, so Key Lock starts off; it replaces KEYLOCK-DEFAULT-ON from 2026-10-12).
  *
- * The store owns the setting (default on) and the engine follows it: a fresh deck, with no button
- * pressed, routes through the stretcher after an audio load and after a tracker -> audio hot swap.
+ * The store owns the setting (default off) and the engine follows it: a fresh deck, with no button
+ * pressed, bypasses the stretcher after an audio load. Once Key Lock is on, a tracker -> audio hot
+ * swap keeps the deck stretching.
  * The scenario selector goes through DJActions.setDeckKeyLock so the engine follows a preset too.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -30,26 +32,29 @@ function wav16(samples: Int16Array): ArrayBuffer {
 interface Inner { keyLock: { isActive: boolean }; _playbackMode: string }
 const stretcherActive = (d: unknown): boolean => (d as Inner).keyLock.isActive;
 
-describe('Key Lock is on by default', () => {
-  it('a fresh deck, no button pressed, stretches after an audio load and after a module hot swap', async () => {
+describe('Key Lock is off by default', () => {
+  it('a fresh deck, no button pressed, bypasses the stretcher; a key-locked deck keeps it after a module hot swap', async () => {
     installRealWebAudio(); resolveWorkletsFromPublic(); servePublicToFetch();
     const Tone = await import('tone');
     Tone.setContext(new OfflineAudioContext(2, 4800, 48000) as never);
     const { useDJStore } = await import('@/stores/useDJStore');
     const { DeckEngine } = await import('../DeckEngine');
 
-    expect(useDJStore.getState().decks.A.keyLockEnabled, 'the store default').toBe(true);
+    expect(useDJStore.getState().decks.A.keyLockEnabled, 'the store default').toBe(false);
 
     const out = new Tone.Gain(1);
     out.connect(Tone.getDestination().input as never);
     const deck = new DeckEngine({ id: 'A', outputNode: out });
     await audioLoadsSettled(400, 20000);
-    expect(deck.getKeyLock(), 'the engine starts from the store').toBe(true);
-    expect(stretcherActive(deck), 'fresh deck').toBe(true);
+    expect(deck.getKeyLock(), 'the engine starts from the store').toBe(false);
+    expect(stretcherActive(deck), 'fresh deck').toBe(false);
 
     const wav = wav16(Int16Array.from({ length: RATE * 2 }, (_, i) => Math.round(3000 * Math.sin(i / 20))));
     await deck.loadAudioFile(wav, 'tune.wav');
-    expect(stretcherActive(deck), 'after an audio load').toBe(true);
+    expect(stretcherActive(deck), 'after an audio load').toBe(false);
+
+    deck.setKeyLock(true);
+    expect(stretcherActive(deck), 'Key Lock pressed').toBe(true);
 
     // A deck that was on the tracker path, key-locked, then hot-swapped to its rendered audio.
     (deck as unknown as Inner)._playbackMode = 'tracker';
