@@ -56,6 +56,12 @@ export class DeckAudioPlayer {
   private _seekCount = 0;
   private _lastSeekTarget = 0;
 
+  // Wall seconds the deck chain after this player delays the audio (the Key
+  // Lock stretcher's latency). The player reads that far ahead of the position
+  // it reports, so a key-locked deck sounds where an unlocked deck at the same
+  // position does: positions, seeks, beat sync and the playhead stay aligned.
+  private _readAheadSec = 0;
+
   // Audio loop region (seconds)
   private _loopIn: number | null = null;
   private _loopOut: number | null = null;
@@ -271,9 +277,10 @@ export class DeckAudioPlayer {
    */
   seek(seconds: number): void {
     const wasPlaying = this.player.state === 'started';
-    const clamped = Math.max(0, Math.min(seconds, this._duration));
+    // Reported position -> read position: read ahead by the chain latency at this rate.
+    const clamped = Math.max(0, Math.min(seconds + this.readAheadSource(), this._duration));
     this._seekCount++;
-    this._lastSeekTarget = clamped;
+    this._lastSeekTarget = Math.max(0, Math.min(seconds, this._duration));
     // The new audio starts when an untimed start would (Tone.now(), the time base the position clock and
     // the crossfader use), never before a pending crossfader move lands; the old sources stop at that same
     // instant. Stopped at currentTime instead, an audible deck went silent for one lookAhead (100 ms) on
@@ -387,7 +394,23 @@ export class DeckAudioPlayer {
    * Uses rate-change checkpoint tracking for accuracy during scratch.
    */
   getPosition(): number {
-    return this._positionAt(Tone.now());
+    return Math.max(0, this._positionAt(Tone.now()) - this.readAheadSource());
+  }
+
+  /**
+   * Set the latency of the chain after this player (seconds, wall time). The
+   * reported position is kept; the read position moves by the latency change.
+   */
+  setReadAhead(latencySec: number): void {
+    if (latencySec === this._readAheadSec) return;
+    const pos = this.getPosition();
+    this._readAheadSec = latencySec;
+    if (this._loaded) this.seek(pos);
+  }
+
+  /** The read-ahead in track seconds: wall latency times the playback rate. */
+  private readAheadSource(): number {
+    return this._readAheadSec * this._playbackRate;
   }
 
   /** Playback position at context time `now` (never before the last start). */

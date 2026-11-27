@@ -40,7 +40,7 @@ function realTransport(): DeckAudioPlayer {
   return Object.assign(Object.create(DeckAudioPlayer.prototype), {
     player, _loaded: true, _duration: 180, _playbackRate: 1, _pendingOffset: null,
     _rateChangePos: 0, _rateChangeTime: 0, _rateTrackingActive: false,
-    _seekCount: 0, _lastSeekTarget: 0, onRunningChange: null,
+    _seekCount: 0, _lastSeekTarget: 0, _readAheadSec: 0, onRunningChange: null,
   }) as DeckAudioPlayer;
 }
 

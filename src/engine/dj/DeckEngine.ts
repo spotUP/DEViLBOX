@@ -417,6 +417,8 @@ export class DeckEngine {
     // audio-mode deck. The tracker path bypasses it entirely since the
     // replayer has native pitch/tempo decoupling.
     this.keyLock = new DeckKeyLock();
+    // The audio player reads ahead by the stretcher latency: a key-locked deck sounds on its reported position.
+    this.keyLock.onLatencyChange = () => this.audioPlayer?.setReadAhead(this.keyLock.latencySec());
     this.keyLock.output.connect(this.deckGain);
     // The store owns the setting (default on); the engine follows it from the first frame.
     this.keyLockEnabled = useDJStore.getState().decks[this.id]?.keyLockEnabled ?? false;
@@ -1211,6 +1213,7 @@ export class DeckEngine {
     this.keyLock.setActive(this.keyLockEnabled && this._playbackMode === 'audio');
   }
 
+
   /**
    * Enable / disable repitch lock.
    *
@@ -1245,8 +1248,9 @@ export class DeckEngine {
   /**
    * Audio mode: the position the listener hears now - the player's position
    * minus the latency behind it at the current playback rate (audioLatency.ts):
-   * the output latency plus, with key lock on, the SoundTouch processing
-   * latency (~91 ms; a key-locked deck sounds that much later than it plays).
+   * the output latency. The audio player reads ahead by the Key Lock
+   * stretcher latency (DeckAudioPlayer.setReadAhead), so its position already
+   * is where a key-locked deck sounds.
    * Every DJ visual (waveform playhead, beat grid, overview, turntable, lights
    * derived from the time index) reads this through the DJ store, and phase
    * correction (DJAutoSync) locks on it.
@@ -1254,7 +1258,8 @@ export class DeckEngine {
   getHeardPosition(): number {
     const player = this._stemMode ? this.stemPlayer : this.audioPlayer;
     const ctx = Tone.getContext().rawContext as AudioContext;
-    return heardPositionSec(player.getPosition(), player.getPlaybackRate(), outputLatencySec(ctx) + this.keyLock.latencySec());
+    return heardPositionSec(player.getPosition(), player.getPlaybackRate(), outputLatencySec(ctx) + (this._stemMode ? this.keyLock.latencySec() : 0));
+    // shortcut: the stem player has no read-ahead yet, so a key-locked stem deck still sounds late; add it when stems are mixed against plain decks.
   }
 
   /**
@@ -2372,11 +2377,12 @@ export class DeckEngine {
    * hears: the window of the loaded audio's scope track (rendered with it,
    * channelScopeTrack.ts) ending at getHeardPosition(). A replayer playing
    * live (tracker mode) reads its own channel analysers. Empty when the deck
-   * has no per-channel signal.
+   * has no per-channel signal. `ownPeak`: audio mode scales each channel to
+   * its own render peak (the scopes); default is mix level (the meters).
    */
-  getChannelWaveforms(maxChannels = DECK_SCOPE_CHANNELS): Float32Array[] {
+  getChannelWaveforms(maxChannels = DECK_SCOPE_CHANNELS, ownPeak = false): Float32Array[] {
     if (this._playbackMode === 'audio') {
-      return this._channelScopes ? channelScopeWindow(this._channelScopes, this.getHeardPosition(), maxChannels) : [];
+      return this._channelScopes ? channelScopeWindow(this._channelScopes, this.getHeardPosition(), maxChannels, ownPeak) : [];
     }
     return this.replayer.getChannelWaveforms(maxChannels);
   }

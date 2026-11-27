@@ -67,7 +67,7 @@ function audioPlayer() {
     player, onRunningChange: null,
     _loaded: true, _duration: 30, _playbackRate: 1,
     _rateChangePos: 0, _rateChangeTime: 0, _rateTrackingActive: false,
-    _pendingOffset: null, _seekCount: 0, _lastSeekTarget: 0,
+    _pendingOffset: null, _seekCount: 0, _lastSeekTarget: 0, _readAheadSec: 0,
   }) as DeckAudioPlayer;
   return { ap, player };
 }
