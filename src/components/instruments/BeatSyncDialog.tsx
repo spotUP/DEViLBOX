@@ -3,7 +3,7 @@
  *
  * Methods:
  *   Resample  — changes pitch, preserves transients exactly
- *   Time-stretch — preserves pitch via WSOLA overlap-add
+ *   Time-stretch — preserves pitch via the DJ Key Lock stretcher (stretchKeepPitch)
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -292,7 +292,7 @@ export const BeatSyncDialog: React.FC<BeatSyncDialogProps> = ({
           <p className="text-[10px] text-text-muted">
             {method === 'resample'
               ? 'Changes pitch to fit duration. Fast, exact.'
-              : 'Preserves pitch via WSOLA overlap-add. Slower.'}
+              : 'Preserves pitch (Key Lock stretcher). Slower.'}
           </p>
         </div>
 

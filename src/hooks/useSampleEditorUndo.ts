@@ -9,6 +9,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { SampleUndoManager } from '../lib/audio/SampleUndoManager';
 import type { UndoState } from '../lib/audio/SampleUndoManager';
 import type { LoopType } from './useSampleEditorState';
+import type { SampleLoopView } from '@/utils/audio/sampleLoopView';
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -16,8 +17,7 @@ export interface UseSampleEditorUndoOptions {
   audioBuffer: AudioBuffer | null;
   instrumentParameters: Record<string, unknown> | undefined;
   setAudioBuffer: (buf: AudioBuffer | null) => void;
-  onPersistBuffer: (buffer: AudioBuffer, label: string) => Promise<void>;
-  onUpdateParams: (updates: Record<string, unknown>) => void;
+  onPersistBuffer: (buffer: AudioBuffer, label: string, loop?: Partial<SampleLoopView>) => Promise<void>;
 }
 
 export interface UseSampleEditorUndoReturn {
@@ -35,7 +35,7 @@ export interface UseSampleEditorUndoReturn {
 // ─── Hook ──────────────────────────────────────────────────────────────
 
 export function useSampleEditorUndo(opts: UseSampleEditorUndoOptions): UseSampleEditorUndoReturn {
-  const { audioBuffer, instrumentParameters, setAudioBuffer, onPersistBuffer, onUpdateParams } = opts;
+  const { audioBuffer, instrumentParameters, setAudioBuffer, onPersistBuffer } = opts;
 
   const undoManager = useRef(new SampleUndoManager(20));
   const [undoInfo, setUndoInfo] = useState({
@@ -83,15 +83,14 @@ export function useSampleEditorUndo(opts: UseSampleEditorUndoOptions): UseSample
 
   const applyUndoState = useCallback(async (state: UndoState) => {
     setAudioBuffer(state.buffer);
-    onUpdateParams({
+    // Loop goes with the buffer write: a separate loop update was overwritten by the persist's sample copy.
+    await onPersistBuffer(state.buffer, 'Undo/Redo', {
       loopStart: state.loopStart,
       loopEnd: state.loopEnd,
       loopType: state.loopType,
-      loopEnabled: state.loopType !== 'off',
     });
-    await onPersistBuffer(state.buffer, 'Undo/Redo');
     syncUndoState();
-  }, [setAudioBuffer, onPersistBuffer, onUpdateParams, syncUndoState]);
+  }, [setAudioBuffer, onPersistBuffer, syncUndoState]);
 
   const doUndo = useCallback(() => {
     const current = getCurrentUndoState();

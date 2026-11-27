@@ -40,12 +40,14 @@ export const STRETCH_CONFIG = { blockMs: 80, intervalMs: 20, splitComputation: t
 export const TONALITY_HZ = 20000;
 
 /** The AudioWorkletNode the official Signalsmith factory returns, with its remote methods. */
-interface StretchNode extends AudioWorkletNode {
+export interface StretchNode extends AudioWorkletNode {
   configure(config: typeof STRETCH_CONFIG): Promise<unknown>;
   latency(): Promise<number>;
-  schedule(change: { active?: boolean; semitones?: number; tonalityHz?: number }): Promise<unknown>;
+  schedule(change: { active?: boolean; rate?: number; semitones?: number; tonalityHz?: number }): Promise<unknown>;
+  /** Buffer-playback mode (node built with numberOfInputs: 0): one Float32Array per channel. */
+  addBuffers(buffers: Float32Array[]): Promise<number>;
 }
-type CreateStretchNode = (ctx: BaseAudioContext, options: AudioWorkletNodeOptions) => Promise<StretchNode>;
+export type CreateStretchNode = (ctx: BaseAudioContext, options: AudioWorkletNodeOptions) => Promise<StretchNode>;
 
 export class DeckKeyLock {
   readonly input: Tone.Gain;
@@ -63,7 +65,7 @@ export class DeckKeyLock {
   /** Processing latency the stretcher reported for STRETCH_CONFIG, seconds. */
   private stretchLatencySec = 0;
 
-  private static moduleLoads = new Map<BaseAudioContext, Promise<CreateStretchNode>>();
+  private static moduleLoads = new WeakMap<BaseAudioContext, Promise<CreateStretchNode>>();
 
   /**
    * Called after every rewire, i.e. whenever latencySec() may have changed:
@@ -189,7 +191,7 @@ export class DeckKeyLock {
    * factory. The factory finds the processor already registered, so it never
    * falls back to its blob-URL copy of the module.
    */
-  private static loadModule(ctx: BaseAudioContext): Promise<CreateStretchNode> {
+  static loadModule(ctx: BaseAudioContext): Promise<CreateStretchNode> {
     let p = this.moduleLoads.get(ctx);
     if (!p) {
       const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';

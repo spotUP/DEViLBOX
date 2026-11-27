@@ -7,6 +7,7 @@
 
 import { useRef, useState, useCallback, useMemo } from 'react';
 import { WaveformProcessor } from '../lib/audio/WaveformProcessor';
+import { stretchKeepPitch } from '../lib/audio/stretchKeepPitch';
 import { notify } from '../stores/useNotificationStore';
 import { useSampleEditorUndo } from './useSampleEditorUndo';
 import { sampleLoopToView, viewLoopToSample, LOOP_VIEW_KEYS, type LoopType, type SampleLoopView } from '@/utils/audio/sampleLoopView';
@@ -120,6 +121,8 @@ export interface SampleEditorState {
   doResize: (frames: number) => Promise<void>;
   doInsertSilence: (frames: number) => Promise<void>;
   doResample: (rate: number) => Promise<void>;
+  /** Change speed: length = 1 / (speedPercent / 100). keepPitch uses the Key Lock stretcher, else a resample. */
+  doStretch: (speedPercent: number, keepPitch: boolean) => Promise<void>;
   doUndo: () => void;
   doRedo: () => void;
   doExportWav: () => Promise<void>;
@@ -136,7 +139,7 @@ export interface SampleEditorState {
 interface UseSampleEditorStateOptions {
   instrumentId: number;
   instrumentParameters: Record<string, unknown> | undefined;
-  onPersistBuffer: (buffer: AudioBuffer, label: string) => Promise<void>;
+  onPersistBuffer: (buffer: AudioBuffer, label: string, loop?: Partial<SampleLoopView>) => Promise<void>;
   onUpdateParams: (updates: Record<string, unknown>) => void;
   /** The instrument's sample: the loop the editor shows and edits lives here. */
   sample: SampleConfig | undefined;
@@ -252,7 +255,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     canUndo, canRedo, undoLabel, redoLabel, undoCount, redoCount,
     pushUndo, doUndo, doRedo,
   } = useSampleEditorUndo({
-    audioBuffer, instrumentParameters: viewParams, setAudioBuffer, onPersistBuffer, onUpdateParams,
+    audioBuffer, instrumentParameters: viewParams, setAudioBuffer, onPersistBuffer,
   });
 
   // ─── Display toggles ────────────────────────────────────────────
@@ -439,6 +442,25 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     showAll();
   }, [applyOperation, clearSelection, showAll]);
 
+  const doStretch = useCallback(async (speedPercent: number, keepPitch: boolean) => {
+    if (!audioBuffer || !(speedPercent > 0)) return;
+    const factor = 100 / speedPercent;
+    try {
+      const result = keepPitch
+        ? await stretchKeepPitch(audioBuffer, factor)
+        : WaveformProcessor.varispeed(audioBuffer, factor);
+      pushUndo('Stretch');
+      setAudioBuffer(result);
+      // Same 0-1 loop view on the new buffer = loop frames scaled with length.
+      await onPersistBuffer(result, 'Stretch', { loopStart: loopView.loopStart, loopEnd: loopView.loopEnd });
+      clearSelection();
+      showAll();
+      notify.success(`Speed ${speedPercent}%${keepPitch ? ', pitch kept' : ''}`);
+    } catch (err) {
+      notify.error(`Stretch failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [audioBuffer, loopView, pushUndo, setAudioBuffer, onPersistBuffer, clearSelection, showAll]);
+
   const doExportWav = useCallback(async () => {
     if (!audioBuffer) return;
     try {
@@ -518,7 +540,7 @@ export function useSampleEditorState(opts: UseSampleEditorStateOptions): SampleE
     doCut, doCopy, doPaste, doCrop, doDelete, doSilence,
     doFadeIn, doFadeOut, doVolumeUp, doVolumeDown,
     doReverse, doNormalize, doDcRemoval,
-    doPasteReplace, doPasteMix, doAmplify, doResize, doInsertSilence, doResample,
+    doPasteReplace, doPasteMix, doAmplify, doResize, doInsertSilence, doResample, doStretch,
     doUndo, doRedo, doExportWav, doFindLoop, doSnapLoopToZero,
     params, updateParam, updateParams: onUpdateParams,
   };

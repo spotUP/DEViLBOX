@@ -290,6 +290,14 @@ export class WaveformProcessor {
   }
 
   /** Plain linear-interpolation resample to a new sample rate (pitch is kept, frame count scales). */
+  /** Length x factor at the same sample rate (tape-style speed change: pitch follows speed). */
+  public static varispeed(buffer: AudioBuffer, factor: number): AudioBuffer {
+    const r = this.resample(buffer, buffer.sampleRate * factor);
+    const out = this.createBuffer(r.length, r.numberOfChannels, buffer.sampleRate);
+    for (let c = 0; c < r.numberOfChannels; c++) out.copyToChannel(r.getChannelData(c), c);
+    return out;
+  }
+
   public static resample(buffer: AudioBuffer, newRate: number): AudioBuffer {
     const ratio = newRate / buffer.sampleRate;
     const out = this.createBuffer(Math.round(buffer.length * ratio), buffer.numberOfChannels, newRate);

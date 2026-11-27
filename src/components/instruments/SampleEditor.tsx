@@ -42,6 +42,7 @@ import { AmiResamplerModal } from './AmiResamplerModal';
 import { MpcResamplerModal } from './MpcResamplerModal';
 import { AudioToMidiModal } from './AudioToMidiModal';
 import { AmigaPalModal } from './AmigaPalModal';
+import { SampleStretchDialog } from './SampleStretchDialog';
 import { SampleValueDialog, type SampleValueKind } from './SampleValueDialog';
 import { BeatSyncDialog } from './BeatSyncDialog';
 import { BeatSlicerPanel } from './BeatSlicerPanel';
@@ -178,10 +179,11 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   // ─── Waveform Studio modal state ────────────────────────────────
   const [showWaveformStudio, setShowWaveformStudio] = React.useState(false);
   const [valueDialog, setValueDialog] = React.useState<SampleValueKind | null>(null);
+  const [showStretch, setShowStretch] = React.useState(false);
 
   // ─── Persist callbacks for the state hook ────────────────────────
   const onPersistBuffer = useCallback(
-    async (buffer: AudioBuffer, label: string) => {
+    async (buffer: AudioBuffer, label: string, loop?: Partial<SampleLoopView>) => {
       const dataUrl = await bufferToDataUrl(buffer);
       const updates: Parameters<typeof updateInstrument>[1] = {
         parameters: {
@@ -206,8 +208,10 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       // CRITICAL: Clear audioBuffer — ToneEngine's case 'Sampler' checks
       // config.sample.audioBuffer BEFORE sample.url, so a stale audioBuffer
       // would cause the engine to play the original unedited sample.
-      if (instrument.sample) {
-        updates.sample = { ...instrument.sample, url: dataUrl, audioBuffer: undefined };
+      // A loop view (0-1) is written against the NEW buffer, so loop frames follow a length change.
+      const loopFields = loop ? viewLoopToSample(loop, instrument.sample, buffer.duration, buffer.sampleRate) : null;
+      if (instrument.sample || loopFields) {
+        updates.sample = { ...(instrument.sample ?? newSampleConfig(dataUrl)), ...loopFields, url: dataUrl, audioBuffer: undefined };
       }
       updateInstrument(instrument.id, updates);
 
@@ -325,6 +329,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     doResize,
     doInsertSilence,
     doResample,
+    doStretch,
     doUndo,
     doRedo,
     doExportWav,
@@ -1741,6 +1746,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
               <Button variant="ghost" size="sm" onClick={() => setValueDialog('resize')} title="Resize to a frame count">Resize</Button>
               <Button variant="ghost" size="sm" onClick={() => setValueDialog('amplify')} title="Amplify by a percentage">Amplify</Button>
               <Button variant="ghost" size="sm" onClick={() => setValueDialog('resample')} title="Resample to a new rate">Resample</Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowStretch(true)} title="Change speed, optionally keeping the pitch">Speed</Button>
             </div>
 
             <div className="w-px h-6 bg-dark-border mx-1" />
@@ -1989,6 +1995,12 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
           else if (kind === 'insertSilence') void doInsertSilence(value);
           else void doResample(value);
         }}
+      />
+
+      <SampleStretchDialog
+        isOpen={showStretch}
+        onClose={() => setShowStretch(false)}
+        onApply={(speed, keepPitch) => { setShowStretch(false); void doStretch(speed, keepPitch); }}
       />
 
       {/* ─── AudioToMidiModal ─────────────────────────────────────── */}
