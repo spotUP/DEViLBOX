@@ -10,7 +10,8 @@ import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join, resolve } from 'path';
 import { parseT0astFile } from '@/lib/import/formats/T0astParser';
 import { buildT0astFile } from '@/lib/export/T0astExporter';
-import type { T0astEditModule } from '@/engine/t0ast/t0astEditWasm';
+import { t0astEncodeCell, type T0astEditModule } from '@/engine/t0ast/t0astEditWasm';
+import { midiToNoteValue } from '@/lib/tracker/noteValue';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 const ROOT = resolve(__dirname, '../../../..');
@@ -58,4 +59,23 @@ describe('T0AST export', () => {
     m._free(ptr);
     m._t0ast_close();
   }, 60_000);
+
+  // Octave, measured from the engine: setPitch plays stored note n at 440 * 2^((n - 46) / 12) Hz
+  // (F0 = 440 / 44100 at RATE 44100), so stored 46 is A-4 (MIDI 69). Popcorn's notes (stored
+  // 21..71) all sit inside the grid, none clamp.
+  const popcorn = join(DIR, 'BeRo - popcorn.t0ast');
+  it.skipIf(!existsSync(popcorn))('grid notes are the pitch the engine plays (stored 46 = A-4 440 Hz)', async () => {
+    const song = await load(new Uint8Array(readFileSync(popcorn)), 'popcorn');
+    const m = await create();
+    let seen = 0;
+    for (const p of song.patterns) for (const ch of p.channels) for (const cell of ch.rows) {
+      if (cell.note <= 0 || cell.note >= 97) continue;
+      const stored = t0astEncodeCell(m, cell)[0];
+      const hz = 440 * 2 ** ((stored - 46) / 12);
+      expect(cell.note).toBe(midiToNoteValue(Math.round(69 + 12 * Math.log2(hz / 440))));
+      seen++;
+    }
+    expect(seen).toBeGreaterThan(0);
+    expect(midiToNoteValue(69)).toBe(58);
+  });
 });

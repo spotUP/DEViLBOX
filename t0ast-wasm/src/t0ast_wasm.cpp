@@ -130,16 +130,22 @@ EMSCRIPTEN_KEEPALIVE int t0ast_poke(int offset, const uint8_t* bytes, int count)
 namespace {
 /* ---- grid: the cells as tracker cells, decoded here so TypeScript only copies numbers out.
  * Seven int32 a cell (note, instrument, volume, effTyp, eff, effTyp2, eff2), 64 rows x 16
- * channels a pattern, row-major. Note: 1..127 as stored (the engine plays note n - 1), 97 for a
- * key off (stored 254, 255 or 129). Volume: 0x10 + vol (0..64), 0 when the cell keeps it (0xFF).
+ * channels a pattern, row-major. Note: tracker note value (1 = C-0, 96 = B-7), 97 for a key off
+ * (stored 254, 255 or 129). The value is measured from the engine pitch: setPitch plays stored n at
+ * 440 * 2^((n - 1 - 45) / 12) Hz (F0 = 440 / 44100), so stored 46 sounds 440 Hz = A-4 = value 58,
+ * value = stored + 12. Stored notes above 84 clamp to B-7 (96); export keeps their bytes unedited. Volume: 0x10 + vol (0..64), 0 when the cell keeps it (0xFF).
  * Effects: T0AST's own numbers as stored (playRow, rowEffect). Instrument 0: a T0AST cell has
  * none, each channel plays its own instrument. */
 Song g_grid;
 int32_t g_gridOut[64 * 16 * 7];
 uint8_t g_cellOut[6];
 
+// stored note n plays 440 * 2^((n - 46) / 12) Hz; tracker value 58 is A-4 (440 Hz): see the grid comment
+constexpr int kStoredToValue = 58 - 46;
+
 void gridCell(const Cell& x, int32_t* o) {
-  o[0] = (x.note == 254 || x.note == 255 || x.note == 129) ? 97 : x.note;
+  o[0] = (x.note == 254 || x.note == 255 || x.note == 129) ? 97
+       : (x.note >= 1 && x.note <= 127) ? std::min(96, x.note + kStoredToValue) : 0;
   o[2] = x.vol <= 64 ? 0x10 + x.vol : 0;
   o[3] = x.fx[0]; o[4] = x.par[0]; o[5] = x.fx[1]; o[6] = x.par[1];
 }
@@ -182,7 +188,10 @@ EMSCRIPTEN_KEEPALIVE int t0ast_play_pattern_index(void) {
 /* One tracker cell back to the six stored bytes (poke order note, vol, fx[0], fx[1], par[0],
  * par[1]); the inverse of gridPattern, key off stored as 255. */
 EMSCRIPTEN_KEEPALIVE const uint8_t* t0ast_encode_cell(int note, int volume, int effTyp, int eff, int effTyp2, int eff2) {
-  g_cellOut[0] = uint8_t(note == 97 ? 255 : (note >= 0 && note <= 127 ? note : 0));
+  // tracker value back to the stored note; values below C-1 (stored 1) clamp to stored 1
+  g_cellOut[0] = uint8_t(note == 97 ? 255
+                         : (note >= 1 && note <= 96) ? std::max(1, note - kStoredToValue)
+                         : (note < 0 ? 1 : 0));
   g_cellOut[1] = uint8_t(volume >= 0x10 && volume <= 0x50 ? volume - 0x10 : 0xFF);
   g_cellOut[2] = uint8_t(effTyp); g_cellOut[3] = uint8_t(effTyp2);
   g_cellOut[4] = uint8_t(eff); g_cellOut[5] = uint8_t(eff2);
