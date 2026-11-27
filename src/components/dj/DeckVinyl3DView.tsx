@@ -29,6 +29,7 @@ import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
+import { faderOffset, dragToValue } from './control3DMapping';
 import { useDJStore } from '@/stores/useDJStore';
 import { tonearmProgress, armAngle, VINYL3D_ARM_RANGE } from '@/lib/dj/tonearm';
 import { platterPositionSec } from './DeckCssTurntable';
@@ -65,6 +66,8 @@ const _compositeMat = new THREE.Matrix4();
 
 
 /** Compute rotation matrix around a Y-axis pivot point (model is Y-up). */
+const PITCH_FADER = { min: -8, max: 8, restValue: 0, travel: -8 };
+
 function makeRotationAroundPivot(angle: number, pivot: THREE.Vector3, out: THREE.Matrix4): void {
   // M = T(pivot) * Ry(angle) * T(-pivot)
   _transMat.makeTranslation(pivot.x, pivot.y, pivot.z);
@@ -389,11 +392,9 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
     // ── Pitch slider follows pitch value ──
     if (pitchsliderMesh) {
-      // SL-1200: pitch 0 = center of track, +pitch = slider moves toward back (-Z)
-      // Full range: -8..+8 semitones maps to +4cm..-4cm Z offset in model space
-      const pitchNorm = (playStateRef.current.pitchOffset ?? 0) / 8; // -1..+1
-      const slideRange = 4.0; // cm of half-travel in model space
-      const zOffset = -pitchNorm * slideRange; // inverted: positive pitch = back
+      // Same direction as the 2D DeckPitchSlider: higher pitch = toward the back (-Z, up on screen).
+      // -8..+8 semitones spans 8 cm of model space, centred on the rest position.
+      const zOffset = faderOffset(playStateRef.current.pitchOffset ?? 0, PITCH_FADER);
       _compositeMat.makeTranslation(0, 0, zOffset);
       pitchsliderMesh.matrix.copy(_compositeMat);
     }
@@ -520,10 +521,9 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       if (!pitchDragRef.current) return;
-      const dy = e.clientY - pitchDragStartYRef.current;
-      const pitchDelta = (dy / 120) * 8; // 120px = full ±8 semitone range
-      const newPitch = Math.max(-8, Math.min(8, pitchDragStartValueRef.current + pitchDelta));
-      DJActions.setDeckPitch(deckId, newPitch);
+      // Drag up = cap moves up = higher pitch (was inverted against the cap). 240px = full range.
+      const up = pitchDragStartYRef.current - e.clientY;
+      DJActions.setDeckPitch(deckId, dragToValue(pitchDragStartValueRef.current, up, PITCH_FADER.min, PITCH_FADER.max, 240));
     };
     const onUp = () => { pitchDragRef.current = false; };
     window.addEventListener('pointermove', onMove);

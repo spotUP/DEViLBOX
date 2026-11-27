@@ -16,6 +16,7 @@ import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF, OrbitControls, View, PerspectiveCamera, Environment } from '@react-three/drei';
 import * as THREE from 'three';
+import { knobAngleY, faderOffset, dragToValue } from './control3DMapping';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import * as DJActions from '@/engine/dj/DJActions';
@@ -29,11 +30,6 @@ const MODEL_PATH = '/models/vestax-mixer.glb';
 // Model coordinate system: Y-up, X=left-right, Z=front-back (negative Z = back/rear)
 // Scale factor: model is in cm-ish units, we normalize to ~0.3 meters tall
 const MODEL_SCALE = 0.01;
-
-// Knob rotation range (radians) — most DJ knobs rotate ~270°
-const KNOB_MIN_ANGLE = -Math.PI * 0.75; // -135°
-const KNOB_MAX_ANGLE = Math.PI * 0.75;  // +135°
-const KNOB_RANGE = KNOB_MAX_ANGLE - KNOB_MIN_ANGLE;
 
 
 // Pre-allocated matrices for per-frame rotation
@@ -71,12 +67,13 @@ interface FaderControl {
   label: string;
   axis: 'x' | 'y' | 'z'; // 3D translation axis
   dragAxis: 'x' | 'y'; // mouse drag axis: 'x'=horizontal, 'y'=vertical
-  travel: number; // travel distance in model units
+  travel: number; // signed distance along `axis` from min to max, model units
+  restValue: number; // value the untouched model shows (cap position in the mesh data)
   action: (value: number) => void;
   readValue: () => number;
   min: number;
   max: number;
-  defaultValue: number; // value at rest position in the 3D model
+  defaultValue: number; // double-click reset value
 }
 
 /** What a button controls */
@@ -148,79 +145,79 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
     const store = useDJStore.getState;
 
     const knobs: KnobControl[] = [
-      // CH-1 (Deck A) strip — x ~ -9.6
+      // CH-1 (Deck A) strip, above its fader (faceplate PGM 1) — x ~ -3.2, rear to front: trim, high, mid, low
       {
-        meshName: 'knob2', label: 'CH1 Trim',
+        meshName: 'knob6', label: 'CH1 Trim',
         action: (v) => DJActions.setDeckTrimGain('A', v),
         readValue: () => store().decks.A.trimGain,
         min: -12, max: 12, defaultValue: 0, centerDetent: true,
       },
       {
-        meshName: 'knob3', label: 'CH1 EQ High',
+        meshName: 'knob7', label: 'CH1 EQ High',
         action: (v) => DJActions.setDeckEQ('A', 'high', v),
         readValue: () => store().decks.A.eqHigh,
         min: -24, max: 6, defaultValue: 0, centerDetent: true,
       },
       {
-        meshName: 'knob4', label: 'CH1 EQ Mid',
+        meshName: 'knob8', label: 'CH1 EQ Mid',
         action: (v) => DJActions.setDeckEQ('A', 'mid', v),
         readValue: () => store().decks.A.eqMid,
         min: -24, max: 6, defaultValue: 0, centerDetent: true,
       },
       {
-        meshName: 'knob5', label: 'CH1 EQ Low',
+        meshName: 'knob9', label: 'CH1 EQ Low',
         action: (v) => DJActions.setDeckEQ('A', 'low', v),
         readValue: () => store().decks.A.eqLow,
         min: -24, max: 6, defaultValue: 0, centerDetent: true,
       },
 
-      // CH-2 (Deck B) strip — x ~ 3.3
+      // CH-2 (Deck B) strip, above its fader (faceplate PGM 2) — x ~ 3.3, rear to front: trim, high, mid, low
       {
-        meshName: 'knob13', label: 'CH2 Trim',
+        meshName: 'knob10', label: 'CH2 Trim',
         action: (v) => DJActions.setDeckTrimGain('B', v),
         readValue: () => store().decks.B.trimGain,
         min: -12, max: 12, defaultValue: 0, centerDetent: true,
       },
       {
-        meshName: 'knob12', label: 'CH2 EQ High',
+        meshName: 'knob11', label: 'CH2 EQ High',
         action: (v) => DJActions.setDeckEQ('B', 'high', v),
         readValue: () => store().decks.B.eqHigh,
         min: -24, max: 6, defaultValue: 0, centerDetent: true,
       },
       {
-        meshName: 'knob11', label: 'CH2 EQ Mid',
+        meshName: 'knob12', label: 'CH2 EQ Mid',
         action: (v) => DJActions.setDeckEQ('B', 'mid', v),
         readValue: () => store().decks.B.eqMid,
         min: -24, max: 6, defaultValue: 0, centerDetent: true,
       },
       {
-        meshName: 'knob10', label: 'CH2 EQ Low',
+        meshName: 'knob13', label: 'CH2 EQ Low',
         action: (v) => DJActions.setDeckEQ('B', 'low', v),
         readValue: () => store().decks.B.eqLow,
         min: -24, max: 6, defaultValue: 0, centerDetent: true,
       },
 
-      // Center column — x ~ -3.2
+      // Left column — x ~ -9.6, rear to front: master, booth, headphone, cue/mix
       {
-        meshName: 'knob9', label: 'Cue/Mix',
+        meshName: 'knob2', label: 'Cue/Mix',
         action: (v) => store().setCueMix(v),
         readValue: () => store().cueMix,
         min: 0, max: 1, defaultValue: 0.5, centerDetent: true,
       },
       {
-        meshName: 'knob8', label: 'Headphone Level',
+        meshName: 'knob3', label: 'Headphone Level',
         action: (v) => store().setCueVolume(v),
         readValue: () => store().cueVolume,
         min: 0, max: 1.5, defaultValue: 1,
       },
       {
-        meshName: 'knob7', label: 'Master Level',
+        meshName: 'knob5', label: 'Master Level',
         action: (v) => DJActions.setMasterVolume(v),
         readValue: () => store().masterVolume,
         min: 0, max: 1.5, defaultValue: 1,
       },
       {
-        meshName: 'knob6', label: 'Booth Level',
+        meshName: 'knob4', label: 'Booth Level',
         action: (v) => DJActions.setBoothVolume(v),
         readValue: () => store().boothVolume,
         min: 0, max: 1.5, defaultValue: 1,
@@ -259,65 +256,62 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
         readValue: () => (store().decks.A.filterPosition + 1) / 2,
         min: 0, max: 1, defaultValue: 0.5, centerDetent: true,
       },
+      {
+        meshName: 'knob14', label: 'Session Monitor Level',
+        action: (v) => store().setSessionMonitorVolume(v),
+        readValue: () => store().sessionMonitorVolume,
+        min: 0, max: 1.5, defaultValue: 1,
+      },
     ];
 
+    // Axes and travel are measured from the model: slots cut in the faceplate
+    // mesh and the scales printed on Faceplate_Diff_01_2.png. Y is up, so no
+    // fader travels on Y. See control3DMapping.ts for the direction rules.
     const faders: FaderControl[] = [
       {
+        // Scale 10 (rear) .. 0 (front); the model rests at 10.
         meshName: 'exp_fader1', label: 'CH1 Volume',
-        axis: 'y', dragAxis: 'y', travel: 5.0, defaultValue: 0.75,
+        axis: 'z', dragAxis: 'y', travel: -5.0, restValue: 1.5, defaultValue: 0.75,
         action: (v) => DJActions.setDeckVolume('A', v),
         readValue: () => store().decks.A.volume,
         min: 0, max: 1.5,
       },
       {
         meshName: 'fader1', label: 'CH2 Volume',
-        axis: 'y', dragAxis: 'y', travel: 5.0, defaultValue: 0.75,
+        axis: 'z', dragAxis: 'y', travel: -5.0, restValue: 1.5, defaultValue: 0.75,
         action: (v) => DJActions.setDeckVolume('B', v),
         readValue: () => store().decks.B.volume,
         min: 0, max: 1.5,
       },
       {
-        meshName: 'fader4', label: 'Master Volume',
-        axis: 'y', dragAxis: 'y', travel: 5.0, defaultValue: 0.75,
-        action: (v) => DJActions.setMasterVolume(v),
-        readValue: () => store().masterVolume,
-        min: 0, max: 1.5,
-      },
-      {
-        meshName: 'hfader1', label: 'Crossfader',
-        axis: 'x', dragAxis: 'x', travel: 4.0, defaultValue: 0.5,
-        action: (v) => {
-          const hamster = store().hamsterSwitch;
-          const pos = hamster ? 1 - v : v;
-          DJActions.setCrossfader(pos);
-        },
+        // Front-centre slot x -2.45..2.55, "1" left, "2" right; the model rests right of centre.
+        meshName: 'fader4', label: 'Crossfader',
+        axis: 'x', dragAxis: 'x', travel: 5.0, restValue: 0.646, defaultValue: 0.5,
+        action: (v) => DJActions.setCrossfader(store().hamsterSwitch ? 1 - v : v),
         readValue: () => {
-          const hamster = store().hamsterSwitch;
           const pos = store().crossfaderPosition;
-          return hamster ? 1 - pos : pos;
+          return store().hamsterSwitch ? 1 - pos : pos;
         },
         min: 0, max: 1,
       },
       {
-        meshName: 'exp_hfader1', label: 'Crossfader Alt',
-        axis: 'x', dragAxis: 'x', travel: 4.0, defaultValue: 0.5,
-        action: (v) => {
-          const hamster = store().hamsterSwitch;
-          const pos = hamster ? 1 - v : v;
-          DJActions.setCrossfader(pos);
-        },
+        // "C.F. MONITOR" PGM 1 (left) .. PGM 2 (right); the model rests at the right end.
+        meshName: 'hfader1', label: 'Crossfader Monitor',
+        axis: 'x', dragAxis: 'x', travel: 2.1, restValue: 1, defaultValue: 0.5,
+        action: (v) => DJActions.setCrossfader(store().hamsterSwitch ? 1 - v : v),
         readValue: () => {
-          const hamster = store().hamsterSwitch;
           const pos = store().crossfaderPosition;
-          return hamster ? 1 - pos : pos;
+          return store().hamsterSwitch ? 1 - pos : pos;
         },
         min: 0, max: 1,
       },
       {
-        meshName: 'knob14', label: 'CF Monitor',
-        axis: 'x', dragAxis: 'x', travel: 3.0, defaultValue: 1,
-        action: (v) => store().setSessionMonitorVolume(v),
-        readValue: () => store().sessionMonitorVolume,
+        // "MONITOR LEVEL" MAX (rear) .. MIN (front).
+        // shortcut: travel and rest are estimated from the slot ends (z 0.5..3.4), re-measure if the cap leaves the slot
+        meshName: 'exp_hfader1', label: 'Headphone Level',
+        axis: 'z', dragAxis: 'y', travel: -2.0, restValue: 0.5, defaultValue: 1,
+        action: (v) => store().setCueVolume(v),
+        readValue: () => store().cueVolume,
         min: 0, max: 1.5,
       },
     ];
@@ -334,12 +328,12 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
         readActive: () => store().decks.B.pflEnabled,
       },
       {
-        meshName: 'exp_button1', label: 'CUE CH1 Alt',
+        meshName: 'exp_button2', label: 'CUE CH1 Alt', // rear button, printed PGM 1
         action: () => DJActions.togglePFL('A'),
         readActive: () => store().decks.A.pflEnabled,
       },
       {
-        meshName: 'exp_button2', label: 'CUE CH2 Alt',
+        meshName: 'exp_button1', label: 'CUE CH2 Alt', // front button, printed PGM 2
         action: () => DJActions.togglePFL('B'),
         readActive: () => store().decks.B.pflEnabled,
       },
@@ -575,9 +569,7 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
       const entry = meshRegistry.get(meshName);
       if (!entry || entry.meshes.length === 0) continue;
 
-      const value = control.readValue();
-      const normalized = (value - control.min) / (control.max - control.min);
-      const angle = KNOB_MIN_ANGLE + normalized * KNOB_RANGE;
+      const angle = knobAngleY(control.readValue(), control.min, control.max);
 
       // Rotate around Y-axis at the knob's center, composed with each mesh's rest matrix
       makeRotationAroundPivotY(angle, entry.center, _knobCompositeMat);
@@ -593,19 +585,12 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
       const entry = meshRegistry.get(meshName);
       if (!entry || entry.meshes.length === 0) continue;
 
-      const value = control.readValue();
-      const normalized = (value - control.min) / (control.max - control.min);
-
-      // Offset relative to default position (rest position in 3D model = defaultValue)
-      const defaultNorm = (control.defaultValue - control.min) / (control.max - control.min);
-      const delta = normalized - defaultNorm;
-      if (control.axis === 'x') {
-        _faderTransMat.makeTranslation(delta * control.travel, 0, 0);
-      } else if (control.axis === 'y') {
-        _faderTransMat.makeTranslation(0, delta * control.travel, 0);
-      } else {
-        _faderTransMat.makeTranslation(0, 0, delta * control.travel);
-      }
+      const offset = faderOffset(control.readValue(), control);
+      _faderTransMat.makeTranslation(
+        control.axis === 'x' ? offset : 0,
+        control.axis === 'y' ? offset : 0,
+        control.axis === 'z' ? offset : 0,
+      );
 
       for (let i = 0; i < entry.meshes.length; i++) {
         const mesh = entry.meshes[i];
@@ -776,9 +761,8 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
         const knob = knobMap.get(knobName);
         if (!knob) return;
         const dy = dragStartRef.current.y - e.clientY;
-        // Tighter sensitivity (150px = full range, matches standard Knob component)
-        const delta = (dy / 150) * (knob.max - knob.min);
-        let newVal = Math.max(knob.min, Math.min(knob.max, dragStartValueRef.current + delta));
+        // 150px = full range, matches standard Knob component
+        let newVal = dragToValue(dragStartValueRef.current, dy, knob.min, knob.max);
         // Snap to center detent (default value) when crossing it
         if (knob.centerDetent) {
           const detent = knob.defaultValue;
@@ -795,8 +779,7 @@ export function MixerScene({ viewRef }: { viewRef: React.RefObject<HTMLDivElemen
         const d = fader.dragAxis === 'x'
           ? e.clientX - dragStartRef.current.x
           : dragStartRef.current.y - e.clientY;
-        const delta = (d / 150) * (fader.max - fader.min);
-        fader.action(Math.max(fader.min, Math.min(fader.max, dragStartValueRef.current + delta)));
+        fader.action(dragToValue(dragStartValueRef.current, d, fader.min, fader.max));
       }
     };
 
