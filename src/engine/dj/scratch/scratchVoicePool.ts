@@ -199,6 +199,9 @@ export class ScratchVoicePool {
     let source: DemoSource = { sig, anchor: this.cueSample(record, cue), safe: record.demoCue.safe };
     // statement and chop (C16): the phrase thrown from its first sample, the scratches on its last word
     if (spec.slice === 'phrase') source = { ...source, anchor: 0 };
+    // a phrase throw plays to the phrase's end (its last word, else the safe range): its steps alone at 130 BPM
+    // stopped "that was fresh" on "that was fr" (SCR-PHRASE-CUT 2026-11-27)
+    if (gesture.id === 'dropPhrase') source = { ...source, end: lastWordSlice(record, DEMO_RATE)?.end ?? record.demoCue.safe[1] };
     else if (spec.slice === 'word') {
       const w = lastWordSlice(record, DEMO_RATE);
       if (w) source = { sig: sig.slice(w.start, w.end), anchor: w.vowel, safe: [0, w.end - w.start - 1] };

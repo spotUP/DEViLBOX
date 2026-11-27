@@ -11,7 +11,11 @@ import { buildThreeDeckRoutine } from '../scratchDemoRoutines';
 import { anchorFor } from '../scratchAnchor';
 import type { ScratchSource } from '../scratchTypes';
 import { getScratchRecord } from '../scratchCatalogue';
-import { gestureBeats } from '../scratchGestureCatalog';
+import { gestureBeats, getGesture } from '../scratchGestureCatalog';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { ScratchVoicePool } from '../scratchVoicePool';
+import { lastWordSlice } from '../scratchCatalogue';
 
 const crateSource = (recordId: string): ScratchSource => ({ type: 'CRATE', recordId, anchor: { position: 0, safe: [0, 1], safeForward: [0, 1], safeReverse: [0, 1] } });
 const PHRASE = getScratchRecord('AH_FRESH_FULL_PHRASE')!;
@@ -31,4 +35,18 @@ describe('a throw follows the demo (SCR-THROW-DEMO)', () => {
     expect(drop.cue).toBe('vowel');
     expect(drop.position).toBeCloseTo(WORD.anchors.vowel, 9);
   });
+
+  it('a phrase throw plays to the phrase\'s end, never stopping inside a word (SCR-PHRASE-CUT)', async () => {
+    // 16 steps at 130 BPM are 1.85 s: from the vowel that stopped "that was fresh" on "that was fr"
+    for (const id of ['AH_FRESH_FULL_PHRASE', 'HE_CUT_THE_MUSIC']) {
+      const rec = getScratchRecord(id)!;
+      const bytes = async () => { const b = readFileSync(join(process.cwd(), 'public', 'data', 'samples', 'packs', 'scratch-originals', rec.file)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.length); };
+      const pool = new ScratchVoicePool({} as BaseAudioContext, {} as AudioNode, { bytes });
+      const out = (await pool.renderStroke(getGesture('dropPhrase'), rec, { seed: 0, humanizeSamples: 0, chain: 'threeDeck' }, 130, 1))!;
+      const end = lastWordSlice(rec)?.end ?? rec.demoCue.safe[1];
+      const steps = Math.trunc(16 * 60 / (130 * 4) * 22050);
+      expect(end - rec.demoCue.anchor).toBeGreaterThan(steps); // a long phrase: its steps alone would cut it
+      expect(out.length).toBe(end - rec.demoCue.anchor);
+    }
+  }, 60_000);
 });

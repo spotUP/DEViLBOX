@@ -136,7 +136,8 @@ export const DEMO_PROFILES: Readonly<Record<'old_school' | 'boombap' | 'east_coa
 export type DemoProfileName = keyof typeof DEMO_PROFILES;
 
 /** A record as the demo's cue source: the signal, the anchor (sample) and the safe range (samples). */
-export interface DemoSource { sig: Float64Array; anchor: number; safe: readonly [number, number] }
+/** `end`: a phrase throw's last sample (its last word's end), so the throw never stops inside a word (SCR-PHRASE-CUT). */
+export interface DemoSource { sig: Float64Array; anchor: number; safe: readonly [number, number]; end?: number }
 
 // ── turntable.py stages ───────────────────────────────────────────────────
 
@@ -443,7 +444,7 @@ export function renderGesture(source: DemoSource, name: string | DemoGesture, du
     const src = source.sig;
     const anchor = Math.trunc(source.anchor);
     const avail = Math.max(1, src.length - anchor);
-    const npl = Math.min(avail, Math.max(n, Math.trunc(0.5 * rate)));
+    const npl = Math.min(avail, Math.max(n, Math.trunc(0.5 * rate), source.end !== undefined ? Math.trunc(source.end) - anchor : 0));
     const vel = new Float64Array(npl).fill(1);
     const out = renderFromMotion(src, anchor, source.safe, vel);
     const fade = new Float64Array(out.length).fill(1);
