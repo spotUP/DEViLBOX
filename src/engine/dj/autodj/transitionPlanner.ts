@@ -156,16 +156,29 @@ export function chooseMixOut(a: DJTrackAnalysis, position: number, lengthSec: nu
 
 export interface MixInChoice { time: number; reasons: string[] }
 
-/** Where the incoming track starts, by strategy (plan section 7). */
-export function chooseMixIn(a: DJTrackAnalysis, style: TransitionStyle, lengthSec: number): MixInChoice {
+/**
+ * Where the incoming track starts, by strategy (plan section 7). `lengthBars` is the transition's
+ * length in bars: a start counted back from a landmark steps back that many INCOMING bars, so it is
+ * an incoming downbeat. `lengthSec` is the outgoing's clock; subtracting it from an incoming time put
+ * the start between the incoming's beats whenever the tempos differed (AUTODJ-MIX-IN-OFF-BEAT).
+ */
+export function chooseMixIn(a: DJTrackAnalysis, style: TransitionStyle, lengthSec: number, lengthBars: number): MixInChoice {
   const c = a.cuePoints;
+  const bars = a.downbeats.bars;
+  const inBarSec = Math.max(1, a.downbeats.meter.beatsPerBar) * 60 / Math.max(1, a.bpm);
+  // The incoming downbeat `lengthBars` bars before `t` (landmarks sit on bar starts); past the grid, the meter's bar length.
+  const barsBefore = (t: number) => {
+    const i = barIndexAt(a.downbeats, t);
+    if (bars.length > 0 && Math.abs(bars[i].start - t) < 0.02) return i - lengthBars >= 0 ? bars[i - lengthBars].start : t - lengthBars * inBarSec;
+    return t - lengthBars * inBarSec;
+  };
   const safe = (t: number | undefined, fallback: number) => (t !== undefined && t >= 0 && t < a.durationSec - lengthSec ? t : fallback);
   const usable = safe(c.bestMixIn, safe(c.firstDrums, a.landmarks.firstUsableMixPoint));
   switch (style) {
     case 'drumIntroMix': return { time: safe(c.firstDrums, usable), reasons: ['start at the incoming drums'] };
     case 'dropMix': {
       const drop = c.firstDrop ?? c.firstHook;
-      if (drop !== undefined && drop - lengthSec >= 0) return { time: drop - lengthSec, reasons: ['start so the incoming drop lands as the outgoing track leaves'] };
+      if (drop !== undefined && barsBefore(drop) >= 0) return { time: barsBefore(drop), reasons: ['start so the incoming drop lands as the outgoing track leaves'] };
       return { time: usable, reasons: ['no drop known: best mix-in'] };
     }
     case 'hardCut': return { time: safe(c.firstHook ?? c.firstDrop ?? c.firstFullGroove, usable), reasons: ['cut straight into the hook'] };
@@ -181,7 +194,7 @@ export function chooseMixIn(a: DJTrackAnalysis, style: TransitionStyle, lengthSe
     }
     case 'vocalSwap': {
       const v = c.firstVocal;
-      if (v !== undefined && v - lengthSec >= 0) return { time: Math.max(usable, v - lengthSec), reasons: ['incoming vocal arrives after the outgoing vocal has left'] };
+      if (v !== undefined && barsBefore(v) >= 0) return { time: Math.max(usable, barsBefore(v)), reasons: ['incoming vocal arrives after the outgoing vocal has left'] };
       return { time: usable, reasons: ['best mix-in'] };
     }
     default: return { time: usable, reasons: [usable === c.bestMixIn ? 'the track\'s best mix-in point' : 'first usable mixing point'] };
@@ -780,7 +793,7 @@ export function planTransition(input: TransitionPlanInput): DJTransitionPlan {
   }
   const durationBeats = durationBars * beatsPerBar;
   const lengthSec = durationBars * barSec;
-  const mixIn = juggle ? ladder!.mixIn : chooseMixIn(incoming, transitionStyle, lengthSec);
+  const mixIn = juggle ? ladder!.mixIn : chooseMixIn(incoming, transitionStyle, lengthSec, durationBars);
   // The incoming starts with the ladder, the trade length before its mix-in.
   const incomingPosition = juggle ? ladder!.incomingPosition : mixIn.time;
   const startBeat = beatIndexAt(outgoing, mixOut.time);
