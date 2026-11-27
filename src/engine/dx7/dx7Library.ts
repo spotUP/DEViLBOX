@@ -76,17 +76,6 @@ export function parseDX7LibraryValue(value: string): { file: string; index: numb
   return Number.isInteger(index) && index >= 0 && index < 32 ? { file: value.slice(0, at), index } : null;
 }
 
-/** Voice names grouped by bank, in the shape CustomSelect takes (one group per bank). */
-export function dx7LibrarySelectGroups(manifest: DX7LibraryManifest) {
-  return manifest.banks.map(bank => ({
-    label: bank.name,
-    options: bank.voices.map((name, i) => ({
-      value: dx7LibraryValue(bank.file, i),
-      label: `${i + 1}. ${name}`,
-    })),
-  }));
-}
-
 export interface DX7LibraryMatch {
   bank: DX7LibraryBank;
   /** Voice indices (0..31) of the bank to list: all of them when the bank itself matches, else the voices that match. */
@@ -114,4 +103,15 @@ export function filterDX7Library(banks: readonly DX7LibraryBank[], query: string
     if (voices.length > 0) matches.push({ bank, voices });
   }
   return matches;
+}
+
+export interface DX7LibraryVoiceRow {
+  bank: DX7LibraryBank;
+  index: number;
+  name: string;
+}
+
+/** The filter result as one flat list of voices, in bank order. */
+export function flattenDX7Matches(matches: readonly DX7LibraryMatch[]): DX7LibraryVoiceRow[] {
+  return matches.flatMap(m => m.voices.map(index => ({ bank: m.bank, index, name: m.bank.voices[index] })));
 }

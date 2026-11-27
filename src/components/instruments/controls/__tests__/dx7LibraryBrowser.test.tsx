@@ -1,12 +1,12 @@
 /**
- * The library browser narrows 246 banks with a live filter and picks a voice in two levels (bank, then voice).
+ * The library browser narrows 246 banks with a live filter and lists the matching voices in one flat list.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Dx7LibraryBrowser } from '../Dx7LibraryBrowser';
-import { filterDX7Library, type DX7LibraryManifest } from '../../../../engine/dx7/dx7Library';
+import { filterDX7Library, flattenDX7Matches, type DX7LibraryManifest } from '../../../../engine/dx7/dx7Library';
 
 afterEach(cleanup);
 
@@ -48,29 +48,34 @@ describe('filterDX7Library', () => {
   });
 });
 
+describe('flattenDX7Matches', () => {
+  it('one row per matching voice, in bank order, carrying its bank and index', () => {
+    const rows = flattenDX7Matches(filterDX7Library(SMALL.banks, 'bass'));
+    expect(rows.map((r) => [r.bank.file, r.index, r.name])).toEqual([
+      ['b1.syx', 1, 'BASS 1'], ['b2.syx', 0, 'SUB BASS'], ['b2.syx', 1, 'WOBBLE'], ['b2.syx', 2, 'PLUCK'],
+    ]);
+  });
+});
+
 describe('Dx7LibraryBrowser', () => {
-  it('typing in the filter narrows the bank list, and picking a voice calls the loader with bank file and index', () => {
+  const rowsNow = () => within(screen.getByRole('listbox', { name: 'Voices' })).getAllByRole('option');
+
+  it('lists every voice flat with its bank, filters live, and picking calls the loader with bank file and index', () => {
     const onPick = vi.fn();
     render(<Dx7LibraryBrowser library={SMALL} current={null} onPick={onPick} />);
-    const banks = () => within(screen.getByRole('listbox', { name: 'Banks' })).getAllByRole('option');
-    expect(banks()).toHaveLength(3);
+    expect(rowsNow()).toHaveLength(8);
     fireEvent.change(screen.getByLabelText('Search the library'), { target: { value: 'wobble' } });
-    expect(banks().map((b) => b.textContent)).toEqual(['Synth Bass Pack']);
-    expect(screen.getByText(/1 of 3 banks, 1 voice$/)).toBeTruthy();
-    fireEvent.click(within(screen.getByRole('listbox', { name: 'Voices' })).getByText('WOBBLE'));
+    expect(rowsNow().map((r) => r.textContent)).toEqual(['WOBBLESynth Bass Pack / Bo Builder']);
+    expect(screen.getByText('1 voice')).toBeTruthy();
+    fireEvent.click(rowsNow()[0]);
     expect(onPick).toHaveBeenCalledWith('b2.syx', 1);
   });
 
-  it('browsing another bank lists its voices; the sounding voice is highlighted; the chosen bank shows its attribution', () => {
+  it('the sounding voice is highlighted', () => {
     render(<Dx7LibraryBrowser library={SMALL} current={{ file: 'b3.syx', index: 1 }} onPick={() => {}} />);
-    const voices = within(screen.getByRole('listbox', { name: 'Voices' }));
-    expect(voices.getByText('WARM PAD').closest('[role=option]')?.getAttribute('aria-selected')).toBe('true');
-    expect(voices.getByText('STRINGS 1').closest('[role=option]')?.getAttribute('aria-selected')).toBe('false');
-    expect(screen.getByText(/Cy Creator/)).toBeTruthy();
-    fireEvent.click(within(screen.getByRole('listbox', { name: 'Banks' })).getByText('Rhodes Collection'));
-    expect(within(screen.getByRole('listbox', { name: 'Voices' })).getByText('E.PIANO 1')).toBeTruthy();
-    expect(screen.getByText(/Ann Author/)).toBeTruthy();
-    expect(screen.getByRole('link').getAttribute('href')).toBe('https://example.test/1');
+    const on = rowsNow().filter((r) => r.getAttribute('aria-selected') === 'true');
+    expect(on).toHaveLength(1);
+    expect(on[0].textContent).toContain('WARM PAD');
   });
 
   it('a search that matches nothing says so', () => {
