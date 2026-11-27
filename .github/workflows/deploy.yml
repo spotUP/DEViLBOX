@@ -152,6 +152,11 @@ jobs:
           # changelog and BUILD_NUMBER count commits, a shallow clone counts 1.
           fetch-depth: 0
           filter: tree:0
+          # Windows cannot hold '>' in file names: leave the three Sonix
+          # "*.-=>PB.instr" files out of the Windows desktop build (their
+          # names are looked up from inside the .smus, so they cannot be renamed).
+          sparse-checkout: ${{ matrix.platform == 'win' && '/*\n!/public/data/songs/sonix-scores2/instruments/*=>PB.instr' || '' }}
+          sparse-checkout-cone-mode: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
