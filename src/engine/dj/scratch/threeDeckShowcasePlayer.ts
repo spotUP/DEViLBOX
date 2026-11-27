@@ -3,7 +3,7 @@
  * Deck C and its own A/B juggle layer (J1-J10, X8) - while the set holds. The decks that are playing are paused
  * (the Auto DJ with them) and resumed where they stopped the moment the render ends; nothing on the DJ mixer is
  * touched, and only one beat sounds at a time. The render goes to the mixer's sampler input (Deck C's place: past
- * the crossfader). If the Auto DJ is mid-transition the showcase waits for the transition to finish.
+ * the crossfader); the main mixer's crossfader and Deck C only show the routine (display, see showOnMixer). If the Auto DJ is mid-transition the showcase waits for the transition to finish.
  *
  * One player; the DJ view's button, the MCP tool and the keyboard command all call `toggle()` through DJActions.
  */
@@ -11,6 +11,7 @@
 import { SHOWCASE_RATE, JUGGLE_RECORDS_URL, type ShowcaseParams, type ShowcaseRender, type ShowcaseRenderIO } from './threeDeckShowcase';
 
 import { getDeckCMotion } from './deckCMotion';
+import { useDJStore } from '@/stores/useDJStore';
 
 export type DeckId = 'A' | 'B' | 'C';
 /** The showcase's strokes on the Deck C motion timeline. */
@@ -54,6 +55,9 @@ export class ThreeDeckShowcasePlayer {
   private source: AudioBufferSourceNode | null = null;
   private render: ShowcaseRender | null = null;
   private run = 0;
+  /** The main mixer's view while the render plays: its crossfader follows the render's, Deck C is shown. */
+  private viewTimer: ReturnType<typeof setInterval> | null = null;
+  private savedView: { crossfader: number; thirdDeck: boolean } | null = null;
   private readonly deps: ShowcaseDeps;
 
   constructor(deps: ShowcaseDeps) { this.deps = deps; }
@@ -110,6 +114,7 @@ export class ThreeDeckShowcasePlayer {
       }
       showcasePlayerStats.played++;
       this.set({ status: 'playing', startTime, durationSec: render.mix.length / SHOWCASE_RATE, held });
+      this.showOnMixer(render);
     } catch (err) {
       console.warn('[ThreeDeckShowcase] not played:', err);
       if (run === this.run) this.set({ status: 'idle', reason: err instanceof Error ? err.message : String(err), held: [] });
@@ -133,10 +138,43 @@ export class ThreeDeckShowcasePlayer {
     this.source = null;
     if (src) { src.onended = null; try { src.stop(); } catch { /* ended */ } try { src.disconnect(); } catch { /* gone */ } }
     const held = this.st.held;
+    this.restoreMixerView();
     getDeckCMotion().endOwner(SHOWCASE_OWNER, Math.trunc(this.deps.ctx().currentTime * SHOWCASE_RATE));
     showcasePlayerStats.ended++;
     this.set({ status: 'idle', held: [] });
     if (held.length) { showcasePlayerStats.resumes++; await this.deps.resume(held); }
+  }
+
+  /**
+   * The main mixer shows the routine (owner 2026-11-27, SHOWCASE-VISUALS-DEAD): Deck C on screen and the mixer's
+   * crossfader following the render's crossfader stream. Display only: the store's position moves, the mixer's
+   * gain does not (DJActions.setCrossfader is what moves both); the held decks are silent and the render plays
+   * past the crossfader, so nothing heard changes. Restored before the held decks resume.
+   */
+  private showOnMixer(render: ShowcaseRender): void {
+    const dj = useDJStore.getState();
+    this.savedView = { crossfader: dj.crossfaderPosition, thirdDeck: dj.thirdDeckActive };
+    if (!dj.thirdDeckActive) dj.setThirdDeckActive(true);
+    const step = () => {
+      const t = this.tickAt(this.deps.ctx().currentTime);
+      if (t === null) return;
+      const pos = render.streams.crossfader[t]! / 255;
+      if (useDJStore.getState().crossfaderPosition !== pos) useDJStore.getState().setCrossfader(pos);
+    };
+    step();
+    this.viewTimer = setInterval(step, 1000 / 50);
+  }
+
+  // shortcut: restores the saved store position; a fader drag (or a DJ engine rebuild) during the run leaves the
+  // mixer gain at that value while the store shows the saved one - upgrade by restoring through DJActions.setCrossfader
+  private restoreMixerView(): void {
+    if (this.viewTimer !== null) { clearInterval(this.viewTimer); this.viewTimer = null; }
+    const v = this.savedView;
+    this.savedView = null;
+    if (!v) return;
+    const dj = useDJStore.getState();
+    dj.setCrossfader(v.crossfader);
+    if (dj.thirdDeckActive !== v.thirdDeck) dj.setThirdDeckActive(v.thirdDeck);
   }
 
   /** The 50 Hz tick of the render at a context time (null when not playing or outside it). */

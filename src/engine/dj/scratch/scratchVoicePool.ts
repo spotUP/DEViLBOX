@@ -31,6 +31,9 @@ import type { ScratchCue, ScratchEventFx, ScratchGesture, ScratchRenderSpec, Scr
 import { getScratchRecord, findRecords, lastWordSlice, registerExtraRecord, forgetExtraRecords, type ScratchRecord } from './scratchCatalogue';
 import { realTimers, type ExecutorTimers } from '../autodj/executorTimers';
 
+/** The pool's strokes on the shared Deck C motion timeline. */
+const POOL_MOTION_OWNER = 'scratchVoicePool';
+
 /** Reachability sentinels: strokes rendered and handed to a bus, records read, routines shaped, loops. */
 export const scratchPoolStats = { rendered: 0, loads: 0, shaped: 0, loops: 0 };
 
@@ -298,8 +301,8 @@ export class ScratchVoicePool {
         bus.stroke(placed, samples, undefined, !gesture.needle);
       }
       // D1: Deck C's platter, fader and slip follow the same render (three_deck's viz capture)
-      if (rendered.viz) getDeckCMotion().addStroke(placed, rendered.viz);
-      else getDeckCMotion().addNeedle(placed, samples.length);
+      if (rendered.viz) getDeckCMotion().addStroke(placed, rendered.viz, POOL_MOTION_OWNER);
+      else getDeckCMotion().addNeedle(placed, samples.length, POOL_MOTION_OWNER);
       return { ok: true };
     })();
     this.track(started);
@@ -379,7 +382,8 @@ export class ScratchVoicePool {
   panic(): void {
     this.releaseAll();
     for (const p of this.deckC.values()) void p.then((b) => b.clear(), () => undefined);
-    getDeckCMotion().clear();
+    // only this pool's strokes: the timeline is shared (the Three Deck Showcase's strokes stay, SHOWCASE-VISUALS-DEAD)
+    getDeckCMotion().endOwner(POOL_MOTION_OWNER, 0);
   }
 
   private track(p: Promise<unknown>): void {
