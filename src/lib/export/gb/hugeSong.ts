@@ -220,7 +220,7 @@ function lengthBits(ins: FurnaceInstrument): { len: number; enable: boolean } {
 
 function envelope(ins: FurnaceInstrument, lossy: Lossy): number {
   const gb = ins.gb;
-  if (!gb) return 0xf0;
+  if (!gb) return 0xf2; // instrument.h DivInstrumentGB(): envVol 15, envDir 0, envLen 2
   if (gb.hwSeqLen > 0) lossy.add('hardware sequence');
   if (gb.softEnv) {
     const v = macro(ins, MACRO_VOL)?.data[0] ?? 15;
@@ -476,7 +476,8 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
               } else h = mapEffect(e.type, e.value, kind, (ord) => orderStart[ord] ?? 0, waveNo);
               if (h === undefined) { if (!((e.type === 0 || e.type === 3) && (e.value & 0xff) === 0)) lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}${FX_NAMES[e.type] ? ` (${FX_NAMES[e.type]})` : ''}`); continue; }
               if ((h & 0xf00) === 0x800) pan = h;
-              else if (effect < 0) effect = h; else lossy.add('second effect in one cell (hUGE has one effect column)');
+              // 13xx + 14xx in one cell: both update the same NR10 shadow, so the later 6xy carries both.
+              else if (effect < 0 || ((e.type === 0x13 || e.type === 0x14) && ch === 0 && (effect & 0xf00) === 0x600)) effect = h; else lossy.add('second effect in one cell (hUGE has one effect column)');
             }
             if (cell.volume >= 0) {
               if (kind === 'wave') waveVolNow[ch] = cell.volume & 15;
@@ -503,6 +504,11 @@ function convert(m: FurnaceModule, subsong: number, room: Record<Kind, number>):
               const ins = m.instruments[ci];
               if (kind === 'duty' && dutyNow[ch] > 0 && !macro(ins, MACRO_DUTY) && (effect & 0xf00) !== 0x900) instr = insNo(kind, baseKey + DUTY_STEP * (dutyNow[ch] + 1), baseKey);
               else if (kind === 'wave' && waveVolNow[ch] < 12 && !macro(ins, MACRO_VOL)) instr = insNo(kind, baseKey + VOL_STEP * (waveVol(waveVolNow[ch]) + 1), baseKey);
+            }
+            // hUGE's instrument load writes NR10 = instrument byte 0 (0); gb.cpp keyOn rewrites chan.sweep, so the reload row restates it.
+            if (ch === 0 && sweep && instr > 0) {
+              if (effect < 0) effect = 0x600 | sweep;
+              else if ((effect & 0xf00) !== 0x600) lossy.add('sweep reset by an instrument reload beside another effect');
             }
             // A row's own volume (Cxy) wins over the carried arp: the arp misses that one row, a lost volume lasts the note.
             if (effect < 0 && arpNow[ch]) effect = arpNow[ch];
