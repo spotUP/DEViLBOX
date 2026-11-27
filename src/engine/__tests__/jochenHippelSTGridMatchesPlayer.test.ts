@@ -38,7 +38,7 @@ const ROOT = join(process.cwd(), 'public/data/songs');
 const CORPUS = [
   'hippel-st/crown arabia.hst', 'hippel-st/crown england.hst', 'hippel-st/crown japan.hst',
   'hippel-st/crown russia.hst', 'hippel-st/crown viking.hst', 'hippel-st/demo music10.sog',
-  'formats/astaroth.sog', 'hippel-st-coso/ghostbattle titletune.soc',
+  'hippel-st/astaroth.sog', 'hippel-st-coso/ghostbattle titletune.soc',
 ];
 const HALF_TICK = 441; // 44.1 kHz frames; the player ticks at 50 Hz
 const SECONDS = 20;
@@ -301,7 +301,7 @@ describe('Jochen Hippel ST grid matches the player', () => {
   }, 240_000);
 
   it.each(['demo music10.sog', 'astaroth.sog'])('%s: Compress (ported) builds the song the player packs for itself', async (name) => {
-    const rel = name.startsWith('demo') ? `hippel-st/${name}` : `formats/${name}`;
+    const rel = `hippel-st/${name}`;
     const bytes = load(rel);
     const m = decodeHstModule(bytes);
     const u = await uade();

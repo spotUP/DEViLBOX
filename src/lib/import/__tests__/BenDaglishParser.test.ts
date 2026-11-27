@@ -13,7 +13,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'ben-daglish/motorhead-titleandingame.bd');
-const FILE2 = resolve(REF, 'formats/mickey_mouse.bd');
+const FILE2 = resolve(REF, 'ben-daglish/mickey_mouse.bd');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

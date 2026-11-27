@@ -25,7 +25,7 @@ import type { RowClock } from '@/lib/import/formats/stepRowClock';
 import { periodToNote } from '@/lib/amiga/periodNotes';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
-const SONGS = ['formats/mickey_mouse.bd', 'ben-daglish/motorhead-titleandingame.bd'];
+const SONGS = ['ben-daglish/mickey_mouse.bd', 'ben-daglish/motorhead-titleandingame.bd'];
 const CHUNKS = 3000;         // 30 s of UADE
 const TOL = 45;              // ms: one tick of jitter around the fitted clock
 const SKIP_START = 120;      // ms: the log starts after the first ticks

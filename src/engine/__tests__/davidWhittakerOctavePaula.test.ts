@@ -42,7 +42,7 @@ async function voicesMatching(rel: string): Promise<{ matched: number; octaves: 
 }
 
 describe('David Whittaker octave', { timeout: 180_000 }, () => {
-  for (const rel of ['formats/apb.dw', 'david-whittaker/garfield2+.dw']) {
+  for (const rel of ['david-whittaker/apb.dw', 'david-whittaker/garfield2+.dw']) {
     it(`${rel}: grid notes equal the pitch Paula plays (absolute)`, async () => {
       const { matched, octaves } = await voicesMatching(rel);
       expect(matched, 'voices whose first notes equal Paula pitch exactly').toBeGreaterThanOrEqual(2);

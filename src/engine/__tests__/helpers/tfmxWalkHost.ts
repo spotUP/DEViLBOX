@@ -12,7 +12,7 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 export const HIPPEL_TFMX_CORPUS: Array<[string, number]> = [
   ['hippel/warp (ingame 2).hip', 4],
   ['hippel-7v/lethalxcess-intro.hip7', 7],
-  ['formats/ghostbattle_gameover.hip7', 7],
+  ['hippel-7v/ghostbattle_gameover.hip7', 7],
 ];
 
 interface TfmxWasm {

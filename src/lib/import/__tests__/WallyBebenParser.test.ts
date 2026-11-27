@@ -6,7 +6,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE_BALLGAME = resolve(REF, 'wally-beben/wicked.wb');
-const FILE_CIRCUS = resolve(REF, 'formats/wicked.wb');
+const FILE_CIRCUS = resolve(REF, 'wally-beben/wicked.wb');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

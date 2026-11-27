@@ -32,7 +32,10 @@ for attempt in $(seq 1 30); do
   base=$(git rev-parse HEAD)
   # Seed from the real index so the stat cache survives: a bare read-tree makes
   # the commit rehash every tracked file (13+ min with the virus scanner on).
-  cp "$(git rev-parse --git-dir)/index" "$GIT_INDEX_FILE"
+  # -p keeps the index mtime: a fresh one disables git's racy-clean check, so a
+  # same-size edit made in the same tick as the last index write looked
+  # unchanged, was never staged, and the commit failed with "nothing to commit".
+  cp -p "$(git rev-parse --git-dir)/index" "$GIT_INDEX_FILE"
   git reset -q "$base" -- .
   # Named regular files are added even when ignored (docs/ is ignored but its
   # docs are force-tracked); directories keep normal ignore rules.

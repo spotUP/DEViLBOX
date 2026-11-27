@@ -9,7 +9,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'hippel-7v/lethalxcess-intro.hip7');
-const FILE2 = resolve(REF, 'formats/ghostbattle_gameover.hip7');
+const FILE2 = resolve(REF, 'hippel-7v/ghostbattle_gameover.hip7');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

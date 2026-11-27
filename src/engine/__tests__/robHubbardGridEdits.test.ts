@@ -14,7 +14,7 @@ import { exportRobHubbard } from '@/lib/export/RobHubbardExporter';
 import { rhNotePeriod, rhPeriodToNote } from '@/lib/import/formats/robHubbardGrid';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
-const SONGS = ['rob-hubbard/skateordie.rh', 'formats/centurion_battle.rh'];
+const SONGS = ['rob-hubbard/skateordie.rh', 'rob-hubbard/centurion_battle.rh'];
 type Rec = Record<string, number | undefined>;
 const load = (n: string): Uint8Array => new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs', n)));
 const ab = (u: Uint8Array): ArrayBuffer => u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength) as ArrayBuffer;

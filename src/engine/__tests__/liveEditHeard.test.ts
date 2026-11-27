@@ -101,7 +101,7 @@ const FILE: Record<string, string> = {
   suntronic: 'SUNTronicTunes/mule.src',
   eupmini: 'euphony/Mondschein/Mondschein.eup',
   // the walker reads the song player; the sfx-only blinkys file is a variant it does not parse
-  tonyWilliams: 'formats/future basketball main.tw',
+  tonyWilliams: 'sound-images/future basketball main.tw',
   robHubbard: files.find((f) => f.endsWith('.rh')) ?? '',
   davidWhittaker: files.find((f) => f.endsWith('.dw')) ?? '',
   benDaglish: files.find((f) => f.endsWith('.bd')) ?? '',
@@ -126,21 +126,21 @@ const FILE: Record<string, string> = {
   richardJoseph: 'richard-joseph/cannon fodder (intro).sng',
   wallyBeben: 'wally-beben/wicked.wb',
   // the .cm file in custommade/ has the suffix, not the cm. prefix isCustomMadeFormat requires: the parser declines it and UADE (absent in node) parses it
-  customMade: 'formats/cm.viking_child',
+  customMade: 'custommade/cm.viking_child',
   // the corpus holds one song per format below; each is confirmed by content detection (E.M.S. V6 header for emsv6, 0x0125 for ems)
   davidHanney: 'david-hanney/tearaway thomas unused.dh',
-  ems: 'formats/ballade.song.ems',
-  emsv6: 'formats/perception.ems',
+  ems: 'ems/ballade.song.ems',
+  emsv6: 'ems/perception.ems',
   fashionTracker: 'fashion-tracker/ivory tover ii.ex',
-  mcmd: 'formats/ep-trmonsterbusiness.mcmd',
+  mcmd: 'mcmd/ep-trmonsterbusiness.mcmd',
   // name order finds other songs first: these are the corpus songs with the format's own magic
   fmTracker: 'fm-tracker/fm dance.fmt',
-  cdfm67: 'formats/amnesia_credits.c67',
+  cdfm67: 'composer-670-cdfm/amnesia_credits.c67',
   // name order finds other songs first: these are the corpus songs with the format's own magic
   // tracked songs: an untracked local download (OctaMED MMDC/, NSF/!DPCM Sample Collection!/sd2.dmc, Nintendo Sound Format/Smam/jam.nsf) sorts first and changes the row
-  med: 'formats/bounty hunter - outro (remixed).mmd3',
-  sidmon2: 'formats/bruno_time.sid2',
-  jamcracker: 'formats/analogue_vibes.jam',
+  med: 'octamed-mmd3/bounty hunter - outro (remixed).mmd3',
+  sidmon2: 'sidmon-2/bruno_time.sid2',
+  jamcracker: 'jamcracker/analogue_vibes.jam',
 };
 /** Formats UADE plays from the module bytes: the Paula stream is the sound. */
 const PAULA = new Set(['suntronic', 'robHubbard', 'davidWhittaker', 'benDaglish', 'jochenHippelST', 'activisionPro', 'fred', 'actionamics', 'soundMaster', 'digitalSonixChrome', 'sidmon1']);
@@ -185,7 +185,6 @@ export const UNMEASURED: Record<string, string> = {
   goatTracker: 'import falls to the UADE scan (parseUADEFile) in node; plays in the GTUltra worklet; its LIVE_EDIT and ADD_ON_EMPTY_ROW rows are measured by goatTrackerLiveEditHeard.test.ts (OWN_TEST, OWN_ADD_TEST)',
   nru: 'no real song exists to measure with: the only corpus .nru (formats/howiedavies.nru) is an Amiga executable (hunk 000003f3), not a NoiseRunner module (no M.K. at 1080), and modland has no NoiseRunner directory (2026-11-26, 404)',
   karlMorton: 'no real song exists to measure with: public/data/songs and test-data hold no Karl Morton (SONG chunk) module (first samurai.mus is another format), and modland has no Karl Morton directory (2026-11-26, 404)',
-  anders0land: 'no corpus song: the only match is an NSF (hot.nsf) that content detection misnames; it imports through the sc68/gme path with no notes',
   dmf: 'import needs the Furnace WASM (FurnaceFileOps.js) the node run cannot load',
   ned: 'import needs the Furnace WASM (FurnaceFileOps.js) the node run cannot load',
   famitracker: 'import needs the Furnace WASM (FurnaceFileOps.js) the node run cannot load',

@@ -132,7 +132,7 @@ describe('David Whittaker effect resize', { timeout: 120000 }, () => {
   });
 
   // Slide and vibrato: three bytes, shown as two consecutive slots (first and second argument).
-  const SONGS = ['david-whittaker/garfield2+.dw', 'formats/apb.dw'];
+  const SONGS = ['david-whittaker/garfield2+.dw', 'david-whittaker/apb.dw'];
   const PAIRS: Array<[string, number]> = [['slide', DW_WALK.slide], ['vibrato', DW_WALK.vibrato]];
   const keyOf = (walk: DwWalk, e: DwWalkEvent): string => { const { row } = dwRowClock(walk).tickToRow(e.ptick); return `${Math.floor(row / 64)}:${e.channel}:${row % 64}`; };
   const sharing = (walk: DwWalk, e: DwWalkEvent): Set<string> => new Set(walk.events.filter((o) => o.block === e.block && o.pos === e.pos).map((o) => keyOf(walk, o)));

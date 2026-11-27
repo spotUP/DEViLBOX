@@ -25,7 +25,7 @@ const CORPUS = [
   ...readdirSync(join(ROOT, 'digital-sonix-and-chrome/David Hanlon')).filter((f) => f.endsWith('.dsc'))
     .map((f) => join('digital-sonix-and-chrome/David Hanlon', f)),
   "digital-sonix-and-chrome/dragon'sbreath ingame 1.dsc",
-  "formats/dragon'sbreath_fanfares.dsc",
+  "digital-sonix-and-chrome/dragon'sbreath_fanfares.dsc",
 ];
 
 function load(rel: string): Uint8Array {
@@ -84,7 +84,7 @@ describe('Digital Sonix & Chrome module codec', () => {
   });
 
   it('orders the entries of the chosen subsong, each `repeats` times, at the tempo word speed', () => {
-    const bytes = load("formats/dragon'sbreath_fanfares.dsc");
+    const bytes = load("digital-sonix-and-chrome/dragon'sbreath_fanfares.dsc");
     const m = decodeDscModule(bytes);
     // Entries: (0,1,64) (192,40,64) | (64,2,64) (192,40,64) | (128,2,64) (192,4,64) | (all zero)
     expect(dscSubsongCount(m)).toBe(4);

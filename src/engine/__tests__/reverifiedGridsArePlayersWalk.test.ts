@@ -32,18 +32,18 @@ const DSC_PATHS = readdirSync(join(process.cwd(), SONGS, 'digital-sonix-and-chro
 
 const FORMATS: Fmt[] = [
   { name: 'Digital Sonix & Chrome', paths: DSC_PATHS, parse: async () => { const m = await import('@/lib/import/formats/DigitalSonixChromeParser'); return (b, n) => m.parseDscFile(ab(b), n); } },
-  { name: 'Fred Editor', paths: ['fredmon/fireworks ii.fred', 'formats/bomb jack.fred', 'formats/rebels.fred', 'formats/fuzzball-title.fred'], parse: async () => { const m = await import('@/lib/import/formats/FredEditorParser'); return (b, n) => m.parseFredEditorFile(ab(b), n); } },
+  { name: 'Fred Editor', paths: ['fredmon/fireworks ii.fred', 'fredmon/bomb jack.fred', 'fredmon/rebels.fred', 'fredmon/fuzzball-title.fred'], parse: async () => { const m = await import('@/lib/import/formats/FredEditorParser'); return (b, n) => m.parseFredEditorFile(ab(b), n); } },
   { name: 'Sound Master', paths: ['sound-master/rackney\'sisland 4.sm', 'sound-master-ii-v1/futureshock-level 3.smpro', 'sound-master-ii-v3/doofus 3.sm3'], parse: async () => { const m = await import('@/lib/import/formats/SoundMasterParser'); return (b, n) => m.parseSoundMasterFile(ab(b), n); } },
   { name: 'Activision Pro', paths: ['activision-pro/gettysburg.avp'], parse: async () => (await import('@/lib/import/formats/ActivisionProParser')).parseActivisionProFile },
   { name: 'Actionamics', paths: ['actionamics/dynablaster.ast'], parse: async () => (await import('@/lib/import/formats/ActionamicsParser')).parseActionamicsFile },
-  { name: 'Sonic Arranger', paths: ['sonic-arranger/mega end.sa', 'formats/almighty.sa'], parse: async () => { const m = await import('@/lib/import/formats/SonicArrangerParser'); return (b, n) => m.parseSonicArrangerFile(ab(b), n); } },
+  { name: 'Sonic Arranger', paths: ['sonic-arranger/mega end.sa', 'sonic-arranger/almighty.sa'], parse: async () => { const m = await import('@/lib/import/formats/SonicArrangerParser'); return (b, n) => m.parseSonicArrangerFile(ab(b), n); } },
   { name: 'Dave Lowe', paths: ['dave-lowe/incredibleshrinkingsphere.dl'], parse: async () => { const m = await import('@/lib/import/formats/DaveLoweParser'); return (b, n) => m.parseDaveLoweFile(ab(b), n); } },
   { name: 'Dave Lowe New', paths: ['dave-lowe-new/m-bison.dln'], parse: async () => { const m = await import('@/lib/import/formats/DaveLoweNewParser'); return (b, n) => m.parseDaveLoweNewFile(ab(b), n); } },
-  { name: 'Rob Hubbard', paths: ['rob-hubbard/skateordie.rh', 'formats/centurion_battle.rh'], parse: async () => { const m = await import('@/lib/import/formats/RobHubbardParser'); return (b, n) => m.parseRobHubbardFile(ab(b), n); } },
-  { name: 'Delta Music 1', paths: ['delta-music/triplex1.dm', 'formats/crusaders1.dm'], parse: async () => { const m = await import('@/lib/import/formats/DeltaMusic1Parser'); return (b, n) => m.parseDeltaMusic1File(ab(b), n); } },
-  { name: 'Digital Sound Studio', paths: ['digital-sound-studio/zrimay.dss', 'formats/doxtro3.dss'], parse: async () => (await import('@/lib/import/formats/DigitalSoundStudioParser')).parseDigitalSoundStudioFile },
+  { name: 'Rob Hubbard', paths: ['rob-hubbard/skateordie.rh', 'rob-hubbard/centurion_battle.rh'], parse: async () => { const m = await import('@/lib/import/formats/RobHubbardParser'); return (b, n) => m.parseRobHubbardFile(ab(b), n); } },
+  { name: 'Delta Music 1', paths: ['delta-music/triplex1.dm', 'delta-music/crusaders1.dm'], parse: async () => { const m = await import('@/lib/import/formats/DeltaMusic1Parser'); return (b, n) => m.parseDeltaMusic1File(ab(b), n); } },
+  { name: 'Digital Sound Studio', paths: ['digital-sound-studio/zrimay.dss', 'digital-sound-studio/doxtro3.dss'], parse: async () => (await import('@/lib/import/formats/DigitalSoundStudioParser')).parseDigitalSoundStudioFile },
   { name: 'InStereo 1', paths: ['instereo!/fantasi8.is'], parse: async () => (await import('@/lib/import/formats/InStereo1Parser')).parseInStereo1File },
-  { name: 'InStereo 2', paths: ['instereo!-2.0/spaceflight.is20', 'formats/stereo_feeling.is20'], parse: async () => (await import('@/lib/import/formats/InStereo2Parser')).parseInStereo2File },
+  { name: 'InStereo 2', paths: ['instereo!-2.0/spaceflight.is20', 'instereo!-2.0/stereo_feeling.is20'], parse: async () => (await import('@/lib/import/formats/InStereo2Parser')).parseInStereo2File },
 ];
 
 /** The grid's note-on pitches per channel in song order. */

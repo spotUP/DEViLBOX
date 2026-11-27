@@ -6,7 +6,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE_DUCKULA1 = resolve(REF, 'sean-conran/count duckula.scr');
-const FILE_DUCKULA2 = resolve(REF, 'formats/count_duckula.scr');
+const FILE_DUCKULA2 = resolve(REF, 'sean-conran/count_duckula.scr');
 
 function loadU8(path: string): Uint8Array {
   return new Uint8Array(readFileSync(path));

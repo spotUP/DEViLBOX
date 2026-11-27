@@ -20,7 +20,7 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern } from '@/types';
 import type { RowClock } from '@/lib/import/formats/stepRowClock';
 
-const SONGS = ['formats/apb.dw', 'david-whittaker/garfield2+.dw'];
+const SONGS = ['david-whittaker/apb.dw', 'david-whittaker/garfield2+.dw'];
 const ROWS = 64;
 const FX = [['effTyp', 'eff'], ['effTyp2', 'eff2'], ['effTyp3', 'eff3'], ['effTyp4', 'eff4'], ['effTyp5', 'eff5']] as const;
 type Rec = Record<string, number | undefined>;

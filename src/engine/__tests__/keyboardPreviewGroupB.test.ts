@@ -223,7 +223,7 @@ describe('OctaMED synth keyboard preview is the instrument as UADE\'s OctaMED pl
 });
 
 describe('OctaMED sampler instruments: a typed key plays the Paula period UADE plays for that grid note', () => {
-  for (const [name, ch] of [['formats/funky nightmare.mmd1', 1], ['formats/universal monsters - dracula.mmd0', 1]] as const) {
+  for (const [name, ch] of [['octamed-mmd1/funky nightmare.mmd1', 1], ['octamed-mmd0/universal monsters - dracula.mmd0', 1]] as const) {
     it(`${name}: voice ${ch}, first note`, { timeout: 60000 }, async () => {
       const file = songFile(name);
       const song = parseMEDFile(buf(file), name) as unknown as TrackerSong;
@@ -241,7 +241,7 @@ describe('OctaMED sampler instruments: a typed key plays the Paula period UADE p
 });
 
 describe('Hippel CoSo keyboard preview is the instrument as the player plays it (prehistoric_tale.hipc)', () => {
-  const file = songFile('formats/prehistoric_tale.hipc');
+  const file = songFile('hippel-coso/prehistoric_tale.hipc');
   // (voice, instrument as the player numbers it, grid note, UADE onset tick of that note, UADE period)
   const cases = [
     { ch: 0, ins: 2, grid: 32, onset: 8, period: 285 },

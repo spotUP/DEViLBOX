@@ -81,7 +81,7 @@ describe('step grid: David Whittaker through parseModuleToSong', () => {
 
 const BD_SONGS = [
   { path: 'ben-daglish/motorhead-titleandingame.bd', step: 5, delayed: 32, clashes: 16, delayedVoice: 3 },
-  { path: 'formats/mickey_mouse.bd', step: 8, delayed: 118, clashes: 0, delayedVoice: 1 },
+  { path: 'ben-daglish/mickey_mouse.bd', step: 8, delayed: 118, clashes: 0, delayedVoice: 1 },
 ];
 
 describe('step grid: Ben Daglish through parseBenDaglishFile', () => {
@@ -121,7 +121,7 @@ describe('step grid: Ben Daglish through parseBenDaglishFile', () => {
 
 describe('step grid: Sound Factory through parseModuleToSong', () => {
   it('goldrunner.psf: main step 6 ticks from the onsets, one row per step, every note on its tick', async () => {
-    const ab = bytesOf('formats/goldrunner.psf');
+    const ab = bytesOf('soundfactory/goldrunner.psf');
     const clockCalls = vi.mocked(makeRowClock).mock.calls.length;
     const stepCalls = vi.mocked(mainStepFromOnsets).mock.calls.length;
     const song = await parseModuleToSong(new File([ab.slice(0)], 'goldrunner.psf'));
@@ -210,7 +210,7 @@ describe('step grid: Rob Hubbard through parseModuleToSong', () => {
 // pattern and takes no time. Each voice walks on alone; the grid pads a position to its longest voice.
 const HIPPEL_SONGS = [
   { path: 'hippel-coso/wings of death (level 3).hipc', speed: 4, positions: 70, positionLength: 32 },
-  { path: 'formats/prehistoric_tale.hipc', speed: 7, positions: 30, positionLength: 24 },
+  { path: 'hippel-coso/prehistoric_tale.hipc', speed: 7, positions: 30, positionLength: 24 },
 ];
 
 describe('step grid: Hippel CoSo through parseModuleToSong', () => {
@@ -423,7 +423,7 @@ describe('step grid: Synth Dream through parseModuleToSong', () => {
 });
 
 describe('step grid: Beathoven through parseModuleToSong', () => {
-  for (const [file, step] of [['formats/beathoven_smallest.bss', 5], ['formats/tristar_cracktro.bss', 2]] as const) {
+  for (const [file, step] of [['beathoven-synthesizer/beathoven_smallest.bss', 5], ['beathoven-synthesizer/tristar_cracktro.bss', 2]] as const) {
     it(`${file}: exact GCD step ${step}, every onset on row*step with no offset`, async () => {
       const ab = bytesOf(file);
       const before = vi.mocked(exactStepFromOnsets).mock.calls.length;

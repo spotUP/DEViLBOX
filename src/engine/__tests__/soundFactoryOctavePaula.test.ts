@@ -21,7 +21,7 @@ beforeAll(async () => { restore = installDwNodeFetch(); mod = (await openUade())
 afterAll(() => { restore(); try { mod._uade_wasm_cleanup(); } catch { /* ignore */ } });
 
 describe('Sound Factory octave', { timeout: 180_000 }, () => {
-  for (const rel of ['formats/goldrunner.psf']) {
+  for (const rel of ['soundfactory/goldrunner.psf']) {
     it(`${rel}: grid note = Paula period pitch + instrument audible shift`, async () => {
       const name = rel.split('/').pop()!;
       const bytes = new Uint8Array(readFileSync(join(ROOT, rel)));

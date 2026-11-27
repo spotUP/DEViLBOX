@@ -15,7 +15,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
 const FILE1 = resolve(REF, 'digibooster-pro/invisibility.dbm');
-const FILE2 = resolve(REF, 'formats/invisibility.dbm');
+const FILE2 = resolve(REF, 'digibooster-pro/invisibility.dbm');
 
 function loadBytes(path: string): Uint8Array {
   return new Uint8Array(readFileSync(path));

@@ -6,7 +6,7 @@
  * break that throws the audio boundaries off 4/8/16 bars (phrase confidence
  * 0.3) must not decide it. The section 31 thresholds are unchanged.
  *
- * Real module (public/data/songs/mod/shortsong1.mod: 10 positions of 64
+ * Real module (public/data/songs/startrekker-am/shortsong1.mod: 10 positions of 64
  * rows, speed 6 / tempo 125, 4 bars a pattern), the real analysis builder,
  * the controller's own context builder and the stand-alone gate.
  */
@@ -25,7 +25,7 @@ import { juggleOpportunity } from '../juggleOpportunity';
 import { POLICY_MIN } from '../jugglePlanner';
 import type { DJTrackAnalysis } from '../../types';
 
-const MODULE = 'public/data/songs/mod/shortsong1.mod';
+const MODULE = 'public/data/songs/startrekker-am/shortsong1.mod';
 
 async function loadModule(): Promise<TrackerSong> {
   const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');

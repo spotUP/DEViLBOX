@@ -13,7 +13,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'tfmx/mdat.hbtitle');
-const FILE2 = resolve(REF, 'formats/mdat.rocknroll');
+const FILE2 = resolve(REF, 'tfmx/mdat.rocknroll');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

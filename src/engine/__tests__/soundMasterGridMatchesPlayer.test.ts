@@ -134,7 +134,7 @@ function noteCount(song: TrackerSong): number[] {
 
 describe('Sound Master module codec', () => {
   it('decode -> encode is byte-exact on every corpus module', () => {
-    for (const path of [...CORPUS.map((c) => c.path), "formats/rackney'sisland_4.sm"]) {
+    for (const path of [...CORPUS.map((c) => c.path), "sound-master/rackney'sisland_4.sm"]) {
       const bytes = load(path);
       const m = decodeSoundMasterModule(bytes);
       expect(encodeSoundMasterModule(m), path).toEqual(bytes);

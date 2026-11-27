@@ -19,7 +19,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'images-music-system/chip5.ims');
-const FILE2 = resolve(REF, 'formats/redoctober-sub-docking.ims');
+const FILE2 = resolve(REF, 'images-music-system/redoctober-sub-docking.ims');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

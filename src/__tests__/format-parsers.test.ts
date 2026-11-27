@@ -1,6 +1,6 @@
 /**
  * Format parser integration tests
- * Tests each parser by loading real files from public/data/songs/formats/.
+ * Tests each parser by loading real files from public/data/songs/<format>/.
  *
  * Run: npx vitest run src/__tests__/format-parsers.test.ts
  *
@@ -10,9 +10,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { songFile } from '../test/songPath';
 
-const BASE = resolve(__dirname, '../../public/data/songs/formats');
 
 function countNotes(song: any): number {
   let total = 0;
@@ -54,7 +53,7 @@ async function uadeDetect(filename: string): Promise<boolean> {
 describe('Format parser tests with real Modland files', () => {
 
   it('DavidWhittaker: apb.dw', async () => {
-    const buf = readFileSync(resolve(BASE, 'apb.dw'));
+    const buf = readFileSync(songFile('apb.dw'));
     const { parseDavidWhittakerFile } = await import('@lib/import/formats/DavidWhittakerParser');
     const { installDwNodeFetch } = await import('@/lib/import/__tests__/helpers/dwNodeFetch');
     const restore = installDwNodeFetch();
@@ -69,7 +68,7 @@ describe('Format parser tests with real Modland files', () => {
   });
 
   it('DaveLowe: afterburner.dl', async () => {
-    const buf = readFileSync(resolve(BASE, 'incredibleshrinkingsphere.dl'));
+    const buf = readFileSync(songFile('incredibleshrinkingsphere.dl'));
     const { isDaveLoweFormat, parseDaveLoweFile } = await import('@lib/import/formats/DaveLoweParser');
     const u8 = new Uint8Array(buf);
 
@@ -89,7 +88,7 @@ describe('Format parser tests with real Modland files', () => {
   });
 
   it('AshleyHogg: ash.cj_in_the_usa', async () => {
-    const buf = readFileSync(resolve(BASE, 'ash.nobby_the_aardvark'));
+    const buf = readFileSync(songFile('ash.nobby_the_aardvark'));
     const { isAshleyHoggFormat, parseAshleyHoggFile } = await import('@lib/import/formats/AshleyHoggParser');
 
     if (isAshleyHoggFormat(buf.buffer as ArrayBuffer)) {
@@ -103,7 +102,7 @@ describe('Format parser tests with real Modland files', () => {
   });
 
   it('Actionamics: dynablaster.ast - uses per-sample effectSpeed', async () => {
-    const buf = readFileSync(resolve(BASE, 'dynablaster.ast'));
+    const buf = readFileSync(songFile('dynablaster.ast'));
     const { isActionamicsFormat, parseActionamicsFile } = await import('@lib/import/formats/ActionamicsParser');
     const u8 = new Uint8Array(buf);
 
@@ -124,7 +123,7 @@ describe('Format parser tests with real Modland files', () => {
   });
 
   it('BenDaglish: artura.bd - detection-only with bdFileData', async () => {
-    const buf = readFileSync(resolve(BASE, 'mickey_mouse.bd'));
+    const buf = readFileSync(songFile('mickey_mouse.bd'));
     const { isBenDaglishFormat, parseBenDaglishFile } = await import('@lib/import/formats/BenDaglishParser');
 
     expect(isBenDaglishFormat(buf.buffer as ArrayBuffer)).toBe(true);
@@ -138,7 +137,7 @@ describe('Format parser tests with real Modland files', () => {
   });
 
   it('CoreDesign: rick_dangerous.core - detection-only, UADE fallback', async () => {
-    const buf = readFileSync(resolve(BASE, 'dynamite_dux.core'));
+    const buf = readFileSync(songFile('dynamite_dux.core'));
     const { isCoreDesignFormat, parseCoreDesignFile } = await import('@lib/import/formats/CoreDesignParser');
 
     if (isCoreDesignFormat(buf.buffer as ArrayBuffer)) {
@@ -153,7 +152,7 @@ describe('Format parser tests with real Modland files', () => {
   });
 
   it('GlueMon: flood.glue - detection-only, UADE fallback', async () => {
-    const buf = readFileSync(resolve(BASE, 'memphis.glue'));
+    const buf = readFileSync(songFile('memphis.glue'));
     const u8 = new Uint8Array(buf);  // copy: avoid Node.js Buffer pool byteOffset
     const ab = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
     const { isGlueMonFormat, parseGlueMonFile } = await import('@lib/import/formats/GlueMonParser');
@@ -168,7 +167,7 @@ describe('Format parser tests with real Modland files', () => {
   });
 
   it('DavidHanney: tearaway.dh - detection-only, UADE fallback', async () => {
-    const buf = readFileSync(resolve(BASE, 'tearaway_thomas.dh'));
+    const buf = readFileSync(songFile('tearaway_thomas.dh'));
     const u8 = new Uint8Array(buf);  // copy: avoid Node.js Buffer pool byteOffset
     const ab = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
     const { isDavidHanneyFormat, parseDavidHanneyFile } = await import('@lib/import/formats/DavidHanneyParser');
@@ -188,7 +187,7 @@ describe('Format parser tests with real Modland files', () => {
 describe('Native parser tests', () => {
 
   it('HivelyTracker/AHX: aces_high.ahx', async () => {
-    const buf = readFileSync(resolve(BASE, 'aces_high.ahx'));
+    const buf = readFileSync(songFile('aces_high.ahx'));
     const { parseHivelyFile } = await import('@lib/import/formats/HivelyParser');
     const song = parseHivelyFile(buf.buffer as ArrayBuffer, 'aces_high.ahx');
     logResult('Hively/AHX', song);
@@ -198,7 +197,7 @@ describe('Native parser tests', () => {
   });
 
   it('FredEditor: aspar.fred', async () => {
-    const buf = readFileSync(resolve(BASE, 'bomb jack.fred'));
+    const buf = readFileSync(songFile('bomb jack.fred'));
     const { isFredEditorFormat, parseFredEditorFile } = await import('@lib/import/formats/FredEditorParser');
     expect(isFredEditorFormat(buf.buffer as ArrayBuffer)).toBe(true);
     const song = await parseFredEditorFile(buf.buffer as ArrayBuffer, 'bomb jack.fred');
@@ -208,7 +207,7 @@ describe('Native parser tests', () => {
   });
 
   it('DeltaMusic2: anthrox_intro.dm2', async () => {
-    const buf = readFileSync(resolve(BASE, 'anthrox_intro.dm2'));
+    const buf = readFileSync(songFile('anthrox_intro.dm2'));
     const { isDeltaMusic2Format, parseDeltaMusic2File } = await import('@lib/import/formats/DeltaMusic2Parser');
     const u8 = new Uint8Array(buf);
     if (isDeltaMusic2Format(u8)) {
@@ -222,7 +221,7 @@ describe('Native parser tests', () => {
   });
 
   it('ArtOfNoise: action_section.aon', async () => {
-    const buf = readFileSync(resolve(BASE, 'action_section.aon'));
+    const buf = readFileSync(songFile('action_section.aon'));
     const { isArtOfNoiseFormat, parseArtOfNoiseFile } = await import('@lib/import/formats/ArtOfNoiseParser');
     const u8 = new Uint8Array(buf);
     if (isArtOfNoiseFormat(u8)) {
@@ -237,7 +236,7 @@ describe('Native parser tests', () => {
   });
 
   it('Oktalyzer: 45.okta', async () => {
-    const buf = readFileSync(resolve(BASE, '45.okta'));
+    const buf = readFileSync(songFile('45.okta'));
     const { parseOktalyzerFile } = await import('@lib/import/formats/OktalyzerParser');
     const song = parseOktalyzerFile(buf.buffer as ArrayBuffer, '45.okta');
     logResult('Oktalyzer', song);
@@ -246,7 +245,7 @@ describe('Native parser tests', () => {
   });
 
   it('InStereo1/2: fantasi8.is', async () => {
-    const buf = readFileSync(resolve(BASE, 'fantasi8.is'));
+    const buf = readFileSync(songFile('fantasi8.is'));
     const u8 = new Uint8Array(buf);
     const { isInStereo1Format, parseInStereo1File } = await import('@lib/import/formats/InStereo1Parser');
     const { isInStereo2Format, parseInStereo2File } = await import('@lib/import/formats/InStereo2Parser');
@@ -264,7 +263,7 @@ describe('Native parser tests', () => {
   });
 
   it('InStereo2: stereo_feeling.is20', async () => {
-    const buf = readFileSync(resolve(BASE, 'stereo_feeling.is20'));
+    const buf = readFileSync(songFile('stereo_feeling.is20'));
     const u8 = new Uint8Array(buf);
     const { isInStereo2Format, parseInStereo2File } = await import('@lib/import/formats/InStereo2Parser');
     if (isInStereo2Format(u8)) {
@@ -279,7 +278,7 @@ describe('Native parser tests', () => {
   it('ManiacsOfNoise: chinese_chess.mon / gyroscope.mon', async () => {
     const { isManiacsOfNoiseFormat, parseManiacsOfNoiseFile } = await import('@lib/import/formats/ManiacsOfNoiseParser');
     for (const f of ['gyroscope.mon', 'gyroscope.mon']) {
-      const buf = readFileSync(resolve(BASE, f));
+      const buf = readFileSync(songFile(f));
       if (isManiacsOfNoiseFormat(buf.buffer as ArrayBuffer, f)) {
         const song = parseManiacsOfNoiseFile(buf.buffer as ArrayBuffer, f);
         logResult(`ManiacsOfNoise ${f}`, song);
@@ -291,7 +290,7 @@ describe('Native parser tests', () => {
   });
 
   it('SidMon1: anarchy.sid1', async () => {
-    const buf = readFileSync(resolve(BASE, 'anarchy.sid1'));
+    const buf = readFileSync(songFile('anarchy.sid1'));
     const { isSidMon1Format, parseSidMon1File } = await import('@lib/import/formats/SidMon1Parser');
     if (isSidMon1Format(buf.buffer as ArrayBuffer)) {
       const song = parseSidMon1File(buf.buffer as ArrayBuffer, 'anarchy.sid1');
@@ -303,7 +302,7 @@ describe('Native parser tests', () => {
   });
 
   it('SidMon2: bruno_time.sid2', async () => {
-    const buf = readFileSync(resolve(BASE, 'bruno_time.sid2'));
+    const buf = readFileSync(songFile('bruno_time.sid2'));
     const { isSidMon2Format, parseSidMon2File } = await import('@lib/import/formats/SidMon2Parser');
     if (isSidMon2Format(buf.buffer as ArrayBuffer)) {
       const song = await parseSidMon2File(buf.buffer as ArrayBuffer, 'bruno_time.sid2');
@@ -315,7 +314,7 @@ describe('Native parser tests', () => {
   });
 
   it('SonicArranger: almighty.sa', async () => {
-    const buf = readFileSync(resolve(BASE, 'almighty.sa'));
+    const buf = readFileSync(songFile('almighty.sa'));
     const { isSonicArrangerFormat, parseSonicArrangerFile } = await import('@lib/import/formats/SonicArrangerParser');
     if (isSonicArrangerFormat(buf.buffer as ArrayBuffer)) {
       const song = await parseSonicArrangerFile(buf.buffer as ArrayBuffer, 'almighty.sa');
@@ -328,7 +327,7 @@ describe('Native parser tests', () => {
   });
 
   it('DigitalMugician: cockwise.mug', async () => {
-    const buf = readFileSync(resolve(BASE, 'cockwise.mug'));
+    const buf = readFileSync(songFile('cockwise.mug'));
     const { isDigitalMugicianFormat, parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
     if (isDigitalMugicianFormat(buf.buffer as ArrayBuffer)) {
       const song = await parseDigitalMugicianFile(buf.buffer as ArrayBuffer, 'cockwise.mug');
@@ -340,7 +339,7 @@ describe('Native parser tests', () => {
   });
 
   it('DigitalMugician2: snickle.mug2', async () => {
-    const buf = readFileSync(resolve(BASE, 'snickle.mug2'));
+    const buf = readFileSync(songFile('snickle.mug2'));
     const { isDigitalMugicianFormat, parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
     if (isDigitalMugicianFormat(buf.buffer as ArrayBuffer)) {
       const song = await parseDigitalMugicianFile(buf.buffer as ArrayBuffer, 'snickle.mug2');
@@ -352,7 +351,7 @@ describe('Native parser tests', () => {
   });
 
   it('MusicAssembler: baseheads.ma', async () => {
-    const buf = readFileSync(resolve(BASE, 'baseheads.ma'));
+    const buf = readFileSync(songFile('baseheads.ma'));
     const { isMusicAssemblerFormat, parseMusicAssemblerFile } = await import('@lib/import/formats/MusicAssemblerParser');
     const u8 = new Uint8Array(buf);
     if (isMusicAssemblerFormat(u8)) {
@@ -366,7 +365,7 @@ describe('Native parser tests', () => {
   });
 
   it('TCBTracker: cannonfodder.tcb', async () => {
-    const buf = readFileSync(resolve(BASE, 'cannonfodder.tcb'));
+    const buf = readFileSync(songFile('cannonfodder.tcb'));
     const { isTCBTrackerFormat, parseTCBTrackerFile } = await import('@lib/import/formats/TCBTrackerParser');
     if (isTCBTrackerFormat(buf.buffer as ArrayBuffer, 'cannonfodder.tcb')) {
       const song = await parseTCBTrackerFile(buf.buffer as ArrayBuffer, 'cannonfodder.tcb');
@@ -379,7 +378,7 @@ describe('Native parser tests', () => {
   });
 
   it('JamCracker: analogue_vibes.jam', async () => {
-    const buf = readFileSync(resolve(BASE, 'analogue_vibes.jam'));
+    const buf = readFileSync(songFile('analogue_vibes.jam'));
     const { isJamCrackerFormat, parseJamCrackerFile } = await import('@lib/import/formats/JamCrackerParser');
     if (isJamCrackerFormat(buf.buffer as ArrayBuffer)) {
       const song = await parseJamCrackerFile(buf.buffer as ArrayBuffer, 'analogue_vibes.jam');
@@ -392,7 +391,7 @@ describe('Native parser tests', () => {
   });
 
   it('SpecialFX: battlecommand.jd', async () => {
-    const buf = readFileSync(resolve(BASE, 'wildwheels_ingame.jd'));
+    const buf = readFileSync(songFile('wildwheels_ingame.jd'));
     const { isSpecialFXFormat, parseSpecialFXFile } = await import('@lib/import/formats/SpecialFXParser');
     if (isSpecialFXFormat(buf.buffer as ArrayBuffer)) {
       const song = parseSpecialFXFile(buf.buffer as ArrayBuffer, 'wildwheels_ingame.jd');
@@ -404,7 +403,7 @@ describe('Native parser tests', () => {
   });
 
   it('JasonBrooke: afterburner2.jb', async () => {
-    const buf = readFileSync(resolve(BASE, 'ikari_warriors.jb'));
+    const buf = readFileSync(songFile('ikari_warriors.jb'));
     const { isJasonBrookeFormat, parseJasonBrookeFile } = await import('@lib/import/formats/JasonBrookeParser');
     if (isJasonBrookeFormat(buf.buffer as ArrayBuffer, 'ikari_warriors.jb')) {
       const song = parseJasonBrookeFile(buf.buffer as ArrayBuffer, 'ikari_warriors.jb');
@@ -416,7 +415,7 @@ describe('Native parser tests', () => {
   });
 
   it('JeroenTel: tusker_ingame.jt', async () => {
-    const buf = readFileSync(resolve(BASE, 'insects_in_space.jt'));
+    const buf = readFileSync(songFile('insects_in_space.jt'));
     const { isJeroenTelFormat, parseJeroenTelFile } = await import('@lib/import/formats/JeroenTelParser');
     if (isJeroenTelFormat(buf.buffer as ArrayBuffer, 'insects_in_space.jt')) {
       const song = await parseJeroenTelFile(buf.buffer as ArrayBuffer, 'insects_in_space.jt');
@@ -428,7 +427,7 @@ describe('Native parser tests', () => {
   });
 
   it('JasonPage: offroad.jpo', async () => {
-    const buf = readFileSync(resolve(BASE, 'offroad.jpo'));
+    const buf = readFileSync(songFile('offroad.jpo'));
     const { isJasonPageFormat, parseJasonPageFile } = await import('@lib/import/formats/JasonPageParser');
     if (isJasonPageFormat(buf.buffer as ArrayBuffer, 'offroad.jpo')) {
       const song = await parseJasonPageFile(buf.buffer as ArrayBuffer, 'offroad.jpo');
@@ -440,7 +439,7 @@ describe('Native parser tests', () => {
   });
 
   it('RobHubbard: sanxion.rh', async () => {
-    const buf = readFileSync(resolve(BASE, 'centurion_battle.rh'));
+    const buf = readFileSync(songFile('centurion_battle.rh'));
     const { isRobHubbardFormat, parseRobHubbardFile } = await import('@lib/import/formats/RobHubbardParser');
     if (isRobHubbardFormat(buf.buffer as ArrayBuffer, 'centurion_battle.rh')) {
       const song = await parseRobHubbardFile(buf.buffer as ArrayBuffer, 'centurion_battle.rh');
@@ -453,7 +452,7 @@ describe('Native parser tests', () => {
 
   it('RobHubbardST: battleships.rho', async () => {
     // .rho files use RobHubbardSTParser (different from .rh which uses RobHubbardParser)
-    const buf = readFileSync(resolve(BASE, 'battleships.rho'));
+    const buf = readFileSync(songFile('battleships.rho'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isRobHubbardSTFormat, parseRobHubbardSTFile } = await import('@lib/import/formats/RobHubbardSTParser');
     expect(isRobHubbardSTFormat(ab)).toBe(true);
@@ -465,7 +464,7 @@ describe('Native parser tests', () => {
 
   it('PSA: punisher.psa', async () => {
     // punisher.psa is PSA format (magic "PSA\0"), routed to PSAParser
-    const buf = readFileSync(resolve(BASE, 'the punisher - title.psa'));
+    const buf = readFileSync(songFile('the punisher - title.psa'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isPSAFormat, parsePSAFile } = await import('@lib/import/formats/PSAParser');
     expect(isPSAFormat(ab)).toBe(true);
@@ -477,7 +476,7 @@ describe('Native parser tests', () => {
 
   it('SoundMon V2: aquarivs.bp', async () => {
     // aquarivs.bp is SoundMon V2 ("V.2" magic at offset 26)
-    const buf = readFileSync(resolve(BASE, 'aquarivs.bp'));
+    const buf = readFileSync(songFile('aquarivs.bp'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isSoundMonFormat, parseSoundMonFile } = await import('@lib/import/formats/SoundMonParser');
     expect(isSoundMonFormat(ab)).toBe(true);
@@ -489,7 +488,7 @@ describe('Native parser tests', () => {
 
   it('SoundMon V3: antidust.bp3', async () => {
     // antidust.bp3 is SoundMon V3 ("V.3" magic at offset 26)
-    const buf = readFileSync(resolve(BASE, 'antidust.bp3'));
+    const buf = readFileSync(songFile('antidust.bp3'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isSoundMonFormat, parseSoundMonFile } = await import('@lib/import/formats/SoundMonParser');
     expect(isSoundMonFormat(ab)).toBe(true);
@@ -501,7 +500,7 @@ describe('Native parser tests', () => {
 
   it('TomyTracker: inconvenient.sg', async () => {
     // inconvenient.sg is TomyTracker format (.sg extension), not Anders0land (which requires hot.* prefix)
-    const buf = readFileSync(resolve(BASE, 'irrepressible intro.sg'));
+    const buf = readFileSync(songFile('irrepressible intro.sg'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isTomyTrackerFormat, parseTomyTrackerFile } = await import('@lib/import/formats/TomyTrackerParser');
     if (isTomyTrackerFormat(ab)) {
@@ -515,7 +514,7 @@ describe('Native parser tests', () => {
 
   it('MusicMaker4V: axelf.mm4', async () => {
     // axelf.mm4 is IFF FORM+MMV8+.mm4 extension → Music Maker 4V
-    const buf = readFileSync(resolve(BASE, 'easystyleofmsx.mm4'));
+    const buf = readFileSync(songFile('easystyleofmsx.mm4'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isMusicMaker4VFormat, parseMusicMaker4VFile } = await import('@lib/import/formats/MusicMakerParser');
     expect(isMusicMaker4VFormat(ab, 'easystyleofmsx.mm4')).toBe(true);
@@ -527,7 +526,7 @@ describe('Native parser tests', () => {
 
   it('MusicMaker8V: crockett8.mm8', async () => {
     // crockett8.mm8 is IFF FORM+MMV8+.mm8 extension → Music Maker 8V
-    const buf = readFileSync(resolve(BASE, 'house2.mm8'));
+    const buf = readFileSync(songFile('house2.mm8'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isMusicMaker8VFormat, parseMusicMaker8VFile } = await import('@lib/import/formats/MusicMakerParser');
     expect(isMusicMaker8VFormat(ab, 'house2.mm8')).toBe(true);
@@ -538,7 +537,7 @@ describe('Native parser tests', () => {
   });
 
   it('QuadraComposer: synth_corn.emod', async () => {
-    const buf = readFileSync(resolve(BASE, 'synth_corn.emod'));
+    const buf = readFileSync(songFile('synth_corn.emod'));
     const { isQuadraComposerFormat, parseQuadraComposerFile } = await import('@lib/import/formats/QuadraComposerParser');
     if (isQuadraComposerFormat(buf.buffer as ArrayBuffer)) {
       const song = await parseQuadraComposerFile(buf.buffer as ArrayBuffer, 'synth_corn.emod');
@@ -550,7 +549,7 @@ describe('Native parser tests', () => {
   });
 
   it('SpeedySystem: airdriver.ss', async () => {
-    const buf = readFileSync(resolve(BASE, 'SnareDrum.ss'));
+    const buf = readFileSync(songFile('SnareDrum.ss'));
     const { isSpeedySystemFormat, parseSpeedySystemFile } = await import('@lib/import/formats/SpeedySystemParser');
     if (isSpeedySystemFormat(buf.buffer as ArrayBuffer)) {
       const song = await parseSpeedySystemFile(buf.buffer as ArrayBuffer, 'SnareDrum.ss');
@@ -562,7 +561,7 @@ describe('Native parser tests', () => {
   });
 
   it('SoundFX: acid_housemix.sfx', async () => {
-    const buf = readFileSync(resolve(BASE, 'operation_stealth.sfx'));
+    const buf = readFileSync(songFile('operation_stealth.sfx'));
     const { isSoundFXFormat, parseSoundFXFile } = await import('@lib/import/formats/SoundFXParser');
     if (isSoundFXFormat(buf.buffer as ArrayBuffer)) {
       const song = await parseSoundFXFile(buf.buffer as ArrayBuffer, 'operation_stealth.sfx');
@@ -575,7 +574,7 @@ describe('Native parser tests', () => {
   });
 
   it('FutureComposer: anthrox.fc', async () => {
-    const buf = readFileSync(resolve(BASE, 'anthrox.fc'));
+    const buf = readFileSync(songFile('anthrox.fc'));
     const { parseFCFile } = await import('@lib/import/formats/FCParser');
     const song = parseFCFile(buf.buffer as ArrayBuffer, 'anthrox.fc');
     logResult('FC', song);
@@ -584,7 +583,7 @@ describe('Native parser tests', () => {
   });
 
   it('FuturePlayer: hybris.fp', async () => {
-    const buf = readFileSync(resolve(BASE, 'hybris.fp'));
+    const buf = readFileSync(songFile('hybris.fp'));
     const { isUADEFormat } = await import('@lib/import/formats/UADEParser');
     // FuturePlayer has a native parser via withNativeThenUADE, but detection is complex
     console.log(`  FuturePlayer detected: ${isUADEFormat('hybris.fp')}`);
@@ -592,7 +591,7 @@ describe('Native parser tests', () => {
   });
 
   it('FredGray: blacklamp.gray', async () => {
-    const buf = readFileSync(resolve(BASE, 'eco.gray'));
+    const buf = readFileSync(songFile('eco.gray'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isFredGrayFormat, parseFredGrayFile } = await import('@lib/import/formats/FredGrayParser');
     expect(isFredGrayFormat(ab, 'eco.gray')).toBe(true);
@@ -603,7 +602,7 @@ describe('Native parser tests', () => {
   });
 
   it('BenDaglishSID: chubbygristle.bds', async () => {
-    const buf = readFileSync(resolve(BASE, 'terramex.bds'));
+    const buf = readFileSync(songFile('terramex.bds'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isBenDaglishSIDFormat, parseBenDaglishSIDFile } = await import('@lib/import/formats/BenDaglishSIDParser');
     expect(isBenDaglishSIDFormat(ab, 'terramex.bds')).toBe(true);
@@ -614,7 +613,7 @@ describe('Native parser tests', () => {
   });
 
   it('Quartet: flimbos_quest.sqt', async () => {
-    const buf = readFileSync(resolve(BASE, 'warlock_the_avenger.sqt'));
+    const buf = readFileSync(songFile('warlock_the_avenger.sqt'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isQuartetFormat, parseQuartetFile } = await import('@lib/import/formats/QuartetParser');
     expect(isQuartetFormat(ab, 'warlock_the_avenger.sqt')).toBe(true);
@@ -625,7 +624,7 @@ describe('Native parser tests', () => {
   });
 
   it('SoundMaster: doofus.sm', async () => {
-    const buf = readFileSync(resolve(BASE, "rackney'sisland_4.sm"));
+    const buf = readFileSync(songFile("rackney'sisland_4.sm"));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isSoundMasterFormat, parseSoundMasterFile } = await import('@lib/import/formats/SoundMasterParser');
     expect(isSoundMasterFormat(ab, "rackney'sisland_4.sm")).toBe(true);
@@ -636,7 +635,7 @@ describe('Native parser tests', () => {
   });
 
   it('WallyBeben: wicked.wb', async () => {
-    const buf = readFileSync(resolve(BASE, 'wicked.wb'));
+    const buf = readFileSync(songFile('wicked.wb'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isWallyBebenFormat, parseWallyBebenFile } = await import('@lib/import/formats/WallyBebenParser');
     expect(isWallyBebenFormat(ab)).toBe(true);
@@ -647,7 +646,7 @@ describe('Native parser tests', () => {
   });
 
   it('SteveBarrett: artificial_dreams.sb', async () => {
-    const buf = readFileSync(resolve(BASE, 'street_fighter.sb'));
+    const buf = readFileSync(songFile('street_fighter.sb'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isSteveBarrettFormat, parseSteveBarrettFile } = await import('@lib/import/formats/SteveBarrettParser');
     expect(isSteveBarrettFormat(ab)).toBe(true);
@@ -658,7 +657,7 @@ describe('Native parser tests', () => {
   });
 
   it('DaveLoweNew: balrog.dln', async () => {
-    const buf = readFileSync(resolve(BASE, 'm-bison.dln'));
+    const buf = readFileSync(songFile('m-bison.dln'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isDaveLoweNewFormat, parseDaveLoweNewFile } = await import('@lib/import/formats/DaveLoweNewParser');
     expect(isDaveLoweNewFormat(ab)).toBe(true);
@@ -669,7 +668,7 @@ describe('Native parser tests', () => {
   });
 
   it('DigitalSoundStudio: doxtro3.dss', async () => {
-    const buf = readFileSync(resolve(BASE, 'doxtro3.dss'));
+    const buf = readFileSync(songFile('doxtro3.dss'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isDigitalSoundStudioFormat, parseDigitalSoundStudioFile } = await import('@lib/import/formats/DigitalSoundStudioParser');
     expect(isDigitalSoundStudioFormat(new Uint8Array(ab))).toBe(true);
@@ -680,7 +679,7 @@ describe('Native parser tests', () => {
   });
 
   it('SeanConran: count_duckula.scr', async () => {
-    const buf = readFileSync(resolve(BASE, 'count_duckula.scr'));
+    const buf = readFileSync(songFile('count_duckula.scr'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isSeanConranFormat, parseSeanConranFile } = await import('@lib/import/formats/SeanConranParser');
     expect(isSeanConranFormat(new Uint8Array(ab))).toBe(true);
@@ -691,7 +690,7 @@ describe('Native parser tests', () => {
   });
 
   it('Desire: batmanreturns.dsr', async () => {
-    const buf = readFileSync(resolve(BASE, 'batmanreturns.dsr'));
+    const buf = readFileSync(songFile('batmanreturns.dsr'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isDesireFormat, parseDesireFile } = await import('@lib/import/formats/DesireParser');
     expect(isDesireFormat(ab)).toBe(true);
@@ -702,7 +701,7 @@ describe('Native parser tests', () => {
   });
 
   it('MED: med.sadman (MMD1 prefix-named file)', async () => {
-    const buf = readFileSync(resolve(BASE, 'med.sadman'));
+    const buf = readFileSync(songFile('med.sadman'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { parseMEDFile } = await import('@lib/import/formats/MEDParser');
     const song = parseMEDFile(ab, 'med.sadman');
@@ -712,7 +711,7 @@ describe('Native parser tests', () => {
   });
 
   it('JochenHippelST: airballtest.sog (raw TFMX magic)', async () => {
-    const buf = readFileSync(resolve(BASE, 'astaroth.sog'));
+    const buf = readFileSync(songFile('astaroth.sog'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
     expect(isJochenHippelSTFormat(ab)).toBe(true);
@@ -723,7 +722,7 @@ describe('Native parser tests', () => {
   });
 
   it('DigitalSonixChrome: dragonsbreath.dsc', async () => {
-    const buf = readFileSync(resolve(BASE, "dragon'sbreath_fanfares.dsc"));
+    const buf = readFileSync(songFile("dragon'sbreath_fanfares.dsc"));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isDscFormat, parseDscFile } = await import('@lib/import/formats/DigitalSonixChromeParser');
     expect(isDscFormat(ab)).toBe(true);
@@ -734,7 +733,7 @@ describe('Native parser tests', () => {
   });
 
   it('MMDC: captain_planet.mmdc', async () => {
-    const buf = readFileSync(resolve(BASE, 'captain planet and the planeteers - title.mmdc'));
+    const buf = readFileSync(songFile('captain planet and the planeteers - title.mmdc'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isMMDCFormat, parseMMDCFile } = await import('@lib/import/formats/MMDCParser');
     expect(isMMDCFormat(ab)).toBe(true);
@@ -745,7 +744,7 @@ describe('Native parser tests', () => {
   });
 
   it('MarkCooksey Old: commando.mc', async () => {
-    const buf = readFileSync(resolve(BASE, 'grand_national-title.mc'));
+    const buf = readFileSync(songFile('grand_national-title.mc'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isMarkCookseyFormat, parseMarkCookseyFile } = await import('@lib/import/formats/MarkCookseyParser');
     expect(isMarkCookseyFormat(ab, 'grand_national-title.mc')).toBe(true);
@@ -756,7 +755,7 @@ describe('Native parser tests', () => {
   });
 
   it('JochenHippel7V: amberstar.hip7', async () => {
-    const buf = readFileSync(resolve(BASE, 'ghostbattle_gameover.hip7'));
+    const buf = readFileSync(songFile('ghostbattle_gameover.hip7'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     const { isJochenHippel7VFormat, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
     if (isJochenHippel7VFormat(ab)) {
@@ -846,7 +845,7 @@ describe('UADE routing detection for remaining formats', () => {
 
   for (const filename of uadeOnlyFiles) {
     it(`UADE route: ${filename}`, async () => {
-      const filePath = resolve(BASE, filename);
+      const filePath = songFile(filename);
       let exists = false;
       try {
         readFileSync(filePath);
@@ -898,7 +897,7 @@ describe('WASM engine format parser structure tests', () => {
     // DigiBoosterParser only handles DBMX/DBM0 magic — it should throw.
     // AmigaFormatParsers catches the throw and falls through to OpenMPT.
     const { parseDigiBoosterFile } = await import('@lib/import/formats/DigiBoosterParser');
-    const filePath = resolve(BASE, 'theday.digi');
+    const filePath = songFile('theday.digi');
     let fileExists = false;
     try {
       readFileSync(filePath);

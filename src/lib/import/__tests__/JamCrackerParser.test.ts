@@ -11,7 +11,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF_MUSIC  = resolve(import.meta.dirname, '../../../../public/data/songs');
 const JAM_FILE_1 = resolve(REF_MUSIC, 'jamcracker/freehand-spreadtro.jam');
-const JAM_FILE_2 = resolve(REF_MUSIC, 'formats/analogue_vibes.jam');
+const JAM_FILE_2 = resolve(REF_MUSIC, 'jamcracker/analogue_vibes.jam');
 
 function loadAB(path: string): ArrayBuffer {
   const buf = readFileSync(path);

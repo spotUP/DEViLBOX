@@ -37,7 +37,7 @@ const ROOT = join(process.cwd(), 'public/data/songs');
 const CORPUS = [
   'hippel-st/crown arabia.hst', 'hippel-st/crown england.hst', 'hippel-st/crown japan.hst',
   'hippel-st/crown russia.hst', 'hippel-st/crown viking.hst', 'hippel-st/demo music10.sog',
-  'formats/astaroth.sog', 'hippel-st-coso/ghostbattle titletune.soc',
+  'hippel-st/astaroth.sog', 'hippel-st-coso/ghostbattle titletune.soc',
 ];
 
 function load(rel: string): Uint8Array {
@@ -99,7 +99,7 @@ describe('Jochen Hippel ST song codec', () => {
   });
 
   it('subsongs are UADE\'s numbers (the player counts from 1): astaroth subsong 2 is steps 37-84', () => {
-    const s = parse('formats/astaroth.sog', 2);
+    const s = parse('hippel-st/astaroth.sog', 2);
     expect(s.songPositions).toEqual(Array.from({ length: 48 }, (_, i) => 37 + i));
     expect(s.initialSpeed).toBe(4);
     expect(s.uadeEditableSubsongs).toMatchObject({ count: 7, start: 1, first: 1 });
@@ -160,7 +160,7 @@ describe('Jochen Hippel ST song codec', () => {
   });
 
   it('applyHstGrid writes only edited cells (a pattern shown by two steps keeps the edit made in either)', () => {
-    const bytes = load('formats/astaroth.sog');
+    const bytes = load('hippel-st/astaroth.sog');
     const edit = new HstSongEdit(bytes);
     const grid = hstGrid(edit);
     // Two steps showing the same pattern on voice 0.

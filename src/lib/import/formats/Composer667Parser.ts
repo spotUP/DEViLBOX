@@ -343,7 +343,7 @@ function _parse669(bytes: Uint8Array, filename: string): TrackerSong | null {
     numPatterns,
     moduleSize: buffer.byteLength,
     // One codec and file-pattern map with Format669Parser: the grid holds one pattern per song position, the file one per pattern.
-    encodeCell: encode669Edit,
+    encodeCell: (cell, stored, channel) => encode669Edit(cell, stored, channel),
     decodeCell: decode669Bytes,
     encodeOverStored: true,
     propagateSharedCells: true,

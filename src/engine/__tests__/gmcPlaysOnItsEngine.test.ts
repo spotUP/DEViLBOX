@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadSharedWorkletScripts, startWorklet } from './workletHarness';
 
-const REL = 'formats/knights_of_sky.gmc';
+const REL = 'game-music-creator/knights_of_sky.gmc';
 
 describe('Game Music Creator plays on its own engine', { timeout: 120000 }, () => {
   it('knights_of_sky.gmc routes to GmcReplayer and the replayer renders it', async () => {

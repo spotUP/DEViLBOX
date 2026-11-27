@@ -12,7 +12,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'delta-music-2/asperity megademo 3.dm2');
-const FILE2 = resolve(REF, 'formats/anthrox_intro.dm2');
+const FILE2 = resolve(REF, 'delta-music-2/anthrox_intro.dm2');
 const FILE3 = resolve(REF, 'delta-music-2/asperity megademo 3.dm2');
 
 function loadU8(p: string): Uint8Array {

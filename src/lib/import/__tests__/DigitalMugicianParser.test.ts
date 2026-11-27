@@ -13,7 +13,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'digital-mugician/believe.dmu');
-const FILE2 = resolve(REF, 'formats/flight.dmu');
+const FILE2 = resolve(REF, 'digital-mugician/flight.dmu');
 const FILE3 = resolve(REF, 'digital-mugician-2/snickle.mug');
 
 function loadBuf(path: string): ArrayBuffer {

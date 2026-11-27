@@ -17,7 +17,7 @@ beforeAll(async () => { restore = installDwNodeFetch(); mod = (await openUade())
 afterAll(() => { restore(); try { mod._uade_wasm_cleanup(); } catch { /* ignore */ } });
 
 describe('OctaMED MMD0/MMD1 octave', { timeout: 180_000 }, () => {
-  for (const rel of ['octamed-mmd0/universal monsters - title.mmd0', 'formats/universal monsters - dracula.mmd0', 'formats/funky nightmare.mmd1']) {
+  for (const rel of ['octamed-mmd0/universal monsters - title.mmd0', 'octamed-mmd0/universal monsters - dracula.mmd0', 'octamed-mmd1/funky nightmare.mmd1']) {
     it(`${rel}: grid notes equal the pitch Paula plays (absolute)`, async () => {
       const name = rel.split('/').pop() ?? rel;
       const bytes = new Uint8Array(readFileSync(join(ROOT, rel)));

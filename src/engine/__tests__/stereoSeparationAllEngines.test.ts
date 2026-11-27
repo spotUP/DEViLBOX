@@ -17,27 +17,27 @@ beforeAll(loadSharedWorkletScripts);
 const S = 'public/data/songs';
 /** [asset dir, worklet stem, engine module, engine class, song, optional worklet transform]. */
 const ENGINES: Array<[string, string, string, string, string, JsTransform?]> = [
-  ['davidwhittaker', 'DavidWhittaker', '@engine/davidwhittaker/DavidWhittakerEngine', 'DavidWhittakerEngine', `${S}/formats/apb.dw`],
+  ['davidwhittaker', 'DavidWhittaker', '@engine/davidwhittaker/DavidWhittakerEngine', 'DavidWhittakerEngine', `${S}/david-whittaker/apb.dw`],
   ['soundmon', 'SoundMon', '@engine/soundmon/SoundMonEngine', 'SoundMonEngine', `${S}/bp-soundmon-2/nicktune1.bp`],
   ['sonic-arranger', 'SonicArranger', '@engine/sonic-arranger/SonicArrangerEngine', 'SonicArrangerEngine', `${S}/sonic-arranger/mega end.sa`],
-  ['deltamusic1', 'DeltaMusic1', '@engine/deltamusic1/DeltaMusic1Engine', 'DeltaMusic1Engine', `${S}/formats/crusaders1.dm`],
-  ['deltamusic2', 'DeltaMusic2', '@engine/deltamusic2/DeltaMusic2Engine', 'DeltaMusic2Engine', `${S}/formats/anthrox_intro.dm2`],
-  ['gmc', 'Gmc', '@engine/gmc/GmcEngine', 'GmcEngine', `${S}/formats/knights_of_sky.gmc`],
-  ['facethemusic', 'FaceTheMusic', '@engine/facethemusic/FaceTheMusicEngine', 'FaceTheMusicEngine', `${S}/formats/staticoscillations.ftm`],
-  ['dss', 'Dss', '@engine/dss/DssEngine', 'DssEngine', `${S}/formats/doxtro3.dss`],
-  ['futurecomposer', 'FutureComposer', '@engine/futurecomposer/FutureComposerEngine', 'FutureComposerEngine', `${S}/formats/anthrox.fc`],
-  ['ronklaren', 'RonKlaren', '@engine/ronklaren/RonKlarenEngine', 'RonKlarenEngine', `${S}/formats/astra_2.rk`],
-  ['synthesis', 'Synthesis', '@engine/synthesis/SynthesisEngine', 'SynthesisEngine', `${S}/formats/space_sound.syn`],
-  ['instereo1', 'InStereo1', '@engine/instereo1/InStereo1Engine', 'InStereo1Engine', `${S}/formats/fantasi8.is`],
-  ['instereo2', 'InStereo2', '@engine/instereo2/InStereo2Engine', 'InStereo2Engine', `${S}/formats/stereo_feeling.is20`],
-  ['activisionpro', 'ActivisionPro', '@engine/activisionpro/ActivisionProEngine', 'ActivisionProEngine', `${S}/formats/gettysburg.avp`],
+  ['deltamusic1', 'DeltaMusic1', '@engine/deltamusic1/DeltaMusic1Engine', 'DeltaMusic1Engine', `${S}/delta-music/crusaders1.dm`],
+  ['deltamusic2', 'DeltaMusic2', '@engine/deltamusic2/DeltaMusic2Engine', 'DeltaMusic2Engine', `${S}/delta-music-2/anthrox_intro.dm2`],
+  ['gmc', 'Gmc', '@engine/gmc/GmcEngine', 'GmcEngine', `${S}/game-music-creator/knights_of_sky.gmc`],
+  ['facethemusic', 'FaceTheMusic', '@engine/facethemusic/FaceTheMusicEngine', 'FaceTheMusicEngine', `${S}/face-the-music/staticoscillations.ftm`],
+  ['dss', 'Dss', '@engine/dss/DssEngine', 'DssEngine', `${S}/digital-sound-studio/doxtro3.dss`],
+  ['futurecomposer', 'FutureComposer', '@engine/futurecomposer/FutureComposerEngine', 'FutureComposerEngine', `${S}/future-composer-1.4/anthrox.fc`],
+  ['ronklaren', 'RonKlaren', '@engine/ronklaren/RonKlarenEngine', 'RonKlarenEngine', `${S}/ron-klaren/astra_2.rk`],
+  ['synthesis', 'Synthesis', '@engine/synthesis/SynthesisEngine', 'SynthesisEngine', `${S}/synthesis/space_sound.syn`],
+  ['instereo1', 'InStereo1', '@engine/instereo1/InStereo1Engine', 'InStereo1Engine', `${S}/instereo!/fantasi8.is`],
+  ['instereo2', 'InStereo2', '@engine/instereo2/InStereo2Engine', 'InStereo2Engine', `${S}/instereo!-2.0/stereo_feeling.is20`],
+  ['activisionpro', 'ActivisionPro', '@engine/activisionpro/ActivisionProEngine', 'ActivisionProEngine', `${S}/activision-pro/gettysburg.avp`],
   ['voodoo', 'Voodoo', '@engine/voodoo/VoodooEngine', 'VoodooEngine', `${S}/voodoo/voo8.vss`],
   ['actionamics', 'Actionamics', '@engine/actionamics/ActionamicsEngine', 'ActionamicsEngine', `${S}/actionamics/dynablaster.ast`],
-  ['fred-replayer', 'FredReplayer', '@engine/fred-replayer/FredReplayerEngine', 'FredReplayerEngine', `${S}/formats/rebels.fred`],
-  ['digmug', 'DigMug', '@engine/digmug/DigMugEngine', 'DigMugEngine', `${S}/formats/flight.dmu`],
-  ['soundfactory', 'SoundFactory2', '@engine/soundfactory/SoundFactory2Engine', 'SoundFactory2Engine', `${S}/formats/goldrunner.psf`],
-  ['soundcontrol', 'SoundControl', '@engine/soundcontrol/SoundControlEngine', 'SoundControlEngine', `${S}/formats/north_sea_inferno.sc`],
-  ['quadracomposer', 'QuadraComposer', '@engine/quadracomposer/QuadraComposerEngine', 'QuadraComposerEngine', `${S}/formats/synth_corn.emod`],
+  ['fred-replayer', 'FredReplayer', '@engine/fred-replayer/FredReplayerEngine', 'FredReplayerEngine', `${S}/fredmon/rebels.fred`],
+  ['digmug', 'DigMug', '@engine/digmug/DigMugEngine', 'DigMugEngine', `${S}/digital-mugician/flight.dmu`],
+  ['soundfactory', 'SoundFactory2', '@engine/soundfactory/SoundFactory2Engine', 'SoundFactory2Engine', `${S}/soundfactory/goldrunner.psf`],
+  ['soundcontrol', 'SoundControl', '@engine/soundcontrol/SoundControlEngine', 'SoundControlEngine', `${S}/soundcontrol/north_sea_inferno.sc`],
+  ['quadracomposer', 'QuadraComposer', '@engine/quadracomposer/QuadraComposerEngine', 'QuadraComposerEngine', `${S}/quadra-composer/synth_corn.emod`],
   ['soundfx', 'SoundFx', '@engine/soundfx/SoundFxEngine', 'SoundFxEngine', `${S}/soundfx/batdance.sfx`, soundfxTransform],
 ];
 
@@ -113,7 +113,7 @@ describe('stereo separation reaches every direct-routed Amiga worklet', { timeou
   it('nuade: stored setting on node ready, live slider through the registry', async () => {
     const { NuadeEngine } = await import('@engine/nuade/NuadeEngine');
     const { proc, send, posted } = await startWorklet('nuade', 'Nuade');
-    await send({ type: 'loadModule', bytes: songBuffer(`${S}/formats/antidust.bp3`), playerId: '', fileName: 'antidust.bp3', companions: [] });
+    await send({ type: 'loadModule', bytes: songBuffer(`${S}/bp-soundmon-3/antidust.bp3`), playerId: '', fileName: 'antidust.bp3', companions: [] });
     expect(posted.find((m) => m.type === 'moduleLoaded' || m.type === 'error')?.type).toBe('moduleLoaded');
     await send({ type: 'play' });
 

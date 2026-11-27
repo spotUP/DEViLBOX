@@ -15,7 +15,7 @@ import { analyzeFormat, formatReportToString } from "./formatAnalysis";
 
 const REF = resolve(import.meta.dirname, "../../../../public/data/songs");
 const FILE1 = resolve(REF, "paul-robotham/dawnpatrol-sad.dat");
-const FILE2 = resolve(REF, "formats/dawnpatrol-sad.dat");
+const FILE2 = resolve(REF, "paul-robotham/dawnpatrol-sad.dat");
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

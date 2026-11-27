@@ -36,7 +36,7 @@ describe('jukebox file-name search', { timeout: 60000 }, () => {
 
     const list = container.querySelector('[data-captures-typing]') as HTMLElement;
     for (const ch of 'apb') fireEvent.keyDown(list, { key: ch });
-    await findByText('formats/apb.dw');
+    await findByText('david-whittaker/apb.dw');
 
     const play = container.querySelector('button[title="Play (Enter)"]') as HTMLButtonElement;
     // formats rows first: the file row is the one named apb.dw

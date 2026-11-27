@@ -32,7 +32,7 @@ beforeAll(() => { restoreDwFetch = installDwNodeFetch(); });
 afterAll(() => restoreDwFetch());
 
 describe('David Whittaker instrument walk', () => {
-  for (const f of ['formats/apb.dw', 'david-whittaker/garfield2+.dw']) {
+  for (const f of ['david-whittaker/apb.dw', 'david-whittaker/garfield2+.dw']) {
     it(`${f}: every instrument the grid plays exists, from the replayer's own sample table`, async () => {
       const ab = load(f);
       const scan = scanDWStructures(new Uint8Array(ab));
@@ -45,13 +45,13 @@ describe('David Whittaker instrument walk', () => {
     });
   }
   it('apb.dw has 15 instruments (4 used by the song are all present)', async () => {
-    expect((await parseDavidWhittakerFile(load('formats/apb.dw'), 'apb.dw')).instruments).toHaveLength(15);
+    expect((await parseDavidWhittakerFile(load('david-whittaker/apb.dw'), 'apb.dw')).instruments).toHaveLength(15);
   });
 });
 
 describe('Jeroen Tel instrument walk', () => {
   it('insects_in_space.jt: instruments come from the sample pointer table, not the BNE displacement', async () => {
-    const song = await parseJeroenTelFile(load('formats/insects_in_space.jt'), 'insects_in_space.jt');
+    const song = await parseJeroenTelFile(load('jeroen-tel/insects_in_space.jt'), 'insects_in_space.jt');
     const used = usedInstruments(song);
     expect(used.length).toBeGreaterThanOrEqual(10);
     expect(song.instruments).toHaveLength(32);

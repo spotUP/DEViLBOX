@@ -19,9 +19,9 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
 const AHX1 = resolve(REF, 'ahx/amanda.ahx');
-const AHX2 = resolve(REF, 'formats/aces_high.ahx');
+const AHX2 = resolve(REF, 'ahx/aces_high.ahx');
 const HVL1 = resolve(REF, 'hivelytracker/waiting for a message.hvl');
-const HVL2 = resolve(REF, 'formats/hexplosion.hvl');
+const HVL2 = resolve(REF, 'hivelytracker/hexplosion.hvl');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

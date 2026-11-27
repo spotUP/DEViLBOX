@@ -9,7 +9,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'fred-gray/eco.gray');
-const FILE2 = resolve(REF, 'formats/eco.gray');
+const FILE2 = resolve(REF, 'fred-gray/eco.gray');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

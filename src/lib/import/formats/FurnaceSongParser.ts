@@ -817,7 +817,7 @@ const CHIP_DEFAULT_INS_TYPE: Record<number, number> = {
 };
 
 // Chip ID mapping
-const CHIP_CHANNELS: Record<number, number> = {
+export const CHIP_CHANNELS: Record<number, number> = {
   0x00: 0,    // End of list
   0x01: 17,   // YMU759
   0x02: 10,   // Genesis (compound)

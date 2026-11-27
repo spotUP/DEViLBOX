@@ -22,7 +22,7 @@ function firstNote(patterns: Pattern[]): [number, number, number] {
 }
 
 describe('volume edits refused with the build-specific reason', () => {
-  it.each(['follin-player-ii/sly spy title.tf', 'formats/follin_smallest.tf'])('Tim Follin %s', (name) => {
+  it.each(['follin-player-ii/sly spy title.tf', 'follin-player-ii/follin_smallest.tf'])('Tim Follin %s', (name) => {
     const raw = read(`public/data/songs/${name}`);
     const g = buildTimFollinGrid(raw);
     if (!g) return;

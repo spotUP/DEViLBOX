@@ -13,7 +13,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'ben-daglish-sid/terramex.bds');
-const FILE2 = resolve(REF, 'formats/terramex.bds');
+const FILE2 = resolve(REF, 'ben-daglish-sid/terramex.bds');
 const FILE3 = resolve(REF, 'ben-daglish-sid/terramex.bds');
 
 function loadBuf(path: string): ArrayBuffer {

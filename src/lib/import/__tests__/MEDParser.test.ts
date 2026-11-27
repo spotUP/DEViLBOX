@@ -11,7 +11,7 @@ import { parseMEDFile } from '../formats/MEDParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
-const FILE1 = resolve(REF, 'formats/universal monsters - dracula.mmd0');
+const FILE1 = resolve(REF, 'octamed-mmd0/universal monsters - dracula.mmd0');
 const FILE2 = resolve(REF, 'octamed-mmd1/funky nightmare.mmd1');
 
 function loadBuf(path: string): ArrayBuffer {

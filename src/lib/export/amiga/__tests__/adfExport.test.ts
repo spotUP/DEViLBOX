@@ -14,39 +14,39 @@ const CASES: Array<[string, string]> = [
   ['jamcracker/freehand-spreadtro.jam', 'JamCracker'],
   ['digital-mugician/believe.dmu', 'Mugician'],
   ['digibooster/the day after.digi', 'DIGI-Booster'],
-  ['formats/msx-cracktro 2.sun', 'SUN-Tronic'],
+  ['suntronic/msx-cracktro 2.sun', 'SUN-Tronic'],
   ['custommade/the viking child crack.cm', 'CustomMade'],
-  ['formats/primemover_01.hot', 'Anders_0land'],
-  ['formats/perception.ems', 'EMS-6'],
-  ['formats/je taime.ems', 'EMS'],
-  ['formats/ballade.song.ems', 'EMS'],
-  ['formats/universal monsters - dracula.mmd0', 'MED'],
-  ['formats/funky nightmare.mmd1', 'MED-A1200'],
-  ['formats/hybris.fp', 'FuturePlayer'],
-  ['formats/imploder_drums.fp', 'FuturePlayer'],
-  ['formats/ep-trmonsterbusiness.mcmd', 'MCMD'],
-  ['formats/beathoven_smallest.bss', 'BeathovenSynthesizer'],
-  ['formats/tristar_cracktro.bss', 'BeathovenSynthesizer'],
-  ['formats/pauker_rap_2.ss', 'SpeedySystem'],
-  ['formats/action.aps', 'AProSys'],
-  ['formats/agony-level1.aam', 'ArtAndMagic'],
-  ['formats/agony-level2.aam', 'ArtAndMagic'],
-  ['formats/future basketball main.tw', 'SoundImages'],
-  ['formats/crystal.dp', 'Tronic'],
-  ['formats/locomotion.dp', 'Tronic'],
-  ['formats/krymini title.amc', 'AM-Composer'],
-  ['formats/krymini jingle 1.amc', 'AM-Composer'],
-  ['formats/riffraff_smallest.riff', 'RiffRaff'],
-  ['formats/sidewinder2.riff', 'RiffRaff'],
-  ['formats/prehistoric_tale.hipc', 'JochenHippel-CoSo'],
+  ['anders-oland/primemover_01.hot', 'Anders_0land'],
+  ['ems/perception.ems', 'EMS-6'],
+  ['ems/je taime.ems', 'EMS'],
+  ['ems/ballade.song.ems', 'EMS'],
+  ['octamed-mmd0/universal monsters - dracula.mmd0', 'MED'],
+  ['octamed-mmd1/funky nightmare.mmd1', 'MED-A1200'],
+  ['future-player/hybris.fp', 'FuturePlayer'],
+  ['future-player/imploder_drums.fp', 'FuturePlayer'],
+  ['mcmd/ep-trmonsterbusiness.mcmd', 'MCMD'],
+  ['beathoven-synthesizer/beathoven_smallest.bss', 'BeathovenSynthesizer'],
+  ['beathoven-synthesizer/tristar_cracktro.bss', 'BeathovenSynthesizer'],
+  ['speedy-system/pauker_rap_2.ss', 'SpeedySystem'],
+  ['AProSys/action.aps', 'AProSys'],
+  ['art-and-magic/agony-level1.aam', 'ArtAndMagic'],
+  ['art-and-magic/agony-level2.aam', 'ArtAndMagic'],
+  ['sound-images/future basketball main.tw', 'SoundImages'],
+  ['tronic/crystal.dp', 'Tronic'],
+  ['tronic/locomotion.dp', 'Tronic'],
+  ['amc/krymini title.amc', 'AM-Composer'],
+  ['amc/krymini jingle 1.amc', 'AM-Composer'],
+  ['riff-raff/riffraff_smallest.riff', 'RiffRaff'],
+  ['riff-raff/sidewinder2.riff', 'RiffRaff'],
+  ['hippel-coso/prehistoric_tale.hipc', 'JochenHippel-CoSo'],
   ['oktalyzer/les granges brulees.okta', 'Oktalyzer'],
-  ['formats/ghostbattle_gameover.hip7', 'JochenHippel-7V'],
+  ['hippel-7v/ghostbattle_gameover.hip7', 'JochenHippel-7V'],
   ['hippel-7v/lethalxcess-intro.hip7', 'JochenHippel-7V'],
-  ['formats/almighty.sa', 'SonicArranger'],
+  ['sonic-arranger/almighty.sa', 'SonicArranger'],
   ['sonic-arranger/mega end.sa', 'SonicArranger'],
-  ['formats/anthrox_intro.dm2', 'DeltaMusic2.0'],
+  ['delta-music-2/anthrox_intro.dm2', 'DeltaMusic2.0'],
   ['delta-music-2/asperity megademo 3.dm2', 'DeltaMusic2.0'],
-  ['formats/anarchy.sid1', 'SIDMon1.0'],
+  ['sidmon-1/anarchy.sid1', 'SIDMon1.0'],
   ['sidmon-1/myfunnymazea.sid', 'SIDMon1.0'],
 ];
 
@@ -75,7 +75,7 @@ describe('adf slot patcher', () => {
   it('writes the file name without extension, sanitized and space padded, at the manifest title slot', async () => {
     const e = manifest.templates['EMS'];
     const base = tpl(e.adf);
-    const mod = song('formats/je taime.ems');
+    const mod = song('ems/je taime.ems');
     const at = (n: string) => buildAdf(mod, n, manifest, async () => base).then((r) =>
       String.fromCharCode(...r.data.subarray(e.titleSlot.diskOffset, e.titleSlot.diskOffset + e.titleSlot.bytes)));
     expect(await at('je taime.ems')).toBe('je taime'.padEnd(e.titleSlot.bytes, ' '));
@@ -94,9 +94,9 @@ describe('adf slot patcher', () => {
   it('TFMX: writes the smpl companion into its own slot with its length word, and refuses a missing or oversize one', () => {
     const e = manifest.templates['TFMX-Pro'];
     const base = tpl(e.adf);
-    const mdat = song('formats/mdat.turrican_bonus');
+    const mdat = song('tfmx/mdat.turrican_bonus');
     expect(adfTemplateFor(mdat, 'mdat.turrican_bonus')).toBe('TFMX-Pro');
-    const smpl = song('formats/smpl.turrican_bonus');
+    const smpl = song('tfmx/smpl.turrican_bonus');
     const r = patchAdfSlot(base, e, mdat, smpl);
     const cs = e.companionSlot!, cl = e.companionLengthWord!.diskOffset;
     expect(new DataView(r.buffer).getUint32(cl, false)).toBe(smpl.length);
@@ -134,9 +134,9 @@ describe('adf slot patcher', () => {
   });
 
   it.each([
-    ['SoundMon2.0', 'formats/aquarivs.bp'],
-    ['InStereo', 'formats/fantasi8.is'],
-    ['QuadraComposer', 'formats/synth_corn.emod'],
+    ['SoundMon2.0', 'bp-soundmon-2/aquarivs.bp'],
+    ['InStereo', 'instereo!/fantasi8.is'],
+    ['QuadraComposer', 'quadra-composer/synth_corn.emod'],
   ])('%s: routes by magic, patches the slot', (name, path) => {
     const e = manifest.templates[name];
     const mod = song(path);
@@ -208,6 +208,6 @@ describe('modules with no magic test route by eagleplayer.conf names', () => {
   });
 
   it('ivanhoe - bonus.pap -> PierreAdane (template boots with audio DMA since 75e5a534e)', () => {
-    expect(adfTemplateFor(song('formats/Ivanhoe_ivanhoe - bonus.pap'), 'Ivanhoe_ivanhoe - bonus.pap', manifest)).toBe('PierreAdane');
+    expect(adfTemplateFor(song('pierre-adane-packer/Ivanhoe_ivanhoe - bonus.pap'), 'Ivanhoe_ivanhoe - bonus.pap', manifest)).toBe('PierreAdane');
   });
 });

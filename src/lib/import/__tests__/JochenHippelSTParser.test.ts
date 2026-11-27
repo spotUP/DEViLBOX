@@ -9,7 +9,7 @@ import { HS_FX, commandStreamEffectToString } from '../formats/commandStreamEffe
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
-const FILE1 = resolve(REF, 'formats/astaroth.sog');
+const FILE1 = resolve(REF, 'hippel-st/astaroth.sog');
 const FILE2 = resolve(REF, 'hippel-st/demo music10.sog');
 
 function loadBuf(path: string): ArrayBuffer {

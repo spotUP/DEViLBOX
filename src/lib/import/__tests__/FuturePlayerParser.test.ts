@@ -12,8 +12,8 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'future-player/imploder drums.fp');
-const FILE2 = resolve(REF, 'formats/hybris.fp');
-const FILE3 = resolve(REF, 'formats/imploder_drums.fp');
+const FILE2 = resolve(REF, 'future-player/hybris.fp');
+const FILE3 = resolve(REF, 'future-player/imploder_drums.fp');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

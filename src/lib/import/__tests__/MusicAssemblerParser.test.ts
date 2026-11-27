@@ -14,7 +14,7 @@ import {
 import { analyzeFormat, formatReportToString } from "./formatAnalysis";
 
 const REF = resolve(import.meta.dirname, "../../../../public/data/songs");
-const FILE1 = resolve(REF, "formats/baseheads.ma");
+const FILE1 = resolve(REF, "music-assembler/baseheads.ma");
 const FILE2 = resolve(REF, "music-assembler/thanatos.ma");
 
 function loadBytes(p: string): Uint8Array {

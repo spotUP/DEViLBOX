@@ -18,7 +18,7 @@ const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
 const FILE1 = resolve(REF, 'digital-sound-studio/zrimay.dss');
 const FILE2 = resolve(REF, 'digital-symphony/binary reality.dss');
-const FILE3 = resolve(REF, 'formats/doxtro3.dss');
+const FILE3 = resolve(REF, 'digital-sound-studio/doxtro3.dss');
 
 function loadBytes(path: string): Uint8Array {
   return new Uint8Array(readFileSync(path));

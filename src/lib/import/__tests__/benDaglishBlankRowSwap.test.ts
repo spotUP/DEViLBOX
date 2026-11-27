@@ -21,7 +21,7 @@ let restore = () => {};
 beforeAll(() => { restore = installWasmNodeFetch('bd', 'Bd'); });
 afterAll(() => restore());
 
-const SONGS = ['ben-daglish/motorhead-titleandingame.bd', 'formats/mickey_mouse.bd'];
+const SONGS = ['ben-daglish/motorhead-titleandingame.bd', 'ben-daglish/mickey_mouse.bd'];
 
 describe.each(SONGS)('Ben Daglish blank-row instrument swap: %s', (rel) => {
   it('writes note and instrument, reads both back, every other cell unchanged; no-swap edit adds 2 bytes, swap 4', async () => {

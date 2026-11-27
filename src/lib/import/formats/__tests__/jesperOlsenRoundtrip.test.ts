@@ -18,7 +18,7 @@ import { parseJesperOlsenFile } from '../JesperOlsenParser';
 const ROOT = join(process.cwd(), 'public/data/songs');
 const SONGS: Array<[string, 'L' | 'G', number[]]> = [
   ['jesper-olsen/lollypop-subgame 01.jo', 'L', [449, 149, 150, 156]],
-  ['formats/lollypop-subgame_01.jo', 'L', [449, 149, 150, 156]],
+  ['jesper-olsen/lollypop-subgame_01.jo', 'L', [449, 149, 150, 156]],
   ['jesper-olsen/georg glaxo/JO.GeorgGlaxo title', 'G', [195, 191, 226, 223]],
 ];
 

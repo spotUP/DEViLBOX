@@ -12,7 +12,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'face-the-music/rock.ftm');
-const FILE2 = resolve(REF, 'formats/staticoscillations.ftm');
+const FILE2 = resolve(REF, 'face-the-music/staticoscillations.ftm');
 const FILE3 = resolve(REF, 'face-the-music/rock.ftm');
 
 function loadU8(p: string): Uint8Array {

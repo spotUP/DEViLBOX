@@ -7,7 +7,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
 const FILE1 = resolve(REF, 'special-fx/striker ingame.jd');
-const FILE2 = resolve(REF, 'formats/wildwheels_ingame.jd');
+const FILE2 = resolve(REF, 'special-fx-st/wildwheels_ingame.jd');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

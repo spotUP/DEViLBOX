@@ -11,8 +11,8 @@ import { resolve } from 'path';
 import { isSTPFormat } from '../formats/SamplerTrackerPlusParser';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
-const FILE1 = resolve(REF, 'formats/noname.stp');
-const FILE2 = resolve(REF, 'formats/noname.stp');
+const FILE1 = resolve(REF, 'soundtracker-pro-ii/noname.stp');
+const FILE2 = resolve(REF, 'soundtracker-pro-ii/noname.stp');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

@@ -111,7 +111,7 @@ beforeAll(async () => {
 function sunTronicCorpus(): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const dir of ['formats/SUNTronicTunes', 'SUNTronicTunes']) {
+  for (const dir of ['suntronic']) {
     if (!existsSync(join(SONGS, dir))) continue;
     for (const e of readdirSync(join(SONGS, dir), { withFileTypes: true })) {
       if (!e.isFile()) continue;
@@ -143,8 +143,8 @@ const FORMATS: FormatRow[] = [
   { key: 'digitalSonixChrome', rig: 'paula', sampleEvery: 4, files: corpus(['.dsc']), pick: pickDscNote, noteSelectsSample: true },
   // The remaining EXPORT_ROUND_TRIP 'pass' rows. Pins: the extension alone would also match another format's files (.sng, .ems v6, .ex).
   { key: 'davidHanney', rig: 'paula', files: corpus(['.dh']) },
-  { key: 'ems', rig: 'paula', files: ['formats/je taime.ems'] },
-  { key: 'emsv6', rig: 'paula', files: ['formats/ballade.song.ems'] },
+  { key: 'ems', rig: 'paula', files: ['ems/je taime.ems'] },
+  { key: 'emsv6', rig: 'paula', files: ['ems/ballade.song.ems'] },
   { key: 'fashionTracker', rig: 'paula', files: corpus(['.ex'], 'fashion-tracker') },
   { key: 'mcmd', rig: 'paula', files: corpus(['.mcmd']) },
   { key: 'richardJoseph', rig: 'paula', files: ['richard-joseph/cannon fodder (intro).sng'] },
@@ -196,7 +196,7 @@ const FORMATS: FormatRow[] = [
   { key: 'soundControl', rig: 'paula', files: ['soundcontrol/north sea inferno ongame1.sc'] },
   { key: 'sonicArranger', rig: 'paula', files: ['sonic-arranger/mega end.sa'] },
   { key: 'synthDream', rig: 'paula', files: ['synth-dream/sdr.monsterbusiness 1'] },
-  { key: 'tonyWilliams', rig: 'paula', files: ['formats/future basketball main.tw'] },
+  { key: 'tonyWilliams', rig: 'paula', files: ['sound-images/future basketball main.tw'] },
   { key: 'beathoven', rig: 'paula', files: ['beathoven-synthesizer/tristar cracktro.bss'] },
   { key: 'synthesis', rig: 'paula', files: ['synthesis/space sound.syn'] },
   // TCB notes are octaves 1-3 only (note bytes 0x10-0x3B); the picked note is 52, the lowest C-1, so the default move down (50) has no
@@ -209,13 +209,13 @@ const FORMATS: FormatRow[] = [
   { key: 'tfmMusicMaker', rig: 'paula', files: ['tfm-music-maker/rainstorm.tfe'] },
   { key: 'tfmx', rig: 'paula', files: ['tfmx/mdat.hbtitle'] },
   { key: 'daveLowe', rig: 'paula', files: ['dave-lowe/incredibleshrinkingsphere.dl'] },
-  { key: 'soundPlayer', rig: 'paula', files: ['formats/Scott Johnston/sjs.tune6'] },
-  { key: 'customMade', rig: 'paula', files: ['formats/cm.viking_child'] },
+  { key: 'soundPlayer', rig: 'paula', files: ['scott-johnston/sjs.tune6'] },
+  { key: 'customMade', rig: 'paula', files: ['custommade/cm.viking_child'] },
   { key: 'markCooksey', rig: 'paula', files: ['mark-cooksey/mighty bombjack.mc'] },
-  { key: 'jasonPage', rig: 'paula', files: ['formats/jpn.virocop-14'] },
+  { key: 'jasonPage', rig: 'paula', files: ['jason-page/jpn.virocop-14'] },
   // PC and chip-tracker formats: UADE refuses their files, so only bytes and grid are held (EXPECTED_NO_RIG).
   { key: '669', rig: 'paula', files: ['composer-669/speed fighter.669'] },
-  { key: 'amf', rig: 'paula', files: ['formats/avoid.amf'] },
+  { key: 'amf', rig: 'paula', files: ['advanced-music-format/avoid.amf'] },
   { key: 'cheesecutter', rig: 'paula', held: 'no exporter in the registry', files: ['cheesecutter/abaddon-trouble.ct'] },
   { key: 'composer667', rig: 'paula', files: ['composer-667/speed fighter.667'] },
   { key: 'digi', rig: 'paula', files: ['digibooster/the day after.digi'] },
@@ -225,8 +225,8 @@ const FORMATS: FormatRow[] = [
   { key: 'gdm', rig: 'paula', held: 'no exporter in the registry', files: ['general-digimusic/tilbury fair (remix).gdm'] },
   { key: 'inStereoAmbiguous', rig: 'paula', files: ['instereo!/fantasi8.is'] },
   { key: 'it', rig: 'paula', files: ['impulse-tracker/absm chain mod.it'] },
-  { key: 'jxs', rig: 'paula', files: ['formats/dreamer.jxs'] },
-  { key: 'kdm', rig: 'paula', files: ['formats/kdmsong.kdm'] },
+  { key: 'jxs', rig: 'paula', files: ['jaytrax/dreamer.jxs'] },
+  { key: 'kdm', rig: 'paula', files: ['ken-silverman-kdm/kdmsong.kdm'] },
   { key: 'mdl', rig: 'paula', held: 'no exporter in the registry', files: ['digi-trakker/rohadtjo.mdl'] },
   { key: 'med', rig: 'paula', files: ['octamed-mmd0/universal monsters - title.mmd0'] },
   { key: 'mod', rig: 'paula', files: ['mod/break the box.mod'] },
@@ -234,16 +234,16 @@ const FORMATS: FormatRow[] = [
   { key: 'organya', rig: 'paula', files: ['organya/obj0640-1.org'] },
   { key: 'piyoPiyo', rig: 'paula', files: ['studio-pixel---piyopiyo/obj0176-1.pmd'] },
   { key: 'plm', rig: 'paula', held: 'no exporter in the registry', files: ['disorder-tracker-2/hyper geckoo.plm'] },
-  { key: 'psm', rig: 'paula', files: ['formats/Epic Pinball - Song 0 - Title.psm'] },
-  { key: 'ptm', rig: 'paula', files: ['formats/rew_vibr.ptm'] },
+  { key: 'psm', rig: 'paula', files: ['psm/Epic Pinball - Song 0 - Title.psm'] },
+  { key: 'ptm', rig: 'paula', files: ['protracker-iff/rew_vibr.ptm'] },
   { key: 'rtm', rig: 'paula', held: 'no exporter in the registry', files: ['real-tracker/odyssey.rtm'] },
   { key: 's3m', rig: 'paula', files: ['s3m/andante.s3m'] },
   { key: 'sidFactory2', rig: 'paula', held: 'no exporter in the registry', files: ['sid-factory-2/Driver 11 Test - Filter.sf2'] },
   { key: 'stm', rig: 'paula', held: 'no exporter in the registry', files: ['scream-tracker-2/slideshow i.stm'] },
-  { key: 'stp', rig: 'paula', files: ['formats/noname.stp'] },
-  { key: 'stx', rig: 'paula', held: 'no exporter in the registry', files: ['formats/futurebrain.stx'] },
-  { key: 'ult', rig: 'paula', held: 'no exporter in the registry', files: ['formats/seasons.ult'] },
-  { key: 'unic', rig: 'paula', files: ['formats/african dreams.unic'], pick: (s) => Promise.resolve(pickNote(s, s.songPositions[0])) },
+  { key: 'stp', rig: 'paula', files: ['soundtracker-pro-ii/noname.stp'] },
+  { key: 'stx', rig: 'paula', held: 'no exporter in the registry', files: ['screamtracker-stmik/futurebrain.stx'] },
+  { key: 'ult', rig: 'paula', held: 'no exporter in the registry', files: ['ultra-tracker/seasons.ult'] },
+  { key: 'unic', rig: 'paula', files: ['unic-tracker/african dreams.unic'], pick: (s) => Promise.resolve(pickNote(s, s.songPositions[0])) },
   { key: 'xm', rig: 'paula', files: ['xm/flo boarding - level 1.xm'] },
 ];
 
@@ -314,19 +314,19 @@ const NO_RIG = new Set<string>();
 // digital-tracker-dtm/sonic subspace.dtm: UADE refuses it; the edited-stage now reaches the render since the dtm export is routed.
 // tfmx/mdat.hbtitle: UADE refuses each of them as loaded here (measured in the hook run of the G16 batch), so only bytes and grid are held; no audio verdict.
 const EXPECTED_NO_RIG: string[] = [
-  'face-the-music/rock.ftm', 'formats/dns.ptc', 'formats/fuzzball-title.fred', 'hivelytracker/waiting for a message.hvl',
+  'face-the-music/rock.ftm', 'dynamic-synthesizer/dns.ptc', 'fredmon/fuzzball-title.fred', 'hivelytracker/waiting for a message.hvl',
   'richard-joseph/cannon fodder (intro).sng', 'synth-dream/sdr.monsterbusiness 1', 'tfm-music-maker/rainstorm.tfe', 'tfmx/mdat.hbtitle',
-  'composer-669/speed fighter.669', 'formats/Epic Pinball - Song 0 - Title.psm', 'formats/avoid.amf', 'formats/dreamer.jxs', 'formats/kdmsong.kdm',
+  'composer-669/speed fighter.669', 'psm/Epic Pinball - Song 0 - Title.psm', 'advanced-music-format/avoid.amf', 'jaytrax/dreamer.jxs', 'ken-silverman-kdm/kdmsong.kdm',
   'digital-tracker-dtm/sonic subspace.dtm', 'organya/obj0640-1.org', 'studio-pixel---piyopiyo/obj0176-1.pmd',
   // Byte-exact since the layout-patch export; UADE refuses both, so only bytes and grid are held.
-  'composer-667/speed fighter.667', 'formats/noname.stp', 'formats/rew_vibr.ptm',
+  'composer-667/speed fighter.667', 'soundtracker-pro-ii/noname.stp', 'protracker-iff/rew_vibr.ptm',
 ];
 /**
  * Files UADE takes but plays as noise, so its stream says nothing about the song: the .sog is the
  * Hippel ST SOURCE the editor packs for the player (the Compress step of jochenHippelSTGridMatchesPlayer),
  * not a module the 68k player reads. Their sound is held by that test's packed form; here only bytes and grid.
  */
-const NO_RIG_BY_DESIGN = new Set(['formats/astaroth.sog', 'hippel-st/demo music10.sog', 'digibooster/the day after.digi']);
+const NO_RIG_BY_DESIGN = new Set(['hippel-st/astaroth.sog', 'hippel-st/demo music10.sog', 'digibooster/the day after.digi']);
 // digibooster/the day after.digi: an 8-channel DigiBooster module; UADE has 4 Paula voices and plays it as a stub stream (6 distinct periods in 8 s, none of them the
 // edited cell's period 339 on voice 0), so its render cannot hear a note edit. The file edit is held by the byte diff (one period byte at the cell's offset) and the grid reload.
 /** The loaded file's own render, once per file. */
@@ -422,7 +422,7 @@ let tfmx: TfmxWalkHost | null = null;
  * 10 ms chunk it happened in (the exact input of the chip, so equal streams are equal sound).
  */
 /** Module name -> its sample companion (corpus path); the player asks UADE for it by the companion's own name. */
-const COMPANIONS: Record<string, string> = { 'sjs.tune6': 'formats/Scott Johnston/smp.tune6', 'jpn.virocop-14': 'formats/smp.virocop-14' };
+const COMPANIONS: Record<string, string> = { 'sjs.tune6': 'scott-johnston/smp.tune6', 'jpn.virocop-14': 'jason-page/smp.virocop-14' };
 
 async function paulaTrace(bytes: Uint8Array, name: string): Promise<Trace | null> {
   // A fresh UADE per render: one that has played other songs carries their state into the next.

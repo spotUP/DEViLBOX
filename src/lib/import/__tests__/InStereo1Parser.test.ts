@@ -12,7 +12,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 const REF_MUSIC = resolve(import.meta.dirname, '../../../../public/data/songs');
 // .is files in the InStereo! 1.0 directory
 const IS1_FILE_1 = resolve(REF_MUSIC, 'instereo!/fantasi8.is');
-const IS1_FILE_2 = resolve(REF_MUSIC, 'formats/fantasi8.is');
+const IS1_FILE_2 = resolve(REF_MUSIC, 'instereo!/fantasi8.is');
 
 function loadBytes(path: string): Uint8Array {
   const buf = readFileSync(path);

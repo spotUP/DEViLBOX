@@ -38,6 +38,6 @@ describe('David Whittaker grid notes: named by the pitch the replayer plays', { 
     await check('david-whittaker/garfield2+.dw', (e) => e.b === 48 && e.a === 1, 45);
   });
   it('apb.dw: byte 28 with a fine_tune_period 421 sample shows note 17 (byte + 25 would show 53)', async () => {
-    await check('formats/apb.dw', (e, ftp) => e.b === 28 && ftp === 421, 17);
+    await check('david-whittaker/apb.dw', (e, ftp) => e.b === 28 && ftp === 421, 17);
   });
 });

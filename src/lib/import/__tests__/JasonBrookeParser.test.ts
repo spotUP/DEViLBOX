@@ -9,7 +9,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'jason-brooke/ikari warriors.jb');
-const FILE2 = resolve(REF, 'formats/ikari_warriors.jb');
+const FILE2 = resolve(REF, 'jason-brooke/ikari_warriors.jb');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

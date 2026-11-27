@@ -15,7 +15,7 @@ import { periodToNote } from '@/lib/amiga/periodNotes';
 
 const ROOT = resolve(__dirname, '../../../../../public/data/songs');
 const FIXTURES = [
-  { name: 'gyroscope.mon', path: `${ROOT}/formats/gyroscope.mon` },
+  { name: 'gyroscope.mon', path: `${ROOT}/maniacs-of-noise/gyroscope.mon` },
   { name: 'unreal flying.mon', path: `${ROOT}/maniacs-of-noise/unreal flying.mon` },
 ];
 

@@ -39,9 +39,9 @@ import { fpCodeSection } from '@/lib/import/formats/fpWalk';
 
 const ROOT = join(process.cwd(), 'public/data/songs');
 const read = (rel: string) => new Uint8Array(readFileSync(join(ROOT, rel)));
-const MA = ['formats/baseheads.ma', 'music-assembler/thanatos.ma'];
-const FP = ['formats/imploder_drums.fp', 'formats/hybris.fp'];
-const HIP7 = ['hippel-7v/lethalxcess-intro.hip7', 'formats/ghostbattle_gameover.hip7'];
+const MA = ['music-assembler/baseheads.ma', 'music-assembler/thanatos.ma'];
+const FP = ['future-player/imploder_drums.fp', 'future-player/hybris.fp'];
+const HIP7 = ['hippel-7v/lethalxcess-intro.hip7', 'hippel-7v/ghostbattle_gameover.hip7'];
 const HIP = ['hippel/warp (ingame 2).hip'];
 
 /** A worker that runs the real worker body behind a structured-clone boundary; hold = never answers. */

@@ -23,7 +23,7 @@ import { analyzeFormat, formatReportToString } from "./formatAnalysis";
 const REF = resolve(import.meta.dirname, "../../../../public/data/songs");
 
 // 4V file from MusicMaker V8/- unknown/
-const FILE_4V = resolve(REF, "formats/easystyleofmsx.mm4");
+const FILE_4V = resolve(REF, "music-maker-4v/easystyleofmsx.mm4");
 // 8V file from MusicMaker V8/- unknown/
 const FILE_8V = resolve(REF, "musicmaker-v8/roetzmegoem.mm8");
 

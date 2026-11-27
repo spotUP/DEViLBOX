@@ -60,10 +60,13 @@ describe('DX7 library voice reaches the instrument and the synth', () => {
     const bank = manifest.banks[1];
 
     render(<Editor id={id} />);
-    // Library browser: filter to the bank, browse it, click voice 5.
+    // Library browser: one flat voice list; filter to the bank, click its voice 5.
     fireEvent.change(await screen.findByLabelText('Search the library'), { target: { value: bank.name } });
-    fireEvent.click(await screen.findByRole('option', { name: new RegExp(`^${bank.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }));
-    fireEvent.click(within(screen.getByRole('listbox', { name: 'Voices' })).getAllByRole('option')[4]);
+    const voice5 = within(await screen.findByRole('listbox', { name: 'Voices' }))
+      .getAllByRole('option')
+      .find((o) => o.getAttribute('title')?.startsWith(`${bank.voices[4]} - ${bank.name}`));
+    expect(voice5, `voice 5 of ${bank.name} is listed`).toBeDefined();
+    fireEvent.click(voice5!);
 
     await waitFor(() => expect(loadLibraryBank).toHaveBeenCalledWith(bank.file, 4));
     const dx7 = useInstrumentStore.getState().instruments.find(i => i.id === id)!.dx7!;

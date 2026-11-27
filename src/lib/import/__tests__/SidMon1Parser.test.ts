@@ -6,7 +6,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE_ANARCHY = resolve(REF, 'sidmon-1/myfunnymazea.sid');
-const FILE_BRAINWAVE = resolve(REF, 'formats/anarchy.sid1');
+const FILE_BRAINWAVE = resolve(REF, 'sidmon-1/anarchy.sid1');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

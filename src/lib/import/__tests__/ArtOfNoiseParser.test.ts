@@ -13,7 +13,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'art-of-noise/inside.blipp.aon');
-const FILE2 = resolve(REF, 'formats/action_section.aon');
+const FILE2 = resolve(REF, 'art-of-noise/action_section.aon');
 const FILE3 = resolve(REF, 'art-of-noise/inside.blipp.aon');
 
 function loadBytes(path: string): Uint8Array {

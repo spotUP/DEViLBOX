@@ -42,17 +42,17 @@ interface Case {
 
 const stoneBank = read('stonetracker', 'hypnosphere.sps');
 const CASES: Case[] = [
-  { format: 'Ems (je taime.ems)', parse: () => parseEMSFile(ab(read('formats', 'je taime.ems')), 'je taime.ems'), parseBytes: (b) => parseEMSFile(ab(b), 'je taime.ems'), exp: exportEms },
-  { format: 'Tomy (irrepressible intro.sg)', parse: () => parseTomyTrackerFile(ab(read('formats', 'irrepressible intro.sg')), 'irrepressible intro.sg'), parseBytes: (b) => parseTomyTrackerFile(ab(b), 'irrepressible intro.sg'), exp: exportTomyTracker },
+  { format: 'Ems (je taime.ems)', parse: () => parseEMSFile(ab(read('ems', 'je taime.ems')), 'je taime.ems'), parseBytes: (b) => parseEMSFile(ab(b), 'je taime.ems'), exp: exportEms },
+  { format: 'Tomy (irrepressible intro.sg)', parse: () => parseTomyTrackerFile(ab(read('tomy-tracker', 'irrepressible intro.sg')), 'irrepressible intro.sg'), parseBytes: (b) => parseTomyTrackerFile(ab(b), 'irrepressible intro.sg'), exp: exportTomyTracker },
   { format: 'Fashion (ivory tover ii.ex)', parse: () => parseFashionTrackerFile(ab(read('fashion-tracker', 'ivory tover ii.ex')), 'ivory tover ii.ex'), parseBytes: (b) => parseFashionTrackerFile(ab(b), 'ivory tover ii.ex'), exp: exportFashionTracker },
-  { format: 'David Hanney (tearaway_thomas.dh)', parse: () => parseDavidHanneyFile(ab(read('formats', 'tearaway_thomas.dh')), 'tearaway_thomas.dh'), parseBytes: (b) => parseDavidHanneyFile(ab(b), 'tearaway_thomas.dh'), exp: exportDavidHanney },
+  { format: 'David Hanney (tearaway_thomas.dh)', parse: () => parseDavidHanneyFile(ab(read('david-hanney', 'tearaway_thomas.dh')), 'tearaway_thomas.dh'), parseBytes: (b) => parseDavidHanneyFile(ab(b), 'tearaway_thomas.dh'), exp: exportDavidHanney },
   { format: 'StoneTracker (hypnosphere.spm)', parse: () => parseStoneTrackerFile(read('stonetracker', 'hypnosphere.spm'), 'hypnosphere.spm', stoneBank), parseBytes: (b) => parseStoneTrackerFile(b, 'hypnosphere.spm', stoneBank), exp: exportStoneTracker },
   { format: 'David Hanney (tearaway thomas unused.dh)', parse: () => parseDavidHanneyFile(ab(read('david-hanney', 'tearaway thomas unused.dh')), 'tearaway thomas unused.dh'), parseBytes: (b) => parseDavidHanneyFile(ab(b), 'tearaway thomas unused.dh'), exp: exportDavidHanney },
-  { format: 'PSA (the punisher - title.psa)', parse: () => parsePSAFile(ab(read('formats', 'the punisher - title.psa')), 'the punisher - title.psa'), parseBytes: (b) => parsePSAFile(ab(b), 'the punisher - title.psa'), exp: exportPSA },
-  { format: 'Thomas Hermann (thm.blueangel69)', parse: () => parseThomasHermannFile(ab(read('formats', 'thm.blueangel69')), 'thm.blueangel69'), parseBytes: (b) => parseThomasHermannFile(ab(b), 'thm.blueangel69'), exp: exportThomasHermann },
+  { format: 'PSA (the punisher - title.psa)', parse: () => parsePSAFile(ab(read('professional-sound-artists', 'the punisher - title.psa')), 'the punisher - title.psa'), parseBytes: (b) => parsePSAFile(ab(b), 'the punisher - title.psa'), exp: exportPSA },
+  { format: 'Thomas Hermann (thm.blueangel69)', parse: () => parseThomasHermannFile(ab(read('thomas-hermann', 'thm.blueangel69')), 'thm.blueangel69'), parseBytes: (b) => parseThomasHermannFile(ab(b), 'thm.blueangel69'), exp: exportThomasHermann },
   // RonKlaren and SoundPlayer import layoutPatch; their layouts have no writeCell (the grep hits are comments), so encodeCell is the writer.
   { format: 'Ron Klaren (astra 2.rk)', parse: () => parseRonKlarenFile(read('ron-klaren', 'astra 2.rk'), 'astra 2.rk')!, parseBytes: (b) => parseRonKlarenFile(b, 'astra 2.rk')!, exp: exportRonKlaren },
-  { format: 'Sound Player (sjs.awesome)', parse: () => parseSoundPlayerFile(ab(read('formats/Scott Johnston', 'sjs.awesome')), 'sjs.awesome'), parseBytes: (b) => parseSoundPlayerFile(ab(b), 'sjs.awesome'), exp: exportSoundPlayer },
+  { format: 'Sound Player (sjs.awesome)', parse: () => parseSoundPlayerFile(ab(read('scott-johnston', 'sjs.awesome')), 'sjs.awesome'), parseBytes: (b) => parseSoundPlayerFile(ab(b), 'sjs.awesome'), exp: exportSoundPlayer },
 ];
 
 type Pos = { p: number; c: number; r: number };

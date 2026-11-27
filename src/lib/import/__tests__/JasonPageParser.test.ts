@@ -9,7 +9,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'jason-page/jpn.fire and ice-1');
-const FILE2 = resolve(REF, 'formats/offroad.jpo');
+const FILE2 = resolve(REF, 'steve-turner/offroad.jpo');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

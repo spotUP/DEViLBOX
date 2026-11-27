@@ -93,7 +93,7 @@ describe('Anders 0land parser and exporter', () => {
     expect((await reparse(out.data)).patterns[p].channels[c].rows[r].note).toBe(typed);
   });
 
-  it('a note typed on a rest is reported, never dropped silently', async () => {
+  it('a note typed on a held row splits the event and reloads on its row', async () => {
     const { ab } = load();
     const song = await parseAnders0landFile(ab, 'primemover 07.hot');
     const rows = song.patterns[0].channels[0].rows;
@@ -102,6 +102,7 @@ describe('Anders 0land parser and exporter', () => {
     rows[rest].note = 40;
     const out = await exportAnders0land(song);
     setGridBaseline(null);
-    expect(out.warnings.length).toBe(1);
+    expect(out.warnings).toEqual([]);
+    expect((await reparse(out.data)).patterns[0].channels[0].rows[rest].note).toBe(40);
   });
 });

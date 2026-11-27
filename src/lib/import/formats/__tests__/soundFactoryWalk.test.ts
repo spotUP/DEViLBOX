@@ -8,7 +8,7 @@ import { join } from 'path';
 import { parseSoundFactoryWithEffects } from '../SoundFactoryParser';
 import { tokenizeSoundFactory } from '../soundFactoryStream';
 
-const DIRS: Record<string, string> = { 'goldrunner.psf': 'formats', 'oriental.psf': 'soundfactory' };
+const DIRS: Record<string, string> = { 'goldrunner.psf': 'soundfactory', 'oriental.psf': 'soundfactory' };
 const load = (n: string) => new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs', DIRS[n], n)));
 /** Notes on the replayer's single pass (findings file: 2078 note tokens in the whole opcode region, all reachable). */
 const GOLDRUNNER_NOTES = 2078;

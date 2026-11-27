@@ -24,7 +24,7 @@ import { DW_FX_MIN, DW_EFFECT_NAMES } from '@/lib/import/formats/davidWhittakerE
 import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
-const SONGS = ['formats/apb.dw', 'david-whittaker/garfield2+.dw'];
+const SONGS = ['david-whittaker/apb.dw', 'david-whittaker/garfield2+.dw'];
 
 const corpus = (n: string) => {
   const f = readFileSync(resolve(ROOT, 'public/data/songs', n));

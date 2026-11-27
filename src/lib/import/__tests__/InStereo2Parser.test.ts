@@ -11,7 +11,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF_MUSIC  = resolve(import.meta.dirname, '../../../../public/data/songs');
 const IS2_FILE_1 = resolve(REF_MUSIC, 'instereo!-2.0/spaceflight.is20');
-const IS2_FILE_2 = resolve(REF_MUSIC, 'formats/stereo_feeling.is20');
+const IS2_FILE_2 = resolve(REF_MUSIC, 'instereo!-2.0/stereo_feeling.is20');
 // IS1 files must NOT be detected as IS2
 const IS1_FILE   = resolve(REF_MUSIC, 'instereo!/fantasi8.is');
 

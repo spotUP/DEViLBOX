@@ -89,7 +89,7 @@ function expectSameVoice(label: string, song: Float32Array, prev: Float32Array, 
   sr.forEach((v, t) => { if (v > 0.004) expect(Math.abs(db(pr[t] || 1e-6, v)), `${label}: tick ${t}`).toBeLessThan(2); });
 }
 
-describe.each(['formats/apb.dw', 'david-whittaker/garfield2+.dw'])('David Whittaker %s: a typed note is the replayer voice, as the song plays it', (name) => {
+describe.each(['david-whittaker/apb.dw', 'david-whittaker/garfield2+.dw'])('David Whittaker %s: a typed note is the replayer voice, as the song plays it', (name) => {
   let restoreFetch = () => {};
   beforeAll(() => { restoreFetch = installDwNodeFetch(); });
   afterAll(() => restoreFetch());
@@ -205,7 +205,7 @@ describe('StarTrekker AM: a key never starts the song, and key release silences 
   });
 });
 
-describe.each(['digital-mugician/believe.dmu', 'formats/flight.dmu', 'formats/cockwise.mug', 'digital-mugician-2/snickle.mug'])('Digital Mugician %s: a typed note is the replayer voice, as the song plays it', (name) => {
+describe.each(['digital-mugician/believe.dmu', 'digital-mugician/flight.dmu', 'digital-mugician-2/cockwise.mug', 'digital-mugician-2/snickle.mug'])('Digital Mugician %s: a typed note is the replayer voice, as the song plays it', (name) => {
   it('the first note of each voice has the song\'s pitch, level and envelope', async () => {
     const ab = corpus(name);
     const raw = new Uint8Array(ab);
@@ -322,7 +322,7 @@ describe('Sonic Arranger: a key never starts the song, and key release silences 
 
 // triplex1.dm is not compared: its voice 2 note plays an instrument an earlier effect row has reconfigured (the
 // replayer's effects rewrite the playing instrument), which a key, playing the instrument as stored, cannot know.
-describe.each(['formats/crusaders1.dm'])('Delta Music 1 %s: a typed note is the replayer voice, as the song plays it', (name) => {
+describe.each(['delta-music/crusaders1.dm'])('Delta Music 1 %s: a typed note is the replayer voice, as the song plays it', (name) => {
   it('the first note of each voice has the song\'s pitch, level and envelope', async () => {
     const ab = corpus(name);
     const song = (await parseDeltaMusic1File(ab, name)) as unknown as GridSong;
@@ -381,7 +381,7 @@ describe('Delta Music 1: a key never starts the song, and key release silences t
   });
 });
 
-describe.each(['formats/anthrox_intro.dm2', 'delta-music-2/asperity megademo 3.dm2'])('Delta Music 2 %s: a typed note is the replayer voice, as the song plays it', (name) => {
+describe.each(['delta-music-2/anthrox_intro.dm2', 'delta-music-2/asperity megademo 3.dm2'])('Delta Music 2 %s: a typed note is the replayer voice, as the song plays it', (name) => {
   it('the first note of each voice has the song\'s pitch, level and envelope', async () => {
     const ab = corpus(name);
     const song = parseDeltaMusic2File(new Uint8Array(ab), name) as unknown as GridSong;
@@ -426,7 +426,7 @@ describe.each(['formats/anthrox_intro.dm2', 'delta-music-2/asperity megademo 3.d
 
 describe('Delta Music 2: a key never starts the song, and key release silences the voice', () => {
   it('anthrox_intro.dm2: silent before a key, sounds on a key, silent after release', async () => {
-    const ab = corpus('formats/anthrox_intro.dm2');
+    const ab = corpus('delta-music-2/anthrox_intro.dm2');
     const b = await startWorklet('deltamusic2', 'DeltaMusic2', emscriptenTransform);
     await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
     await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
@@ -498,7 +498,7 @@ describe('InStereo! 1.0: a key never starts the song, and key release silences t
   });
 });
 
-describe.each(['instereo!-2.0/spaceflight.is20', 'formats/stereo_feeling.is20'])('InStereo! 2.0 %s: a typed note is the replayer voice, as the song plays it', (name) => {
+describe.each(['instereo!-2.0/spaceflight.is20', 'instereo!-2.0/stereo_feeling.is20'])('InStereo! 2.0 %s: a typed note is the replayer voice, as the song plays it', (name) => {
   it('the first synth note of each voice has the song\'s pitch, level and envelope', async () => {
     const ab = corpus(name);
     const song = parseInStereo2File(new Uint8Array(ab), name) as unknown as GridSong;
@@ -605,7 +605,7 @@ describe('TFMX Professional tfmx/mdat.hbtitle: a typed note is the module\'s own
   });
 });
 
-describe.each(['formats/anthrox_intro.dm2', 'delta-music-2/asperity megademo 3.dm2'])('Delta Music 2 %s: instrument numbers show only on notes', (name) => {
+describe.each(['delta-music-2/anthrox_intro.dm2', 'delta-music-2/asperity megademo 3.dm2'])('Delta Music 2 %s: instrument numbers show only on notes', (name) => {
   it('the replayer reads a row\'s instrument only with a note, so no cell shows one without', () => {
     const song = parseDeltaMusic2File(new Uint8Array(corpus(name)), name) as unknown as GridSong;
     let withNote = 0;

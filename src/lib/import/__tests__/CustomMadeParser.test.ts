@@ -69,7 +69,7 @@ describe('Custom Made note on an empty row', () => {
   it('lands in the song bytes at that row and leaves every other row alone; an unedited export is byte-identical', async () => {
     const { patchModuleByLayout } = await import('@/lib/export/layoutPatch');
     const { setGridBaseline, baselineOf } = await import('@/lib/song/gridBaseline');
-    const buf = loadBuf(resolve(REF, 'formats/cm.viking_child'));
+    const buf = loadBuf(resolve(REF, 'custommade/cm.viking_child'));
     const song = await parseCustomMadeFile(buf, 'cm.viking_child');
     setGridBaseline(baselineOf(song.patterns));
     const same = patchModuleByLayout(song.uadeEditableFileData!, song.uadePatternLayout!, song.patterns);

@@ -7,7 +7,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
 const FILE1 = resolve(REF, 'steve-barrett/street fighter.sb');
-const FILE2 = resolve(REF, 'formats/street_fighter.sb');
+const FILE2 = resolve(REF, 'steve-barrett/street_fighter.sb');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

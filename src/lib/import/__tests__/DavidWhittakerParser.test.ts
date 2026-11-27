@@ -9,7 +9,7 @@ import { isDavidWhittakerFormat, parseDavidWhittakerFile } from '../formats/Davi
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const DIR = resolve(import.meta.dirname, '../../../../public/data/songs');
-const FILE1 = resolve(DIR, 'formats/apb.dw');
+const FILE1 = resolve(DIR, 'david-whittaker/apb.dw');
 const FILE2 = resolve(DIR, 'david-whittaker/garfield2+.dw');
 
 function loadBuf(path: string): ArrayBuffer {

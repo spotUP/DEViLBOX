@@ -15,7 +15,7 @@ import { analyzeFormat, formatReportToString } from "./formatAnalysis";
 
 const REF = resolve(import.meta.dirname, "../../../../public/data/songs");
 const FILE1 = resolve(REF, "musicline-editor/drax.ml");
-const FILE2 = resolve(REF, "formats/harmonic disorder.ml");
+const FILE2 = resolve(REF, "musicline-editor/harmonic disorder.ml");
 
 function loadBytes(p: string): Uint8Array {
   return new Uint8Array(readFileSync(p));

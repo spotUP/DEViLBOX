@@ -122,23 +122,6 @@
    "ms": 572
   },
   {
-   "correlation": -2,
-   "lagMs": 0,
-   "windowSecs": 30,
-   "uadeEndAt": -1,
-   "nuadeEndAt": 0,
-   "peak": 0,
-   "rms": 0,
-   "voices": 4,
-   "player": "desire",
-   "uadeRms": 0.021057994281675103,
-   "format": "desire",
-   "song": "public/data/songs/desire/batmanreturns.dsr",
-   "songPass": false,
-   "sha": "8a77adaa76036bdcea540196",
-   "ms": 521
-  },
-  {
    "correlation": 0.9888553866220634,
    "lagMs": -20,
    "windowSecs": 30,
@@ -593,23 +576,6 @@
    "ms": 39
   },
   {
-   "error": "_uade_wasm_load failed (ret=-1)",
-   "peak": 0,
-   "rms": 0,
-   "correlation": null,
-   "lagMs": 0,
-   "uadeEndAt": -1,
-   "nuadeEndAt": -1,
-   "windowSecs": 0,
-   "voices": 0,
-   "player": "",
-   "format": "paulrobotham",
-   "song": "public/data/songs/paul-robotham/dawnpatrol-sad.dat",
-   "songPass": false,
-   "sha": "ae635e0778536bdcea540196",
-   "ms": 31
-  },
-  {
    "correlation": 0.9926560127079566,
    "lagMs": -20,
    "windowSecs": 30,
@@ -626,23 +592,6 @@
    "songPass": true,
    "sha": "cdc3087b31dc6bdcea540196",
    "ms": 573
-  },
-  {
-   "correlation": 0.9926560127079566,
-   "lagMs": -20,
-   "windowSecs": 30,
-   "uadeEndAt": -1,
-   "nuadeEndAt": -1,
-   "peak": 0.748046875,
-   "rms": 0.12711092475466515,
-   "voices": 4,
-   "player": "paulshields",
-   "uadeRms": 0.12368700989094983,
-   "format": "paulshields",
-   "song": "public/data/songs/paul-shields/jug-hiscore.ps",
-   "songPass": true,
-   "sha": "cdc3087b31dc6bdcea540196",
-   "ms": 437
   },
   {
    "correlation": 0.9798738238777297,
@@ -1623,24 +1572,6 @@
    "ms": 582
   },
   {
-   "own": 0.9929682141564948,
-   "correlation": 0.9931252450952027,
-   "lagMs": 0,
-   "windowSecs": 20.32,
-   "uadeEndAt": -1,
-   "nuadeEndAt": 20.82,
-   "peak": 0.640625,
-   "rms": 0.11014640561615568,
-   "voices": 4,
-   "player": "actionamics",
-   "uadeRms": 0.070470199235682,
-   "format": "actionamics",
-   "song": "public/data/songs/actionamics/dynablaster.ast",
-   "songPass": false,
-   "sha": "fa0b4b07526b6bdcea540196319a3110c44a27c425af927d",
-   "ms": 474
-  },
-  {
    "own": 0.881127284595701,
    "correlation": 0.9245634330838013,
    "lagMs": -20,
@@ -1658,24 +1589,6 @@
    "songPass": true,
    "sha": "b574f61823dc6bdcea540196751e451d047c2d835018fbaf",
    "ms": 526
-  },
-  {
-   "own": 0.881127284595701,
-   "correlation": 0.9245634330838013,
-   "lagMs": -20,
-   "windowSecs": 30,
-   "uadeEndAt": -1,
-   "nuadeEndAt": -1,
-   "peak": 0.9921875,
-   "rms": 0.16223020459100843,
-   "voices": 4,
-   "player": "activisionpro",
-   "uadeRms": 0.11102861462711924,
-   "format": "activisionpro",
-   "song": "public/data/songs/activision-pro/gettysburg.avp",
-   "songPass": true,
-   "sha": "b574f61823dc6bdcea540196751e451d047c2d835018fbaf",
-   "ms": 432
   },
   {
    "own": 0.9968532833926135,
@@ -1935,24 +1848,6 @@
    "songPass": true,
    "sha": "0177282276f76bdcea5401965b681b1c3465bcd2ac8ef650",
    "ms": 536
-  },
-  {
-   "own": 0.9438106140713916,
-   "correlation": 0.9728404404341232,
-   "lagMs": -20,
-   "windowSecs": 30,
-   "uadeEndAt": -1,
-   "nuadeEndAt": -1,
-   "peak": 0.74609375,
-   "rms": 0.1966364767364966,
-   "voices": 4,
-   "player": "instereo1",
-   "uadeRms": 0.13226729670253087,
-   "format": "instereo1",
-   "song": "public/data/songs/instereo!/fantasi8.is",
-   "songPass": true,
-   "sha": "0177282276f76bdcea5401965b681b1c3465bcd2ac8ef650",
-   "ms": 403
   },
   {
    "own": 0.044539405888466416,
@@ -2433,23 +2328,6 @@
    "ms": 482
   },
   {
-   "correlation": null,
-   "lagMs": 0,
-   "windowSecs": -0.5,
-   "uadeEndAt": -1,
-   "nuadeEndAt": 0.019979166666666666,
-   "peak": 0,
-   "rms": 0,
-   "voices": 4,
-   "player": "fredgray",
-   "uadeRms": 0.09484468967210309,
-   "format": "fredgray",
-   "song": "public/data/songs/fred-gray/eco.gray",
-   "songPass": false,
-   "sha": "e87e46cab0b9555264d9fafd",
-   "ms": 286
-  },
-  {
    "correlation": 0.9038860516506159,
    "lagMs": -20,
    "windowSecs": 30,
@@ -2630,23 +2508,6 @@
    "songPass": true,
    "sha": "210e01908b39555264d9fafd",
    "ms": 459
-  },
-  {
-   "correlation": 0.9750557859402106,
-   "lagMs": -20,
-   "windowSecs": 30,
-   "uadeEndAt": -1,
-   "nuadeEndAt": -1,
-   "peak": 0.615234375,
-   "rms": 0.18992505058556933,
-   "voices": 4,
-   "player": "jankomrsicflogel",
-   "uadeRms": 0.18786082537507284,
-   "format": "jankomrsicflogel",
-   "song": "public/data/songs/janko-mrsic-flogel/spacestation.jmf",
-   "songPass": true,
-   "sha": "210e01908b39555264d9fafd",
-   "ms": 379
   },
   {
    "error": "_uade_wasm_load failed (ret=-1)",
@@ -2899,23 +2760,6 @@
    "songPass": false,
    "sha": "7a7dbffa06fe555264d9fafd",
    "ms": 607
-  },
-  {
-   "correlation": 0.8032345074531267,
-   "lagMs": -20,
-   "windowSecs": 30,
-   "uadeEndAt": -1,
-   "nuadeEndAt": -1,
-   "peak": 0.53271484375,
-   "rms": 0.15380276804818935,
-   "voices": 4,
-   "player": "robhubbardst",
-   "uadeRms": 0.14509320279592292,
-   "format": "robhubbardst",
-   "song": "public/data/songs/rob-hubbard-st/battleships.rho",
-   "songPass": false,
-   "sha": "7a7dbffa06fe555264d9fafd",
-   "ms": 399
   },
   {
    "own": 0.37190653604823554,
@@ -3260,23 +3104,6 @@
    "songPass": false,
    "sha": "f48ed8e97054555264d9fafd",
    "ms": 119
-  },
-  {
-   "correlation": 0.9766403347215656,
-   "lagMs": -20,
-   "windowSecs": 30,
-   "uadeEndAt": -1,
-   "nuadeEndAt": -1,
-   "peak": 0.984375,
-   "rms": 0.22370913399953332,
-   "voices": 4,
-   "player": "soundfx",
-   "uadeRms": 0.15245481169150582,
-   "format": "soundfx",
-   "song": "public/data/songs/multimedia-sound/bottle popper.mms",
-   "songPass": true,
-   "sha": "a7fb5f5046f6555264d9fafd",
-   "ms": 351
   },
   {
    "correlation": 0.9641472398122981,

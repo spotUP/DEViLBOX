@@ -9,7 +9,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'maniacs-of-noise/unreal flying.mon');
-const FILE2 = resolve(REF, 'formats/gyroscope.mon');
+const FILE2 = resolve(REF, 'maniacs-of-noise/gyroscope.mon');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

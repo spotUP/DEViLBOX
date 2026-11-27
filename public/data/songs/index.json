@@ -4717,7 +4717,6 @@
           "break the box.mod",
           "libpt4-dyn_loop.mod",
           "libpt4-pt4x_40.mod",
-          "shortsong1.mod",
           "world class dub.mod"
         ],
         "multi-tracker": [
@@ -6658,6 +6657,7 @@
         "startrekker-am": [
           "amsyntdemo.mod",
           "amsyntdemo.mod.nt",
+          "shortsong1.mod",
           "shortsong1.mod.nt",
           "silent sleep.mod",
           "silent sleep.mod.nt"
@@ -39985,7 +39985,6 @@
         "break the box.mod",
         "libpt4-dyn_loop.mod",
         "libpt4-pt4x_40.mod",
-        "shortsong1.mod",
         "world class dub.mod"
       ]
     },
@@ -88756,6 +88755,7 @@
       "siblings": [
         "amsyntdemo.mod",
         "amsyntdemo.mod.nt",
+        "shortsong1.mod",
         "shortsong1.mod.nt",
         "silent sleep.mod",
         "silent sleep.mod.nt"

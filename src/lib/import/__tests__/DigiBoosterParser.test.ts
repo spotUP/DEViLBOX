@@ -12,7 +12,7 @@ import { analyzeFormat, formatReportToString } from "./formatAnalysis";
 
 const REF = resolve(import.meta.dirname, "../../../../public/data/songs");
 const FILE1 = resolve(REF, "digibooster/the day after.digi");
-const FILE2 = resolve(REF, "formats/the_day_after.digi");
+const FILE2 = resolve(REF, "digibooster/the_day_after.digi");
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

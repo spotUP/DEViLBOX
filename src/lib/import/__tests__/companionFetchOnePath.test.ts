@@ -29,13 +29,13 @@ describe('companionFetch: the file browser and the jukebox read the same partner
   afterEach(() => { vi.unstubAllGlobals(); });
 
   it('finds WantedTeam.bin beside a Jesper Olsen song in a mixed folder', async () => {
-    const found = await gatherCompanions('lollypop-subgame_01.jo', 'songs/', undefined);
+    const found = await gatherCompanions('lollypop-subgame_01.jo', 'songs/jesper-olsen/', undefined);
     expect([...found.keys()]).toContain('WantedTeam.bin');
     expect(found.get('WantedTeam.bin')!.byteLength).toBeGreaterThan(0);
   });
 
   it('finds the .nt partner of a StarTrekker AM song in a mixed folder', async () => {
-    const found = await gatherCompanions('shortsong1.mod', 'songs', undefined);
+    const found = await gatherCompanions('shortsong1.mod', 'songs/startrekker-am', undefined);
     expect([...found.keys()]).toContain('shortsong1.mod.nt');
   });
 
@@ -45,7 +45,7 @@ describe('companionFetch: the file browser and the jukebox read the same partner
   });
 
   it('gives a plain module no partners', async () => {
-    const found = await gatherCompanions('a sleep so deep.mod', 'songs/', undefined);
+    const found = await gatherCompanions('a sleep so deep.mod', 'songs/mod/', undefined);
     expect(found.size).toBe(0);
   });
 });
@@ -57,10 +57,10 @@ describe('companionFetch: the file browser and the jukebox read the same partner
  */
 describe('companionFetch: server listing asks only for folders that exist', () => {
   const tree: Record<string, { name: string; isDirectory: boolean }[]> = {
-    '': [{ name: 'Ad Lib', isDirectory: true }, { name: 'zm', isDirectory: true }, { name: 'sx', isDirectory: true }],
-    'Ad Lib/': [{ name: 'EdLib D00', isDirectory: true }],
-    'Ad Lib/EdLib D00/': [{ name: 'JCH', isDirectory: true }],
-    'Ad Lib/EdLib D00/JCH/': [{ name: 'colgatbo.d00', isDirectory: false }],
+    '': [{ name: 'ad-lib', isDirectory: true }, { name: 'zm', isDirectory: true }, { name: 'sx', isDirectory: true }],
+    'ad-lib/': [{ name: 'EdLib D00', isDirectory: true }],
+    'ad-lib/EdLib D00/': [{ name: 'JCH', isDirectory: true }],
+    'ad-lib/EdLib D00/JCH/': [{ name: 'colgatbo.d00', isDirectory: false }],
     'zm/': [{ name: 'Songs', isDirectory: true }, { name: 'Samples', isDirectory: true }],
     'zm/Songs/': [{ name: 'tune.sng', isDirectory: false }],
     'zm/Samples/': [{ name: 'electom', isDirectory: false }],

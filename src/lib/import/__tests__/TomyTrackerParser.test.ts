@@ -6,7 +6,7 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE_INCONVENIENT = resolve(REF, 'tomy-tracker/inconvenient intro.sg');
-const FILE_IRREPRESSIBLE = resolve(REF, 'formats/irrepressible intro.sg');
+const FILE_IRREPRESSIBLE = resolve(REF, 'tomy-tracker/irrepressible intro.sg');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

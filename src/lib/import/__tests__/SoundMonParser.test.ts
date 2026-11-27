@@ -15,9 +15,9 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 const FILE1 = resolve(REF, 'bp-soundmon-2/nicktune1.bp');
-const FILE2 = resolve(REF, 'formats/aquarivs.bp');
+const FILE2 = resolve(REF, 'bp-soundmon-2/aquarivs.bp');
 const FILE3 = resolve(REF, 'bp-soundmon-3/testmod.bp3');
-const FILE4 = resolve(REF, 'formats/antidust.bp3');
+const FILE4 = resolve(REF, 'bp-soundmon-3/antidust.bp3');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

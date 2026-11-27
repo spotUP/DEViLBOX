@@ -8,7 +8,7 @@ import { isComposer667Format, parseComposer667File } from '../formats/Composer66
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
-const FILE1 = resolve(REF, 'formats/fonetag.669');
+const FILE1 = resolve(REF, 'composer-669/fonetag.669');
 const FILE2 = resolve(REF, 'composer-669/speed fighter.669');
 
 function loadU8(p: string): Uint8Array {
