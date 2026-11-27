@@ -82,6 +82,12 @@ function readStr(buf: Uint8Array, off: number, len: number): string {
 
 interface IFFChunk { offset: number; size: number; }
 
+/** SDAT body = u32 internal length + sdata; the chunk may carry pad bytes after it (roetzmegoem.mm8: 3126 in a 3128 body). */
+function sdatBody(buf: Uint8Array, sdat: IFFChunk): Uint8Array {
+  const len = Math.min(u32be(buf, sdat.offset), sdat.size - 4);
+  return buf.slice(sdat.offset + 4, sdat.offset + 4 + len);
+}
+
 /**
  * Walk FORM+MMV4/MMV8 IFF chunks. Returns a Map from chunk ID to
  * { offset, size } where offset points to the first byte of chunk data.
@@ -167,7 +173,7 @@ function parseMusicMakerFile(
       const ic = pins ?? inst;
       if (sdat && ic) {
         const stem = 'iff';
-        const sdata = buf.slice(sdat.offset + 4, sdat.offset + sdat.size);
+        const sdata = sdatBody(buf, sdat);
         const names = ch.get('INAM');
         const comp = new Map<string, ArrayBuffer>([[`${stem}.${pins ? 'ip' : 'i'}`, buf.slice(ic.offset, ic.offset + ic.size).buffer as ArrayBuffer]]);
         // INAM in a saved IFF: a 2200-byte path block, u16 name length (16), then the 36 x 16-byte table a split song keeps in .ip.n.
@@ -697,7 +703,7 @@ export function readMusicMakerIff(buffer: ArrayBuffer | Uint8Array): { song: Mus
   const chunks = readChunks(b);
   const sdat = chunks.get('SDAT');
   if (!sdat || sdat.size < 4) throw new Error('MusicMaker file has no SDAT chunk');
-  const song = decodeMusicMakerSong(b.slice(sdat.offset + 4, sdat.offset + sdat.size));
+  const song = decodeMusicMakerSong(sdatBody(b, sdat));
   const pins = chunks.get('PINS'), inst = chunks.get('INST');
   const c = pins ?? inst;
   if (!c) throw new Error('MusicMaker file has no INST or PINS chunk');

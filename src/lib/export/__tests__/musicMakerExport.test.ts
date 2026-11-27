@@ -69,7 +69,13 @@ describe('Music Maker edit reaches the bytes the engine plays', () => {
 });
 
 describe('Music Maker IFF (.mm4/.mm8) is editable', () => {
-  const FILES = ['easystyleofmsx.mm4', 'house2.mm8'];
+  // Instrument names the file stores (roetzmegoem.mm8: checked for grid + byte-exact only).
+  const NAMES: Record<string, string[] | null> = {
+    'easystyleofmsx.mm4': ['bass_0.1', '#bassdrum1', 'polysynth'],
+    'house2.mm8': ['House1', 'FLOETTE', 'Bongo'],
+    'roetzmegoem.mm8': null,
+  };
+  const FILES = Object.keys(NAMES);
   const loadIff = async (n: string) => {
     const raw = new Uint8Array(readFileSync(songFile(n)));
     const { parseMusicMaker4VFile, parseMusicMaker8VFile } = await import('@lib/import/formats/MusicMakerParser');
@@ -81,7 +87,7 @@ describe('Music Maker IFF (.mm4/.mm8) is editable', () => {
       const { raw, song } = await loadIff(n);
       expect(song.format).toBe('MusicMaker');
       const names = song.instruments.map((i) => i.name);
-      expect(names).toEqual(expect.arrayContaining(n.endsWith('.mm4') ? ['bass_0.1', '#bassdrum1', 'polysynth'] : ['House1', 'FLOETTE', 'Bongo']));
+      if (NAMES[n]) expect(names).toEqual(expect.arrayContaining(NAMES[n]!));
       let hit: [number, number, number] | null = null;
       song.patterns.forEach((pp, p) => pp.channels.forEach((c, v) => c.rows.forEach((cell, r) => { if (!hit && cell.note > 0 && cell.note < 90) hit = [p, v, r]; })));
       expect(hit).not.toBeNull();

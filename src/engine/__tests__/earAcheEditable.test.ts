@@ -76,3 +76,28 @@ describe('EarAche editable grid', () => {
     expect(out[at[0]] >> 4).toBe(next);
   });
 });
+
+describe('EarAche second real song: skythebest.ea', () => {
+  const sky = 'public/data/songs/earache/skythebest.ea';
+  const loadSky = () => { const b = readFileSync(sky); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
+  it('decodes real notes, every cell re-encodes to its file bytes, unedited export is byte-exact', async () => {
+    const song = parseEarAcheFile(loadSky(), 'skythebest.ea');
+    const layout = song.uadePatternLayout!;
+    const bytes = new Uint8Array(loadSky());
+    let notes = 0;
+    song.patterns.forEach((pat, p) => pat.channels.forEach((c, ch) => c.rows.forEach((cell, r) => {
+      const off = layout.getCellFileOffset!(p, r, ch);
+      if (off < 0) return;
+      if (cell.note) notes++;
+      expect(Array.from(layout.encodeCell(cell))).toEqual(Array.from(bytes.subarray(off, off + 2)));
+    })));
+    expect(notes).toBeGreaterThan(20);
+    const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
+    const g = await import('@/lib/song/gridBaseline');
+    g.setGridBaseline(g.baselineOf(song.patterns), g.extraBaselineOf(song.patterns));
+    const res = await exportNativeSong(song);
+    const d = res!.data as Blob | Uint8Array | ArrayBuffer;
+    const out = d instanceof Blob ? new Uint8Array(await d.arrayBuffer()) : new Uint8Array(d as ArrayBuffer);
+    expect(Buffer.from(out).equals(Buffer.from(bytes))).toBe(true);
+  });
+});
