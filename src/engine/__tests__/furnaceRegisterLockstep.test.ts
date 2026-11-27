@@ -136,6 +136,8 @@ const SONGS: Array<{ path: string; fixture: string; what: string }> = [
     what: 'Furnace, YM2612: 516 portamento hints in 20 s, F-num/block' },
   { path: 'public/data/songs/furnace/genesis/mm5_boss.fur', fixture: 'mm5_boss.fur.json',
     what: 'Furnace, YM2612 + SN76489: arpeggios held across new notes (keyOffAffectsArp per platform)' },
+  { path: 'public/data/songs/furnace/ay8910/Drifting in Colour.fur', fixture: 'Drifting_in_Colour.fur.json',
+    what: 'Furnace, AY-3-8910: hardware-envelope saw lead (auto-envelope, arpeggio held at the macro release)' },
 ];
 
 describe('Furnace and DefleMask songs write the registers Furnace writes', () => {

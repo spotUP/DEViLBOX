@@ -5,7 +5,7 @@
  * test (furnaceRegisterLockstep.test.ts).
  */
 /** Register file of each VGM chip command; the platform address as the dispatch wrote it. */
-export type ChipKind = 'opn' | 'psg' | 'gb' | 'pce' | 'nes';
+export type ChipKind = 'opn' | 'psg' | 'gb' | 'pce' | 'nes' | 'ay';
 
 /** One chip's writes, flat [addr, val, addr, val, ...]: frame 0 (the reset block plus the first tick) and every write after it. */
 export interface ChipStream { frame0: number[]; writes: number[] }
@@ -48,7 +48,7 @@ export function sortCommands(c: number[][]): number[][] {
 /** DivSystem ids of each kind (the platform types a song's chips are created with). */
 export const KIND_OF_PLATFORM: Record<number, ChipKind> = {
   20: 'opn', 52: 'opn', 80: 'opn', 81: 'opn', 89: 'opn',
-  4: 'psg', 6: 'gb', 7: 'pce', 8: 'nes',
+  4: 'psg', 6: 'gb', 7: 'pce', 8: 'nes', 17: 'ay',
 };
 
 /**
