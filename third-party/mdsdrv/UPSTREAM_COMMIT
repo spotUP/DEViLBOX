@@ -2,3 +2,8 @@ https://github.com/superctr/MDSDRV
 commit fefc7178579c59505f860e292e76af4a1857c6eb (2025-03-09, "Merge pull request #23 from htv04/makefile")
 Vendored source only, nested .git removed. Removed from tools/: asm68k.exe (non-free), mdslink.exe (GPL, see plan D8),
 salvador.exe, sjasmplus.exe (prebuilt Windows binaries). Build with tools/build-mdsdrv.sh (vasm + sjasmplus, PACK_Z80=0).
+
+DEViLBOX patches (lines marked "; DEViLBOX:" in src/):
+- 2026-11-26 mdsdrv.68k mds_pcm_key_on: bclr nf_slur before the nf_key_off test. Upstream returned on a slurred note (nf_key_off
+  clear) before the andi that clears nf_slur, so one E0 on a PCM track turned every later note into a tie (no mailbox start;
+  Plok_Beach PCM1/PCM2 o1 r0, 6.72 s). FM tracks clear nf_slur on their own key-on path (@note_key_on).

@@ -3123,6 +3123,7 @@ mds_pcm_update
 	bra.w	mds_update_return
 
 mds_pcm_key_on
+	bclr	#nf+nf_slur,flag				; DEViLBOX: a slurred note (no key-off) ends the slur, as the FM key-on does
 	bclr	#nf+nf_key_off,flag
 	beq.w	mds_update_return
 	bset	#cf+cf_key_on,flag

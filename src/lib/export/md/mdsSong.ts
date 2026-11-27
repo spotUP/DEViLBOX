@@ -594,11 +594,14 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
   // shortcut: MDSDRV rate 8 taken as 8 * 2190 Hz (mdsseq.md "~2190 Hz steps"); upgrade if a measured Z80 loop rate differs.
   const PCM_HZ = 8 * 2190, pcm: number[] = [], pcmItems = new Map<string, number>();
   // vol: the FM6 volume at note-on; its residual to the driver's 2 dB PCM step is baked into this copy of the sample (pcmDacScale).
-  const pcmRef = (smp: number, freqNote: number, vol: number): number => {
-    const k = `${smp}:${freqNote}:${vol}`, sc = pcmDacScale(vol);
+  // off: 90xx-92xx sample offset in source frames. MDSDRV has no offset command, so the header points at a copy that starts there
+  // (deduped per offset); an offset at or past the end plays nothing (genesis.cpp: dacPos >= samples ends the sample), as -1.
+  const pcmRef = (smp: number, freqNote: number, vol: number, off = 0): number => {
+    const k = `${smp}:${freqNote}:${vol}:${off}`, sc = pcmDacScale(vol);
     if (pcmItems.has(k)) return pcmItems.get(k)!;
     const sm = m.samples[smp];
-    const src = sm.depth === 16 ? Array.from(sm.data, (v) => v >> 8) : Array.from(sm.data);
+    if (off >= sm.length) return -1;
+    const src = (sm.depth === 16 ? Array.from(sm.data, (v) => v >> 8) : Array.from(sm.data)).slice(off);
     if (sm.depth !== 8 && sm.depth !== 16) lossy.add(`FM6 sample depth ${sm.depth} (played as 8-bit data)`);
     if (sm.loop) lossy.add('FM6 sample loop (played once)');
     const step = (sm.c4Rate || 8363) * 2 ** ((freqNote - 108) / 12) / PCM_HZ;
@@ -959,7 +962,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
     const firstNote = lc ? lc.rows.findIndex((r) => { const cell = cellAt(ch, lc.o, r); const v = noteOf(cell); return v > NO_NOTE && v < 253; }) : -1;
     // Furnace 0.6.8.3 genesis.cpp: 17xx sets dacMode; a non-sample note keeps it (compat DAC) unless the last DAC note was a sample instrument.
     // Channel state, not chunk state: a 17 01 in one order still holds in the next.
-    let dacMode = false, furnaceDac = false;
+    let dacMode = false, furnaceDac = false, sOff = 0; // sOff: 90xx-92xx offset bytes (playback.cpp chan.sampleOff, kept across rows)
     for (const [ci, c] of (lc ? [...chunks, lc] : chunks).entries()) {
       const wrapPass = ci === chunks.length;
       let faAt = -1;
@@ -1037,7 +1040,7 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (op === 1 && nv > NO_NOTE) op1Ins.add(ins);
         else if (op > 1 && nv > NO_NOTE && !op1Ins.has(ins)) lossy.add('extended channel 3: OP2-OP4 instrument other than OP1\'s (FM3 plays OP1\'s voice)');
         const cmds: number[] = [];
-        let pChanged = false, vChanged = false, dacOff = false;
+        let pChanged = false, vChanged = false, dacOff = false, rowOff = -1;
         // Furnace commits the instrument's operators at a note-on after an instrument change, before the row's post effects (12xx-16xy).
         if (kind === 'fm' && nv > NO_NOTE && nv < 253 && ins !== curIns) { tlOv.fill(-1); mulOv.fill(-1); }
         // EDxx runs the whole row xx ticks late; ECxx keys off xx ticks after the row runs (playback.cpp rowDelay / cut, delayBehavior 2).
@@ -1107,6 +1110,13 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             continue;
           }
           if (e.type === 0xf0 && Math.max(1, e.value * 2 / 5) === hz) continue; // the start tick rate (or a repeat of it)
+          // 90xx-92xx set offset bytes 0-2 and send SAMPLE_POS on this row; oldSampleOffset (pre-0.6.3 files): 9xxx = xxx * 256, 93-9F
+          // too (playback.cpp 0x90). The row's NOTE_ON then starts there (genesis.cpp setPos), so the note picks a pre-offset sample.
+          if (e.type >= 0x90 && e.type <= 0x9f) {
+            if (m.compatFlags.oldSampleOffset) rowOff = (((e.type & 15) << 8) | e.value) * 256;
+            else if (e.type < 0x93) rowOff = sOff = (sOff & ~(0xff << ((e.type - 0x90) * 8))) | (e.value << ((e.type - 0x90) * 8));
+            continue;
+          }
           lossy.add(`effect ${e.type.toString(16).padStart(2, '0').toUpperCase()}`);
         }
         const vs = volStep();
@@ -1139,16 +1149,18 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
         if (compatDac) {
           // shortcut: sampleBank (EBxx) taken as 0 and the sample plays at note pitch; upgrade if a song banks or relies on native rate.
           const smp = ((nv + 60) % 12 + 12) % 12;
-          if (smp < m.samples.length && m.samples[smp].length > 0) dacHdr = pcmRef(smp, Math.max(0, Math.min(179, nv + 60)), dacVol(vol));
+          if (smp < m.samples.length && m.samples[smp].length > 0) dacHdr = pcmRef(smp, Math.max(0, Math.min(179, nv + 60)), dacVol(vol), Math.max(0, rowOff));
           lossy.add('FM6 compat DAC note (17xx, non-sample instrument): sample bank 0, played at note pitch');
         } else if (dac) {
           furnaceDac = true;
           const a = m.instruments[ins].amiga, fn = Math.max(0, Math.min(179, nv + 60));
           // No SM feature in the file means the DivInstrumentAmiga defaults (instrument.h: initSample 0, no note map).
           const smp = a?.useNoteMap ? a.noteMap?.[fn]?.map ?? -1 : a?.initSample ?? 0;
-          if (smp >= 0 && smp < m.samples.length && m.samples[smp].length > 0) dacHdr = pcmRef(smp, a?.useNoteMap ? a.noteMap?.[fn]?.freq ?? fn : fn, dacVol(vol));
+          if (smp >= 0 && smp < m.samples.length && m.samples[smp].length > 0) dacHdr = pcmRef(smp, a?.useNoteMap ? a.noteMap?.[fn]?.freq ?? fn : fn, dacVol(vol), Math.max(0, rowOff));
         }
         const isNote = nv > NO_NOTE && nv < 253 && (!dac || dacHdr >= 0), isOff = (dac && dacHdr < 0) || nv >= 253 || (dacOff && !isNote);
+        // shortcut: a 90xx without a sample note (Furnace jumps the playing sample and the next note keeps setPos) is dropped; upgrade with a header at the jump.
+        if (rowOff >= 0 && !dac) lossy.add('90xx-92xx sample offset without a sample note (ignored)');
         if (pcmOn && !isNote && cell && cell.volume >= 0 && isDac(ins) && !m.compatFlags.noOPN2Vol) lossy.add('FM6 DAC volume change mid-note (driver 2 dB step only)');
         if (dac && isNote) { curIns = compatDac ? -1 : ins; pcmOn = true; if (dacHdr !== curPcm) { curPcm = dacHdr; cmds.unshift(0xf0, dacHdr); } }
         else if (isNote) { pcmOn = false; curPcm = -1; }
@@ -1210,6 +1222,9 @@ export function furnaceToMds(m: FurnaceModule, subsong = 0): MdsSong {
             if (kind === 'psg' && effDtn() !== dtnOut) { dtnOut = effDtn(); cmds.push(0xe6, dtnOut & 0xff); }
             const slide = (kind === 'psg' || kind === 'fm') && (Number.isNaN(shFrom) ? sounding && prevKey >= 0 : true) && portaXx > 0 && from !== nv * 128;
             // E0 slurs every such note, also a PSG 03xx onto the note already reached (no slide): a key-on would restart the macros.
+            // A slurred sample note holds the sample and its rate (mds_pcm_key_on: no key-off, no header or pitch write); the driver
+            // clears nf_slur there too (DEViLBOX patch, third-party/mdsdrv/UPSTREAM_COMMIT), so E0 no longer sticks (Plok_Beach o1 r0).
+            if (slur && dac && nv !== prevKey) lossy.add('EAxx legato pitch change on a sample (held)');
             if ((kind === 'fm' || kind === 'psg') && slur) cmds.push(0xe0);
             const fresh = !m.compatFlags.continuousVibrato && !portaSlur;
             if (!m.compatFlags.continuousVibrato && (!portaSlur || retarget)) { vPos = 0; vAt = tick + delay; }
