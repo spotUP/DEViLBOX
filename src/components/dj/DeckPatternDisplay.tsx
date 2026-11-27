@@ -21,6 +21,10 @@ import { ReadOnlyPatternCanvas } from '@/components/tracker/ReadOnlyPatternCanva
 import { DJOscilloscope } from '@/components/visualization/DJOscilloscope';
 import { heardDeckRow, type DeckRow } from '@/hooks/dj/heardDeckRow';
 import { clockNowMs } from '@/engine/audioLatency';
+import { buildEndlessPattern } from '@/lib/dj/endlessPattern';
+
+/** Rows of the neighbouring order positions shown above and below the current pattern (more than a deck view's half height). */
+const ENDLESS_MARGIN = 64;
 
 interface DeckPatternDisplayProps {
   deckId: 'A' | 'B' | 'C';
@@ -101,7 +105,7 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
   }, [deckId, activePatternName]);
 
   const showUnused = useSettingsStore((st) => st.showUnusedChannels);
-  const { patternData, numChannels, numRows, channelMask } = useMemo(() => {
+  const { patternData, rowNumbers, currentStart, numChannels, channelMask } = useMemo(() => {
     try {
       const engine = getDJEngine();
       const deck = engine.getDeck(deckId);
@@ -112,19 +116,20 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
       // One rule for every deck: the pattern view only for a song with notes,
       // otherwise the oscilloscope (an RSID program parses to an empty song).
       if (!song || !song.songPositions || song.songPositions.length === 0 || !songHasNotes(song)) {
-        return { patternData: null, numChannels: 4, numRows: 64, channelMask: undefined };
+        return { patternData: null, rowNumbers: undefined, currentStart: 0, numChannels: 4, channelMask: undefined };
       }
-      const patternIndex = song.songPositions[songPos] ?? 0;
-      const pat = song.patterns[patternIndex] ?? null;
+      // One long pattern: the current position's rows with its neighbours' joined above and below.
+      const endless = buildEndlessPattern(song.patterns, song.songPositions, songPos, ENDLESS_MARGIN);
       return {
-        patternData: pat,
+        patternData: endless?.pattern ?? null,
+        rowNumbers: endless?.rowNumbers,
+        currentStart: endless?.currentStart ?? 0,
         numChannels: song.numChannels,
-        numRows: pat ? pat.length : 64,
         // The same visible-channel list as the tracker, from every pattern of this deck's song.
         channelMask: visibleChannelMask(song.patterns, { showUnused }),
       };
     } catch {
-      return { patternData: null, numChannels: 4, numRows: 64, channelMask: undefined };
+      return { patternData: null, rowNumbers: undefined, currentStart: 0, numChannels: 4, channelMask: undefined };
     }
     // songVersion: the deck took a song (DeckEngine.loadSong) with no other
     // store write the view would re-read on.
@@ -141,10 +146,10 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
     }
   }, [deckId, numChannels]);
 
-  // Compute visual row: during backward scratch, subtract offset from pattPos
-  const visualRow = activePatternName && visualOffset > 0
-    ? ((pattPos - Math.round(visualOffset)) % numRows + numRows) % numRows
-    : pattPos;
+  // Row in the joined pattern; a backward scratch scrolls up into the previous position's rows.
+  const visualRow = currentStart + (activePatternName && visualOffset > 0
+    ? Math.max(-currentStart, pattPos - Math.round(visualOffset))
+    : pattPos);
 
   // ── Vertical drag to scratch ──────────────────────────────────────────────
   const isDraggingRef = useRef(false);
@@ -225,6 +230,7 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
           isPlaying={isPlaying}
           vuFeed={vuFeed}
           channelMask={channelMask}
+          rowNumbers={rowNumbers}
         />
       ) : fileName ? (
         <DJOscilloscope />

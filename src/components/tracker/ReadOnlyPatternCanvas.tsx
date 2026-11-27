@@ -95,6 +95,8 @@ interface ReadOnlyPatternCanvasProps {
   channelMask?: readonly boolean[];
   /** Per-channel VU meters over the columns, metered from this source (a DJ deck's channel scopes). */
   vuFeed?: ChannelMeterFeed;
+  /** Row number shown per row of `pattern` (a DJ deck's joined pattern, endlessPattern.ts); the row index when absent. */
+  rowNumbers?: readonly number[];
 }
 
 export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React.memo(({
@@ -105,6 +107,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
   height: heightProp,
   vuFeed,
   channelMask,
+  rowNumbers,
 }) => {
   // Mutable ref — set imperatively when canvas is created in useEffect
   const canvasRef    = useRef<HTMLCanvasElement | null>(null);
@@ -142,11 +145,12 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
     };
   }, [getCurrentTheme]);
 
-  const snapshotPattern = useCallback((p: Pattern | null, nc: number): PatternSnapshot | null => {
+  const snapshotPattern = useCallback((p: Pattern | null, nc: number, rn?: readonly number[]): PatternSnapshot | null => {
     if (!p) return null;
     return {
       id:       p.id,
       length:   p.length,
+      rowNumbers: rn ? [...rn] : undefined,
       channels: p.channels.slice(0, nc).map((ch): ChannelSnapshot => ({
         id:         ch.id,
         effectCols: ch.channelMeta?.effectCols ?? 2,
@@ -236,7 +240,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
         width:      w / initLayout.scale,
         height:     h / initLayout.scale,
         theme:      snapshotTheme(),
-        pattern:    snapshotPattern(pattern, numChannels),
+        pattern:    snapshotPattern(pattern, numChannels, rowNumbers),
         currentRow,
         numChannels,
         isPlaying,
@@ -292,11 +296,11 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
   useEffect(() => {
     bridgeRef.current?.post({
       type:       'pattern',
-      pattern:    snapshotPattern(pattern, numChannels),
+      pattern:    snapshotPattern(pattern, numChannels, rowNumbers),
       numChannels,
       layout:     toWorker(layoutNow),
     });
-  }, [pattern, numChannels, layoutNow, snapshotPattern, toWorker]);
+  }, [pattern, rowNumbers, numChannels, layoutNow, snapshotPattern, toWorker]);
 
   // ── Forward playback state ────────────────────────────────────────────────
 

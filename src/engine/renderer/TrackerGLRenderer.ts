@@ -552,8 +552,9 @@ export class TrackerGLRenderer {
       if (y + rowH < 0 || y > height) continue;
 
       if (!ui.trackerVisualBg) {
-        const isHL2 = hl2Interval > 0 && rowIndex % hl2Interval === 0;
-        const isHL = rowIndex % hlInterval === 0;
+        const rowNum = (ghostPattern ?? pattern).rowNumbers?.[rowIndex] ?? rowIndex;
+        const isHL2 = hl2Interval > 0 && rowNum % hl2Interval === 0;
+        const isHL = rowNum % hlInterval === 0;
         const bgColor = isHL2 ? colors.rowSecondaryHighlight : isHL ? colors.rowHighlight : colors.rowNormal;
         const alpha = isGhostRow ? bgColor[3] * 0.35 : bgColor[3];
         this.addRect(0, y, width, rowH, [bgColor[0], bgColor[1], bgColor[2], alpha]);
@@ -738,8 +739,9 @@ export class TrackerGLRenderer {
 
       const ghostAlpha = isGhostRow ? 0.35 : 1.0;
       // Per-row alpha for ghost; per-channel mute alpha computed in channel loop below
-      const isHL2b = hl2Interval > 0 && rowIndex % hl2Interval === 0;
-      const isHL = rowIndex % hlInterval === 0 || isHL2b;
+      const rowNum = sourcePattern.rowNumbers?.[rowIndex] ?? rowIndex;
+      const isHL2b = hl2Interval > 0 && rowNum % hl2Interval === 0;
+      const isHL = rowNum % hlInterval === 0 || isHL2b;
 
       // Line number — use pre-computed hex/dec tables
       // Glow trails behind the playhead: active row = white, rows above fade out
@@ -749,11 +751,11 @@ export class TrackerGLRenderer {
       const bold = behind === 0; // bold on the exact active row
       let lineNumStr: string;
       if (ui.showBeatLabels) {
-        const beat = Math.floor(rowIndex / hlInterval) + 1;
-        const tick = (rowIndex % hlInterval) + 1;
+        const beat = Math.floor(rowNum / hlInterval) + 1;
+        const tick = (rowNum % hlInterval) + 1;
         lineNumStr = `${beat}.${tick}`;
       } else {
-        lineNumStr = ui.useHex ? HEX_TABLE[rowIndex & 0xFF] : DEC_TABLE[rowIndex & 0xFF];
+        lineNumStr = ui.useHex ? HEX_TABLE[rowNum & 0xFF] : DEC_TABLE[rowNum & 0xFF];
       }
       const lnColor = lerpWhiteRGBA(isHL ? colors.lineNumberHighlight : colors.lineNumber, glow);
       this.setTmpColor(lnColor, ghostAlpha);

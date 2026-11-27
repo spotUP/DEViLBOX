@@ -81,6 +81,8 @@ export interface PatternSnapshot {
   id: string;
   length: number;
   channels: ChannelSnapshot[];
+  /** Row number shown in the gutter and used for highlights, per row (a DJ deck's joined pattern); the row index when absent. */
+  rowNumbers?: number[];
 }
 
 // ─── Cursor / selection ───────────────────────────────────────────────────────
