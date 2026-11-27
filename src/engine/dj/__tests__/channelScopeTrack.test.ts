@@ -51,6 +51,15 @@ describe('channel scope track', () => {
     expect(peak(w)).toBeLessThan(0.055);
   });
 
+  it('ownPeak scales a quiet channel to its own render peak (the deck scopes draw it full height)', () => {
+    const t = build();
+    const [loud, silent, quiet] = channelScopeWindow(t, 0.9, 3, true);
+    expect(peak(quiet)).toBeGreaterThan(0.95);
+    expect(peak(loud)).toBeGreaterThan(0.95);
+    expect(peak(silent)).toBe(0);
+    expect(peak(channelScopeWindow(t, 0.4, 3, true)[0])).toBe(0); // still silent before it starts
+  });
+
   it('is flat before the start and past the end of the render', () => {
     const t = build();
     expect(channelScopeWindow(t, 0).every((w) => peak(w) === 0)).toBe(true);

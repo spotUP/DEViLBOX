@@ -40,7 +40,7 @@ function sample(deckId: DeckId, entry: DeckCacheEntry): void {
   try {
     const deck = getDJEngine().getDeck(deckId);
     entry.data.waveform = deck.getWaveform();
-    entry.data.channelWaveforms = deck.getChannelWaveforms(DECK_SCOPE_CHANNELS);
+    entry.data.channelWaveforms = deck.getChannelWaveforms(DECK_SCOPE_CHANNELS, true); // scopes: each channel at its own peak
     entry.data.fft = deck.getFFT();
     entry.data.level = deck.getLevel();
   } catch {

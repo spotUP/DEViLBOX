@@ -297,15 +297,17 @@ export class ChannelScopeTrackBuilder {
 /**
  * The scope window that ends at `positionSec`: DECK_SCOPE_WINDOW samples per
  * channel in -1..1, zero before the start and past the end of the render.
+ * Mix level by default (meters); `ownPeak` scales each channel to its own
+ * whole-render peak (scopes: one channel of an N-channel mix is a few px).
  */
-export function channelScopeWindow(track: ChannelScopeTrack, positionSec: number, maxChannels = DECK_SCOPE_CHANNELS): Float32Array[] {
+export function channelScopeWindow(track: ChannelScopeTrack, positionSec: number, maxChannels = DECK_SCOPE_CHANNELS, ownPeak = false): Float32Array[] {
   const end = Math.floor(positionSec * track.sampleRate);
   const start = end - DECK_SCOPE_WINDOW;
   const n = Math.min(maxChannels, track.channels.length);
   const out: Float32Array[] = [];
   for (let ch = 0; ch < n; ch++) {
     const src = track.channels[ch];
-    const k = track.scales[ch] / 127;
+    const k = ownPeak ? 1 / 127 : track.scales[ch] / 127;
     const w = new Float32Array(DECK_SCOPE_WINDOW);
     for (let i = 0; i < DECK_SCOPE_WINDOW; i++) {
       const j = start + i;
