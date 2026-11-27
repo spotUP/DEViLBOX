@@ -290,10 +290,14 @@ export function syncDeckBPM(deckId: DeckId, otherDeckId?: DeckId): void {
 
     if (!otherState.fileName) return;
 
-    // Move crossfader fully to the other (leader) deck
-    const cf = store.crossfaderPosition;
-    if (deckId === 'A' && cf < 1) store.setCrossfader(1);
-    else if (deckId === 'B' && cf > 0) store.setCrossfader(0);
+    // Owner 2026-11-27: the crossfader moves (fully to the leader) only when this
+    // deck was stopped and SYNC auto-starts it; SYNC on a playing (on-air) deck
+    // changes tempo only, so it never cuts the audience off it.
+    if (!thisState.isPlaying) {
+      const cf = store.crossfaderPosition;
+      if (deckId === 'A' && cf < 1) store.setCrossfader(1);
+      else if (deckId === 'B' && cf > 0) store.setCrossfader(0);
+    }
 
     if (thisState.beatGrid && otherState.beatGrid) {
       // Precise beat-grid sync + phase align
@@ -315,11 +319,10 @@ export function syncDeckBPM(deckId: DeckId, otherDeckId?: DeckId): void {
       setDeckPitch(deckId, semitones);
     }
 
-    // Auto-play this deck if it isn't already playing
+    // Auto-play through the one play path (context start, engine volume
+    // resync, stream auto-dub); a bare deck.play() skipped the volume resync.
     if (!thisState.isPlaying) {
-      thisDeck.play().then(() => {
-        useDJStore.getState().setDeckPlaying(deckId, true);
-      }).catch(() => { /* engine not ready */ });
+      void togglePlay(deckId, { quantize: false }).catch(() => { /* engine not ready */ });
     }
   } catch {
     // Engine might not be initialized yet

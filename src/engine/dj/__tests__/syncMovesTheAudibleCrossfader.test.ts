@@ -53,16 +53,28 @@ describe('the mixer follows the store crossfader', () => {
     mixerCalls.length = 0;
   });
 
-  it('SYNC on deck A moves the audible mix fully to deck B, not just the fader on screen', () => {
+  it('SYNC on a stopped deck A (auto-starts) moves the audible mix fully to deck B, not just the fader on screen', () => {
     getDJEngine();
     useDJStore.getState().setCrossfader(0.5);
     useDJStore.getState().setDeckState('B', { fileName: 'b.mod', detectedBPM: 140, isPlaying: true });
-    useDJStore.getState().setDeckState('A', { fileName: 'a.mod', detectedBPM: 125, isPlaying: true });
+    useDJStore.getState().setDeckState('A', { fileName: 'a.mod', detectedBPM: 125, isPlaying: false });
 
     syncDeckBPM('A');
 
     expect(useDJStore.getState().crossfaderPosition).toBe(1);
     expect(mixerState.position).toBe(1);
+  });
+
+  it('SYNC on a playing (on-air) deck changes tempo only: the crossfader stays put', () => {
+    getDJEngine();
+    useDJStore.getState().setCrossfader(0.3);
+    useDJStore.getState().setDeckState('A', { fileName: 'a.mod', detectedBPM: 125, isPlaying: true });
+    useDJStore.getState().setDeckState('B', { fileName: 'b.mod', detectedBPM: 140, isPlaying: true });
+
+    syncDeckBPM('B');
+
+    expect(useDJStore.getState().crossfaderPosition).toBe(0.3);
+    expect(mixerState.position).toBe(0.3);
   });
 
   it('a store-only crossfader write reaches the mixer', () => {
