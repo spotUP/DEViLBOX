@@ -43,6 +43,7 @@ static uint32_t s_mask = 0xFFFFFFFFu;
 static float s_separation = 1.0f;
 static int s_repeat = -1; /* nw_set_repeat value, -1 = never set (nuade default) */
 static uint32_t s_subsong_count = 0, s_default_subsong = 0, s_voice_count = 0;
+static const uint8_t *s_voice_tracks = NULL; /* NuadeSongInfo.voice_tracks of s_song, NULL = voice v is track v */
 
 /* ---- companion files in memory (the NuadeIo the player reads samples / instruments through) ---- */
 typedef struct {
@@ -129,6 +130,7 @@ EMSCRIPTEN_KEEPALIVE void nw_close(void) {
   if (s_song) nuade_close(s_song);
   s_song = NULL;
   s_voice_count = s_subsong_count = s_default_subsong = 0;
+  s_voice_tracks = NULL;
 }
 
 EMSCRIPTEN_KEEPALIVE const char *nw_last_error(void) { return s_error; }
@@ -173,6 +175,7 @@ static void adopt_info(void) {
   s_voice_count = info->voice_count > NW_MAX_VOICES ? NW_MAX_VOICES : info->voice_count;
   s_subsong_count = info->subsong_count;
   s_default_subsong = info->default_subsong;
+  s_voice_tracks = info->voice_tracks;
 }
 
 /* 0 ok, -1 bad arguments, -2 open failed (nw_last_error). `playerId` forces one player ("" or NULL probes all). */
@@ -260,13 +263,11 @@ EMSCRIPTEN_KEEPALIVE int nw_set_separation(float x) {
 }
 EMSCRIPTEN_KEEPALIVE void nw_set_mute_mask(int mask) { s_mask = (uint32_t)mask; }
 
-/* The app numbers voices by the song's own voice (the tracker column). SoundMon's voice n plays on Paula channel 3 - n,
- * and nuade (since 111c9657965f) numbers its mixer voices, voice info, snapshots and meters by Paula channel, so for that
- * player the column of mixer voice v is voice_count - 1 - v. Every per-voice export below goes through this. */
+/* The app numbers voices by the song's own track (the tracker column). A player whose mixer voices, voice info,
+ * snapshots and meters follow the hardware channel instead (SoundMon) maps each voice to its track in
+ * NuadeSongInfo.voice_tracks (patch 0005). Every per-voice export below goes through this. */
 static uint32_t column_of(uint32_t v) {
-  const NuadePlayer *pl = s_song ? nuade_player(s_song) : NULL;
-  if (pl && pl->id && strcmp(pl->id, "soundmon") == 0 && s_voice_count > v) return s_voice_count - 1 - v;
-  return v;
+  return s_voice_tracks && v < s_voice_count ? s_voice_tracks[v] : v;
 }
 
 /* The pan each voice has in the stereo mix right now (-1 left .. 1 right, separation applied). A tick player's mixer

@@ -1,7 +1,7 @@
 {
  "version": 1,
  "instrument": {
-  "wasm": "e663ff7c7d22",
+  "wasm": "a8d7a0d46ba1",
   "known_good": {
    "song": "public/data/songs/bp-soundmon-3/antidust.bp3",
    "correlation": 0.9739032057230175,
@@ -4297,12 +4297,12 @@
    "voices": 4,
    "player": "soundmon",
    "uadeRms": 0.1751563806444863,
-   "swapMs": 197.3090830000001,
+   "swapMs": 165.67016699999976,
    "format": "soundmon",
    "song": "public/data/songs/bp-soundmon-3/antidust.bp3",
    "songPass": true,
-   "sha": "ac3b86e5f667e663ff7c7d2202c8c4919e029fddf3607b6f",
-   "ms": 1202
+   "sha": "ac3b86e5f667a8d7a0d46ba102c8c4919e029fddf3607b6f",
+   "ms": 593
   },
   {
    "own": 0.985018994867954,
@@ -4319,8 +4319,8 @@
    "format": "soundmon",
    "song": "public/data/songs/bp-soundmon-2/aquarivs.bp",
    "songPass": true,
-   "sha": "58d8f38ad31ce663ff7c7d2202c8c4919e029fddf3607b6f",
-   "ms": 900
+   "sha": "58d8f38ad31ca8d7a0d46ba102c8c4919e029fddf3607b6f",
+   "ms": 704
   },
   {
    "own": 0.9117510346186775,
@@ -4337,8 +4337,8 @@
    "format": "soundmon",
    "song": "public/data/songs/bp-soundmon-2/nicktune1.bp",
    "songPass": true,
-   "sha": "ee5a17088d58e663ff7c7d2202c8c4919e029fddf3607b6f",
-   "ms": 840
+   "sha": "ee5a17088d58a8d7a0d46ba102c8c4919e029fddf3607b6f",
+   "ms": 561
   }
  ]
 }

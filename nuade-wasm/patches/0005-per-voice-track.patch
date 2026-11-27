@@ -1,0 +1,31 @@
+diff --color -ruN a/include/nuade/player.h b/include/nuade/player.h
+--- a/include/nuade/player.h	2026-11-27 00:12:05
++++ b/include/nuade/player.h	2026-11-27 00:12:06
+@@ -65,6 +65,10 @@
+     // nuade_mute_voice for the display voices and nuade_mute_instrument for any instrument number. Without it a player
+     // with display voices of its own cannot be muted.
+     bool player_mutes;
++    // The song's track (its tracker_cells column) each mixer voice plays, voice_count entries, when the mixer voices
++    // are numbered by hardware channel rather than by track (SoundMon: voice v plays track 3 - v). 0 = voice v plays
++    // track v. Stays valid until the player's close.
++    const uint8_t* voice_tracks;
+ } NuadeSongInfo;
+ 
+ typedef struct NuadePlayerOpenResult {
+diff --color -ruN a/players/soundmon/soundmon_nuade.c b/players/soundmon/soundmon_nuade.c
+--- a/players/soundmon/soundmon_nuade.c	2026-11-27 00:12:05
++++ b/players/soundmon/soundmon_nuade.c	2026-11-27 00:12:06
+@@ -25,9 +25,12 @@
+         snprintf(result.error.message, sizeof(result.error.message), "not a valid SoundMon module");
+         return result;
+     }
++    // Mixer voice v is Paula channel v, which plays SoundMon voice (track) 3 - v
++    static const uint8_t voice_tracks[SOUNDMON_NUADE_VOICES] = { 3, 2, 1, 0 };
+     result.user_data = module;
+     result.info = (NuadeSongInfo) {
+-        .voice_count = SOUNDMON_NUADE_VOICES, .subsong_count = 1, .default_subsong = 0, .timebase_hz = SM_TICK_HZ
++        .voice_count = SOUNDMON_NUADE_VOICES, .subsong_count = 1, .default_subsong = 0, .timebase_hz = SM_TICK_HZ,
++        .voice_tracks = voice_tracks
+     };
+     return result;
+ }
