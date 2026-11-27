@@ -105,9 +105,10 @@ export class AxsEngine extends WASMChannelOutputsEngine {
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
   }
 
-  /** Live edit: set one cell (block, track, row, raw note/vel/cmd/par); heard when the row next plays. */
-  setCell(block: number, track: number, row: number, note: number, vel: number, cmd: number, par: number): void {
-    this.workletNode?.port.postMessage({ type: 'setCell', block, track, row, note, vel, cmd, par });
+  /** Live edit (gridCellEdits): one grid cell (pattern = block, channel = track); the WASM
+   *  (axs_set_grid_cell) turns it into the stored bytes. Heard when the row next plays. */
+  setCell(pattern: number, row: number, channel: number, note: number, instrument: number, effTyp: number, eff: number, volume: number): void {
+    this.workletNode?.port.postMessage({ type: 'setCell', pattern, row, channel, note, instrument, effTyp, eff, volume });
   }
 
   play(): void {

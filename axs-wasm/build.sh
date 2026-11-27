@@ -9,7 +9,7 @@ FLAGS="-O2 -fno-fast-math -ffp-contract=off -fwrapv"
 em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
     -I"$SCRIPT_DIR/src" \
     "$SCRIPT_DIR/src/axs_wasm.cpp" \
-    -sEXPORTED_FUNCTIONS="['_axs_open','_axs_error','_axs_duration_ms','_axs_position','_axs_row','_axs_render','_axs_close','_axs_grid','_axs_set_cell','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_axs_open','_axs_error','_axs_duration_ms','_axs_position','_axs_row','_axs_render','_axs_close','_axs_grid','_axs_set_cell','_axs_set_grid_cell','_axs_start_bpm','_axs_start_speed','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['HEAPU8','HEAPF32','UTF8ToString']" \
     -sMODULARIZE=1 -sEXPORT_NAME=createAxs -sENVIRONMENT=worker -sINCOMING_MODULE_JS_API="['wasmBinary']" \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=33554432 \
@@ -18,7 +18,7 @@ em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
 em++ $FLAGS -std=c++17 -Wall -Wextra -Wno-unused-function \
     -I"$SCRIPT_DIR/src" \
     "$SCRIPT_DIR/src/axs_wasm.cpp" \
-    -sEXPORTED_FUNCTIONS="['_axs_open','_axs_close','_axs_error','_axs_duration_ms','_axs_grid','_axs_render','_axs_set_cell','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_axs_open','_axs_close','_axs_error','_axs_duration_ms','_axs_position','_axs_row','_axs_grid','_axs_render','_axs_set_cell','_axs_set_grid_cell','_axs_start_bpm','_axs_start_speed','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['HEAPU8','HEAP32','HEAPF32','UTF8ToString']" \
     -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createAxsEdit -sENVIRONMENT=web,worker,node \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=33554432 -sINVOKE_RUN=0 -o "$OUT_DIR/AxsEdit.js"

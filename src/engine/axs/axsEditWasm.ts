@@ -17,6 +17,11 @@ interface AxsEditModule {
   _axs_grid(): number;
   _axs_render(out: number, frames: number): number;
   _axs_set_cell(block: number, track: number, row: number, note: number, vel: number, cmd: number, par: number): number;
+  _axs_set_grid_cell(block: number, track: number, row: number, note: number, instrument: number, effTyp: number, eff: number, volume: number): number;
+  _axs_start_bpm(): number;
+  _axs_start_speed(): number;
+  _axs_position(): number;
+  _axs_row(): number;
   UTF8ToString(p: number): string;
 }
 export type CreateAxsEdit = (opts?: { locateFile?: (f: string) => string }) => Promise<AxsEditModule>;
@@ -24,7 +29,7 @@ export type CreateAxsEdit = (opts?: { locateFile?: (f: string) => string }) => P
 /** One cell as stored: note 0 = empty (else MIDI note + 1, 0xff = note off), velocity, command, parameter. */
 export interface AxsCell { note: number; vel: number; cmd: number; par: number }
 export interface AxsBlock { tracks: number; rows: number; trackBytes: number[]; cells: AxsCell[][] }
-export interface AxsGrid { order: number[]; blocks: AxsBlock[] }
+export interface AxsGrid { order: number[]; blocks: AxsBlock[]; speed: number; bpm: number }
 
 let mod: Promise<AxsEditModule> | null = null;
 
@@ -64,6 +69,7 @@ export async function axsGrid(bytes: Uint8Array, create?: CreateAxsEdit): Promis
     }
     blocks.push({ tracks, rows, trackBytes, cells });
   }
+  const speed = m._axs_start_speed(), bpm = m._axs_start_bpm();
   m._axs_close();
-  return { order, blocks };
+  return { order, blocks, speed, bpm };
 }

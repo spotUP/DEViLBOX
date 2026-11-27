@@ -65,8 +65,9 @@ export async function parseAxsFile(bytes: Uint8Array, filename: string, create?:
     songLength: order.length || 1,
     restartPosition: 0,
     numChannels,
-    initialSpeed: 6,
-    initialBPM: 125,
+    // The replayer's own clock (axs_start_speed / axs_start_bpm): tick 2.5 / BPM s, row = speed ticks.
+    initialSpeed: grid.speed,
+    initialBPM: grid.bpm,
     linearPeriods: false,
     axsFileData: bytes.slice().buffer as ArrayBuffer,
   };

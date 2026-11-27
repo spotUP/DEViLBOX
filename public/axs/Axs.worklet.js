@@ -37,7 +37,7 @@ class AxsProcessor extends AudioWorkletProcessor {
       case 'setCell': {
         // Live edit: one cell of a block; also patched into the song bytes' TRAK so a reopen keeps it.
         if (!this.module || !this.open) break;
-        this.module._axs_set_cell(data.block, data.track, data.row, data.note, data.vel, data.cmd, data.par);
+        this.module._axs_set_grid_cell(data.pattern, data.channel, data.row, data.note, data.instrument, data.effTyp, data.eff, data.volume);
         this.edits.push(data);
         break;
       }
@@ -62,7 +62,7 @@ class AxsProcessor extends AudioWorkletProcessor {
     const ok = m._axs_open(ptr, this.songBytes.length, sampleRate);
     m._free(ptr);
     if (!ok) { this.port.postMessage({ type: 'error', message: 'axs_open: ' + m.UTF8ToString(m._axs_error()) }); return false; }
-    for (const e of this.edits) m._axs_set_cell(e.block, e.track, e.row, e.note, e.vel, e.cmd, e.par);
+    for (const e of this.edits) m._axs_set_grid_cell(e.pattern, e.channel, e.row, e.note, e.instrument, e.effTyp, e.eff, e.volume);
     this.open = true;
     this.ended = false;
     this.lastPos = -1;
