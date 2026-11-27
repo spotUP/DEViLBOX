@@ -1,14 +1,14 @@
 {
  "version": 1,
  "instrument": {
-  "wasm": "96a019904e0e",
+  "wasm": "e663ff7c7d22",
   "known_good": {
-   "song": "public/data/songs/formats/antidust.bp3",
+   "song": "public/data/songs/bp-soundmon-3/antidust.bp3",
    "correlation": 0.9739032057230175,
    "pass": true
   },
   "known_bad": {
-   "song": "public/data/songs/formats/apb.dw",
+   "song": "public/data/songs/david-whittaker/apb.dw",
    "correlation": 0.8472068002914434,
    "pass": false
   },
@@ -28,7 +28,7 @@
    "uadeRms": 0.024524415228749548,
    "swapMs": 62.836874999999964,
    "format": "ashleyhogg",
-   "song": "public/data/songs/formats/ash.nobby_the_aardvark",
+   "song": "public/data/songs/ashley-hogg/ash.nobby_the_aardvark",
    "songPass": true,
    "sha": "eefffc5488d86bdcea540196",
    "ms": 139
@@ -81,7 +81,7 @@
    "uadeRms": 0.10670410208827019,
    "swapMs": 197.38587499999994,
    "format": "davidhanney",
-   "song": "public/data/songs/formats/tearaway_thomas.dh",
+   "song": "public/data/songs/david-hanney/tearaway_thomas.dh",
    "songPass": true,
    "sha": "0f06f5091eea6bdcea540196",
    "ms": 1062
@@ -116,7 +116,7 @@
    "uadeRms": 0.021057994281675103,
    "swapMs": 57.42329199999949,
    "format": "desire",
-   "song": "public/data/songs/formats/batmanreturns.dsr",
+   "song": "public/data/songs/desire/batmanreturns.dsr",
    "songPass": false,
    "sha": "8a77adaa76036bdcea540196",
    "ms": 572
@@ -221,7 +221,7 @@
    "uadeRms": 0.11671356075822448,
    "swapMs": 155.3012080000044,
    "format": "howiedavies",
-   "song": "public/data/songs/formats/blazing_thunder.hd",
+   "song": "public/data/songs/howie-davies/blazing_thunder.hd",
    "songPass": true,
    "sha": "a54c33b1ed866bdcea540196",
    "ms": 542
@@ -238,7 +238,7 @@
    "player": "howiedavies",
    "uadeRms": 0.13134762308636783,
    "format": "howiedavies",
-   "song": "public/data/songs/formats/howiedavies.nru",
+   "song": "public/data/songs/noiserunner/howiedavies.nru",
    "songPass": true,
    "sha": "f0dd264bf6126bdcea540196",
    "ms": 388
@@ -272,7 +272,7 @@
    "voices": 0,
    "player": "",
    "format": "infogrames",
-   "song": "public/data/songs/formats/bob4e.dum",
+   "song": "public/data/songs/infogrames/bob4e.dum",
    "songPass": false,
    "sha": "c50c985dce156bdcea540196",
    "ms": 37
@@ -307,7 +307,7 @@
    "uadeRms": 0.08104652354935651,
    "swapMs": 146.92666699999972,
    "format": "jasonbrooke",
-   "song": "public/data/songs/formats/ikari_warriors.jb",
+   "song": "public/data/songs/jason-brooke/ikari_warriors.jb",
    "songPass": true,
    "sha": "32e09bd807656bdcea540196",
    "ms": 528
@@ -341,7 +341,7 @@
    "voices": 0,
    "player": "",
    "format": "jasonpage",
-   "song": "public/data/songs/formats/jpn.virocop-14",
+   "song": "public/data/songs/jason-page/jpn.virocop-14",
    "songPass": false,
    "sha": "c52c9cdac9976bdcea540196",
    "ms": 30
@@ -376,7 +376,7 @@
    "uadeRms": 0.046977513833088694,
    "swapMs": 135.86108299999614,
    "format": "jeroentel",
-   "song": "public/data/songs/formats/insects_in_space.jt",
+   "song": "public/data/songs/jeroen-tel/insects_in_space.jt",
    "songPass": true,
    "sha": "4540414a282a6bdcea540196",
    "ms": 563
@@ -410,7 +410,7 @@
    "voices": 0,
    "player": "",
    "format": "krishatlelid",
-   "song": "public/data/songs/formats/hatlelid_smallest.kh",
+   "song": "public/data/songs/kris-hatlelid/hatlelid_smallest.kh",
    "songPass": false,
    "sha": "ff7a47e0d3ed6bdcea540196",
    "ms": 47
@@ -464,7 +464,7 @@
    "uadeRms": 0.20132583819527183,
    "swapMs": 110.17983399999503,
    "format": "maniacsofnoise",
-   "song": "public/data/songs/formats/gyroscope.mon",
+   "song": "public/data/songs/maniacs-of-noise/gyroscope.mon",
    "songPass": true,
    "sha": "66af600fb37b6bdcea540196",
    "ms": 592
@@ -499,7 +499,7 @@
    "uadeRms": 0.07019954401374524,
    "swapMs": 131.15483400000085,
    "format": "markcooksey",
-   "song": "public/data/songs/formats/grand_national-title.mc",
+   "song": "public/data/songs/mark-cooksey/grand_national-title.mc",
    "songPass": true,
    "sha": "bfba2cafc5e36bdcea540196",
    "ms": 529
@@ -587,7 +587,7 @@
    "voices": 0,
    "player": "",
    "format": "paulrobotham",
-   "song": "public/data/songs/formats/dawnpatrol-sad.dat",
+   "song": "public/data/songs/paul-robotham/dawnpatrol-sad.dat",
    "songPass": false,
    "sha": "ae635e0778536bdcea540196",
    "ms": 39
@@ -622,7 +622,7 @@
    "uadeRms": 0.12368700989094983,
    "swapMs": 136.55404100000305,
    "format": "paulshields",
-   "song": "public/data/songs/formats/jug-hiscore.ps",
+   "song": "public/data/songs/paul-shields/jug-hiscore.ps",
    "songPass": true,
    "sha": "cdc3087b31dc6bdcea540196",
    "ms": 573
@@ -657,7 +657,7 @@
    "uadeRms": 0.2813024175840124,
    "swapMs": 141.18895899999916,
    "format": "professionalsoundartists",
-   "song": "public/data/songs/formats/the punisher - title.psa",
+   "song": "public/data/songs/professional-sound-artists/the punisher - title.psa",
    "songPass": true,
    "sha": "c66e1f2e0fb06bdcea540196",
    "ms": 587
@@ -727,7 +727,7 @@
    "uadeRms": 0.0885817271360376,
    "swapMs": 149.94537500000297,
    "format": "riffraff",
-   "song": "public/data/songs/formats/riffraff_smallest.riff",
+   "song": "public/data/songs/riff-raff/riffraff_smallest.riff",
    "songPass": true,
    "sha": "5d4b271f59e86bdcea540196",
    "ms": 675
@@ -744,7 +744,7 @@
    "player": "riffraff",
    "uadeRms": 0.0879053033590104,
    "format": "riffraff",
-   "song": "public/data/songs/formats/sidewinder2.riff",
+   "song": "public/data/songs/riff-raff/sidewinder2.riff",
    "songPass": true,
    "sha": "5d4b271f59e86bdcea540196",
    "ms": 404
@@ -779,7 +779,7 @@
    "uadeRms": 0.12853948097151371,
    "swapMs": 96.90766699999222,
    "format": "scumm",
-   "song": "public/data/songs/formats/zaktitle.scumm",
+   "song": "public/data/songs/scumm/zaktitle.scumm",
    "songPass": true,
    "sha": "251183c5f9286bdcea540196",
    "ms": 459
@@ -797,7 +797,7 @@
    "uadeRms": 0.13604712466437255,
    "swapMs": 132.41712499999267,
    "format": "seanconnolly",
-   "song": "public/data/songs/formats/surf_ninjas.scn",
+   "song": "public/data/songs/sean-connolly/surf_ninjas.scn",
    "songPass": true,
    "sha": "67d6a70e86ff6bdcea540196",
    "ms": 515
@@ -850,7 +850,7 @@
    "uadeRms": 0.07919546620533362,
    "swapMs": 202.5857079999987,
    "format": "soundmaster",
-   "song": "public/data/songs/formats/rackney'sisland_4.sm",
+   "song": "public/data/songs/sound-master/rackney'sisland_4.sm",
    "songPass": true,
    "sha": "43be8d23c0166bdcea540196",
    "ms": 715
@@ -902,7 +902,7 @@
    "uadeRms": 0.12427058171554724,
    "swapMs": 5.033458000005339,
    "format": "specialfx",
-   "song": "public/data/songs/formats/wildwheels_ingame.jd",
+   "song": "public/data/songs/special-fx-st/wildwheels_ingame.jd",
    "songPass": false,
    "sha": "4b5df738e44b6bdcea540196",
    "ms": 256
@@ -955,7 +955,7 @@
    "uadeRms": 0.12514202995913837,
    "swapMs": 169.22029199999815,
    "format": "speedysystem",
-   "song": "public/data/songs/formats/pauker_rap_2.ss",
+   "song": "public/data/songs/speedy-system/pauker_rap_2.ss",
    "songPass": true,
    "sha": "1960e897dc976bdcea540196",
    "ms": 727
@@ -990,7 +990,7 @@
    "uadeRms": 0.13395239834908587,
    "swapMs": 141.5424580000108,
    "format": "stevebarrett",
-   "song": "public/data/songs/formats/street_fighter.sb",
+   "song": "public/data/songs/steve-barrett/street_fighter.sb",
    "songPass": false,
    "sha": "15df2f60f3ff6bdcea540196",
    "ms": 615
@@ -1024,7 +1024,7 @@
    "voices": 0,
    "player": "",
    "format": "synthpack",
-   "song": "public/data/songs/formats/centerbase_soft.osp",
+   "song": "public/data/songs/synth-pack/centerbase_soft.osp",
    "songPass": false,
    "sha": "f026f40a49336bdcea540196",
    "ms": 62
@@ -1059,7 +1059,7 @@
    "uadeRms": 0.12044578306098085,
    "swapMs": 205.56599999999162,
    "format": "tomytracker",
-   "song": "public/data/songs/formats/irrepressible intro.sg",
+   "song": "public/data/songs/tomy-tracker/irrepressible intro.sg",
    "songPass": true,
    "sha": "448d2f589cd36bdcea540196",
    "ms": 984
@@ -1111,7 +1111,7 @@
    "uadeRms": 0.12441371580298291,
    "swapMs": 88.675209,
    "format": "robhubbard",
-   "song": "public/data/songs/formats/centurion_battle.rh",
+   "song": "public/data/songs/rob-hubbard/centurion_battle.rh",
    "songPass": true,
    "sha": "060150e7b7a86bdcea540196",
    "ms": 215
@@ -1163,7 +1163,7 @@
    "uadeRms": 0.05100315776752345,
    "swapMs": 13.150209000000018,
    "format": "timfollin",
-   "song": "public/data/songs/formats/follin_smallest.tf",
+   "song": "public/data/songs/follin-player-ii/follin_smallest.tf",
    "songPass": true,
    "sha": "dd152d5a5d606bdcea540196",
    "ms": 417
@@ -1198,7 +1198,7 @@
    "uadeRms": 0.10311166686651962,
    "swapMs": 126.11933299999998,
    "format": "earache",
-   "song": "public/data/songs/formats/skythebest.ea",
+   "song": "public/data/songs/earache/skythebest.ea",
    "songPass": true,
    "sha": "de8af43e62d56bdcea540196",
    "ms": 567
@@ -1233,7 +1233,7 @@
    "uadeRms": 0.14444283035279362,
    "swapMs": 126.10858299999995,
    "format": "musicalenlightenment",
-   "song": "public/data/songs/formats/64_conversion.tme",
+   "song": "public/data/songs/the-musical-enlightenment/64_conversion.tme",
    "songPass": true,
    "sha": "dd4f4a6833776bdcea540196",
    "ms": 526
@@ -1268,7 +1268,7 @@
    "uadeRms": 0.07211921225142619,
    "swapMs": 118.1111249999999,
    "format": "amcomposer",
-   "song": "public/data/songs/formats/krymini title.amc",
+   "song": "public/data/songs/amc/krymini title.amc",
    "songPass": true,
    "sha": "5077e485a0ce6bdcea540196",
    "ms": 515
@@ -1285,7 +1285,7 @@
    "player": "amcomposer",
    "uadeRms": 0.07719568217390402,
    "format": "amcomposer",
-   "song": "public/data/songs/formats/krymini jingle 1.amc",
+   "song": "public/data/songs/amc/krymini jingle 1.amc",
    "songPass": true,
    "sha": "cfb1e6057b056bdcea540196",
    "ms": 115
@@ -1303,7 +1303,7 @@
    "uadeRms": 0.16007817979011837,
    "swapMs": 120.84500000000003,
    "format": "aprosys",
-   "song": "public/data/songs/formats/action.aps",
+   "song": "public/data/songs/aprosys/action.aps",
    "songPass": false,
    "sha": "529f8a6ad2226bdcea540196",
    "ms": 478
@@ -1320,7 +1320,7 @@
    "player": "aprosys",
    "uadeRms": 0.10462746489489104,
    "format": "aprosys",
-   "song": "public/data/songs/formats/actionfiltersound.aps",
+   "song": "public/data/songs/aprosys/actionfiltersound.aps",
    "songPass": false,
    "sha": "9600aa00a0266bdcea540196",
    "ms": 395
@@ -1338,7 +1338,7 @@
    "uadeRms": 0.18729764760197073,
    "swapMs": 93.66016600000012,
    "format": "artandmagic",
-   "song": "public/data/songs/formats/agony-level1.aam",
+   "song": "public/data/songs/art-and-magic/agony-level1.aam",
    "songPass": true,
    "sha": "dcaca84627136bdcea540196",
    "ms": 407
@@ -1355,7 +1355,7 @@
    "player": "artandmagic",
    "uadeRms": 0.16268944100654575,
    "format": "artandmagic",
-   "song": "public/data/songs/formats/agony-level2.aam",
+   "song": "public/data/songs/art-and-magic/agony-level2.aam",
    "songPass": true,
    "sha": "88c74347308b6bdcea540196",
    "ms": 315
@@ -1372,7 +1372,7 @@
    "voices": 0,
    "player": "",
    "format": "dirkbialluch",
-   "song": "public/data/songs/formats/tpu.timelock ingame",
+   "song": "public/data/songs/dirk-bialluch/tpu.timelock ingame",
    "songPass": false,
    "sha": "175e723d3c9b6bdcea540196",
    "ms": 28
@@ -1389,7 +1389,7 @@
    "voices": 0,
    "player": "",
    "format": "dynamicsynthesizer",
-   "song": "public/data/songs/formats/dns.ptc",
+   "song": "public/data/songs/dynamic-synthesizer/dns.ptc",
    "songPass": false,
    "sha": "1081b4266d0e6bdcea540196",
    "ms": 20
@@ -1407,7 +1407,7 @@
    "uadeRms": 0.1306306876776107,
    "swapMs": 115.96337500000027,
    "format": "ems",
-   "song": "public/data/songs/formats/ballade.song.ems",
+   "song": "public/data/songs/ems/ballade.song.ems",
    "songPass": true,
    "sha": "92d2176d342d6bdcea540196",
    "ms": 450
@@ -1424,7 +1424,7 @@
    "player": "ems",
    "uadeRms": 0.08114406234129455,
    "format": "ems",
-   "song": "public/data/songs/formats/je taime.ems",
+   "song": "public/data/songs/ems/je taime.ems",
    "songPass": true,
    "sha": "3b6a83e00f1b6bdcea540196",
    "ms": 314
@@ -1442,7 +1442,7 @@
    "uadeRms": 0.3092040886596035,
    "swapMs": 117.33449999999993,
    "format": "majortom",
-   "song": "public/data/songs/formats/pseudofever.arp",
+   "song": "public/data/songs/major-tom/pseudofever.arp",
    "songPass": true,
    "sha": "64ceb929be636bdcea540196",
    "ms": 466
@@ -1459,7 +1459,7 @@
    "voices": 0,
    "player": "",
    "format": "maximumeffect",
-   "song": "public/data/songs/formats/MAX.DinosaurDetective gamedat",
+   "song": "public/data/songs/maximum-effect/MAX.DinosaurDetective gamedat",
    "songPass": false,
    "sha": "472530911f3f6bdcea540196",
    "ms": 24
@@ -1476,7 +1476,7 @@
    "voices": 0,
    "player": "",
    "format": "maximumeffect",
-   "song": "public/data/songs/formats/MAX.DinosaurDetective jingle1",
+   "song": "public/data/songs/maximum-effect/MAX.DinosaurDetective jingle1",
    "songPass": false,
    "sha": "a88ce07a82ee6bdcea540196",
    "ms": 20
@@ -1494,7 +1494,7 @@
    "uadeRms": 0.06115882166313674,
    "swapMs": 114.66708299999937,
    "format": "mcmd",
-   "song": "public/data/songs/formats/ep-trmonsterbusiness.mcmd",
+   "song": "public/data/songs/mcmd/ep-trmonsterbusiness.mcmd",
    "songPass": true,
    "sha": "9c67d51049146bdcea540196",
    "ms": 335
@@ -1512,7 +1512,7 @@
    "uadeRms": 0.101943284139466,
    "swapMs": 113.15429200000017,
    "format": "peterverswyvelen",
-   "song": "public/data/songs/formats/zarathrusta title.pvp",
+   "song": "public/data/songs/peter-verswyvelen/zarathrusta title.pvp",
    "songPass": true,
    "sha": "c422297096f56bdcea540196",
    "ms": 434
@@ -1529,7 +1529,7 @@
    "voices": 0,
    "player": "",
    "format": "pierreadane",
-   "song": "public/data/songs/formats/Ivanhoe_ivanhoe - bonus.pap",
+   "song": "public/data/songs/pierre-adane-packer/Ivanhoe_ivanhoe - bonus.pap",
    "songPass": false,
    "sha": "457900ffdcf96bdcea540196",
    "ms": 28
@@ -1546,7 +1546,7 @@
    "voices": 0,
    "player": "",
    "format": "pierreadane",
-   "song": "public/data/songs/formats/Ivanhoe_ivanhoe - hiscore.pap",
+   "song": "public/data/songs/pierre-adane-packer/Ivanhoe_ivanhoe - hiscore.pap",
    "songPass": false,
    "sha": "781f96a385746bdcea540196",
    "ms": 20
@@ -1563,7 +1563,7 @@
    "voices": 0,
    "player": "",
    "format": "thomashermann",
-   "song": "public/data/songs/formats/thm.blueangel69",
+   "song": "public/data/songs/thomas-hermann/thm.blueangel69",
    "songPass": false,
    "sha": "a67e6e8d76d06bdcea540196",
    "ms": 25
@@ -1581,7 +1581,7 @@
    "uadeRms": 0.24604440462242463,
    "swapMs": 119.48970800000006,
    "format": "tronic",
-   "song": "public/data/songs/formats/crystal.dp",
+   "song": "public/data/songs/tronic/crystal.dp",
    "songPass": true,
    "sha": "1bcd8b6b7f516bdcea540196",
    "ms": 433
@@ -1598,7 +1598,7 @@
    "player": "tronic",
    "uadeRms": 0.10335751811006193,
    "format": "tronic",
-   "song": "public/data/songs/formats/locomotion.dp",
+   "song": "public/data/songs/tronic/locomotion.dp",
    "songPass": true,
    "sha": "56e2c61311466bdcea540196",
    "ms": 302
@@ -1617,7 +1617,7 @@
    "uadeRms": 0.070470199235682,
    "swapMs": 90.86895900000013,
    "format": "actionamics",
-   "song": "public/data/songs/formats/dynablaster.ast",
+   "song": "public/data/songs/actionamics/dynablaster.ast",
    "songPass": false,
    "sha": "fa0b4b07526b6bdcea540196319a3110c44a27c425af927d",
    "ms": 582
@@ -1654,7 +1654,7 @@
    "uadeRms": 0.11102861462711924,
    "swapMs": 108.52545899999996,
    "format": "activisionpro",
-   "song": "public/data/songs/formats/gettysburg.avp",
+   "song": "public/data/songs/activision-pro/gettysburg.avp",
    "songPass": true,
    "sha": "b574f61823dc6bdcea540196751e451d047c2d835018fbaf",
    "ms": 526
@@ -1691,7 +1691,7 @@
    "uadeRms": 0.06536648907983626,
    "swapMs": 101.17066599999998,
    "format": "bendaglish",
-   "song": "public/data/songs/formats/mickey_mouse.bd",
+   "song": "public/data/songs/ben-daglish/mickey_mouse.bd",
    "songPass": true,
    "sha": "2da5cff386e06bdcea540196efe59acf178cecfabb2a342e",
    "ms": 519
@@ -1728,7 +1728,7 @@
    "uadeRms": 0.12835961836134532,
    "swapMs": 75.84920899999997,
    "format": "davidwhittaker",
-   "song": "public/data/songs/formats/apb.dw",
+   "song": "public/data/songs/david-whittaker/apb.dw",
    "songPass": false,
    "sha": "4d82eb78dbf66bdcea540196c31a8890d0ee34481cb08d7e",
    "ms": 455
@@ -1765,7 +1765,7 @@
    "uadeRms": 0.15640969546749292,
    "swapMs": 135.7178329999997,
    "format": "deltamusic1",
-   "song": "public/data/songs/formats/crusaders1.dm",
+   "song": "public/data/songs/delta-music/crusaders1.dm",
    "songPass": false,
    "sha": "f070f284f84c6bdcea540196e4152c387c7a0e72ad7ffa35",
    "ms": 546
@@ -1802,7 +1802,7 @@
    "uadeRms": 0.1481855672979078,
    "swapMs": 108.77520900000127,
    "format": "dss",
-   "song": "public/data/songs/formats/doxtro3.dss",
+   "song": "public/data/songs/digital-sound-studio/doxtro3.dss",
    "songPass": true,
    "sha": "41296ae12f6b6bdcea540196e3d9e2334443e8921301d7ec",
    "ms": 514
@@ -1876,7 +1876,7 @@
    "uadeRms": 0.19933709664172575,
    "swapMs": 103.5609999999997,
    "format": "futurecomposer",
-   "song": "public/data/songs/formats/adept.smod",
+   "song": "public/data/songs/future-composer-1.3/adept.smod",
    "songPass": false,
    "sha": "af911d8564c36bdcea540196a061bddb9fc678572f4ecfc5",
    "ms": 402
@@ -1894,7 +1894,7 @@
    "player": "futurecomposer",
    "uadeRms": 0.1664433490715225,
    "format": "futurecomposer",
-   "song": "public/data/songs/formats/anthrox.fc",
+   "song": "public/data/songs/future-composer-1.4/anthrox.fc",
    "songPass": true,
    "sha": "8b0e0d97d74c6bdcea540196a061bddb9fc678572f4ecfc5",
    "ms": 455
@@ -1931,7 +1931,7 @@
    "uadeRms": 0.13226729670253087,
    "swapMs": 113.132916999999,
    "format": "instereo1",
-   "song": "public/data/songs/formats/fantasi8.is",
+   "song": "public/data/songs/instereo!/fantasi8.is",
    "songPass": true,
    "sha": "0177282276f76bdcea5401965b681b1c3465bcd2ac8ef650",
    "ms": 536
@@ -1968,7 +1968,7 @@
    "uadeRms": 0.17878199032369918,
    "swapMs": 114.40908299999865,
    "format": "instereo2",
-   "song": "public/data/songs/formats/stereo_feeling.is20",
+   "song": "public/data/songs/instereo!-2.0/stereo_feeling.is20",
    "songPass": false,
    "sha": "3a55c6bb795e6bdcea540196d98206b085e12441c2436b00",
    "ms": 521
@@ -2024,7 +2024,7 @@
    "uadeRms": 0.046288777488314996,
    "swapMs": 66.57962499999849,
    "format": "soundcontrol",
-   "song": "public/data/songs/formats/north_sea_inferno.sc",
+   "song": "public/data/songs/soundcontrol/north_sea_inferno.sc",
    "songPass": true,
    "sha": "4bfe27c859ee6bdcea540196385ed1f95f994baca9eed33b",
    "ms": 436
@@ -2061,7 +2061,7 @@
    "uadeRms": 0.15275413029725166,
    "swapMs": 44.502667000000656,
    "format": "synthesis",
-   "song": "public/data/songs/formats/space_sound.syn",
+   "song": "public/data/songs/synthesis/space_sound.syn",
    "songPass": false,
    "sha": "8e0a3847942f6bdcea54019681dcdf35d42147b2bd9d7ddc",
    "ms": 292
@@ -2098,7 +2098,7 @@
    "uadeRms": 0.046408219476618835,
    "swapMs": 113.290209,
    "format": "hippel",
-   "song": "public/data/songs/formats/prehistoric_tale.hipc",
+   "song": "public/data/songs/hippel-coso/prehistoric_tale.hipc",
    "songPass": true,
    "sha": "be34391128846bdcea54019670a3b40fffb5bed42bb32490",
    "ms": 632
@@ -2284,7 +2284,7 @@
    "uadeRms": 0.4081851273725002,
    "swapMs": 148.17725000000064,
    "format": "deltamusic2",
-   "song": "public/data/songs/formats/anthrox_intro.dm2",
+   "song": "public/data/songs/delta-music-2/anthrox_intro.dm2",
    "songPass": false,
    "sha": "61e63b73cb4e555264d9fafdd1693ed987e043c5cf5a15cd",
    "ms": 348
@@ -2321,7 +2321,7 @@
    "uadeRms": 0.1345724710707016,
    "swapMs": 218.63162499999999,
    "format": "digmug",
-   "song": "public/data/songs/formats/cockwise.mug",
+   "song": "public/data/songs/digital-mugician-2/cockwise.mug",
    "songPass": false,
    "sha": "689db6569875555264d9fafd98fcb9e62c70153c1bcf4558",
    "ms": 1041
@@ -2339,7 +2339,7 @@
    "player": "digmug",
    "uadeRms": 0.10002591039350264,
    "format": "digmug",
-   "song": "public/data/songs/formats/flight.dmu",
+   "song": "public/data/songs/digital-mugician/flight.dmu",
    "songPass": true,
    "sha": "62cdbfee922c555264d9fafd98fcb9e62c70153c1bcf4558",
    "ms": 553
@@ -2357,7 +2357,7 @@
    "player": "digmug",
    "uadeRms": 0.13357153974729705,
    "format": "digmug",
-   "song": "public/data/songs/formats/snickle.mug2",
+   "song": "public/data/songs/digital-mugician-2/snickle.mug2",
    "songPass": false,
    "sha": "1f88242bb482555264d9fafd98fcb9e62c70153c1bcf4558",
    "ms": 782
@@ -2375,7 +2375,7 @@
    "uadeRms": 0.020068559264086443,
    "swapMs": 163.51004199999988,
    "format": "emsv6",
-   "song": "public/data/songs/formats/perception.ems",
+   "song": "public/data/songs/ems/perception.ems",
    "songPass": false,
    "sha": "ed25ba91ba1f555264d9fafd",
    "ms": 882
@@ -2392,7 +2392,7 @@
    "voices": 0,
    "player": "",
    "format": "facethemusic",
-   "song": "public/data/songs/formats/staticoscillations.ftm",
+   "song": "public/data/songs/face-the-music/staticoscillations.ftm",
    "songPass": false,
    "sha": "bd2c24516189555264d9fafd0f6fb956128e73af73f847aa",
    "ms": 60
@@ -2427,7 +2427,7 @@
    "uadeRms": 0.09484468967210309,
    "swapMs": 118.67458299999998,
    "format": "fredgray",
-   "song": "public/data/songs/formats/eco.gray",
+   "song": "public/data/songs/fred-gray/eco.gray",
    "songPass": false,
    "sha": "e87e46cab0b9555264d9fafd",
    "ms": 482
@@ -2462,7 +2462,7 @@
    "uadeRms": 0.1709385316080885,
    "swapMs": 147.45829199999935,
    "format": "gluemon",
-   "song": "public/data/songs/formats/memphis.glue",
+   "song": "public/data/songs/gluemon/memphis.glue",
    "songPass": true,
    "sha": "11478506d68c555264d9fafd",
    "ms": 460
@@ -2498,7 +2498,7 @@
    "uadeRms": 0.13849883925553308,
    "swapMs": 116.37837500000023,
    "format": "gmc",
-   "song": "public/data/songs/formats/knights_of_sky.gmc",
+   "song": "public/data/songs/game-music-creator/knights_of_sky.gmc",
    "songPass": true,
    "sha": "e9b83e1c842a555264d9fafd991a7008806ffa469880c659",
    "ms": 504
@@ -2535,7 +2535,7 @@
    "uadeRms": 0.10793955230679693,
    "swapMs": 166.89166699999987,
    "format": "hippel7v",
-   "song": "public/data/songs/formats/ghostbattle_gameover.hip7",
+   "song": "public/data/songs/hippel-7v/ghostbattle_gameover.hip7",
    "songPass": true,
    "sha": "5e19758b8b1e555264d9fafd70a3b40fffb5bed42bb32490",
    "ms": 1433
@@ -2572,7 +2572,7 @@
    "uadeRms": 0.11055552871167247,
    "swapMs": 126.67395899999974,
    "format": "jamcracker",
-   "song": "public/data/songs/formats/analogue_vibes.jam",
+   "song": "public/data/songs/jamcracker/analogue_vibes.jam",
    "songPass": true,
    "sha": "1f9c268ab70b555264d9fafd30502514293b96dba27bb46b",
    "ms": 597
@@ -2626,7 +2626,7 @@
    "uadeRms": 0.18786082537507284,
    "swapMs": 121.28820800000176,
    "format": "jankomrsicflogel",
-   "song": "public/data/songs/formats/spacestation.jmf",
+   "song": "public/data/songs/janko-mrsic-flogel/spacestation.jmf",
    "songPass": true,
    "sha": "210e01908b39555264d9fafd",
    "ms": 459
@@ -2660,7 +2660,7 @@
    "voices": 0,
    "player": "",
    "format": "jesperolsen",
-   "song": "public/data/songs/formats/lollypop-subgame_01.jo",
+   "song": "public/data/songs/jesper-olsen/lollypop-subgame_01.jo",
    "songPass": false,
    "sha": "7abc06bab6bb555264d9fafd",
    "ms": 75
@@ -2713,7 +2713,7 @@
    "uadeRms": 0.13781006319329314,
    "swapMs": 113.74674999999843,
    "format": "musicassembler",
-   "song": "public/data/songs/formats/baseheads.ma",
+   "song": "public/data/songs/music-assembler/baseheads.ma",
    "songPass": false,
    "sha": "b8a89714f97c555264d9fafda803051257c7ab181d9f8879",
    "ms": 638
@@ -2750,7 +2750,7 @@
    "uadeRms": 0.14607524838158112,
    "swapMs": 211.4654159999991,
    "format": "musicmaker",
-   "song": "public/data/songs/formats/easystyleofmsx.mm4",
+   "song": "public/data/songs/music-maker-4v/easystyleofmsx.mm4",
    "songPass": true,
    "sha": "ef2b59af60f5555264d9fafdd9db54da0503",
    "ms": 1056
@@ -2768,7 +2768,7 @@
    "player": "musicmaker",
    "uadeRms": 0.04301377276266808,
    "format": "musicmaker",
-   "song": "public/data/songs/formats/house2.mm8",
+   "song": "public/data/songs/musicmaker-v8/house2.mm8",
    "songPass": true,
    "sha": "841de19e2773555264d9fafdd9db54da0503",
    "ms": 723
@@ -2786,7 +2786,7 @@
    "player": "musicmaker",
    "uadeRms": 0.08021012365778538,
    "format": "musicmaker",
-   "song": "public/data/songs/formats/MusicMaker V8 Old/- unknown/moveback.sdata",
+   "song": "public/data/songs/musicmaker-v8/old/- unknown/moveback.sdata",
    "songPass": true,
    "sha": "8ab9603793b8555264d9fafdd9db54da0503",
    "ms": 695
@@ -2805,7 +2805,7 @@
    "uadeRms": 0.08874383000103246,
    "swapMs": 175.43733300000167,
    "format": "oktalyzer",
-   "song": "public/data/songs/formats/45.okta",
+   "song": "public/data/songs/oktalyzer/45.okta",
    "songPass": false,
    "sha": "cdd9676da16f555264d9fafd46bace7855823c2104fffc75",
    "ms": 974
@@ -2840,7 +2840,7 @@
    "voices": 0,
    "player": "",
    "format": "pokeynoise",
-   "song": "public/data/songs/formats/pn.tetris",
+   "song": "public/data/songs/pokeynoise/pn.tetris",
    "songPass": false,
    "sha": "1d147f7e7991555264d9fafd",
    "ms": 34
@@ -2859,7 +2859,7 @@
    "uadeRms": 0.16647501963282585,
    "swapMs": 160.24291699999958,
    "format": "quadracomposer",
-   "song": "public/data/songs/formats/synth_corn.emod",
+   "song": "public/data/songs/quadra-composer/synth_corn.emod",
    "songPass": false,
    "sha": "eaf0f10b3573555264d9fafdd4d515745eb7b8bb262fe3b9",
    "ms": 660
@@ -2895,7 +2895,7 @@
    "uadeRms": 0.14509320279592292,
    "swapMs": 161.13754100000006,
    "format": "robhubbardst",
-   "song": "public/data/songs/formats/battleships.rho",
+   "song": "public/data/songs/rob-hubbard-st/battleships.rho",
    "songPass": false,
    "sha": "7a7dbffa06fe555264d9fafd",
    "ms": 607
@@ -2931,7 +2931,7 @@
    "uadeRms": 0.14108669648632916,
    "swapMs": 170.78158299999996,
    "format": "ronklaren",
-   "song": "public/data/songs/formats/astra_2.rk",
+   "song": "public/data/songs/ron-klaren/astra_2.rk",
    "songPass": false,
    "sha": "c1c327332d72555264d9fafd4858d6a9b626b40f04b4a267",
    "ms": 665
@@ -2949,7 +2949,7 @@
    "player": "ronklaren",
    "uadeRms": 0.1268811913222537,
    "format": "ronklaren",
-   "song": "public/data/songs/formats/rk.journey",
+   "song": "public/data/songs/ron-klaren/rk.journey",
    "songPass": false,
    "sha": "8ed99a56b6fb555264d9fafd4858d6a9b626b40f04b4a267",
    "ms": 531
@@ -2985,7 +2985,7 @@
    "uadeRms": 0.05510392673835905,
    "swapMs": 164.08237500000178,
    "format": "seanconran",
-   "song": "public/data/songs/formats/count_duckula.scr",
+   "song": "public/data/songs/sean-conran/count_duckula.scr",
    "songPass": true,
    "sha": "fb6549eebdf2555264d9fafd",
    "ms": 594
@@ -3021,7 +3021,7 @@
    "uadeRms": 0.051386698250279854,
    "swapMs": 164.6968330000018,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tune1",
+   "song": "public/data/songs/scott-johnston/sjs.tune1",
    "songPass": false,
    "sha": "b853f006923a555264d9fafd87fd1297cbc418519628ab88",
    "ms": 1399
@@ -3039,7 +3039,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.0797716215717547,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.menace",
+   "song": "public/data/songs/scott-johnston/sjs.menace",
    "songPass": true,
    "sha": "29a0e2613ee2555264d9fafd87fd1297cbc418519628ab88",
    "ms": 1136
@@ -3058,7 +3058,7 @@
    "uadeRms": 0.2200681745042242,
    "swapMs": 412.5849999999991,
    "format": "sidmon2",
-   "song": "public/data/songs/formats/bruno_time.sid2",
+   "song": "public/data/songs/sidmon-2/bruno_time.sid2",
    "songPass": true,
    "sha": "6ccd269aa4ef555264d9fafdd7ae7e4e8f841e020216dbae",
    "ms": 1587
@@ -3097,7 +3097,7 @@
    "uadeRms": 0.07327449622604837,
    "swapMs": 164.55574999999953,
    "format": "sonicarranger",
-   "song": "public/data/songs/formats/almighty.sa",
+   "song": "public/data/songs/sonic-arranger/almighty.sa",
    "songPass": true,
    "sha": "56bf8ad82e94555264d9fafd184ceb07d4ffbdbabd3a1511",
    "ms": 532
@@ -3132,7 +3132,7 @@
    "voices": 0,
    "player": "",
    "format": "sonix",
-   "song": "public/data/songs/formats/radiokomppi.smus",
+   "song": "public/data/songs/iff-smus/radiokomppi.smus",
    "songPass": false,
    "sha": "e7c7ad648fb6555264d9fafdnoown",
    "ms": 40
@@ -3185,7 +3185,7 @@
    "uadeRms": 0.130652122056274,
    "swapMs": 107.19479100000171,
    "format": "soundfactory",
-   "song": "public/data/songs/formats/goldrunner.psf",
+   "song": "public/data/songs/soundfactory/goldrunner.psf",
    "songPass": false,
    "sha": "fdbd4cdb8ceb555264d9fafd2a7409491b59d4e26b007e95",
    "ms": 475
@@ -3239,7 +3239,7 @@
    "uadeRms": 0.15245481169150582,
    "swapMs": 132.97904199999903,
    "format": "soundfx",
-   "song": "public/data/songs/formats/bottle popper.mms",
+   "song": "public/data/songs/multimedia-sound/bottle popper.mms",
    "songPass": true,
    "sha": "a7fb5f5046f6555264d9fafd",
    "ms": 503
@@ -3256,7 +3256,7 @@
    "player": "soundfx",
    "uadeRms": 0.04878026165549663,
    "format": "soundfx",
-   "song": "public/data/songs/formats/operation_stealth.sfx",
+   "song": "public/data/songs/soundfx/operation_stealth.sfx",
    "songPass": false,
    "sha": "f48ed8e97054555264d9fafd",
    "ms": 119
@@ -3291,7 +3291,7 @@
    "uadeRms": 0.0786444778048758,
    "swapMs": 166.56404199999815,
    "format": "spl",
-   "song": "public/data/songs/formats/boulderdash.spl",
+   "song": "public/data/songs/sound-programming-language/boulderdash.spl",
    "songPass": true,
    "sha": "a94054ec3f8b555264d9fafd",
    "ms": 513
@@ -3312,7 +3312,7 @@
    "uadeRms": 0.09588399093164769,
    "swapMs": 173.96549999999843,
    "format": "suntronic",
-   "song": "public/data/songs/formats/msx-cracktro 2.sun",
+   "song": "public/data/songs/suntronic/msx-cracktro 2.sun",
    "songPass": true,
    "sha": "fdba5aa12930555264d9fafda616e3d53d99",
    "ms": 781
@@ -3332,7 +3332,7 @@
    "player": "suntronic",
    "uadeRms": 0.09448167259248184,
    "format": "suntronic",
-   "song": "public/data/songs/formats/msx-cracktro.sun",
+   "song": "public/data/songs/suntronic/msx-cracktro.sun",
    "songPass": true,
    "sha": "335573322045555264d9fafda616e3d53d99",
    "ms": 400
@@ -3352,7 +3352,7 @@
    "player": "suntronic",
    "uadeRms": 0.18734807414484908,
    "format": "suntronic",
-   "song": "public/data/songs/formats/msx-intro.sun",
+   "song": "public/data/songs/suntronic/msx-intro.sun",
    "songPass": true,
    "sha": "4e43a5d9f74c555264d9fafda616e3d53d99",
    "ms": 423
@@ -3369,7 +3369,7 @@
    "voices": 0,
    "player": "",
    "format": "synthdream",
-   "song": "public/data/songs/formats/sdr.monsterbusiness_5",
+   "song": "public/data/songs/synth-dream/sdr.monsterbusiness_5",
    "songPass": false,
    "sha": "8e2ba640a332555264d9fafd",
    "ms": 32
@@ -3386,7 +3386,7 @@
    "voices": 0,
    "player": "",
    "format": "synthdream",
-   "song": "public/data/songs/formats/sdr.nobuddiesland_jigsaw",
+   "song": "public/data/songs/synth-dream/sdr.nobuddiesland_jigsaw",
    "songPass": false,
    "sha": "4932969bc270555264d9fafd",
    "ms": 25
@@ -3527,7 +3527,7 @@
    "player": "andersoland",
    "uadeRms": 0.1744877572572128,
    "format": "andersoland",
-   "song": "public/data/songs/formats/primemover_01.hot",
+   "song": "public/data/songs/anders-oland/primemover_01.hot",
    "songPass": true,
    "sha": "095045d0dc89555264d9fafd87fd1297cbc418519628ab88",
    "ms": 690
@@ -3545,7 +3545,7 @@
    "player": "andersoland",
    "uadeRms": 0.18744044120923806,
    "format": "andersoland",
-   "song": "public/data/songs/formats/primemover_09.hot",
+   "song": "public/data/songs/anders-oland/primemover_09.hot",
    "songPass": true,
    "sha": "766b52a046bb555264d9fafd87fd1297cbc418519628ab88",
    "ms": 589
@@ -3564,7 +3564,7 @@
    "uadeRms": 0.07486043628436799,
    "swapMs": 107.14508399999977,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.awesome",
+   "song": "public/data/songs/scott-johnston/sjs.awesome",
    "songPass": true,
    "sha": "fccda28c23f3555264d9fafd87fd1297cbc418519628ab88",
    "ms": 631
@@ -3582,7 +3582,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.048529049204557806,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.beasti",
+   "song": "public/data/songs/scott-johnston/sjs.beasti",
    "songPass": false,
    "sha": "4b98d23d60c1555264d9fafd87fd1297cbc418519628ab88",
    "ms": 666
@@ -3600,7 +3600,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.07915349435248746,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.beastii",
+   "song": "public/data/songs/scott-johnston/sjs.beastii",
    "songPass": true,
    "sha": "44dd50754f17555264d9fafd87fd1297cbc418519628ab88",
    "ms": 839
@@ -3618,7 +3618,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.06720671589288083,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.cancan",
+   "song": "public/data/songs/scott-johnston/sjs.cancan",
    "songPass": true,
    "sha": "cc7424f2f5ec555264d9fafd87fd1297cbc418519628ab88",
    "ms": 834
@@ -3636,7 +3636,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.05064327904069504,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.doggie",
+   "song": "public/data/songs/scott-johnston/sjs.doggie",
    "songPass": true,
    "sha": "d67ea356e953555264d9fafd87fd1297cbc418519628ab88",
    "ms": 637
@@ -3654,7 +3654,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.029767042304642482,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.jb",
+   "song": "public/data/songs/scott-johnston/sjs.jb",
    "songPass": true,
    "sha": "d089b5719554555264d9fafd87fd1297cbc418519628ab88",
    "ms": 488
@@ -3672,7 +3672,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.09367046583420287,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.kw",
+   "song": "public/data/songs/scott-johnston/sjs.kw",
    "songPass": true,
    "sha": "7ba9af662cbb555264d9fafd87fd1297cbc418519628ab88",
    "ms": 546
@@ -3690,7 +3690,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.07556147433241946,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.lemming1",
+   "song": "public/data/songs/scott-johnston/sjs.lemming1",
    "songPass": true,
    "sha": "f49585a81f2b555264d9fafd87fd1297cbc418519628ab88",
    "ms": 605
@@ -3708,7 +3708,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.0708593371893704,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.lemming2",
+   "song": "public/data/songs/scott-johnston/sjs.lemming2",
    "songPass": true,
    "sha": "0e7c4349f471555264d9fafd87fd1297cbc418519628ab88",
    "ms": 553
@@ -3726,7 +3726,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.07654521533730062,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.lemming3",
+   "song": "public/data/songs/scott-johnston/sjs.lemming3",
    "songPass": true,
    "sha": "6b9962710a6c555264d9fafd87fd1297cbc418519628ab88",
    "ms": 523
@@ -3744,7 +3744,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.0929961430053442,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.lemmings intro",
+   "song": "public/data/songs/scott-johnston/sjs.lemmings intro",
    "songPass": true,
    "sha": "dd6021f73561555264d9fafd87fd1297cbc418519628ab88",
    "ms": 529
@@ -3762,7 +3762,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.058965393078701966,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.mountain",
+   "song": "public/data/songs/scott-johnston/sjs.mountain",
    "songPass": false,
    "sha": "90751b50b3d5555264d9fafd87fd1297cbc418519628ab88",
    "ms": 561
@@ -3780,7 +3780,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.06611236529669676,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.rudi",
+   "song": "public/data/songs/scott-johnston/sjs.rudi",
    "songPass": true,
    "sha": "1bfd3e47052e555264d9fafd87fd1297cbc418519628ab88",
    "ms": 547
@@ -3798,7 +3798,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.05945606631666945,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tenlemmings",
+   "song": "public/data/songs/scott-johnston/sjs.tenlemmings",
    "songPass": true,
    "sha": "607a1c42fee0555264d9fafd87fd1297cbc418519628ab88",
    "ms": 565
@@ -3816,7 +3816,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.07730842934016363,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tim1",
+   "song": "public/data/songs/scott-johnston/sjs.tim1",
    "songPass": true,
    "sha": "d4ea530cc8c6555264d9fafd87fd1297cbc418519628ab88",
    "ms": 529
@@ -3834,7 +3834,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.056420456065114484,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tim10",
+   "song": "public/data/songs/scott-johnston/sjs.tim10",
    "songPass": true,
    "sha": "528b79e430b7555264d9fafd87fd1297cbc418519628ab88",
    "ms": 528
@@ -3852,7 +3852,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.062260012960962396,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tim2",
+   "song": "public/data/songs/scott-johnston/sjs.tim2",
    "songPass": true,
    "sha": "ab2a2152cc59555264d9fafd87fd1297cbc418519628ab88",
    "ms": 1920
@@ -3870,7 +3870,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.07060481441648887,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tim3",
+   "song": "public/data/songs/scott-johnston/sjs.tim3",
    "songPass": true,
    "sha": "5338db07f195555264d9fafd87fd1297cbc418519628ab88",
    "ms": 576
@@ -3888,7 +3888,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.06311892902286219,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tim4",
+   "song": "public/data/songs/scott-johnston/sjs.tim4",
    "songPass": true,
    "sha": "fe1ca4a6d424555264d9fafd87fd1297cbc418519628ab88",
    "ms": 523
@@ -3906,7 +3906,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.05751543958747493,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tim5",
+   "song": "public/data/songs/scott-johnston/sjs.tim5",
    "songPass": true,
    "sha": "709de79392ee555264d9fafd87fd1297cbc418519628ab88",
    "ms": 522
@@ -3924,7 +3924,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.05606655690778129,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tim6",
+   "song": "public/data/songs/scott-johnston/sjs.tim6",
    "songPass": true,
    "sha": "360d2f487118555264d9fafd87fd1297cbc418519628ab88",
    "ms": 526
@@ -3942,7 +3942,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.06943232759422664,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tim7",
+   "song": "public/data/songs/scott-johnston/sjs.tim7",
    "songPass": true,
    "sha": "be0ffccb51f5555264d9fafd87fd1297cbc418519628ab88",
    "ms": 514
@@ -3960,7 +3960,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.06779378238442284,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tim8",
+   "song": "public/data/songs/scott-johnston/sjs.tim8",
    "songPass": true,
    "sha": "610aac13f0b8555264d9fafd87fd1297cbc418519628ab88",
    "ms": 494
@@ -3978,7 +3978,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.062330529372809855,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tim9",
+   "song": "public/data/songs/scott-johnston/sjs.tim9",
    "songPass": true,
    "sha": "7f0e554f0b89555264d9fafd87fd1297cbc418519628ab88",
    "ms": 520
@@ -3996,7 +3996,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.06853510093564148,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tune2",
+   "song": "public/data/songs/scott-johnston/sjs.tune2",
    "songPass": true,
    "sha": "a7ddef5a5b01555264d9fafd87fd1297cbc418519628ab88",
    "ms": 593
@@ -4014,7 +4014,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.06898427808285545,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tune3",
+   "song": "public/data/songs/scott-johnston/sjs.tune3",
    "songPass": true,
    "sha": "8ea6459f1049555264d9fafd87fd1297cbc418519628ab88",
    "ms": 557
@@ -4032,7 +4032,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.07579773402511035,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tune4",
+   "song": "public/data/songs/scott-johnston/sjs.tune4",
    "songPass": false,
    "sha": "c83e480e7577555264d9fafd87fd1297cbc418519628ab88",
    "ms": 594
@@ -4050,7 +4050,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.06978846197301286,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tune5",
+   "song": "public/data/songs/scott-johnston/sjs.tune5",
    "songPass": true,
    "sha": "cd021d3a21af555264d9fafd87fd1297cbc418519628ab88",
    "ms": 636
@@ -4068,7 +4068,7 @@
    "player": "scottjohnston",
    "uadeRms": 0.0744035279858171,
    "format": "scottjohnston",
-   "song": "public/data/songs/formats/Scott Johnston/sjs.tune6",
+   "song": "public/data/songs/scott-johnston/sjs.tune6",
    "songPass": true,
    "sha": "e24491dcb479555264d9fafd87fd1297cbc418519628ab88",
    "ms": 691
@@ -4087,7 +4087,7 @@
    "uadeRms": 0.16300568346630856,
    "swapMs": 103.40529100000003,
    "format": "fred_np",
-   "song": "public/data/songs/formats/bomb jack.fred",
+   "song": "public/data/songs/fredmon/bomb jack.fred",
    "songPass": false,
    "sha": "2bc3e93f7fc3555264d9fafdb4d5a11ba69410f9de3b43c1",
    "ms": 509
@@ -4105,7 +4105,7 @@
    "player": "fred_np",
    "uadeRms": 0.1637099927737541,
    "format": "fred_np",
-   "song": "public/data/songs/formats/rebels.fred",
+   "song": "public/data/songs/fredmon/rebels.fred",
    "songPass": true,
    "sha": "53e92b0d7fb4555264d9fafdb4d5a11ba69410f9de3b43c1",
    "ms": 456
@@ -4123,7 +4123,7 @@
    "uadeRms": 0.0621874709665814,
    "swapMs": 1.5599999999999454,
    "format": "soundimages",
-   "song": "public/data/songs/formats/blinkys scary school-sfx.tw",
+   "song": "public/data/songs/sound-images/blinkys scary school-sfx.tw",
    "songPass": true,
    "sha": "3fa40b121cc28a1c9ae84d8b",
    "ms": 107
@@ -4140,7 +4140,7 @@
    "player": "soundimages",
    "uadeRms": 0.06298476838531986,
    "format": "soundimages",
-   "song": "public/data/songs/formats/future basketball main.tw",
+   "song": "public/data/songs/sound-images/future basketball main.tw",
    "songPass": true,
    "sha": "9e2793acddd68a1c9ae84d8b",
    "ms": 390
@@ -4158,7 +4158,7 @@
    "uadeRms": 0.03530496098994738,
    "swapMs": 142.23800000000006,
    "format": "dsc",
-   "song": "public/data/songs/formats/dragon'sbreath_fanfares.dsc",
+   "song": "public/data/songs/digital-sonix-and-chrome/dragon'sbreath_fanfares.dsc",
    "songPass": true,
    "sha": "f643c7ee08908a1c9ae84d8b",
    "ms": 525
@@ -4210,7 +4210,7 @@
    "uadeRms": 0.0742353626262777,
    "swapMs": 2.8308750000001055,
    "format": "paulsummers",
-   "song": "public/data/songs/formats/everton_fc_-_jingles.snk",
+   "song": "public/data/songs/paul-summers/everton_fc_-_jingles.snk",
    "songPass": true,
    "sha": "a8d676bf4f2f8a1c9ae84d8b",
    "ms": 112
@@ -4263,7 +4263,7 @@
    "uadeRms": 0.10324845703039388,
    "swapMs": 127.39158299999986,
    "format": "mmdc",
-   "song": "public/data/songs/formats/captain planet and the planeteers - title.mmdc",
+   "song": "public/data/songs/octamed-mmdc/captain planet and the planeteers - title.mmdc",
    "songPass": true,
    "sha": "261a34af8e0d0a5752ff9f1b",
    "ms": 455
@@ -4297,12 +4297,12 @@
    "voices": 4,
    "player": "soundmon",
    "uadeRms": 0.1751563806444863,
-   "swapMs": 134.42108299999995,
+   "swapMs": 197.3090830000001,
    "format": "soundmon",
-   "song": "public/data/songs/formats/antidust.bp3",
+   "song": "public/data/songs/bp-soundmon-3/antidust.bp3",
    "songPass": true,
-   "sha": "ac3b86e5f66796a019904e0e02c8c4919e029fddf3607b6f",
-   "ms": 570
+   "sha": "ac3b86e5f667e663ff7c7d2202c8c4919e029fddf3607b6f",
+   "ms": 1202
   },
   {
    "own": 0.985018994867954,
@@ -4317,10 +4317,10 @@
    "player": "soundmon",
    "uadeRms": 0.11327385860327414,
    "format": "soundmon",
-   "song": "public/data/songs/formats/aquarivs.bp",
+   "song": "public/data/songs/bp-soundmon-2/aquarivs.bp",
    "songPass": true,
-   "sha": "58d8f38ad31c96a019904e0e02c8c4919e029fddf3607b6f",
-   "ms": 433
+   "sha": "58d8f38ad31ce663ff7c7d2202c8c4919e029fddf3607b6f",
+   "ms": 900
   },
   {
    "own": 0.9117510346186775,
@@ -4337,8 +4337,8 @@
    "format": "soundmon",
    "song": "public/data/songs/bp-soundmon-2/nicktune1.bp",
    "songPass": true,
-   "sha": "ee5a17088d5896a019904e0e02c8c4919e029fddf3607b6f",
-   "ms": 474
+   "sha": "ee5a17088d58e663ff7c7d2202c8c4919e029fddf3607b6f",
+   "ms": 840
   }
  ]
 }
