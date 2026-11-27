@@ -49,8 +49,10 @@ export interface UADEPatternLayout {
    * set, so bytes the grid has no field for are kept rather than invented.
    * `channel` is the grid column the cell sits in, passed by writers that know it,
    * for formats whose command names the voice it plays on (TFMX).
+   * `pattern` / `row` are the cell's song position, passed by writers that know it, for formats whose grid shows a
+   * value carried in from an earlier row (669's sticky command 6).
    */
-  encodeCell: (cell: TrackerCell, stored?: Uint8Array, channel?: number) => Uint8Array;
+  encodeCell: (cell: TrackerCell, stored?: Uint8Array, channel?: number, pattern?: number, row?: number) => Uint8Array;
 
   /**
    * The cell holds bytes the grid does not show (Ron Klaren's wait byte, the
@@ -152,10 +154,10 @@ export function encodeStoredCell(
   const note = cell.note ?? 0;
   // storeNote takes the grid value itself, so the octave below C-0 (negative values) goes through it too.
   const storable = (note >= 1 && note <= 96) || (!!layout.storeNote && isLowOctaveNote(note));
-  if (!transposesNotes(layout) || !storable) return layout.encodeCell(cell, stored, channel);
+  if (!transposesNotes(layout) || !storable) return layout.encodeCell(cell, stored, channel, pattern, row);
   const fields = storedNoteFields(layout, pattern, row, channel, note);
   if (!fields) return null;
-  const bytes = layout.encodeCell({ ...cell, ...fields }, stored, channel);
+  const bytes = layout.encodeCell({ ...cell, ...fields }, stored, channel, pattern, row);
   if (!layout.storeNote && layout.decodeCell && layout.decodeCell(bytes).note !== fields.note) return null;
   return bytes;
 }
