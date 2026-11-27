@@ -147,7 +147,15 @@ function DemandInvalidator() {
     };
     // Poll at ~30fps — enough for smooth turntable animation, half the CPU cost
     id = setInterval(poll, 33);
-    return () => clearInterval(id);
+    // A control moved while every deck is stopped (MIDI, 2D mixer, a 3D drag):
+    // render one frame so the 3D knob / fader follows at once. Several store
+    // writes in one frame merge into one render.
+    const unsub = useDJStore.subscribe((state) => {
+      if (document.hidden) return;
+      const d = state.decks;
+      if (!d.A.isPlaying && !d.B.isPlaying && !d.C.isPlaying) invalidateRef.current();
+    });
+    return () => { clearInterval(id); unsub(); };
   }, []);
 
   return null;

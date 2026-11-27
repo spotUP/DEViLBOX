@@ -39,3 +39,29 @@ export function faderOffset(value: number, f: FaderTravel): number {
 export function dragToValue(startValue: number, pixels: number, min: number, max: number, pixelsFullRange = 150): number {
   return Math.max(min, Math.min(max, startValue + (pixels / pixelsFullRange) * (max - min)));
 }
+
+/**
+ * Hit slop for the small 3D controls. A Vestax knob is about 14 px across in
+ * the default DJ 3D camera, so a press that misses the mesh still picks the
+ * control whose centre is within this many pixels.
+ */
+export const CONTROL_HIT_RADIUS_PX = 24;
+
+export interface ScreenPoint {
+  name: string;
+  x: number;
+  y: number;
+}
+
+/** Name of the point nearest (x, y) within `radiusPx`, or null. */
+export function pickNearestScreenPoint(points: readonly ScreenPoint[], x: number, y: number, radiusPx = CONTROL_HIT_RADIUS_PX): string | null {
+  let best: string | null = null;
+  let bestD2 = radiusPx * radiusPx;
+  for (const p of points) {
+    const dx = p.x - x;
+    const dy = p.y - y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 <= bestD2) { bestD2 = d2; best = p.name; }
+  }
+  return best;
+}

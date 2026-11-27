@@ -181,11 +181,13 @@ SNAPSHOT_SKIPPED_PATHS=(
 # test to name a skipped path only when every path it names is listed here.
 # furnaceEffectTable and furnaceSequencerChipIds compare the generated effect
 # tables and chip ids against Furnace's sysDef/dispatch headers (2026-11-17).
+# mixer3DHitTargets reads the control mesh names from vestax-mixer.glb (24 MB).
 SNAPSHOT_KEPT_PATHS=(
   /third-party/furnace-master/src/engine/sysDef.cpp
   /third-party/furnace-master/src/engine/sysDef.h
   /third-party/furnace-master/src/engine/dispatch.h
   /third-party/furnace-master/src/engine/song.h
+  /public/models/vestax-mixer.glb
 )
 # The sparse-checkout file (non-cone, gitignore syntax: the last matching line wins).
 snapshot_sparse_patterns() {

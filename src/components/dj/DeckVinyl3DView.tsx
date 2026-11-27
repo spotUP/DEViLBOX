@@ -26,7 +26,7 @@
 
 import { deckAccent } from '@lib/deckIdentity';
 import { useRef, useCallback, useEffect, useMemo, useState } from 'react';
-import { useFrame, type ThreeEvent } from '@react-three/fiber';
+import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { faderOffset, dragToValue } from './control3DMapping';
@@ -112,15 +112,31 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
   // Store subscriptions
   const isPlaying = useDJStore((s) => s.decks[deckId].isPlaying);
-  const songPos = useDJStore((s) => s.decks[deckId].songPos);
   const totalPositions = useDJStore((s) => s.decks[deckId].totalPositions);
   const durationMs = useDJStore((s) => s.decks[deckId].durationMs);
   const playbackMode = useDJStore((s) => s.decks[deckId].playbackMode);
-  const pitchOffset = useDJStore((s) => s.decks[deckId].pitchOffset);
   const trackName = useDJStore((s) => s.decks[deckId].trackName);
+  // Only the centre LED needs a render; it flips when crossing 0 %, not per pixel of pitch drag.
+  const pitchAtCenter = useDJStore((s) => Math.abs(s.decks[deckId].pitchOffset) < 0.15);
+  const { invalidate } = useThree();
 
-  const playStateRef = useRef({ isPlaying, songPos, totalPositions, durationMs, playbackMode, pitchOffset });
-  playStateRef.current = { isPlaying, songPos, totalPositions, durationMs, playbackMode, pitchOffset };
+  // songPos and pitchOffset change every row / every pitch-drag move. They feed
+  // useFrame only, so they live in a ref fed by a store subscription instead of
+  // re-rendering this whole scene (and its R3F tree) on each change.
+  const playStateRef = useRef({
+    isPlaying, totalPositions, durationMs, playbackMode,
+    songPos: useDJStore.getState().decks[deckId].songPos,
+    pitchOffset: useDJStore.getState().decks[deckId].pitchOffset,
+  });
+  Object.assign(playStateRef.current, { isPlaying, totalPositions, durationMs, playbackMode });
+  useEffect(() => {
+    const sync = (d: { songPos: number; pitchOffset: number }) => {
+      playStateRef.current.songPos = d.songPos;
+      playStateRef.current.pitchOffset = d.pitchOffset;
+    };
+    sync(useDJStore.getState().decks[deckId]);
+    return useDJStore.subscribe((st) => sync(st.decks[deckId]));
+  }, [deckId]);
 
   const accentColor = deckAccent(deckId);
 
@@ -460,7 +476,8 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
     const omega = (pixelVelocity / 400) * OMEGA_NORMAL * sensitivity;
     physicsRef.current?.setHandVelocity(omega);
     lastPointerRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
-  }, []);
+    invalidate();
+  }, [invalidate]);
 
   const handlePlatterPointerUp = useCallback(() => {
     lastPointerRef.current = null;
@@ -508,7 +525,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
   const handlePitchPointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
-    if (!powerOnRef.current) return;
+    // The pitch fader is mechanical: it moves with the deck powered off (was gated on power, so it looked stuck).
     pitchDragRef.current = true;
     pitchDragStartYRef.current = e.nativeEvent.clientY;
     pitchDragStartValueRef.current = playStateRef.current.pitchOffset;
@@ -524,6 +541,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
       // Drag up = cap moves up = higher pitch (was inverted against the cap). 240px = full range.
       const up = pitchDragStartYRef.current - e.clientY;
       DJActions.setDeckPitch(deckId, dragToValue(pitchDragStartValueRef.current, up, PITCH_FADER.min, PITCH_FADER.max, 240));
+      invalidate(); // demand frameloop: render the moved cap now
     };
     const onUp = () => { pitchDragRef.current = false; };
     window.addEventListener('pointermove', onMove);
@@ -532,7 +550,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [deckId]);
+  }, [deckId, invalidate]);
 
   // Keep the Three.js handlers minimal — just stop propagation
   const handlePitchPointerMove = useCallback(() => {}, []);
@@ -591,6 +609,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
     // Move tonearm immediately (visual feedback before audio seeks)
     tonearmAngleRef.current = armAngle(VINYL3D_ARM_RANGE, newProgress);
+    invalidate();
 
     try {
       const deck = getDJEngine().getDeck(deckId);
@@ -602,7 +621,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
         deck.replayer?.seekTo(targetPos, 0);
       }
     } catch { /* not ready */ }
-  }, [deckId]);
+  }, [deckId, invalidate]);
 
   const handlePickupUp = useCallback(() => {
     pickupDragRef.current = false;
@@ -741,7 +760,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
       </mesh>
       {/* Pitch center indicator LED — green dot when pitch is at 0% */}
       {(() => {
-        const atCenter = powerOn && Math.abs(pitchOffset) < 0.15;
+        const atCenter = powerOn && pitchAtCenter;
         return (
           <mesh position={[0.1950, 0.0935, 0.0660]} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[0.002, 10]} />
