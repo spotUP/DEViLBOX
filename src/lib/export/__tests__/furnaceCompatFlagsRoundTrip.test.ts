@@ -57,4 +57,29 @@ describe('DivCompatFlags coverage', () => {
       else expect(block, f).toMatch(new RegExp(`\\['${f}'`));
     }
   });
+
+  // The exporter table, in file order: [name, new-song value].
+  const exporterTable = (): [string, number][] => {
+    const exp = read('src/lib/export/FurnaceModuleExporter.ts');
+    const block = exp.slice(exp.indexOf('INFO_COMPAT_FLAGS'), exp.indexOf('];', exp.indexOf('INFO_COMPAT_FLAGS')));
+    return [...block.matchAll(/\['(\w+)', (\d+)\]/g)].map((m) => [m[1], Number(m[2])]);
+  };
+
+  it('exporter INFO compat bytes are in the order fur.cpp reads them (old INFO reader)', () => {
+    const fur = read('third-party/furnace-master/src/engine/fileOps/fur.cpp');
+    const seg = fur.slice(fur.indexOf('ds.compatFlags.limitSlides=reader.readC()'), fur.indexOf('subSong->speeds.len=reader.readC()'));
+    const readOrder = [...seg.matchAll(/ds\.(?:compatFlags\.)?(\w+)=reader\.readC\(\)/g)].map((m) => m[1])
+      .filter((n) => n !== 'patchbayAuto'); // written on its own after the patchbay
+    expect(exporterTable().map(([k]) => k)).toEqual(readOrder);
+  });
+
+  it('exporter new-song compat values are the Furnace defaults (song.cpp setDefaults)', () => {
+    const cpp = read('third-party/furnace-master/src/engine/song.cpp');
+    const body = cpp.slice(cpp.indexOf('void DivCompatFlags::setDefaults()'));
+    const defs = new Map([...body.slice(0, body.indexOf('\n}')).matchAll(/(\w+)=(true|false|\d+);/g)]
+      .map((m): [string, number] => [m[1], m[2] === 'true' ? 1 : m[2] === 'false' ? 0 : Number(m[2])]));
+    // 0.6.8.3 stores full linear pitch as 2 (later Furnace reads >1 as 1); autoSystem is a song field (default true).
+    const expected = (k: string) => (k === 'linearPitch' ? 2 : k === 'autoSystem' ? 1 : defs.get(k));
+    for (const [k, v] of exporterTable()) expect(v, k).toBe(expected(k));
+  });
 });

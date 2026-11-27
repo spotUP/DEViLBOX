@@ -111,6 +111,7 @@ state_mirrored_ssg_envelope:    .blkb   1       ; envelope shape
 state_ssg_reg_vol:              .blkb   1       ; mode+volume
 state_mirrored_ssg_waveform:    .blkb   1       ; noise+tone (shifted per channel)
 state_ssg_arpeggio:             .blkb   1       ; arpeggio (semitone shift)
+state_ssg_noise_period:         .blkb   1       ; noise period (reg 0x06), DEViLBOX patch; pairs with tools/furtool.py noiseFreq
 state_ssg_macro_data:           .blkb   2       ; address of the start of the macro program
 state_ssg_macro_pos:            .blkb   2       ; address of the current position in the macro program
 state_ssg_macro_load:           .blkb   2       ; function to load the SSG registers modified by the macro program

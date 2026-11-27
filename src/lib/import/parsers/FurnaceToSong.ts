@@ -212,9 +212,14 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
       // preview there as FurnacePSG, not as a generic Tone.js ChipSynth; its
       // "Legacy Samples" instrument plays on the YM2612's DAC, not as a
       // Sampler with no sample.
+      // A mixed-kind chip (YM2610's FM/SSG/ADPCM, OPNA, OPL4 ...) owns every
+      // instrument type its kinds take: a Neo Geo song's FM instrument is the
+      // YM2610's (FurnaceOPNB), not a Genesis FurnaceOPN.
       const mapped = mapFurnaceInstrumentType(furIns.type);
-      const synthType = (mapped === 'ChipSynth' || mapped === 'Sampler'
-        ? synthTypeForPlatform(loaded.instrumentSystems[i])
+      const platformSynth = synthTypeForPlatform(loaded.instrumentSystems[i]);
+      const chipOwnsType = chipSpecOf(platformSynth)?.kinds.some((k) => k.insTypes.includes(furIns.type)) ?? false;
+      const synthType = (mapped === 'ChipSynth' || mapped === 'Sampler' || chipOwnsType
+        ? platformSynth
         : undefined) ?? mapped;
       const previewChannel = loaded.instrumentChipChannels[i];
 

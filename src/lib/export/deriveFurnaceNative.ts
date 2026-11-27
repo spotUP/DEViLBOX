@@ -34,7 +34,7 @@ export async function deriveFurnaceNativeFromSong(song: FurnaceModuleSong): Prom
   const native = buildFurnaceNativeData(module);
   const ins2 = collectIns2Uploads(module.instruments as unknown as Parameters<typeof collectIns2Uploads>[0]);
   const instrumentIds = song.instruments
-    .filter((i) => i.synthType === NEO_GEO_SYNTH_TYPE && i.furnace)
+    .filter((i) => i.synthType === (song.chip?.synthType ?? NEO_GEO_SYNTH_TYPE) && i.furnace)
     .map((i) => i.id);
   return { native, ins2, instrumentIds, samples: toSequencerSamples(module), warnings };
 }

@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { xmVolToFurnace } from '@/lib/import/furnaceEditorCells';
-import { exportFurnaceModule, furnaceModuleExportAvailable, FUR_SYSTEM_YM2610, FUR_SYSTEM_YM2610_EXT } from '../FurnaceModuleExporter';
+import { cellToFile, speedSetupOf, exportFurnaceModule, furnaceModuleExportAvailable, FUR_SYSTEM_YM2610, FUR_SYSTEM_YM2610_EXT } from '../FurnaceModuleExporter';
 import { maxVolumeOfChipChannel } from '@engine/furnace-dispatch/chipVoiceKinds';
 import pako from 'pako';
 import { parseFurnaceSong } from '@/lib/import/formats/FurnaceSongParser';
@@ -195,9 +195,9 @@ describe('exportFurnaceModule', () => {
     const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
     const fx = (row: number) => mod.patterns.get('0_0_0')!.rows[row].effects[0];
     expect(fx(1)).toEqual({ type: 0x0f, value: 3 });
-    // FDxx, not F0xx: Furnace multiplies F0's rate by the virtual tempo (initial BPM / 150), FD replaces the numerator.
+    // FDxx, not F0xx: Furnace multiplies F0's rate by the virtual tempo (initial BPM / BPM = 1), FD replaces the numerator.
     expect(fx(2)).toEqual({ type: 0xfd, value: 0x78 });
-    expect(mod.subsongs[0].virtualTempoD).toBe(150);
+    expect(mod.subsongs[0].virtualTempoD).toBe(Math.round(s.initialBPM));
     expect(fx(3)).toEqual({ type: 0xff, value: 0 });
   });
 
@@ -329,6 +329,31 @@ describe('exportFurnaceModule', () => {
     expect(mod.instruments[0].amiga?.initSample ?? -1).toBe(-1);
   });
 
+  it('writes per-operator macros in raw form and in named form (opMacros) as O1-O4 macros the parser reads back', async () => {
+    const tl = { code: 6, type: 0, data: [10, 20, 30], loop: 1, release: -1, mode: 0 };
+    const ar = { code: 1, type: 0, data: [31, 15], loop: -1, release: 1, mode: 0, delay: 2, speed: 3 };
+    const raw = song();
+    raw.instruments[0] = inst(1, 'Raw', { ...fmConfig, opMacroArrays: [[tl], [], [ar], []] } as FurnaceConfig);
+    const named = song();
+    named.instruments[0] = inst(1, 'Named', {
+      ...fmConfig,
+      opMacros: [{ tl: { ...tl, code: undefined } }, {}, { ar: { ...ar, code: undefined }, kvs: { ...tl, code: undefined } }, {}],
+    } as unknown as FurnaceConfig);
+
+    for (const s of [raw, named]) {
+      const r = exportFurnaceModule(s);
+      const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+      const ops = mod.instruments[0].opMacroArrays ?? [];
+      const pick = (m: { code: number; data: number[]; loop: number; release: number; delay?: number; speed?: number }) =>
+        ({ code: m.code, data: Array.from(m.data), loop: m.loop, release: m.release, delay: m.delay ?? 0, speed: m.speed ?? 1 });
+      expect((ops[0] ?? []).map(pick)).toEqual([{ code: 6, data: [10, 20, 30], loop: 1, release: 255, delay: 0, speed: 1 }]);
+      expect(ops[1] ?? []).toEqual([]);
+      expect((ops[2] ?? []).map(pick)).toEqual([{ code: 1, data: [31, 15], loop: 255, release: 1, delay: 2, speed: 3 }]);
+      expect(ops[3] ?? []).toEqual([]);
+      expect(r.warnings.some((w) => /KVS operator macro left out/.test(w))).toBe(s === named);
+    }
+  });
+
   it('a sample edited in the sample editor (new PCM, resampled rate) is what the .fur SMP2 holds', async () => {
     const edited = userSampleFromWavDataUrl(
       userSampleToWavDataUrl({ name: 'kick', data: new Int16Array([9, -9, 300, 4]), rate: 11025 }), 'kick');
@@ -394,6 +419,21 @@ describe('exportFurnaceModule', () => {
     expect(mod.systemVol?.[0]).toBeCloseTo(0.5);
     expect(mod.systemPan?.[0]).toBeCloseTo(-0.5);
     expect(mod.systemPanFR?.[0]).toBeCloseTo(0.25);
+  });
+
+  it('writes a tracker F06 as 0F06 + 0906 when the song alternates two speeds, so both speeds become 6', () => {
+    expect(speedSetupOf([6], undefined)).toBe('one');
+    expect(speedSetupOf([6, 3], undefined)).toBe('two');
+    expect(speedSetupOf([6, 3], [[2, 2]])).toBe('many');
+    const cell: TrackerCell = { ...EMPTY_CELL, effTyp: 0x0f, eff: 0x06 };
+    const warnings: string[] = [];
+    const fx = (speeds: 'one' | 'two' | 'many') =>
+      cellToFile(cell, new Map(), 'c', [], 'tracker', warnings, false, 127, speeds).fx.filter((f) => f.type >= 0).map((f) => [f.type, f.val]);
+    expect(fx('one')).toEqual([[0x0f, 6]]);
+    expect(fx('two')).toEqual([[0x0f, 6], [0x09, 6]]);
+    expect(warnings).toEqual([]);
+    fx('many');
+    expect(warnings).toHaveLength(1);
   });
 
   it('keeps the second speed, the grooves and the compat flags of a loaded Furnace module', async () => {

@@ -33,6 +33,19 @@ VERBOSE = False
 def error(s):
     sys.exit("ERROR: " + s)
 
+
+cur_module = None  # DEViLBOX patch: module being converted, for the FDxx tempo
+
+
+def timer_b_for(m, n):
+    """DEViLBOX patch: YM2610 timer B value for a tick rate of hz * N / D (Furnace virtual tempo)"""
+    hz = m.frequency * n / m.virtual_tempo_d
+    tb = round(256 - (4000000 / (1152 * hz)))
+    if not 0 <= tb <= 255:
+        error("tick rate %.2f Hz (%.2f Hz * %d / %d) is out of YM2610 timer B range (13.6 Hz to 3472 Hz)"
+              % (hz, m.frequency, n, m.virtual_tempo_d))
+    return tb
+
 def dbg(s):
     if VERBOSE:
         print(s, file=sys.stderr)
@@ -286,7 +299,7 @@ def register_nss_ops():
         # 0x30
         ("fm2_op3_vol", ["vol"]),
         ("fm2_op4_vol", ["vol"]),
-        None,
+        ("vol_step_u", ["step"]),  # DEViLBOX patch: Furnace F8xx, tools/nullsound/nss-vol-step.s
         ("b_vol"   , ["volume"]),
         ("a_vol"   , ["volume"]),
         ("fm_pan"  , ["pan_mask"]),
@@ -316,7 +329,7 @@ def register_nss_ops():
         ("a_retrigger", ["delay"]),
         ("a_pan",    ["pan_mask"]),
         ("b_pan",    ["pan_mask"]),
-        None,
+        ("vol_step_d", ["step"]),  # DEViLBOX patch: Furnace F9xx, tools/nullsound/nss-vol-step.s
         ("call_tbl" , ["calls"]),
         ("fm_note_w" , ["note"]),
         # 0x50
@@ -657,6 +670,16 @@ def furnace_row_to_nss_actions(fur_pattern, pos):
         # speed
         elif fx == 0x0f:
             out.flow_fx.append(speed(fxval))
+        # DEViLBOX patch: virtual tempo numerator (FD00 keeps the tempo, as in Furnace)
+        elif fx == 0xfd:
+            if fxval > 0:
+                out.flow_fx.append(tempo(timer_b_for(cur_module, fxval)))
+        # DEViLBOX patch: single volume step up / down (stops a volume slide)
+        elif fx in (0xf8, 0xf9):
+            if ext_fm2 and location_channel in [1,2,3,4]:
+                row_warn("unsupported FX")
+            else:
+                out.post_fx.append((vol_step_u if fx == 0xf8 else vol_step_d)(max(fxval, 0)))
         # FM OP1 level
         elif fx == 0x12:
             out.fx.append(op1_lvl(fxval))
@@ -1167,7 +1190,7 @@ def compact_nss_stream(nss, m, ins, channel):
     # insert a tempo opcode on the first track that is used in the Furnace module
     global tempo_injected
     if not tempo_injected and stream_size_in_effective_opcodes(nss)>0:
-        tb = round(256 - (4000000 / (1152 * m.frequency)))
+        tb = timer_b_for(m, m.virtual_tempo_n)  # DEViLBOX patch: was m.frequency only
         nss.insert(0, tempo(tb))
         tempo_injected = True
 
@@ -1774,6 +1797,8 @@ def main():
     dbg("Loading Furnace module %s"%arguments.FILE)
     bs = load_module(arguments.FILE)
     m = read_module(bs)
+    global cur_module
+    cur_module = m  # DEViLBOX patch
     smp = read_samples(module_id_from_path(arguments.FILE), m.samples, bs)
     ins = read_instruments(m, m.instruments, smp, bs)
     p = read_all_patterns(m, bs)

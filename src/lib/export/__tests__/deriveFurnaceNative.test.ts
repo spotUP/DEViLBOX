@@ -145,9 +145,9 @@ describe('deriveFurnaceNativeFromSong on the composer trial song', () => {
     expect(sub.speed1).toBe(dbx.speed ?? 6);
     // parser: a one-entry speed pattern sets speed2 = speed1 (FurnaceSongParser.ts:2206)
     expect(sub.speed2).toBe(sub.speed1);
-    expect(sub.hz).toBeCloseTo(ym2610TimerBHz(60), 4); // Neo Geo: Timer B rate
+    expect(sub.hz).toBeCloseTo(ym2610TimerBHz(Math.round(dbx.bpm) * 2 / 5), 4); // Neo Geo: Timer B at the song tick
     expect(sub.virtualTempoN).toBe(Math.round(dbx.bpm));
-    expect(sub.virtualTempoD).toBe(150);
+    expect(sub.virtualTempoD).toBe(Math.round(dbx.bpm));
     expect(d.instrumentIds).toEqual(dbx.instruments.map((i) => i.id));
     expect(d.ins2).toHaveLength(dbx.instruments.length);
     d.ins2.forEach((u, i) => {
@@ -169,4 +169,20 @@ describe('deriveFurnaceNativeFromSong on the composer trial song', () => {
     const row = d.native.subsongs[0].channels[ch].patterns.get(p)!.rows[r];
     expect(row.effects[0]).toEqual({ cmd: 0x0c, val: clone.channels[ch].rows[r].eff });
   });
+
+  // Owner 2026-11-27: chip macros follow the song tick, as in Furnace. Furnace (and our C++
+  // sequencer, FurnaceSequencer.cpp tempoAccum loop) steps the chips' macros once per engine tick
+  // at `hz`, and steps the song's row tick tempoAccum += vN, while >= vD. So one macro step per
+  // song tick needs vN == vD, and hz must be the song's tick rate (BPM * 2 / 5; on the YM2610 the
+  // Timer B rate nullsound runs at).
+  for (const bpm of [125, 150, 90]) {
+    it(`steps instrument macros once per song tick at ${bpm} BPM, speed 6`, async () => {
+      const dbx = loadDbx();
+      const d = await deriveFurnaceNativeFromSong({ ...toSong(dbx), initialBPM: bpm, initialSpeed: 6 });
+      const sub = d.native.subsongs[0];
+      const macroStepsPerRow = sub.speed1 * sub.virtualTempoD / sub.virtualTempoN; // engine ticks per row
+      expect(macroStepsPerRow).toBe(6);
+      expect(sub.hz).toBeCloseTo(ym2610TimerBHz(bpm * 2 / 5), 4);
+    });
+  }
 });

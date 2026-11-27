@@ -16,15 +16,15 @@
  */
 import pako from 'pako';
 import type { InstrumentConfig, FurnaceConfig, FurnaceMacro } from '@/types/instrument';
-import type { FurnaceUserSample } from '@/types/instrument/furnace';
-import type { Pattern, TrackerCell } from '@/types/tracker';
+import type { FurnaceUserSample, FurnaceOpMacros } from '@/types/instrument/furnace';
+import type { FurnaceModuleSample, Pattern, TrackerCell } from '@/types/tracker';
 import { effectNotationOf, type EffectNotation } from '@/lib/tracker/effectNotation';
 import {
   encodeInstrumentAsINS2,
   type FurnaceInstrument,
   type FurnaceMacro as FileMacro,
 } from '@/lib/import/formats/furnace/FurnaceInstrumentParser';
-import { resolveInsType, DIV_INS_ADPCMA, DIV_INS_ADPCMB } from './FurnaceInstrumentEncoder';
+import { resolveInsType, DIV_INS_ADPCMA, DIV_INS_ADPCMB, DIV_INS_GB } from './FurnaceInstrumentEncoder';
 import { editorEffectToFurnace, xmVolToFurnace, xmNoteToFurnace } from '@/lib/import/furnaceEditorCells';
 import { maxVolumeOfChannel } from '@engine/furnace-dispatch/channelVolume';
 import { FurnaceDispatchPlatform } from '@engine/furnace-dispatch/platforms';
@@ -45,7 +45,7 @@ const FUR_MAX_ROWS = 256;
  * a new Furnace song. Three runs: version 37-69 (20 bytes), 70-130 (28), 138-200 (8).
  */
 const INFO_COMPAT_FLAGS: ReadonlyArray<ReadonlyArray<readonly [string, number]>> = [
-  [['limitSlides', 0], ['linearPitch', 2], ['loopModality', 1], ['properNoiseLayout', 1], ['waveDutyIsVol', 0],
+  [['limitSlides', 0], ['linearPitch', 2], ['loopModality', 2], ['properNoiseLayout', 1], ['waveDutyIsVol', 0],
     ['resetMacroOnPorta', 0], ['legacyVolumeSlides', 0], ['compatibleArpeggio', 0], ['noteOffResetsSlides', 1],
     ['targetResetsSlides', 1], ['arpNonPorta', 0], ['algMacroBehavior', 0], ['brokenShortcutSlides', 0],
     ['ignoreDuplicateSlides', 0], ['stopPortaOnNoteOff', 0], ['continuousVibrato', 0], ['brokenDACMode', 0],
@@ -67,7 +67,7 @@ const INFO_COMPAT_FLAGS: ReadonlyArray<ReadonlyArray<readonly [string, number]>>
  * Writing this rate (60 Hz -> 59.866 Hz) keeps the Furnace reference in step with the ROM.
  */
 export function ym2610TimerBHz(hz: number): number {
-  const tb = Math.round(256 - 4_000_000 / (1152 * hz));
+  const tb = Math.max(0, Math.min(255, Math.round(256 - 4_000_000 / (1152 * hz)))); // Timer B is 8 bits: under ~13.6 Hz clamps
   return 4_000_000 / (1152 * (256 - tb));
 }
 
@@ -132,6 +132,8 @@ export interface FurnaceModuleSong {
   keepOutsideContract?: boolean;
   /** Groove patterns of a loaded module, 16 entries each, unused entries 0. */
   grooves?: number[][];
+  /** Samples of a loaded module, in module order: its ADPCM voices name them by `amiga.initSample`. */
+  furnaceSamples?: FurnaceModuleSample[];
   /** Chip config of a loaded module: sysConf flag string (key=value lines), volume (1 = 1.0), pan and front/rear pan (-1..1). Absent = Neo Geo defaults. */
   chipFlags?: string;
   systemVol?: number;
@@ -141,6 +143,8 @@ export interface FurnaceModuleSong {
   extendedFm?: boolean;
   /** Another chip than the Neo Geo (the NES feature-test song): system id, channel count, instrument synth type, per-channel volume maximum. */
   chip?: { id: number; channels: number; synthType: string; volMax: (ch: number) => number; chipFlags: string; name: string };
+  /** Module wavetables (wave macro values index this list), in the shape the parser returns: width = length, height = max value. */
+  wavetables?: Array<{ data: number[]; width: number; height: number }>;
 }
 
 export interface FurnaceModuleResult {
@@ -307,6 +311,19 @@ export function volumeColumnEffect(vol: number, volMax = 127): { type: number; v
   }
 }
 
+/**
+ * The speed setup of a song, for writing a tracker Fxx 01-1F (set speed): 'one' speed (0Fxx sets it),
+ * 'two' alternating speeds and no grooves (0Fxx sets speed 2, 09xx speed 1), 'many' (grooves, or a
+ * speed pattern of 3-16 entries: 0Fxx sets speed 1 only and no command sets the rest).
+ * shortcut: from the song's start setup; a 09xx groove change inside a loaded module is not followed.
+ */
+export type SpeedSetup = 'one' | 'two' | 'many';
+
+export function speedSetupOf(speeds: number[], grooves: number[][] | undefined): SpeedSetup {
+  if (speeds.length > 2 || (grooves?.length ?? 0) > 0 && speeds.length > 1) return 'many';
+  return speeds.length === 2 ? 'two' : 'one';
+}
+
 export function cellToFile(
   cell: TrackerCell,
   insIndexById: Map<number, number>,
@@ -318,6 +335,8 @@ export function cellToFile(
   arpStop = false,
   /** The channel's own volume maximum (FM 127, SSG 15, ADPCM-A 31, ADPCM-B 255). */
   volMax = 127,
+  /** The song's speed setup (speedSetupOf): how a tracker Fxx 01-1F must be written to set every speed. */
+  speeds: SpeedSetup = 'one',
 ): FileCell {
   let note = -1;
   if (cell.note > 0) {
@@ -333,6 +352,7 @@ export function cellToFile(
   let vol = cell.volume ? xmVolToFurnace(cell.volume, volMax) : -1;
   const volFx = cell.volume && vol < 0 && notation === 'tracker' ? volumeColumnEffect(cell.volume, volMax) : null;
   if (cell.volume && vol < 0 && !volFx) warnings.push(`${where}: volume column 0x${cell.volume.toString(16)} dropped, it is not a set-volume value (0x10-0x50) or a volume command Furnace has`);
+  let speedOneToo = 0;
   const fx = cellEffects(cell).map(([t, v]) => {
     if (notation === 'tracker' && t === 0x0c) {
       if (vol < 0) vol = xmVolToFurnace(0x10 + Math.min(64, v), volMax);
@@ -343,15 +363,26 @@ export function cellToFile(
       // Store meaning: 01-1F speed, 20-FF BPM, 00 stops. Furnace 0Fxx sets speed 1 while the song has
       // one speed (playback.cpp case 0x0f), FF00 stops the song.
       // F0xx sets the base rate and Furnace still scales it by the virtual tempo (playback.cpp
-      // tempoAccum), which the writer sets to initial BPM / 150. FDxx swaps the numerator, so the
-      // rate is hz * xx / 150 = xx * 2 / 5 Hz, the store's BPM rule.
-      // shortcut: exact only with virtual tempo denominator 150 (the default); a loaded module with another one plays off-tempo.
+      // tempoAccum). The writer sets vD = hz * 5 / 2 (see the header below). FDxx swaps the
+      // numerator, so the rate is hz * xx / vD = xx * 2 / 5 Hz, the store's BPM rule.
+      // shortcut: exact only while vD = hz * 5 / 2 (the default); a song with its own virtualTempoD plays off-tempo.
       if (v >= 0x20) return { type: 0xfd, val: v };
       if (v === 0) return { type: 0xff, val: 0 };
+    }
+    if (notation === 'tracker' && t === 0x0f && v > 0 && v < 0x20) {
+      if (speeds === 'two') speedOneToo = v;
+      else if (speeds === 'many') warnings.push(`${where}: F${v.toString(16).padStart(2, '0').toUpperCase()} sets the first speed only, the song has grooves or a speed pattern of more than two speeds`);
     }
     const e = editorEffectToFurnace(t, v);
     return { type: e.cmd, val: e.val };
   });
+  if (speedOneToo > 0) {
+    // Furnace 0Fxx sets speed 2 while the song alternates two speeds and has no grooves; 09xx sets
+    // speed 1 then (playback.cpp case 0x09 / 0x0f). Both together make every row xx ticks, the store's Fxx.
+    const free = fx.find((f) => f.type < 0 && f.val < 0);
+    if (free) { free.type = 0x09; free.val = speedOneToo; }
+    else warnings.push(`${where}: F${speedOneToo.toString(16).padStart(2, '0').toUpperCase()} sets speed 2 only, no free effect column for the 09xx that sets speed 1`);
+  }
   if (volFx) {
     const free = fx.find((f) => f.type < 0 && f.val < 0);
     if (free) { free.type = volFx.type; free.val = volFx.val; }
@@ -483,17 +514,89 @@ function encodeSmp2(sample: FurnaceUserSample): Uint8Array {
   return block('SMP2', b);
 }
 
-function toFileInstrument(name: string, cfg: FurnaceConfig, samples: ModuleSample[]): FurnaceInstrument {
+/**
+ * One SMP2 block for a sample of a loaded module, as `DivSample::putSampleData` (sample.cpp) writes
+ * it: its own depth (ADPCM-A 5, ADPCM-B 6, 8, 16), length, loop and data bytes, unconverted.
+ */
+function encodeModuleSmp2(sample: FurnaceModuleSample): Uint8Array {
+  const rate = Math.round(sample.rate);
+  const b = new Bytes()
+    .str(sample.name)
+    .u32(sample.samples ?? sample.data.length)
+    .u32(rate).u32(rate)
+    .u8(sample.depth).u8(sample.loopMode).u8(0).u8(0)
+    .u32(sample.loopStart >>> 0).u32(sample.loopEnd >>> 0); // -1 = no loop
+  for (let i = 0; i < 4; i++) b.u32(0xffffffff);
+  if (sample.depth === 16) for (let i = 0; i < sample.data.length; i++) b.u16(sample.data[i] & 0xffff);
+  else for (let i = 0; i < sample.data.length; i++) b.u8(sample.data[i] & 0xff);
+  return block('SMP2', b);
+}
+
+/**
+ * Operator macro codes inside a Furnace O1-O4 feature block: the order of DivInstrumentSTD::OpMacro
+ * (instrument.h, DIV_MACRO_OP_AM .. DIV_MACRO_OP_KSR, minus the DIV_MACRO_OP_AM base of 32).
+ */
+const OP_MACRO_CODE: Readonly<Record<string, number>> = {
+  am: 0, ar: 1, dr: 2, mult: 3, rr: 4, sl: 5, tl: 6, dt2: 7, rs: 8, dt: 9,
+  d2r: 10, ssg: 11, dam: 12, dvb: 13, egt: 14, ksl: 15, sus: 16, vib: 17, ws: 18, ksr: 19,
+};
+
+/**
+ * The per-operator macros in the raw form the file holds ([operator][macro], code 0-19).
+ * The raw arrays win when they carry data (the .fur importer and the instrument editor write them);
+ * otherwise the named form (`opMacros[op].tl` ...) is converted. A named key without a Furnace
+ * operator macro (kvs) is not written.
+ */
+/** One WAVE block as DivWavetable::putWaveData writes it: empty name, len, min (always 0), max, len x int32. */
+function encodeWave(w: { data: number[]; width: number; height: number }, i: number): Uint8Array {
+  // DivWavetable::readWaveData rejects len > 256 and clamps max to 255.
+  if (w.width < 1 || w.width > 256 || w.data.length !== w.width) throw new Error(`Cannot export a Furnace module: wavetable ${i} has ${w.data.length} values for width ${w.width} (1-256)`);
+  if (w.height < 1 || w.height > 255) throw new Error(`Cannot export a Furnace module: wavetable ${i} height ${w.height} is outside 1-255`);
+  const b = new Bytes().u8(0).u32(w.width).u32(0).u32(w.height);
+  for (const v of w.data) b.u32(v);
+  return block('WAVE', b);
+}
+
+function operatorMacrosOf(cfg: FurnaceConfig): FurnaceMacro[][] | undefined {
+  const raw = cfg.opMacroArrays;
+  if (raw?.some((a) => a.some((m) => m.data.length > 0))) return raw.map((a) => a.filter((m) => m.data.length > 0));
+  const named = cfg.opMacros ?? [];
+  if (!named.some((o) => o && Object.values(o).some((m) => m && m.data.length > 0))) return raw;
+  return named.slice(0, 4).map((o: FurnaceOpMacros) => Object.entries(o ?? {})
+    .filter((e): e is [string, FurnaceMacro] => !!e[1] && e[1].data.length > 0 && OP_MACRO_CODE[e[0]] !== undefined)
+    .map(([key, m]) => ({ ...m, code: OP_MACRO_CODE[key] }))
+    .sort((a, b) => (a.code ?? 0) - (b.code ?? 0)));
+}
+
+/**
+ * Module index of the sample a voice plays: its own user sample (written after the loaded module's
+ * samples), else for an ADPCM voice of a loaded module its `amiga.initSample` into those samples; -1 = none.
+ */
+function fileSampleIndex(cfg: FurnaceConfig, samples: ModuleSample[], moduleSampleCount: number): number {
+  const own = moduleSampleIndex(cfg, samples);
+  if (own >= 0) return moduleSampleCount + own;
   const type = resolveInsType(cfg);
-  const sampleIndex = moduleSampleIndex(cfg, samples);
+  const init = cfg.amiga?.initSample ?? -1;
+  return (type === DIV_INS_ADPCMA || type === DIV_INS_ADPCMB) && init >= 0 && init < moduleSampleCount ? init : -1;
+}
+
+function toFileInstrument(name: string, cfg: FurnaceConfig, samples: ModuleSample[], moduleSampleCount: number): FurnaceInstrument {
+  const type = resolveInsType(cfg);
+  const sampleIndex = fileSampleIndex(cfg, samples, moduleSampleCount);
   return {
     name,
     type,
     fm: type === 1 ? cfg : undefined,
+    // The GB feature block: envelope, sound length, hardware sequence. Absent, Furnace plays its own default.
+    gb: type === DIV_INS_GB && cfg.gb ? {
+      envVol: cfg.gb.envVol, envDir: cfg.gb.envDir, envLen: cfg.gb.envLen, soundLen: cfg.gb.soundLen,
+      softEnv: !!cfg.gb.softEnv, alwaysInit: !!cfg.gb.alwaysInit, doubleWave: !!cfg.gb.doubleWave,
+      hwSeqLen: cfg.gb.hwSeq?.length ?? 0, hwSeq: cfg.gb.hwSeq ?? [],
+    } : undefined,
     macros: cfg.macros.filter((m) => m.data.length > 0).map(toFileMacro),
     samples: [],
     wavetables: [],
-    opMacroArrays: cfg.opMacroArrays?.map((a) => a.filter((m) => m.data.length > 0).map(toFileMacro)),
+    opMacroArrays: operatorMacrosOf(cfg)?.map((a) => a.map(toFileMacro)),
     // The instrument points at its sample by module index, as the live synth does.
     // One sample for every note: a note map would name samples the module does not hold.
     ...(sampleIndex >= 0
@@ -502,15 +605,16 @@ function toFileInstrument(name: string, cfg: FurnaceConfig, samples: ModuleSampl
   };
 }
 
-function checkInstrument(inst: InstrumentConfig, cfg: FurnaceConfig, problems: string[]): void {
+function checkInstrument(inst: InstrumentConfig, cfg: FurnaceConfig, problems: string[], warnings: string[]): void {
   const label = `Instrument ${inst.id} "${inst.name}"`;
   if (hasUserSample(cfg)) {
     if (!(cfg.userSample.data instanceof Int16Array) || cfg.userSample.data.length === 0) problems.push(`${label}: the sample has no 16-bit data`);
     if (!(cfg.userSample.rate > 0)) problems.push(`${label}: the sample has no rate`);
   }
-  const hasNamedOpMacros = (cfg.opMacros ?? []).some((o) => Object.values(o).some((m) => m && m.data.length > 0));
-  const hasRawOpMacros = (cfg.opMacroArrays ?? []).some((a) => a.some((m) => m.data.length > 0));
-  if (hasNamedOpMacros && !hasRawOpMacros) problems.push(`${label}: per-operator macros are not in the raw form the writer needs`);
+  const rawOpMacros = (cfg.opMacroArrays ?? []).some((a) => a.some((m) => m.data.length > 0));
+  if (!rawOpMacros && (cfg.opMacros ?? []).some((o) => o?.kvs && o.kvs.data.length > 0)) {
+    warnings.push(`${label}: KVS operator macro left out, Furnace has no KVS macro`);
+  }
 }
 
 // -- Module -----------------------------------------------------------------------
@@ -530,7 +634,7 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   if (skipped.length > 0) {
     warnings.push(`Left out ${skipped.length} instrument(s) that are not Neo Geo voices: ${skipped.map((i) => `${i.id} "${i.name}"`).join(', ')}`);
   }
-  for (const inst of neo) checkInstrument(inst, inst.furnace as FurnaceConfig, problems);
+  for (const inst of neo) checkInstrument(inst, inst.furnace as FurnaceConfig, problems, warnings);
 
   // Patterns
   if (song.patterns.length === 0) problems.push('The song has no patterns');
@@ -549,6 +653,12 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   }
   if (song.songPositions.length === 0) problems.push('The order list is empty');
   if (song.songPositions.length > 256) problems.push('A Furnace order table holds at most 256 entries');
+
+  // Song speeds: INFO writes them below; a tracker Fxx 01-1F in the cells is written to set them all.
+  const speeds = song.speedPattern && song.speedPattern.length > 0
+    ? song.speedPattern.slice(0, 16).map((v) => Math.max(1, Math.round(v)))
+    : [Math.max(1, song.initialSpeed), ...(song.speed2 && song.speed2 > 0 && song.speed2 !== Math.max(1, song.initialSpeed) ? [song.speed2] : [])];
+  const speedSetup = speedSetupOf(speeds, song.grooves);
 
   // Cells per channel and pattern
   // The user's chosen effect-column count is the floor; used columns raise it (never above 8).
@@ -570,7 +680,7 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
         const cell = r < p.length ? src?.rows[r] : undefined;
         rows.push(cell && src
           ? cellToFile(cell, insIndexById, `Pattern ${pi} channel ${ch + 1} row ${r}`, problems, effectNotationOf(src.channelMeta), warnings,
-            trackerArpStopAt(song.patterns, song.songPositions, pi, ch, r), song.chip ? song.chip.volMax(ch) : neoGeoChannelVolMax(ch, !!song.extendedFm))
+            trackerArpStopAt(song.patterns, song.songPositions, pi, ch, r), song.chip ? song.chip.volMax(ch) : neoGeoChannelVolMax(ch, !!song.extendedFm), speedSetup)
           : { note: -1, ins: -1, vol: -1, fx: Array.from({ length: MAX_FX_COLUMNS }, () => ({ type: -1, val: -1 })) });
       }
       if (p.length < patLen && !breakWritten.has(pi)) {
@@ -599,12 +709,16 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   }
 
   // Song timing and grooves. INFO stores speeds and groove entries as bytes (fur.cpp v0.6.8.3).
-  const hz = song.chip ? (song.hz ?? 60) : ym2610TimerBHz(song.hz ?? 60);
-  const vN = song.virtualTempoN ?? Math.max(1, Math.min(65535, Math.round(song.initialBPM)));
-  const vD = song.virtualTempoD ?? 150;
-  const speeds = song.speedPattern && song.speedPattern.length > 0
-    ? song.speedPattern.slice(0, 16).map((v) => Math.max(1, Math.round(v)))
-    : [Math.max(1, song.initialSpeed), ...(song.speed2 && song.speed2 > 0 && song.speed2 !== Math.max(1, song.initialSpeed) ? [song.speed2] : [])];
+  // Owner 2026-11-27: instrument macros follow the song tick, as in Furnace. Furnace steps macros
+  // once per engine tick (hz) and the row tick by the virtual tempo, so the engine tick is the song
+  // tick (BPM * 2 / 5) and vN / vD = 1 by default. vD = the requested rate * 5 / 2 keeps FDxx
+  // (vN = xx) at xx * 2 / 5 Hz rows; an explicit hz of 60 still writes vD 150 as before.
+  // shortcut: a mid-song FDxx moves the rows only; macros keep the initial tick rate (Furnace's own FDxx).
+  const bpm = Math.max(1, Math.min(65535, Math.round(song.initialBPM)));
+  const requestedHz = song.hz ?? bpm * 2 / 5;
+  const hz = song.chip ? requestedHz : ym2610TimerBHz(requestedHz);
+  const vN = song.virtualTempoN ?? bpm;
+  const vD = song.virtualTempoD ?? Math.max(1, Math.min(65535, Math.round(requestedHz * 5 / 2)));
   const speed1 = speeds[0], speed2 = speeds[1] ?? 0;
   if (speeds.some((v) => v > 255)) throw new Error(`Cannot export a Furnace module: speed ${Math.max(...speeds)} is over the 255 Furnace 0.6.8.3 stores`);
   const arpSpeed = Math.max(1, Math.min(255, Math.round(song.arpSpeed ?? 1)));
@@ -614,8 +728,11 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   const compat = infoCompatFlags(song.compatFlags ?? {}, warnings);
 
   const userSamples = collectUserSamples(neo.map((inst) => inst.furnace as FurnaceConfig));
-  const ins2 = neo.map((inst) => encodeInstrumentAsINS2(toFileInstrument(inst.name, inst.furnace as FurnaceConfig, userSamples), FUR_EXPORT_VERSION));
-  const smp2 = userSamples.map((s) => encodeSmp2(s.sample));
+  // The loaded module's samples keep their indices (its voices' initSample); user samples follow.
+  const moduleSamples = song.furnaceSamples ?? [];
+  const ins2 = neo.map((inst) => encodeInstrumentAsINS2(toFileInstrument(inst.name, inst.furnace as FurnaceConfig, userSamples, moduleSamples.length), FUR_EXPORT_VERSION));
+  const smp2 = [...moduleSamples.map(encodeModuleSmp2), ...userSamples.map((s) => encodeSmp2(s.sample))];
+  const waves = (song.wavetables ?? []).map(encodeWave);
 
   // Chip flags of the YM2610 (fur.cpp, "CHIP FLAGS": key=value lines, zero-terminated). Furnace
   // loads a module without this block at SSG volume 128, half the level of the chip, which
@@ -624,12 +741,12 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   // Asset directories (instruments, waves, samples): one empty directory each.
   const adir = block('ADIR', new Bytes().u32(0));
 
-  // Layout: header, INFO, FLAG, ADIR x3, INS2..., SMP2..., PATN... (fur.cpp v0.6.8.3, old INFO reader).
-  const buildInfo = (flagPtr: number, adirPtrs: number[], insPtrs: number[], smpPtrs: number[], patPtrs: number[]): Uint8Array => {
+  // Layout: header, INFO, FLAG, ADIR x3, INS2..., WAVE..., SMP2..., PATN... (fur.cpp v0.6.8.3, old INFO reader).
+  const buildInfo = (flagPtr: number, adirPtrs: number[], insPtrs: number[], wavePtrs: number[], smpPtrs: number[], patPtrs: number[]): Uint8Array => {
     const b = new Bytes()
       .u8(0).u8(speed1).u8(speed2 || speed1).u8(arpSpeed) // time base, speeds, arpeggio speed
       .f32(hz).u16(patLen).u16(song.songPositions.length).u8(4).u8(16)
-      .u16(ins2.length).u16(0).u16(smp2.length).u32(patnBlocks.length);
+      .u16(ins2.length).u16(waves.length).u16(smp2.length).u32(patnBlocks.length);
     for (let i = 0; i < 32; i++) b.u8(i === 0 ? system : 0);
     for (let i = 0; i < 32; i++) b.u8(i === 0 ? Math.round(sysVol * 64) : 0); // chip volume, 64 = 1.0
     for (let i = 0; i < 32; i++) b.u8(i === 0 ? Math.round(sysPan * 127) : 0); // chip panning
@@ -637,6 +754,7 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
     b.str(song.name).str(song.author ?? '').f32(song.tuning ?? 440);
     compat[0].forEach((v) => b.u8(v));
     insPtrs.forEach((p) => b.u32(p));
+    wavePtrs.forEach((p) => b.u32(p));
     smpPtrs.forEach((p) => b.u32(p));
     patPtrs.forEach((p) => b.u32(p));
     for (let ch = 0; ch < chans; ch++) for (const pos of song.songPositions) b.u8(pos);
@@ -663,24 +781,26 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
     adirPtrs.forEach((p) => b.u32(p));
     return block('INFO', b);
   };
-  const infoLen = buildInfo(0, [0, 0, 0], ins2.map(() => 0), smp2.map(() => 0), patnBlocks.map(() => 0)).length;
+  const infoLen = buildInfo(0, [0, 0, 0], ins2.map(() => 0), waves.map(() => 0), smp2.map(() => 0), patnBlocks.map(() => 0)).length;
   let cursor = 32 + infoLen;
   const flagPtr = cursor;
   cursor += flag.length;
   const adirPtrs = [0, 1, 2].map(() => { const p = cursor; cursor += adir.length; return p; });
   const insPtrs = ins2.map((b) => { const p = cursor; cursor += b.length; return p; });
+  const wavePtrs = waves.map((b) => { const p = cursor; cursor += b.length; return p; });
   const smpPtrs = smp2.map((b) => { const p = cursor; cursor += b.length; return p; });
   const patPtrs = patnBlocks.map((b) => { const p = cursor; cursor += b.length; return p; });
-  const info = buildInfo(flagPtr, adirPtrs, insPtrs, smpPtrs, patPtrs);
+  const info = buildInfo(flagPtr, adirPtrs, insPtrs, wavePtrs, smpPtrs, patPtrs);
 
   const file = new Bytes().ascii('-Furnace module-').u16(FUR_EXPORT_VERSION).u16(0).u32(32);
   for (let i = 0; i < 8; i++) file.u8(0);
-  for (const part of [info, flag, adir, adir, adir, ...ins2, ...smp2, ...patnBlocks]) file.bytes(part);
+  for (const part of [info, flag, adir, adir, adir, ...ins2, ...waves, ...smp2, ...patnBlocks]) file.bytes(part);
 
-  // An ADPCM voice with no sample of its own names no sample in the module.
+  // An ADPCM voice that names no sample in the module.
   const bare = neo.filter((i) => {
-    const t = resolveInsType(i.furnace as FurnaceConfig);
-    return (t === DIV_INS_ADPCMA || t === DIV_INS_ADPCMB) && !(i.furnace as FurnaceConfig).userSample;
+    const cfg = i.furnace as FurnaceConfig;
+    const t = resolveInsType(cfg);
+    return (t === DIV_INS_ADPCMA || t === DIV_INS_ADPCMB) && fileSampleIndex(cfg, userSamples, moduleSamples.length) < 0;
   });
   if (bare.length > 0) {
     warnings.push(`ADPCM instruments without a sample of their own are written without a sample: ${bare.map((i) => `${i.id} "${i.name}"`).join(', ')}`);

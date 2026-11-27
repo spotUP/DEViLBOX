@@ -553,7 +553,7 @@ nss_opcodes:
         ;; 0x30
         .nss_op fm2_op3_vol
         .nss_op fm2_op4_vol
-        .nss_op_unused
+        .nss_op vol_step_u      ; DEViLBOX patch: Furnace F8xx, nss-vol-step.s
         .nss_op adpcm_b_vol
         .nss_op adpcm_a_vol
         .nss_op fm_pan
@@ -583,7 +583,7 @@ nss_opcodes:
         .nss_op adpcm_a_retrigger
         .nss_op adpcm_a_pan
         .nss_op adpcm_b_pan
-        .nss_op_unused
+        .nss_op vol_step_d      ; DEViLBOX patch: Furnace F9xx, nss-vol-step.s
         .nss_op nss_call_table
         .nss_op fm_note_on_and_wait
         ;; 0x50

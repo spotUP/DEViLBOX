@@ -29,7 +29,7 @@ import { readNoteMapEntry } from '@/lib/furnace/noteMap';
 // DivInstrumentType values (from instrument.h)
 const DIV_INS_STD = 0;
 export const DIV_INS_FM = 1;
-const DIV_INS_GB = 2;
+export const DIV_INS_GB = 2;
 const DIV_INS_C64 = 3;
 export const DIV_INS_AY = 6;
 export const DIV_INS_POKEMINI = 47;

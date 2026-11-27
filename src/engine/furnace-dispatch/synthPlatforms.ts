@@ -110,6 +110,9 @@ export const STAND_INS: Readonly<Record<number, readonly number[]>> = {
     FurnaceDispatchPlatform.YM2612_CSM,
   ],
   [FurnaceDispatchPlatform.ARCADE]: [FurnaceDispatchPlatform.YM2151],
+  // A Neo Geo song in extended-FM mode runs the _EXT chip; the YM2610 synths play it.
+  [FurnaceDispatchPlatform.YM2610]: [FurnaceDispatchPlatform.YM2610_EXT],
+  [FurnaceDispatchPlatform.YM2610B]: [FurnaceDispatchPlatform.YM2610B_EXT],
 };
 
 /**

@@ -43,8 +43,9 @@ const FX_ANY = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0x08, 0x09, 0x0a, 0x0b, 0x
 const FX_FM_ONLY = new Set([0x12, 0x13, 0x14, 0x15]);
 // FM 2 operator channels: furtool's op-channel table has only these (others raise KeyError).
 const FX_OP = new Set([0x03, 0x04, 0x0a, 0xea, 0xed]);
-// SSG macros furtool reads: vol 0, arp 1, wave 3, envelope shape 6, envelope num 7 / den 8.
-const SSG_MACROS = new Set([0, 1, 3, 6, 7, 8]);
+// SSG macros furtool reads: vol 0, arp 1, noise freq 2 (vendored third-party/ngdevkit furtool + nss-ssg.s only), wave 3,
+// envelope shape 6, envelope num 7 / den 8.
+const SSG_MACROS = new Set([0, 1, 2, 3, 6, 7, 8]);
 
 /** 'C-4' / 'F#5' / 'Bb3' / 'OFF' / 'REL' -> editor note (C-4 = 49, off = 97, release = 255). */
 export function noteNumber(name: string): number {
@@ -192,7 +193,7 @@ function lintInstrument(inst: InstrumentConfig, out: string[]): void {
     const loops = new Set<number>();
     for (const m of macros) {
       const code = m.code ?? -1;
-      if (!SSG_MACROS.has(code)) out.push(`${label}: SSG macro ${code} is not converted (pitch/phase reset crash furtool, noise freq is not supported)`);
+      if (!SSG_MACROS.has(code)) out.push(`${label}: SSG macro ${code} is not converted (pitch/phase reset crash furtool)`);
       if (m.mode !== 0) out.push(`${label}: macro ${code} must be a sequence (mode 0)`);
       if (m.release >= 0) out.push(`${label}: macro ${code} has a release point`);
       if (m.delay || (m.speed ?? 1) !== 1) out.push(`${label}: macro ${code} has delay or speed`);

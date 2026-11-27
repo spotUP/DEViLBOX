@@ -2,9 +2,18 @@
  * Every format whose exporter file existed but the router never reached (xm, mod, dtm, fur, it, s3m):
  * a real file loads through its normal parser and exportNativeSong returns that format's exporter output.
  */
+import { relative } from 'node:path';
+import { songFile } from '../../../test/songPath';
 import { describe, it, expect, vi } from 'vitest';
 import { parseAs, readFixture } from './exporterHarness.shared';
 import { exportNativeSong, selectNativeExporter } from '../nativeExportRouter';
+// Static so the parser's module graph loads at collection, not inside a test's timeout.
+import { parseFurnaceFile } from '@lib/import/parsers/FurnaceToSong';
+import { NEO_GEO_SYNTH_TYPE } from '../FurnaceModuleExporter';
+// Modules parseFurnaceFile loads lazily on its TS-fallback path (no WASM script in happy-dom).
+import '@lib/import/formats/FurnaceSongParser';
+import '@lib/import/InstrumentConverter';
+import '@lib/import/formats/furnace/FurnaceInstrumentParser';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 
 // The OpenMPT writer needs its WASM module; the router's job is to hand it the right format.
@@ -25,7 +34,7 @@ describe('exportNativeSong reaches the existing exporter', () => {
   it.each([
     ['xm', 'public/data/songs/xm/flo boarding - level 1.xm'],
     ['it', 'public/data/songs/impulse-tracker/absm chain mod.it'],
-    ['s3m', 'public/data/songs/formats/andante.s3m'],
+    ['s3m', 'public/data/songs/s3m/andante.s3m'],
   ])('%s goes to the OpenMPT writer in its own format', async (format, rel) => {
     openMpt.mockResolvedValueOnce({ data: new Blob([format]), filename: `x.${format}`, warnings: [] });
     const song = await load(rel);
@@ -52,8 +61,6 @@ describe('exportNativeSong reaches the existing exporter', () => {
 
   it('fur: a real Furnace file never goes to the OpenMPT writer; with a Neo Geo voice it writes a Furnace module', async () => {
     const rel = 'public/data/songs/furnace/misc/Inner Machinations YM2610B.fur';
-    const { parseFurnaceFile } = await import('@lib/import/parsers/FurnaceToSong');
-    const { NEO_GEO_SYNTH_TYPE } = await import('../FurnaceModuleExporter');
     const bytes = readFixture(rel);
     const song = await parseFurnaceFile(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, 'x.fur');
     expect(selectNativeExporter(song)?.id).not.toBe('openMpt');
@@ -81,7 +88,7 @@ describe('exportNativeSong reaches the existing exporter', () => {
     ['ult', 'seasons.ult'],
     ['669', 'fonetag.669'],
   ])('%s is written by the layout patch / layout exporter', async (ext, name) => {
-    const rel = `public/data/songs/formats/${name}`;
+    const rel = relative(process.cwd(), songFile(name));
     const bytes = readFixture(rel);
     const song = { ...(await load(rel)), uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), uadeEditableFileName: name } as TrackerSong;
     const out = await exportNativeSong(song);
@@ -91,14 +98,14 @@ describe('exportNativeSong reaches the existing exporter', () => {
 
   it('psm (parsed as S3M) goes to the OpenMPT writer', async () => {
     openMpt.mockResolvedValueOnce({ data: new Blob(['s3m']), filename: 'x.s3m', warnings: [] });
-    const song = await load('public/data/songs/formats/Epic Pinball - Song 0 - Title.psm');
+    const song = await load('public/data/songs/psm/Epic Pinball - Song 0 - Title.psm');
     expect(selectNativeExporter(song)?.id).toBe('openMpt');
     await exportNativeSong(song);
     expect(openMpt).toHaveBeenLastCalledWith(song.patterns, song.instruments, song.songPositions, expect.objectContaining({ format: 's3m' }));
   });
 
   it('amf (parsed as MOD, no layout) is converted by the ProTracker writer and says so', async () => {
-    const song = await load('public/data/songs/formats/avoid.amf');
+    const song = await load('public/data/songs/advanced-music-format/avoid.amf');
     expect(selectNativeExporter(song)?.id).toBe('mod');
     const out = await exportNativeSong(song);
     expect(out!.warnings.join(' ')).toMatch(/converted to a ProTracker MOD/);
@@ -107,7 +114,7 @@ describe('exportNativeSong reaches the existing exporter', () => {
   it('amf as the app loads it (no writer): an edited grid comes back as the original with a warning that the edit is missing', async () => {
     const { useFormatStore } = await import('@stores/useFormatStore');
     const { baselineOf, setGridBaseline } = await import('@/lib/song/gridBaseline');
-    const rel = 'public/data/songs/formats/avoid.amf';
+    const rel = 'public/data/songs/advanced-music-format/avoid.amf';
     const bytes = readFixture(rel);
     const base = await load(rel);
     useFormatStore.setState({ libopenmptFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, uadeEditableFileName: 'avoid.amf' });
@@ -120,7 +127,6 @@ describe('exportNativeSong reaches the existing exporter', () => {
   });
 
   it('fur without Neo Geo voices warns instead of returning the original silently', async () => {
-    const { parseFurnaceFile } = await import('@lib/import/parsers/FurnaceToSong');
     const bytes = readFixture('public/data/songs/furnace/misc/Inner Machinations YM2610B.fur');
     const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     const song = { ...(await parseFurnaceFile(buf, 'x.fur')), uadeEditableFileData: buf, uadeEditableFileName: 'x.fur' } as TrackerSong;

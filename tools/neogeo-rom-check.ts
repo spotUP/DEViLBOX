@@ -18,6 +18,11 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const RESULTS = path.join(ROOT, 'test-data/neogeo-rom-check.json');
 const TAP = path.join(ROOT, 'tools/neogeo-rom-check.lua');
 const AG = process.env.ARCADEGAME ?? path.join(homedir(), 'Code/ArcadeGame');
+// ONE ngdevkit copy: the vendored, patched one (third-party/ngdevkit/VENDORED.md) replaces the game's own furtool/nsstool
+// and patched nullsound modules in the harness; the game's patch_nullsound_lib.py still links them against the Homebrew lib.
+const NGDK = path.join(ROOT, 'third-party/ngdevkit');
+const NGDK_TOOLS = ['tools/furtool.py', 'tools/nsstool.py'].map((f) => path.join(NGDK, f));
+const NGDK_SOUND = ['nss-ssg.s', 'stream.s', 'nss-vol-step.s', 'struct-fx.inc', 'pipeline.inc', 'timer.inc', 'align.inc'];
 const FURNACE = process.env.FURNACE_CLI ?? '/Applications/Furnace.app/Contents/MacOS/furnace';
 const HARNESS = path.join(tmpdir(), 'neogeo-rom-check-harness');
 const MVS_CLK = 8_000_000;
@@ -161,6 +166,7 @@ function prepareHarness() {
 function buildRom(fur: string): string {
   prepareHarness();
   copyFileSync(fur, path.join(HARNESS, 'assets/sound/music/inner.fur'));
+  for (const f of NGDK_SOUND) copyFileSync(path.join(NGDK, 'nullsound', f), path.join(HARNESS, 'tools/nullsound', f));
   rmSync(path.join(HARNESS, 'build/nss'), { recursive: true, force: true });
   rmSync(path.join(HARNESS, 'build/sound/driver.ihx'), { force: true });
   // build/samples.inc names the ADPCM samples vromtool pulls out of inner.fur (INNER_00_<SAMPLE>_START_LSB ...), but the
@@ -168,15 +174,15 @@ function buildRom(fur: string): string {
   // previous song's sample names, so a .fur with other sample names (ironwing_kick) linked with undefined globals.
   rmSync(path.join(HARNESS, 'build/samples.inc'), { force: true });
   const R = path.join(HARNESS, 'build/rom'), q = path.join(homedir(), '.claude/bin/buildq');
-  const mk = ['nice', '-n', '19', 'gmake', '-j3', 'build/rom/gumbirds-v1.v1', 'build/rom/gumbirds-m1.m1'];
+  const mk = ['nice', '-n', '19', 'gmake', '-j3', `FURTOOL=${NGDK_TOOLS[0]}`, `NSSTOOL=${NGDK_TOOLS[1]}`, 'build/rom/gumbirds-v1.v1', 'build/rom/gumbirds-m1.m1'];
   rmSync(path.join(R, 'gumbirds-m1.m1'), { force: true }); rmSync(path.join(R, 'gumbirds-v1.v1'), { force: true });
   // V ROM + sample map first: the M1 instruments file .includes build/samples.inc, but no rule makes its .rel depend on
   // it, so under -j3 the M1 make assembled it while vromtool was still writing it (".include/.incbin file error").
   try { for (const t of [mk.slice(0, -1).concat('build/samples.inc'), mk.slice(0, -2).concat(mk.at(-1)!)]) run(existsSync(q) ? q : t[0], existsSync(q) ? ['--purpose', 'neogeo agent: rom check', '--', ...t] : t.slice(1), { cwd: HARNESS, timeout: 0 }); }  // no timeout: buildq queue waits can exceed 10 min
   catch (e) {
     const x = e as { stdout?: string; stderr?: string }, m = `${x.stdout ?? ''}\n${x.stderr ?? e}`;
-    // keep the cause lines (linker undefined globals, assembler errors), not only make's closing "Error 2"
-    throw new Error(`build: ${(m.match(/(AssertionError|Undefined Global|Error)[^\n]*/g) ?? [m.slice(-300)]).slice(-3).join(' | ')}`);
+    // keep the cause lines (linker undefined globals, assembler errors, ENOSPC), not only make's closing "Error 2"
+    throw new Error(`build: ${(m.match(/(AssertionError|Undefined Global|No space left|error)[^\n]*/gi) ?? [m.slice(-300)]).slice(-3).join(' | ')}`);
   }
   const rom = ['-p', `${R}/gumbirds-p1.p1`, '-c', `${R}/gumbirds-c1.c1`, `${R}/gumbirds-c2.c2`, '-v', `${R}/gumbirds-v1.v1`, '-s', `${R}/gumbirds-s1.s1`, '-m', `${R}/gumbirds-m1.m1`, '-n', 'gumbirds'];
   run('romtool.py', ['-b', 'cartridge', '-f', 'zip', ...rom, '-o', `${R}/gumbirds.zip`]);
@@ -185,7 +191,11 @@ function buildRom(fur: string): string {
 }
 
 const results: Record<string, Verdict> = existsSync(RESULTS) ? JSON.parse(readFileSync(RESULTS, 'utf8')) : {};
-const toolHash = createHash('sha1').update(readFileSync(TAP)).update(readFileSync(import.meta.filename)).digest('hex');
+// A row for a song no longer in SONGS is a stale verdict (the YM2610B module dropped in a3fc7eeab kept failing in the file).
+const stale = Object.keys(results).filter((k) => !SONGS.some((s) => s.name === k));
+if (stale.length) { for (const k of stale) delete results[k]; writeFileSync(RESULTS, `${JSON.stringify(results, null, 1)}\n`); console.log(`[PRUNE] ${stale.join(', ')}`); }
+const toolHash = [TAP, import.meta.filename, ...NGDK_TOOLS, ...NGDK_SOUND.map((x) => path.join(NGDK, 'nullsound', x))]
+  .reduce((h, f) => h.update(readFileSync(f)), createHash('sha1')).digest('hex');
 for (const song of SONGS) {
   if (only && song.name !== only) continue;
   if (failedOnly && results[song.name]?.pass !== false) continue;
