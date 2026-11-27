@@ -15,6 +15,8 @@ import { PRIVATE_EFFECTS_DOC, PRIVATE_EFFECTS_TOPIC } from './privateEffectBlock
 import { COMMAND_STREAM_DOC, COMMAND_STREAM_TOPIC } from './commandStreamEffects';
 import { AMIGA_STANDARD_DOC, AMIGA_STANDARD_TOPIC } from './amigaStandardEffects';
 import { NEO_GEO_COMPOSING_DOC, NEO_GEO_COMPOSING_TOPIC } from './neoGeoComposing';
+import { GENESIS_COMPOSING_DOC, GENESIS_COMPOSING_TOPIC } from './genesisComposing';
+import { GAME_BOY_COMPOSING_DOC, GAME_BOY_COMPOSING_TOPIC } from './gameBoyComposing';
 import { PC_TRACKER_COMPOSING_DOC, PC_TRACKER_COMPOSING_TOPIC } from './pcTrackerComposing';
 import type { ToolOutcome, ToolSpec } from './toolLoop';
 
@@ -101,6 +103,8 @@ export async function createFreeToolset(callBrowser: BrowserCaller, options: Too
       // tools this chat can call, so the model never plans around one it cannot.
       if (name === 'get_mcp_help') {
         if (args?.topic === NEO_GEO_COMPOSING_TOPIC) return { ok: true, content: NEO_GEO_COMPOSING_DOC };
+        if (args?.topic === GENESIS_COMPOSING_TOPIC) return { ok: true, content: GENESIS_COMPOSING_DOC };
+        if (args?.topic === GAME_BOY_COMPOSING_TOPIC) return { ok: true, content: GAME_BOY_COMPOSING_DOC };
         if (args?.topic === PC_TRACKER_COMPOSING_TOPIC) return { ok: true, content: PC_TRACKER_COMPOSING_DOC };
         if (args?.topic === PRIVATE_EFFECTS_TOPIC) return { ok: true, content: PRIVATE_EFFECTS_DOC };
         if (args?.topic === COMMAND_STREAM_TOPIC) return { ok: true, content: COMMAND_STREAM_DOC };

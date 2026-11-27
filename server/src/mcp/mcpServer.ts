@@ -16,6 +16,8 @@ import { COMMAND_STREAM_DOC, COMMAND_STREAM_TOPIC } from '../ai/commandStreamEff
 import { AMIGA_STANDARD_DOC, AMIGA_STANDARD_TOPIC } from '../ai/amigaStandardEffects';
 import { NEO_GEO_COMPOSING_DOC, NEO_GEO_COMPOSING_TOPIC } from '../ai/neoGeoComposing';
 import { NES_COMPOSING_DOC, NES_COMPOSING_TOPIC } from '../ai/nesComposing';
+import { GENESIS_COMPOSING_DOC, GENESIS_COMPOSING_TOPIC } from '../ai/genesisComposing';
+import { GAME_BOY_COMPOSING_DOC, GAME_BOY_COMPOSING_TOPIC } from '../ai/gameBoyComposing';
 import { PC_TRACKER_COMPOSING_DOC, PC_TRACKER_COMPOSING_TOPIC } from '../ai/pcTrackerComposing';
 import { resolveCompanions, modlandListing, type CompanionListing } from '../../../src/lib/import/companionResolver';
 
@@ -1166,6 +1168,17 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
   );
 
   server.tool(
+    'set_instrument_sample',
+    'Neo Geo drums: make a YM2610 Furnace instrument an ADPCM-A (or ADPCM-B) voice playing a real WAV from the app files, e.g. /data/samples/tr707/tr707-kick.wav. Channel 0 is taken as 16-bit PCM; the chip codec runs in the WASM. Write its notes on the ADPCM-A channels.',
+    {
+      id: z.number().int().min(0).describe('Instrument ID (a Neo Geo Furnace instrument)'),
+      url: z.string().describe('App path of a WAV file, starting with /'),
+      kind: z.enum(['adpcmA', 'adpcmB']).optional().describe('Voice kind, default adpcmA (fixed-pitch drums)'),
+    },
+    (p) => call('set_instrument_sample', p),
+  );
+
+  server.tool(
     'update_instrument',
     'Update an instrument config. Pass any instrument config fields as key-value pairs.',
     {
@@ -2196,11 +2209,13 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
     'List all available MCP tools grouped by category with brief descriptions. Use this to discover what DEViLBOX can do. Optionally filter by category.',
     {
       category: z.string().optional().describe('Filter by category name (e.g., "transport", "mixer", "pattern", "synth", "modland", "hvsc", "performance")'),
-      topic: z.string().optional().describe('Return a help topic instead of the tool list. Topics: "neo-geo-composing" (effect commands that reach the YM2610 chip), "nes-composing" (effect commands of the 2A03 and the NES expansion chips), "pc-tracker-composing" (cell effects of MOD, XM, S3M, IT style songs), "format-private-effects" (effect ids of formats with their own effect set), "command-stream-effects" (effect ids of command-stream formats such as Riff Raff and Ron Klaren), "amiga-standard-effects" (standard effect ids that Amiga native importers write)'),
+      topic: z.string().optional().describe('Return a help topic instead of the tool list. Topics: "neo-geo-composing" (effect commands that reach the YM2610 chip), "nes-composing" (effect commands of the 2A03 and the NES expansion chips), "genesis-composing" (effect commands that reach the YM2612 and SN76489 in a tracker-made song), "game-boy-composing" (effect commands that reach the Game Boy APU in a tracker-made song), "pc-tracker-composing" (cell effects of MOD, XM, S3M, IT style songs), "format-private-effects" (effect ids of formats with their own effect set), "command-stream-effects" (effect ids of command-stream formats such as Riff Raff and Ron Klaren), "amiga-standard-effects" (standard effect ids that Amiga native importers write)'),
     },
     async (p) => {
       if (p.topic === NEO_GEO_COMPOSING_TOPIC) return textResult(NEO_GEO_COMPOSING_DOC);
       if (p.topic === NES_COMPOSING_TOPIC) return textResult(NES_COMPOSING_DOC);
+      if (p.topic === GENESIS_COMPOSING_TOPIC) return textResult(GENESIS_COMPOSING_DOC);
+      if (p.topic === GAME_BOY_COMPOSING_TOPIC) return textResult(GAME_BOY_COMPOSING_DOC);
       if (p.topic === PC_TRACKER_COMPOSING_TOPIC) return textResult(PC_TRACKER_COMPOSING_DOC);
       if (p.topic === PRIVATE_EFFECTS_TOPIC) return textResult(PRIVATE_EFFECTS_DOC);
       if (p.topic === COMMAND_STREAM_TOPIC) return textResult(COMMAND_STREAM_DOC);
@@ -2716,6 +2731,13 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
     'DJ mixer state: decks A, B and C (playing, BPM, channelScopeCount = per-channel scopes shown, pitch, loaded track, position, volume, EQ, filter; Deck C without a track of its own follows the master deck\'s tempo), masterDeck (the set\'s master clock), crossfader, master.',
     {},
     (p) => call('dj_get_state', p),
+  );
+
+  server.tool(
+    'dj_get_channel_scopes',
+    'Read-only: what a DJ deck\'s per-channel scopes draw. Per channel: scale (the scope track\'s whole-render peak, 0 = never sounds), storedSamples, and windowPeak (peak of the window the CH scope draws at the heard position now).',
+    { deck: z.enum(['A', 'B', 'C']).optional().describe('Deck (default A)') },
+    (p) => call('dj_get_channel_scopes', p),
   );
 
   server.tool(

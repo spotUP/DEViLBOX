@@ -15,11 +15,8 @@
 
 import { DivCmd, FurnaceDispatchPlatform } from './FurnaceDispatchEngine';
 import type { ImportMetadata } from '../../types/tracker';
-import {
-  FURNACE_EFFECT_POOL,
-  FURNACE_EFFECT_TABLE,
-  type FurnaceEffectEntry,
-} from './furnaceEffectTable.gen';
+import { FURNACE_EFFECT_POOL, type FurnaceEffectEntry } from './furnaceEffectTable.gen';
+import { furnaceEffectTableFor } from './synthPlatforms';
 
 /**
  * Dispatch command result from effect routing
@@ -195,7 +192,8 @@ export class FurnaceEffectRouter {
 
   /**
    * Route platform-specific effects (0x10+) from Furnace's own per-system maps
-   * (furnaceEffectTable.gen.ts, generated from sysDef.cpp). Platform id = DivSystem id.
+   * (furnaceEffectTable.gen.ts, generated from sysDef.cpp). Platform id = DivSystem id;
+   * a compound system uses its stand-in chip's map (furnaceEffectTableFor).
    * Order follows DivEngine: pre-effect always runs; then the effect map, and the
    * post map only when the effect map did not handle it.
    */
@@ -203,7 +201,7 @@ export class FurnaceEffectRouter {
     if (platform !== this.platformType) {
       this.setPlatform(platform);
     }
-    const sys = FURNACE_EFFECT_TABLE[platform];
+    const sys = furnaceEffectTableFor(platform);
     if (!sys) return [];
     const commands: DispatchCommand[] = [];
     const emit = (entry: FurnaceEffectEntry | undefined): boolean => {

@@ -6,7 +6,9 @@
  * plays on). Values are DivSystem ids (FurnaceDispatchPlatform).
  */
 import { FurnaceDispatchPlatform } from './platforms';
-import type { SynthType } from '@typedefs/instrument';
+// Relative, alias-free: the server's composing docs import this file.
+import type { SynthType } from '../../types/instrument/base';
+import { FURNACE_EFFECT_TABLE, type FurnaceSystemEffects } from './furnaceEffectTable.gen';
 
 export const SYNTH_TO_DISPATCH: Record<string, number> = {
   FurnaceNES: FurnaceDispatchPlatform.NES,
@@ -109,6 +111,16 @@ export const STAND_INS: Readonly<Record<number, readonly number[]>> = {
   ],
   [FurnaceDispatchPlatform.ARCADE]: [FurnaceDispatchPlatform.YM2151],
 };
+
+/**
+ * The chip effect map (sysDef.cpp) for `platform`. A compound system with no
+ * map of its own (GENESIS, GENESIS_EXT, ARCADE) uses the map of the chip that
+ * stands in for it (STAND_INS), as the worklet routes its channels there.
+ */
+export function furnaceEffectTableFor(platform: number): FurnaceSystemEffects | undefined {
+  return FURNACE_EFFECT_TABLE[platform]
+    ?? (STAND_INS[platform] ?? []).map((p) => FURNACE_EFFECT_TABLE[p]).find((t) => t !== undefined);
+}
 
 /**
  * The synth for a module instrument that plays on `platform`, or undefined

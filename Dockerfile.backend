@@ -24,6 +24,7 @@ COPY src/types /app/src/types
 COPY src/utils/ft2EffectDescriptions.ts /app/src/utils/ft2EffectDescriptions.ts
 COPY src/engine/furnace-dispatch/platforms.ts /app/src/engine/furnace-dispatch/platforms.ts
 COPY src/engine/furnace-dispatch/furnaceEffectTable.gen.ts /app/src/engine/furnace-dispatch/furnaceEffectTable.gen.ts
+COPY src/engine/furnace-dispatch/synthPlatforms.ts /app/src/engine/furnace-dispatch/synthPlatforms.ts
 
 # Build TypeScript, then prune devDeps
 RUN npm run build && npm prune --production
