@@ -22,7 +22,7 @@ import { savedSongToApply, savedSongToJson } from '@/lib/song/savedSong';
 import { setRestoredEditsPending } from '@/lib/song/gridBaseline';
 import { restoreFromStoredBytes } from '@/lib/song/restoreFromStoredBytes';
 import { snapshotSong } from '@/lib/song/snapshotSong';
-import { decideSnapshot, keysToDrop, newestFirst, songFingerprint } from '@/lib/song/songRevisions';
+import { decideSnapshot, keysToDrop, MAX_REPLACED_REVISIONS, newestFirst, songFingerprint } from '@/lib/song/songRevisions';
 import { compressProject } from '@/lib/projectCompression';
 import { markExplicitlySaved, clearExplicitlySaved, setExplicitlySaved, isExplicitlySaved } from '@/lib/persistence/explicitSave';
 
@@ -52,7 +52,7 @@ const IDB_REVISIONS_STORE = 'revisions';
 const IDB_REPLACED_STORE = 'replaced';
 const IDB_PROJECT_KEY = 'current';
 const IDB_RECOVERY_KEY = 'recovery';
-const MAX_REVISIONS = 50;
+const MAX_REVISIONS = MAX_REPLACED_REVISIONS; // owner: last 20 saves
 
 // Safari fallback for requestIdleCallback
 const requestIdleCallbackPolyfill =
@@ -335,22 +335,10 @@ function idbPruneRevisions(max: number): Promise<void> {
   return getDB().then(db => new Promise((resolve, reject) => {
     const tx = db.transaction(IDB_REVISIONS_STORE, 'readwrite');
     const store = tx.objectStore(IDB_REVISIONS_STORE);
-    const countReq = store.count();
-    countReq.onsuccess = () => {
-      const total = countReq.result;
-      if (total <= max) { resolve(); return; }
-      // Delete oldest entries (lowest keys)
-      const toDelete = total - max;
-      const cursorReq = store.openCursor();
-      let deleted = 0;
-      cursorReq.onsuccess = () => {
-        const cursor = cursorReq.result;
-        if (cursor && deleted < toDelete) {
-          cursor.delete();
-          deleted++;
-          cursor.continue();
-        }
-      };
+    const keysReq = store.getAllKeys();
+    keysReq.onsuccess = () => {
+      // keysToDrop is the tested rule; autoIncrement keys ascend, so the oldest come first.
+      for (const k of keysToDrop(keysReq.result as number[], max)) store.delete(k);
     };
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
