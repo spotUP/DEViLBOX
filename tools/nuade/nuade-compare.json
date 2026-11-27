@@ -1252,7 +1252,7 @@
    "uadeRms": 0.16007817979011837,
    "swapMs": 120.84500000000003,
    "format": "aprosys",
-   "song": "public/data/songs/aprosys/action.aps",
+   "song": "public/data/songs/AProSys/action.aps",
    "songPass": false,
    "sha": "529f8a6ad2226bdcea540196",
    "ms": 478
@@ -1269,7 +1269,7 @@
    "player": "aprosys",
    "uadeRms": 0.10462746489489104,
    "format": "aprosys",
-   "song": "public/data/songs/aprosys/actionfiltersound.aps",
+   "song": "public/data/songs/AProSys/actionfiltersound.aps",
    "songPass": false,
    "sha": "9600aa00a0266bdcea540196",
    "ms": 395
