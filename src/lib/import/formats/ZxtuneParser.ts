@@ -8,8 +8,8 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
-import { isPt3, pt3Grid, type CreatePt3Edit } from '@/engine/pt3/pt3EditWasm';
+import type { InstrumentConfig, Pattern, ImportMetadata } from '@/types';
+import { isPt3, pt3Grid, type CreatePt3Edit, type Pt3Grid } from '@/engine/pt3/pt3EditWasm';
 
 // ── Format detection ──────────────────────────────────────────────────────────
 
@@ -148,28 +148,10 @@ export async function parseZxtuneFile(
  */
 async function parsePt3(fileName: string, data: ArrayBuffer, create?: CreatePt3Edit): Promise<TrackerSong> {
   const grid = await pt3Grid(new Uint8Array(data), create);
-  const numbers = [...grid.patterns.keys()];
-  const patterns = numbers.map((p) => {
-    const cells = grid.patterns.get(p) ?? [];
-    return {
-      id: `pattern-${p}`,
-      name: `Pattern ${p}`,
-      length: cells.length,
-      channels: ['A', 'B', 'C'].map((name, ch) => ({
-        id: `channel-${ch}`, name, muted: false, solo: false, collapsed: false, volume: 100,
-        pan: ch === 0 ? -50 : ch === 2 ? 50 : 0, instrumentId: null, color: null,
-        rows: cells.map((row) => row[ch]),
-      })),
-      importMetadata: {
-        sourceFormat: 'ZXTune' as const, sourceFile: fileName, importedAt: new Date().toISOString(),
-        originalChannelCount: 3, originalPatternCount: numbers.length, originalInstrumentCount: 0,
-      },
-    };
-  });
+  const { patterns, songPositions, pt3NoteOffsets } = pt3GridPatterns(grid, fileName);
   const instruments: InstrumentConfig[] = ['A', 'B', 'C'].map((c, i) => ({
     id: i + 1, name: `AY ${c}`, type: 'synth' as const, synthType: 'AyletSynth' as const, effects: [], volume: 0, pan: 0,
   } as InstrumentConfig));
-  const songPositions = grid.positions.map((p) => numbers.indexOf(p));
   return {
     name: `${fileName.replace(/\.[^.]+$/, '')} [PT3]`,
     format: 'ZXTune' as TrackerFormat,
@@ -184,6 +166,35 @@ async function parsePt3(fileName: string, data: ArrayBuffer, create?: CreatePt3E
     linearPeriods: false,
     zxtuneFileData: data.slice(0),
     ayFileData: grid.ay,
+    pt3NoteOffsets,
+  };
+}
+
+/** The song patterns, order and note-byte offsets of a decoded PT3 grid (.pt3 files and PT3 modules inside .ay). */
+export function pt3GridPatterns(grid: Pt3Grid, fileName: string, sourceFormat: ImportMetadata['sourceFormat'] = 'ZXTune'): {
+  patterns: Pattern[]; songPositions: number[]; pt3NoteOffsets: number[][][];
+} {
+  const numbers = [...grid.patterns.keys()];
+  const patterns: Pattern[] = numbers.map((p) => {
+    const cells = grid.patterns.get(p) ?? [];
+    return {
+      id: `pattern-${p}`,
+      name: `Pattern ${p}`,
+      length: cells.length,
+      channels: ['A', 'B', 'C'].map((name, ch) => ({
+        id: `channel-${ch}`, name, muted: false, solo: false, collapsed: false, volume: 100,
+        pan: ch === 0 ? -50 : ch === 2 ? 50 : 0, instrumentId: null, color: null,
+        rows: cells.map((row) => row[ch]),
+      })),
+      importMetadata: {
+        sourceFormat, sourceFile: fileName, importedAt: new Date().toISOString(),
+        originalChannelCount: 3, originalPatternCount: numbers.length, originalInstrumentCount: 0,
+      },
+    };
+  });
+  return {
+    patterns,
+    songPositions: grid.positions.map((p) => numbers.indexOf(p)),
     pt3NoteOffsets: numbers.map((p) => grid.noteOffsets.get(p) ?? []),
   };
 }

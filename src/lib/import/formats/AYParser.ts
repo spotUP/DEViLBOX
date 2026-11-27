@@ -29,6 +29,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/types';
 import { extractAYRegisterFrames } from './AyletWasmExtractor';
+import type { CreatePt3Edit } from '@/engine/pt3/pt3EditWasm';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,31 @@ function relPtr(buf: Uint8Array, ptrOff: number): number {
   if (rel === 0) return -1;
   const abs = ptrOff + rel;
   return abs < 0 || abs >= buf.length ? -1 : abs;
+}
+
+/**
+ * The PT3 module an EMUL song carries in one of its memory blocks (many .ay rips are the S.V. Bulba player plus the
+ * untouched module): its file offset, length to the block end, and the Z80 address the block loads it at. Null when
+ * no block of the song holds a "ProTracker 3" / "Vortex Tracker" module header.
+ */
+export function embeddedPt3Module(buf: Uint8Array, songIndex: number): { offset: number; length: number; z80Addr: number } | null {
+  if (String.fromCharCode(...buf.subarray(4, 8)) !== 'EMUL') return null;
+  const songs = relPtr(buf, OFF_SONGS);
+  const data = songs < 0 ? -1 : relPtr(buf, songs + songIndex * 4 + 2);
+  let at = data < 0 ? -1 : relPtr(buf, data + 12);
+  if (at < 0) return null;
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  for (; at + 6 <= buf.length; at += 6) {
+    const addr = dv.getUint16(at, false);
+    if (addr === 0) break;
+    const blk = relPtr(buf, at + 4);
+    if (blk < 0) continue;
+    const len = Math.min(dv.getUint16(at + 2, false), buf.length - blk, 0x10000 - addr);
+    const text = String.fromCharCode(...buf.subarray(blk, blk + len));
+    const k = [text.indexOf('ProTracker 3'), text.indexOf('Vortex Tracker')].filter((i) => i >= 0).sort((a, b) => a - b)[0];
+    if (k !== undefined) return { offset: blk + k, length: len - k, z80Addr: addr + k };
+  }
+  return null;
 }
 
 /** Read a null-terminated string through a relative pointer at `ptrOff`. */
@@ -183,7 +209,7 @@ export async function parseAYStructuredFile(buffer: ArrayBuffer, filename: strin
   );
 }
 
-export async function parseAYFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
+export async function parseAYFile(buffer: ArrayBuffer, filename: string, create?: CreatePt3Edit): Promise<TrackerSong> {
   if (!isAYFormat(buffer)) throw new Error('Not a valid AY file');
   // AMAD plays the same way: the aylet wasm runs its FXM player where an EMUL
   // file has Z80 code, and the grid is drawn from the AY registers either way.
@@ -205,6 +231,29 @@ export async function parseAYFile(buffer: ArrayBuffer, filename: string): Promis
     pan: 0,
   }));
 
+  const name = songName(buf, firstSong) || misc || filename.replace(/\.(ay|emul|amad)$/i, '');
+  const title = name + (author ? ` — ${author}` : '');
+
+  // A PT3 module in the song's memory: the C++ PT3 decoder gives the stored patterns (the tune's own player reads
+  // the same bytes), so the grid is the song and a note edit is a poke into that module.
+  const pt3 = embeddedPt3Module(buf, firstSong);
+  if (pt3) {
+    try {
+      const { pt3Grid } = await import('@/engine/pt3/pt3EditWasm');
+      const { pt3GridPatterns } = await import('./ZxtuneParser');
+      const grid = await pt3Grid(buf.slice(pt3.offset, pt3.offset + pt3.length), create);
+      const { patterns, songPositions, pt3NoteOffsets } = pt3GridPatterns(grid, filename, 'AY');
+      return {
+        name: title, format: 'AY' as TrackerFormat, patterns, instruments,
+        songPositions, songLength: songPositions.length, restartPosition: grid.loop, numChannels: 3,
+        initialSpeed: grid.speed, initialBPM: 125, linearPeriods: false,
+        ayFileData: buffer.slice(0), pt3NoteOffsets, pt3ModuleAt: pt3,
+      };
+    } catch (err) {
+      console.warn(`[AYParser] ${filename}: the PT3 module in the tune does not decode, showing the register view:`, err);
+    }
+  }
+
   // The grid: aylet runs the tune for 300 frames and the registers after
   // each frame become the pattern. A file aylet cannot run still loads with
   // an empty grid, and the console says why.
@@ -217,10 +266,8 @@ export async function parseAYFile(buffer: ArrayBuffer, filename: string): Promis
     pattern = emptyPattern(3);
   }
 
-  const name = songName(buf, firstSong) || misc || filename.replace(/\.(ay|emul|amad)$/i, '');
-
   return {
-    name: name + (author ? ` — ${author}` : ''),
+    name: title,
     format: 'AY' as TrackerFormat,
     patterns: [pattern],
     instruments,
