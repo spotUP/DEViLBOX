@@ -109,28 +109,45 @@ describe('loading a track onto a stopped deck makes no sound', () => {
   beforeEach(() => { vi.useFakeTimers(); raw.currentTime = 5; });
   afterEach(() => { vi.useRealTimers(); });
 
-  it('the scratch-buffer priming that follows a load is never heard', async () => {
+  /** Run the priming of a stopped deck whose Key Lock stretcher delays the player by `lagS` and drains in `drainS`. */
+  async function prime(lagS: number, drainS: number) {
     const { ap, player } = audioPlayer();
     const gain = gainParam(1);
     const deck = Object.assign(Object.create(DeckEngine.prototype), {
       audioPlayer: ap,
+      keyLock: { drainSec: () => drainS },
       channelGain: { gain: { _param: gain } },
       _playbackMode: 'audio',
       scratchBufferReady: true,
       _primingScratchBuffer: false,
       _primingCancelRequested: false,
     }) as DeckEngine;
-
     let finished = false;
     void (deck as unknown as { _primeScratchBuffer(): Promise<void> })._primeScratchBuffer()
       .then(() => { finished = true; });
     await runClockUntil(() => finished);
+    // What reaches channelGain: the player's output, delayed and smeared by the stretcher.
+    const atGain = player.sounding.map(s => ({ from: s.from, to: s.to + lagS }));
+    return { finished, player, gain, atGain };
+  }
+
+  it('the scratch-buffer priming that follows a load is never heard', async () => {
+    const { finished, player, gain } = await prime(0, 0);
 
     expect(finished).toBe(true);
     expect(player.sounding.length).toBe(1);            // priming did run the player
     expect(player.sounding[0].to).toBeLessThan(Infinity); // and paused it
     expect(audibleAt(player.sounding, gain)).toEqual([]);
     expect(gain.valueAt(raw.currentTime + 1)).toBe(1);  // the deck's gain comes back
+  });
+
+  it('with Key Lock on, the gain stays down until the stretcher has drained the priming audio', async () => {
+    // DeckKeyLock at STRETCH_CONFIG: 100 ms latency, 80 ms blocks. The crate-load leak (2026-11-26) was
+    // the stretcher still sounding ~80 ms after the gain came back at the player's silent time.
+    const { finished, gain, atGain } = await prime(0.18, 0.18);
+    expect(finished).toBe(true);
+    expect(audibleAt(atGain, gain)).toEqual([]);
+    expect(gain.valueAt(raw.currentTime + 1)).toBe(1);
   });
 
   it('a pause silences the deck by the time pause() returns, not one lookahead later', () => {

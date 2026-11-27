@@ -117,6 +117,15 @@ export class DeckKeyLock {
     return this.routedThroughStretch ? this.stretchLatencySec : 0;
   }
 
+  /**
+   * Seconds after the input goes silent until the output is silent: the
+   * latency plus one block, since an input sample reaches every output frame
+   * whose block overlaps it. 0 on the bypass wire.
+   */
+  drainSec(): number {
+    return this.routedThroughStretch ? this.stretchLatencySec + STRETCH_CONFIG.blockMs / 1000 : 0;
+  }
+
   get active(): boolean { return this.isActive; }
   get ready(): boolean { return this.stretchNode !== null; }
 

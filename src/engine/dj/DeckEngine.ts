@@ -922,9 +922,10 @@ export class DeckEngine {
         let silentAt = ctx.currentTime;
         try { silentAt = this.audioPlayer.pause(); } catch { /* ok */ }
         this.audioPlayer.seek(restoreTo);
-        // Unmute only once the paused player's fade-out has finished, or the
-        // tail of the priming playback is heard.
-        const restoreAt = Math.max(silentAt, ctx.currentTime);
+        // Unmute only once the priming playback has left the chain before
+        // channelGain: the player's fade-out, then Key Lock's stretcher (on by
+        // default) still outputs the audio for its latency + one block.
+        const restoreAt = Math.max(silentAt + this.keyLock.drainSec(), ctx.currentTime);
         gainParam.cancelScheduledValues(restoreAt);
         gainParam.setValueAtTime(prevValue, restoreAt);
       }
