@@ -14,7 +14,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
 import * as DJActions from '@/engine/dj/DJActions';
-import { clockNowMs, deckPositionAt } from '@/engine/audioLatency';
+import { clockNowMs, deckPositionAt, slewPosition, type SlewedPosition } from '@/engine/audioLatency';
 import type { DeckId } from '@/engine/dj/DeckEngine';
 import * as Tone from 'tone';
 import { deckCPlatterRadians, subscribeDeckCMotion } from '@/engine/dj/scratch/deckCMotion';
@@ -26,13 +26,20 @@ interface DeckCssTurntableProps {
   deckId: 'A' | 'B' | 'C';
 }
 
+const platterShown = new Map<DeckId, SlewedPosition>();
+
 /**
  * The position the platter and tonearm show: the HEARD position now (the
  * deck's clock anchor extrapolated to this moment), never the player's
  * rendered position, which runs ahead of the ear by the output latency.
  */
 export function platterPositionSec(deckId: DeckId): number {
-  return deckPositionAt(useDJStore.getState().decks[deckId], clockNowMs());
+  const deck = useDJStore.getState().decks[deckId];
+  const now = clockNowMs();
+  // Slewed, not the raw extrapolation: each 20 Hz re-anchor would otherwise snap the platter angle.
+  const shown = slewPosition(platterShown.get(deckId), deckPositionAt(deck, now), deck.positionAnchor.rate, now);
+  platterShown.set(deckId, shown);
+  return shown.posSec;
 }
 
 export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) => {

@@ -105,6 +105,29 @@ export function deckPositionAt(deck: { positionAnchor: ClockAnchor; durationMs: 
   return positionAtFrame(deck.positionAnchor, frameMs, deck.durationMs > 0 ? deck.durationMs / 1000 : Infinity);
 }
 
+/** A continuous shown position: where a slewed visual (the platter) stands and when. */
+export interface SlewedPosition { posSec: number; atMs: number }
+
+/** Re-anchor corrections close with this time constant; a gap past SLEW_SNAP_SEC is a real seek or cue. */
+const SLEW_TAU_MS = 120;
+const SLEW_SNAP_SEC = 0.25;
+
+/**
+ * The platter position at `frameMs`, continuous across clock re-anchors: the
+ * shown position runs on at `rate` and closes the gap to the anchor's
+ * `targetSec` exponentially, so a 20 Hz re-anchor that disagrees with the
+ * previous extrapolation by a few ms bends the platter instead of snapping
+ * it. A gap past SLEW_SNAP_SEC (seek, cue, load) snaps at once.
+ */
+export function slewPosition(shown: SlewedPosition | undefined, targetSec: number, rate: number, frameMs: number): SlewedPosition {
+  if (!shown || frameMs < shown.atMs) return { posSec: targetSec, atMs: frameMs };
+  const dtMs = frameMs - shown.atMs;
+  const runOn = shown.posSec + (dtMs / 1000) * (Number.isFinite(rate) ? rate : 0);
+  const gap = targetSec - runOn;
+  if (Math.abs(gap) > SLEW_SNAP_SEC) return { posSec: targetSec, atMs: frameMs };
+  return { posSec: runOn + gap * (1 - Math.exp(-dtMs / SLEW_TAU_MS)), atMs: frameMs };
+}
+
 /**
  * The audio-context time of the sample the listener hears now: the context's
  * currentTime minus the output latency. A display ring stamped in context
