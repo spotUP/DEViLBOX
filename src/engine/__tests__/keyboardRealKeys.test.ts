@@ -19,8 +19,9 @@ import { startWorklet, ROOT, type WorkletProc } from './workletHarness';
 import { renderTicks, rmsPerTick, fundamentalHz, FPT } from './keyboardPreviewHarness';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { useFormatStore } from '@/stores/useFormatStore';
-import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
+import { installWasmNodeFetches } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import { pinEditPathEngine } from './helpers/pinEditPathEngine';
+import { songFile } from '@/test/songPath';
 
 // Edit-path test: guards the engine that takes the edit, whatever the playback verdicts make the default.
 pinEditPathEngine('robhubbard', 'soundmaster', 'hippel', 'sidmon2', 'instereo1', 'soundmon');
@@ -32,7 +33,8 @@ vi.mock('@/utils/audio-context', async (orig) => {
 });
 
 const corpus = (n: string) => {
-  const f = readFileSync(resolve(ROOT, 'public/data/songs', n));
+  // bare file name: resolved through songFile() wherever its format directory is
+  const f = readFileSync(n.includes('/') ? resolve(ROOT, 'public/data/songs', n) : songFile(n));
   return f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
 };
 const emscriptenTransform = (c: string) => c
@@ -86,7 +88,7 @@ const FORMATS: Format[] = [
     },
   },
   {
-    name: 'Digital Mugician cockwise.mug', song: 'formats/cockwise.mug', synthType: 'DigMugSynth', worklet: ['digmug', 'DigMug'], sustains: false,
+    name: 'Digital Mugician cockwise.mug', song: 'cockwise.mug', synthType: 'DigMugSynth', worklet: ['digmug', 'DigMug'], sustains: false,
     pick: (i) => i.find((x) => x.synthType === 'DigMugSynth' && x.id === 3),
     make: async (inst, send) => {
       const { DigMugEngine } = await import('@/engine/digmug/DigMugEngine');
@@ -98,7 +100,7 @@ const FORMATS: Format[] = [
     },
   },
   {
-    name: 'Delta Music 1 crusaders1.dm', song: 'formats/crusaders1.dm', synthType: 'DeltaMusic1Synth', worklet: ['deltamusic1', 'DeltaMusic1'],
+    name: 'Delta Music 1 crusaders1.dm', song: 'crusaders1.dm', synthType: 'DeltaMusic1Synth', worklet: ['deltamusic1', 'DeltaMusic1'],
     pick: (i) => i.find((x) => x.synthType === 'DeltaMusic1Synth' && x.id === 3),
     make: async (inst, send) => {
       const { DeltaMusic1Engine } = await import('@/engine/deltamusic1/DeltaMusic1Engine');
@@ -110,7 +112,7 @@ const FORMATS: Format[] = [
     },
   },
   {
-    name: 'Delta Music 2 anthrox_intro.dm2', song: 'formats/anthrox_intro.dm2', synthType: 'DeltaMusic2Synth', worklet: ['deltamusic2', 'DeltaMusic2'],
+    name: 'Delta Music 2 anthrox_intro.dm2', song: 'anthrox_intro.dm2', synthType: 'DeltaMusic2Synth', worklet: ['deltamusic2', 'DeltaMusic2'],
     pick: (i) => i.find((x) => x.synthType === 'DeltaMusic2Synth' && x.id === 3),
     make: async (inst, send) => {
       const { DeltaMusic2Engine } = await import('@/engine/deltamusic2/DeltaMusic2Engine');
@@ -147,7 +149,7 @@ const FORMATS: Format[] = [
     },
   },
   {
-    name: 'InStereo! 2.0 stereo_feeling.is20', sustains: false, song: 'formats/stereo_feeling.is20', synthType: 'InStereo2Synth', worklet: ['instereo2', 'InStereo2'],
+    name: 'InStereo! 2.0 stereo_feeling.is20', sustains: false, song: 'stereo_feeling.is20', synthType: 'InStereo2Synth', worklet: ['instereo2', 'InStereo2'],
     pick: (i) => i.find((x) => x.synthType === 'InStereo2Synth' && x.id === 6),
     make: async (inst, send) => {
       const { InStereo2Engine } = await import('@/engine/instereo2/InStereo2Engine');
@@ -159,7 +161,7 @@ const FORMATS: Format[] = [
     },
   },
   {
-    name: 'David Whittaker apb.dw', sustains: false, song: 'formats/apb.dw', synthType: 'DavidWhittakerSynth', worklet: ['davidwhittaker', 'DavidWhittaker'],
+    name: 'David Whittaker apb.dw', sustains: false, song: 'apb.dw', synthType: 'DavidWhittakerSynth', worklet: ['davidwhittaker', 'DavidWhittaker'],
     pick: (i) => i.find((x) => x.synthType === 'DavidWhittakerSynth' && x.id === 8),
     make: async (inst, send) => {
       const { DavidWhittakerEngine } = await import('@/engine/davidwhittaker/DavidWhittakerEngine');
@@ -198,7 +200,8 @@ const FORMATS: Format[] = [
 ];
 
 let restoreFetch = () => {};
-beforeAll(() => { restoreFetch = installDwNodeFetch(); });
+// DigitalMugicianParser decodes the grid in DigMugEdit
+beforeAll(() => { restoreFetch = installWasmNodeFetches([['davidwhittaker', 'DavidWhittaker'], ['digmug', 'DigMugEdit']]); });
 afterAll(() => restoreFetch());
 
 describe.each(FORMATS)('$name: the keyboard, through the real import and key path', (f) => {

@@ -1,6 +1,8 @@
 /**
  * kh.* (Kris Hatlelid): the UADE hybrid route kept the parser's empty 64-row
  * placeholder, so the grid stayed blank/frozen while the song played.
+ * Since 60c3326e7 the parser decodes the real event grid (KrisHatlelidGrid), so
+ * the route keeps it; a parser that falls back to a blank grid fails here.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -11,11 +13,10 @@ import { nativeGridHasNotes } from '../uadeScanQuality';
 const KH = resolve(import.meta.dirname, '../../../../public/data/songs/kris-hatlelid/fiendish freddys - songs.kh');
 
 describe('hybrid native route grid', () => {
-  it('the Kris Hatlelid parser grid is a stub, so the route must hand over to the UADE scan', () => {
+  it('the Kris Hatlelid parser grid carries the song notes, so the route keeps it instead of a blank grid', () => {
     const b = readFileSync(KH);
     const song = parseKrisHatlelidFile(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer, 'fiendish freddys - songs.kh');
-    expect(song.patterns).toHaveLength(1);
-    expect(nativeGridHasNotes(song)).toBe(false);
+    expect(nativeGridHasNotes(song)).toBe(true);
   });
 
   it('keeps a grid that has notes and rejects an empty one', () => {

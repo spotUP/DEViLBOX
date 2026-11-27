@@ -760,14 +760,6 @@
       "cells": 0,
       "bytes": 0
     },
-    "pxtone": {
-      "exporter": "PxTone (PxtoneExporter, wasm-dependent)",
-      "tier": "pattern-data",
-      "status": "store-dependent",
-      "matchPct": 0,
-      "cells": 0,
-      "bytes": 0
-    },
     "psa": {
       "exporter": "PSAExporter.exportPSA",
       "tier": "byte-exact",
@@ -799,6 +791,14 @@
       "matchPct": 1,
       "cells": 15338,
       "bytes": 15338
+    },
+    "pxtone": {
+      "exporter": "PxTone (PxtoneExporter, wasm-dependent)",
+      "tier": "pattern-data",
+      "status": "store-dependent",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
     },
     "quadraComposer": {
       "exporter": "QuadraComposerExporter.exportQuadraComposer",
@@ -1007,6 +1007,14 @@
       "matchPct": 1,
       "cells": 35482,
       "bytes": 35482
+    },
+    "steveTurner": {
+      "exporter": "SteveTurnerExporter.exportSteveTurner",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 40595,
+      "bytes": 40595
     },
     "stm": {
       "exporter": "STMExporter.exportSTM",

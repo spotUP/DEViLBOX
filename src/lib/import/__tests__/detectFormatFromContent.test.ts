@@ -12,9 +12,14 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { detectFormat, detectFormatFromContent } from '../FormatRegistry';
+import { songFile } from '@/test/songPath';
+// static: a dynamic import inside the test body loads the whole parser graph under its timeout
+import { isUADEExclusiveFile, detectNativeFormat } from '../prepareModuleImport';
 
 const SONGS = join(process.cwd(), 'public/data/songs');
-const head = (rel: string): Uint8Array => new Uint8Array(readFileSync(join(SONGS, rel))).subarray(0, 128);
+// bare file name: resolved through songFile() wherever its format directory is
+const songAt = (rel: string): string => (rel.includes('/') ? join(SONGS, rel) : songFile(rel));
+const head = (rel: string): Uint8Array => new Uint8Array(readFileSync(songAt(rel))).subarray(0, 128);
 const keyOf = (rel: string): string | undefined => detectFormatFromContent(rel.split('/').pop()!, head(rel))?.key;
 
 describe('detectFormatFromContent', () => {
@@ -25,7 +30,7 @@ describe('detectFormatFromContent', () => {
   });
   it('Digital Tracker (D.T.) and Imago Orpheus (IM10) are not AdPlug', () => {
     expect(keyOf('digital-tracker-dtm/sonic subspace.dtm')).toBe('dtm');
-    expect(keyOf('formats/astaris.imf')).toBe('imagoOrpheus');
+    expect(keyOf('astaris.imf')).toBe('imagoOrpheus');
   });
   it('PiyoPiyo (PMD magic) is not PC-98 PMD, and names itself', () => {
     expect(keyOf('studio-pixel---piyopiyo/obj0176-1.pmd')).toBe('piyoPiyo');
@@ -34,7 +39,9 @@ describe('detectFormatFromContent', () => {
   it('StoneTracker, TFM Music Maker and Composer 670 resolve by name', () => {
     expect(keyOf('stonetracker/hypnosphere.spm')).toBe('stoneTracker');
     expect(keyOf('tfm-music-maker/rainstorm.tfe')).toBe('tfmMusicMaker');
-    expect(keyOf('composer-670-cdfm/black glass ][ - muzik0.670')).toBe('cdfm67');
+    expect(keyOf('composer-670-cdfm/amnesia_credits.c67')).toBe('cdfm67');
+    // .670 is a different Composer 670 layout the CDFM67 replayer cannot read (65abac584)
+    expect(keyOf('composer-670-cdfm/black glass ][ - muzik0.670')).not.toBe('cdfm67');
   });
   it('FM Tracker goes to libopenmpt: no native parser, not UADE', () => {
     const fmt = detectFormatFromContent('fm dance.fmt', head('fm-tracker/fm dance.fmt'));
@@ -42,9 +49,8 @@ describe('detectFormatFromContent', () => {
     expect(fmt?.nativeParser).toBeUndefined();
     expect(fmt?.libopenmptFallback).toBe(true);
   });
-  it('Atari SNDH named .snd is SNDH, and the import does not hand it to UADE', { timeout: 60_000 }, async () => {
+  it('Atari SNDH named .snd is SNDH, and the import does not hand it to UADE', () => {
     expect(keyOf('sndh/mad_max/jochen.snd')).toBe('sndh');
-    const { isUADEExclusiveFile, detectNativeFormat } = await import('../prepareModuleImport');
     expect(isUADEExclusiveFile('jochen.snd', head('sndh/mad_max/jochen.snd'))).toBe(false);
     // ...and it has a native route, so the import does not fall to libopenmpt
     // ("Failed to load module: ptr").
@@ -54,20 +60,20 @@ describe('detectFormatFromContent', () => {
   });
   it('a Maniacs of Noise .mon stays Maniacs of Noise; a MONOTONE .mon is told apart by its header', () => {
     expect(detectFormat('gyroscope.mon')?.key).toBe('maniacsOfNoise'); // by name alone
-    expect(keyOf('formats/gyroscope.mon')).toBe('maniacsOfNoise');
+    expect(keyOf('gyroscope.mon')).toBe('maniacsOfNoise');
     expect(detectFormat('PRELUDE.MON')?.key).toBe('maniacsOfNoise'); // the name cannot tell them apart
     const prelude = new Uint8Array(readFileSync(join(process.cwd(), 'src/lib/import/__tests__/fixtures/monotone/PRELUDE.MON')));
     expect(detectFormatFromContent('PRELUDE.MON', prelude.subarray(0, 128))?.key).toBe('monotone');
   });
   it('a name with no collision keeps its name-only answer', () => {
-    expect(keyOf('formats/mdat.turrican_bonus')).toBe(detectFormat('mdat.turrican_bonus')?.key);
+    expect(keyOf('mdat.turrican_bonus')).toBe(detectFormat('mdat.turrican_bonus')?.key);
   });
   // Live: the only real ChipTracker song in the corpus is named .mod; the
   // MOD parser refused it (KRIS sits at 952, not M.K. at 1080) and OpenMPT
   // failed, so it never opened.
   it('a ChipTracker song named .mod (KRIS at 952) is KRIS, a ProTracker .mod stays MOD', () => {
-    const whole = (rel: string): Uint8Array => new Uint8Array(readFileSync(join(SONGS, rel)));
+    const whole = (rel: string): Uint8Array => new Uint8Array(readFileSync(songAt(rel)));
     expect(detectFormatFromContent('chuckrock.mod', whole('chiptracker/chuck rock - chuckrock.mod'))?.key).toBe('kris');
-    expect(detectFormatFromContent('shortsong1.mod', whole('formats/shortsong1.mod'))?.key).toBe(detectFormat('shortsong1.mod')?.key);
+    expect(detectFormatFromContent('shortsong1.mod', whole('shortsong1.mod'))?.key).toBe(detectFormat('shortsong1.mod')?.key);
   });
 });
