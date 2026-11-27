@@ -29,7 +29,7 @@ const PSG_CLOCK = 3579545, VGM_RATE = 44100, CH = 6;
 interface Verdict { inputHash: string; file: string; pass: boolean; seconds: number; hz?: number; romBytes?: number; lossy?: string[]; romStarts?: number; furnaceStarts?: number; keyOnMatch?: number; pitchMatch?: number; volumeMatch?: number; volumeExact?: number; panMatch?: number; waveMatch?: number; noiseMatch?: number; ddaMatch?: number; error?: string }
 /** One register write; tick = 60 Hz tick it belongs to. */
 type W = { tick: number; reg: number; val: number; cy?: number };
-/** Channel state after a tick: period 0 = silent. */
+/** Channel state after a tick. Register period 0 plays as 4096 (Furnace pce_psg.cpp), so per is 1..4096. */
 type St = { on: boolean; dda: boolean; per: number; vol: number; noise: boolean; nfreq: number; pan: number };
 
 const args = process.argv.slice(2);
@@ -102,7 +102,7 @@ function states(ws: W[]): St[][] {
   const pan = new Array<number>(CH).fill(255), per = new Array<number>(CH).fill(0), ctl = new Array<number>(CH).fill(0), nz = new Array<number>(CH).fill(0);
   let sel = 0, i = 0;
   // Noise wins over DDA on channels 5-6 (Furnace pce_psg.cpp: noisectrl & control & 0x80 outputs noise), so a noise tick is not a DDA tick.
-  const snap = () => Array.from({ length: CH }, (_, c) => ({ on: (ctl[c] & 0x80) !== 0 && (ctl[c] & 31) > 0, dda: (ctl[c] & 0xc0) === 0xc0 && !(c >= 4 && (nz[c] & 0x80) !== 0), per: per[c], vol: ctl[c] & 31, noise: c >= 4 && (nz[c] & 0x80) !== 0, nfreq: nz[c] & 31, pan: pan[c] }));
+  const snap = () => Array.from({ length: CH }, (_, c) => ({ on: (ctl[c] & 0x80) !== 0 && (ctl[c] & 31) > 0, dda: (ctl[c] & 0xc0) === 0xc0 && !(c >= 4 && (nz[c] & 0x80) !== 0), per: per[c] || 4096, vol: ctl[c] & 31, noise: c >= 4 && (nz[c] & 0x80) !== 0, nfreq: nz[c] & 31, pan: pan[c] }));
   const all: St[][] = [];
   const last = ws.length ? ws[ws.length - 1].tick : 0;
   for (let t = 0; t <= last; t++) {
@@ -193,13 +193,14 @@ for (const file of walk(SONGS)) {
       else if (process.env.PCE_VOLDIFF) console.log(`  vol tick ${t} ch${ch} fur ${a.vol} rom ${b.vol}`);
       if (a.pan === b.pan) panOk++;
     }
-    // noise channels 4-5: sounding, noise-enable and noise frequency per tick, over ticks where either side sounds
+    // noise channels 4-5: sounding, noise-enable, noise frequency, level and pan per tick, over ticks where either side sounds
     let nz = 0, nzEq = 0;
     for (let t = 0; t < Math.min(want.length, got.length); t++) for (let ch = 4; ch < CH; ch++) {
       const a = want[t][ch], b = got[t][ch];
       if (!a.on && !b.on) continue;
       nz++;
-      const same = a.on === b.on && a.noise === b.noise && (!a.noise || a.nfreq === b.nfreq);
+      // level and pan count too: the tone loop above skips noise ticks, so a noise volume error was invisible
+      const same = a.on === b.on && a.noise === b.noise && (!a.noise || (a.nfreq === b.nfreq && Math.abs(a.vol - b.vol) <= 1 && a.pan === b.pan));
       if (same) nzEq++;
       else if (process.env.PCE_VOLDIFF) console.log(`  noise tick ${t} ch${ch} fur on=${a.on} noise=${a.noise} f=${a.nfreq} rom on=${b.on} noise=${b.noise} f=${b.nfreq}`);
     }

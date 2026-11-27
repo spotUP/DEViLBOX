@@ -40,4 +40,17 @@ describe('HuSIC volume column on a held note', () => {
     const vols = cmds.filter((c) => c.op === 0xfd && c.arg < 0x80).map((c) => c.arg);
     expect(new Set(vols).size).toBeGreaterThanOrEqual(5);
   });
+
+  // pcengineasdmo ch5 "Cra" rows carry 03FF: Furnace restarts no macro there. A full note per row replayed volume
+  // envelope frame 0 (register level 15 for one tick, then 31) on every row, a 20 Hz flutter the rom-check did not see.
+  it('exports a noise note under 03xx as a slurred note', async () => {
+    const cmds = (await track('pce/pcengineasdmo.fur', 4, 62)).filter((c) => c.frame > 32);
+    expect(cmds.filter((c) => c.op === 0xe9).length).toBeGreaterThanOrEqual(8);
+  });
+
+  // Ma-Da-Ra ch4 changes to an instrument with no pan macro near frame 2184: the old pan envelope must be switched off.
+  it('switches the pan envelope off for an instrument without a pan macro', async () => {
+    const cmds = await track('pce/Ma-Da-Ra.fur', 3, 2300);
+    expect(cmds.some((c) => c.op === 0xe6 && c.arg === 0xff)).toBe(true);
+  });
 });

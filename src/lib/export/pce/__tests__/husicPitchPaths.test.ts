@@ -48,4 +48,9 @@ describe('HuSIC pitch paths', () => {
     const split = all.some((cmds) => cmds.some((c, i) => c.op < 0xe6 && lastBefore(cmds, i, 0xf7) !== undefined && lastBefore(cmds, i, 0xf7) !== 0xff && lastBefore(cmds, i, 0xf8) !== undefined && lastBefore(cmds, i, 0xf8) !== 0xff));
     expect(split).toBe(true);
   });
+  it('keys on an octave -1 note as its low byte instead of holding the previous note', async () => {
+    // pcengineasdmo ch0 order 30 row 0 (frame 4804): A#-1 in Furnace = HuSIC byte $0E (_freq[1] = 3839).
+    const cmds = await track('pce/pcengineasdmo.fur', 0, 4900);
+    expect(cmds.some((c) => c.frame === 4804 && c.op === 0x0e)).toBe(true);
+  });
 });

@@ -1185,7 +1185,19 @@ LL56:
 	__pushw
 	__ldwi	4
 	  jsr	asr
+; DEViLBOX: octave nibble $F (a note env step below byte $00) is octave -1: period doubled, clamped to $FFF
+	cpx	#15
+	bne	.shr
+	ldx	#1
+	  jsr	asl
+	cmp	#$10
+	bcc	.put
+	lda	#$0f
+	ldx	#$ff
+	bra	.put
+.shr:
 	  jsr	asr
+.put:
 	__stwps
 LL59:
 

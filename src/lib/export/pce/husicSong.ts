@@ -47,6 +47,34 @@ function macroFrames(raw: FurnaceMacro, version: number, hz: number, lossy: Loss
 }
 
 /** Envelope list for one `_sound_dat` table pair, deduplicated; each item is bytes ending in $FF plus its loop offset. */
+const semiOf = (nb: number) => (nb >> 4) * 12 + (nb & 15);
+/** One drv_noteenv step (hus.c): an up step whose semitone nibble passes 15 carries into the octave and skips the +4 fix. */
+export function noteEnvStep(mod: number, val: number): number {
+  const num = val & 0x7f, oct = ((num / 12) | 0) << 4, k = num % 12;
+  if (val & 0x80) { mod -= oct; mod -= (mod & 15) >= k ? k : k + 4; }
+  else { mod += oct + k; if ((mod & 15) >= 12) mod += 4; }
+  return mod & 0xff;
+}
+/** Sounding semitone of a note byte: nibbles $D-$F are A..B of the octave below (_freq[0..2]). Octave nibble $F
+ * (a note env step below byte $00) is octave -1: the patched set_note doubles the period, clamped to $FFF. */
+const pitchSemi = (nb: number) => ((nb >> 4) === 15 ? -1 : nb >> 4) * 12 + (((nb & 15) + 3) & 15) - 3;
+/**
+ * Env byte that moves the driver from `cur` to semitone `target`: the plain delta when it works, else the byte nearest to it
+ * that does. Some moves have no byte (G + 10: the carry skips past F); those take the nearest note, up to two semitones off.
+ */
+export function noteEnvByte(cur: number, target: number, plain: number): number {
+  const signed = (b: number) => (b & 0x80 ? -(b & 0x7f) : b);
+  let best = plain, cost = Infinity;
+  for (let b = 0; b < 255; b++) {
+    if (b === 0x7f || b === 0x80) continue;
+    const r = noteEnvStep(cur, b);
+    if ((r & 15) === 12) continue; // _freq[15] is no note of the scale
+    const c = Math.abs(pitchSemi(r) - target) * 1000 + Math.abs(signed(b) - signed(plain));
+    if (c < cost) { cost = c; best = b; }
+  }
+  return best;
+}
+
 class EnvTable {
   items: Array<{ bytes: number[]; lp: number }> = [];
   private keys = new Map<string, number>();
@@ -60,14 +88,22 @@ class EnvTable {
   level(f: Frames): number { return this.add([...f.vals, 0xff], f.loop >= 0 ? f.loop : f.vals.length - 1); }
   /** Note / pitch envelope: HuSIC adds each byte to the current value (bit 7 = down; $FF is the end mark, so -127
    * cannot be stored), so absolute offsets become deltas. `wrap`: the target register wraps at this size (noise). */
-  note(f: Frames, wrap = 0): number {
+  /** Note env. With `base` (the key-on note byte) each step is encoded so the driver's own step lands on base + vals[i]. */
+  note(f: Frames, wrap = 0, base?: number): number {
     const w = (x: number) => (wrap ? ((((x % wrap) + wrap + wrap / 2 - 1) % wrap) - wrap / 2 + 1) : x);
     const enc = (d: number) => { const x = w(d); return x < 0 ? 0x80 | Math.min(126, -x) : Math.min(127, x); };
     const a = f.vals, last = a.length - 1;
-    const bytes = a.map((v, i) => enc(v - (i ? a[i - 1] : 0)));
+    let cur = base ?? 0;
+    const step = (i: number, d: number) => {
+      if (base === undefined) return enc(d);
+      const b = noteEnvByte(cur, Math.max(-12, Math.min(95, semiOf(base) + a[i])), enc(d));
+      cur = noteEnvStep(cur, b);
+      return b;
+    };
+    const bytes = a.map((v, i) => step(i, v - (i ? a[i - 1] : 0)));
     bytes.push(0xff);
     const lp = bytes.length;
-    if (f.loop >= 0) bytes.push(enc(a[f.loop] - a[last]), ...a.slice(f.loop + 1).map((v, i) => enc(v - a[f.loop + i])), 0xff);
+    if (f.loop >= 0) bytes.push(step(f.loop, a[f.loop] - a[last]), ...a.slice(f.loop + 1).map((v, i) => step(f.loop + 1 + i, v - a[f.loop + i])), 0xff);
     else bytes.push(0, 0xff);
     return this.add(bytes, lp);
   }
@@ -157,9 +193,13 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
   if (freq[0] !== 4068) throw new Error('HuSIC player: _freq table not at LL0+' + FREQ_TABLE + '; update FREQ_TABLE after changing the LL0 strings');
   const tuning = m.tuning || 440;
   // low: also bytes $0D-$0F, _freq[0..2] >> 0 = A-0..B-0 below byte $00. Only for a plain key-on note: the note env
-  // (drv_noteenv) steps note_data as octave << 4 | semitone 0-11 and cannot reach or leave them.
+  // (drv_noteenv) steps note_data as octave << 4 | semitone 0-11 and cannot reach or leave them; it reaches octave -1
+  // (high nibble $F, below byte $00) instead, which the patched set_note plays at twice the period, clamped to $FFF.
+  // Furnace pce.cpp clamps the final period to 1..4096 and the chip plays register 0 as 4096 (pce_psg.cpp), so every
+  // note below ~A-0 sounds at 4096: the driver's lowest table period $0D (4068) is within 12 cents of it.
+  const clampPer = (p: number) => Math.max(1, Math.min(4096, p));
   const noteByte = (nv: number, low = false): number => {
-    const want = PSG_CLOCK / 32 / (tuning * Math.pow(2, (nv - 45) / 12));
+    const want = clampPer(PSG_CLOCK / 32 / (tuning * Math.pow(2, (nv - 45) / 12)));
     let best = 0, err = Infinity;
     for (let oct = 0; oct < 8; oct++) for (let semi = 0; semi < (low && !oct ? 16 : 12); semi++) {
       const p = freq[(semi + 3) & 15] >> oct;
@@ -301,17 +341,17 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
     // Baked per note into a $F8 pitch env after the row pass.
     const rawT: number[] = [];
     const pend: Array<{ ev: Ev; tick: number; f0: number; nv: number; af?: Frames; pf?: Frames; rel: boolean; noise: boolean; arpOn: boolean }> = [];
-    let slide = 0, slideTo: number | undefined, e12 = 0, slid = 0, vibDepth = 0, vibRate = 0, vibFine = 15, vibPos = 0, pitchFx = 0, slideNv = 0;
+    let slide = 0, slideTo: number | undefined, e12 = 0, e12To = 0, slid = 0, vibDepth = 0, vibRate = 0, vibFine = 15, vibPos = 0, pitchFx = 0, slideNv = 0;
     const pmul = linear ? slideMul : 1;
     const toRaw = (semis: number) => (linear ? semis * 128 : furPeriod(slideNv) - furPeriod(slideNv + semis));
-    let porta = 0, curNv = -1, toneOn = false, snap: Ev | undefined, glideFrom = 0, glideTo = 0, glideStart = 0;
+    let porta = 0, curNv = NaN, toneOn = false, snap: Ev | undefined, glideFrom = 0, glideTo = 0, glideStart = 0;
     // Furnace (playback.cpp, targetResetsSlides): reaching the 03xx target clears portaSpeed, so later notes key on again.
     let portaDone = -1;
     // Furnace runs 01/02/03 only once the channel has been used (keyOn || keyOff); a slide set before the first note waits.
     // nv is Furnace's note minus 60. A linear channel starts at Furnace note 60 (SharedChannel baseFreq 0x1e00), i.e. nv 0.
     // shortcut: non-linear channels start at baseFreq 0 in Furnace but are modelled from nv 0 here; fix if a song needs it.
     let used = false;
-    const period = (nb: number) => freq[((nb & 15) + 3) & 15] >> (nb >> 4);
+    const period = (nb: number) => (nb >> 4 === 15 ? Math.min(0xfff, freq[((nb & 15) + 3) & 15] << 1) : freq[((nb & 15) + 3) & 15] >> (nb >> 4));
     const dropSnap = (frame: number) => {
       if (!snap || frame >= snap.frame) { snap = undefined; return; }
       evs.splice(evs.indexOf(snap), 1);
@@ -346,10 +386,13 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       if (cell && cell.instrument !== -1) ins = cell.instrument;
       if (cell && cell.volume !== -1) { chanVol = Math.min(31, cell.volume); volFine = chanVol << 8; volChanged = true; }
       const at = frameOf(row.tick + delay);
+      // Furnace notes go below C-0 (octave -1 = flat value -12..-1), so a negative value is still a note: test the cell, not the sign
+      // (an octave -1 note was dropped and the previous note held on; pcengineasdmo ch0/ch2 order 30).
+      const isNote = !!cell && cell.note >= 0 && cell.note <= 12 && !(cell.note === 0 && cell.octave === 0);
       const nv = cell ? convertFurnaceNoteValue(cell) : -1;
-      if (nv >= 0 && nv < 253) dropSnap(at);
+      if (isNote) dropSnap(at);
       if (!portaSet && portaDone >= 0 && at >= portaDone) { porta = 0; portaDone = -1; }
-      if (nv >= 0 && nv < 253 && porta && toneOn && curNv >= 0 && !(ch >= 4 && (noiseFx || framesOf(Math.max(0, ins), MACRO_DUTY, 'noise')?.vals.some((v) => v > 0)))) {
+      if (isNote && porta && toneOn && !Number.isNaN(curNv) && !(ch >= 4 && (noiseFx || framesOf(Math.max(0, ins), MACRO_DUTY, 'noise')?.vals.some((v) => v > 0)))) {
         const from = Math.round(curNv), p0 = period(noteByte(from)), p1 = period(noteByte(nv));
         const ticks = Math.max(1, Math.ceil(linear ? (Math.abs(nv - curNv) * 128) / (porta * slideMul) : Math.abs(p1 - p0) / porta));
         const fa = frameOf(row.tick + delay + ticks);
@@ -359,14 +402,20 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         evs.push(snap);
         glideFrom = curNv; glideTo = nv; glideStart = at; curNv = nv;
         if (resetAtTarget) portaDone = fa;
-      } else if (nv >= 0 && nv < 253 && !noiseStart(Math.max(0, ins)) && xpcmIndex(Math.max(0, ins), nv) >= 0) {
+      } else if (isNote && !noiseStart(Math.max(0, ins)) && xpcmIndex(Math.max(0, ins), nv) >= 0) {
         // Furnace pce.cpp: an Amiga-type or useSample instrument plays its sample through DDA; the driver streams it as XPCM ($EF 01).
         // With noise on (channels 5-6) the HuC6280 outputs noise over DDA (pce_psg.cpp), so that note takes the tone path below.
         curNv = nv; toneOn = false; noteFrame = at; noteTick = delay;
         evs.push({ frame: at, kind: 'note', cmds, note: xpcmIndex(Math.max(0, ins), nv), dda: true, vol: volCode(Math.max(0, ins), chanVol) });
-      } else if (nv >= 0 && nv < 253) {
-        curNv = nv; toneOn = !(ch >= 4 && noiseFx); noteFrame = at;
+      } else if (isNote) {
+        // Furnace: a note under 03xx restarts no macro. Noise has no period to glide, so it is a slurred noise note
+        // (volume envelope runs on). A full note here replayed envelope frame 0 on every row (pcengineasdmo ch5 "Cra").
+        // shortcut: the noise register jumps at once (exact for 03FF) and 11xx-effect noise still restarts, upgrade when a song needs either
+        const slurIn = porta > 0 && toneOn && !Number.isNaN(curNv) && noiseStart(Math.max(0, ins));
+        curNv = nv; toneOn = !(ch >= 4 && noiseFx);
         const insIdx = Math.max(0, ins);
+        const slurVol = slurIn && volChanged ? volCode(insIdx, chanVol, Math.max(0, at - noteFrame)) : undefined;
+        if (!slurIn) noteFrame = at;
         if (isSampleIns(m.instruments[insIdx]) && !noiseStart(insIdx)) lossy.add('sample instrument without a usable sample played as a wavetable tone');
         const wf = framesOf(insIdx, MACRO_WAVE, 'wave');
         const wave = wf && new Set(wf.vals).size > 1 ? -1 - waveEnv.level(wf) : wf ? wf.vals[0] : waveFx;
@@ -386,14 +435,16 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
           // Arp as note offsets per frame (fixed notes resolved against this note). Noise: the driver's note env does not
           // reach the noise register, its pitch env does (drv_pitchenv adds to noise_freq), so arp goes there as register deltas.
           const nvs = af ? af.vals.map((v) => arpNv(nv, v)) : [nv];
-          const arpOn = nvs.some((x) => x !== nv);
+          // An arp whose steps all clamp to the same period (all below the chip floor) is no arp on the chip; it keeps the low byte.
+          const arpOn = noise ? nvs.some((x) => x !== nv) : nvs.some((x) => clampPer(furPeriod(x)) !== clampPer(furPeriod(nv)));
           const note = noise ? noiseReg(nvs[0]) : noteByte(nv, !arpOn);
-          const ne = arpOn && !noise ? envIdx(noteEnv.note({ vals: nvs.map((x) => x - nv), loop: af!.loop }), 'note') : 0xff;
+          const ne = arpOn && !noise ? envIdx(noteEnv.note({ vals: nvs.map((x) => x - nv), loop: af!.loop }, 0, note), 'note') : 0xff;
           // envCmds must stay last: the pending-note code patches NOTE_ENV / PITCH_ENV values by position from the end
           const envCmds = [NOISE, noise ? 1 : 0, NOTE_ENV, ne, PITCH_ENV, 0xff];
           const ev: Ev = f0
             ? { frame: frameOf(row.tick + delay) + f0, kind: 'note', cmds: envCmds, note, glide: {}, owner }
-            : { frame: at, kind: 'note', cmds: [...cmds, ...(wave < 0 ? [WAVE_ENV, -1 - wave] : [WAVE, wave]), ...(anyPan && panEnvOf(insIdx) !== 0xff ? [PAN_ENV, panEnvOf(insIdx)] : []), ...envCmds], note, vol: volCode(insIdx, chanVol) };
+            : slurIn ? { frame: at, kind: 'note', cmds: [...cmds, ...envCmds], note, glide: {}, vol: slurVol, owner }
+            : { frame: at, kind: 'note', cmds: [...cmds, ...(wave < 0 ? [WAVE_ENV, -1 - wave] : [WAVE, wave]), ...(anyPan ? [PAN_ENV, panEnvOf(insIdx)] : []), ...envCmds], note, vol: volCode(insIdx, chanVol) };
           owner ??= ev;
           evs.push(ev);
           pend.push({ ev, tick: row.tick + delay, f0, nv, af: arpOn ? af0 : undefined, pf, rel, noise, arpOn });
@@ -405,15 +456,17 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
       // Furnace keeps an 01/02 slide (portaSpeed) running into later notes (each restarts from its own pitch); only an
       // E1/E2 note slide, whose target belongs to the old note, ends with a new note here.
       if (noteTick >= 0 && !slideSet && slideTo !== undefined) slide = 0;
-      if (nv >= 0 && nv <= 253) used = true;
+      if (isNote || nv === 253) used = true;
       for (let k = 0; k < row.ticks; k++) {
         if (k === noteTick) { slid = 0; e12 = 0; slideNv = nv; slideTo = undefined; if (!flag('continuousVibrato')) vibPos = 0; }
         if (k === Math.max(0, noteTick) && e12Semis) {
-          e12 += e12Semis;
-          slideTo = toRaw(e12); slide = Math.sign(slideTo - slid) * e12Speed * pmul;
+          // Furnace E1xy/E2xy aim at chan.note +- y; chan.note moves to the target only when a slide reaches it (targetResetsSlides),
+          // so an E2 issued before the E1 arrived counts from the old note (pcengineasdmo ch3 order 14 rows 0-2).
+          e12To = e12 + e12Semis;
+          slideTo = toRaw(e12To); slide = Math.sign(slideTo - slid) * e12Speed * pmul;
         }
         if (used) slid += slide;
-        if (used && slideTo !== undefined && (slide > 0 ? slid >= slideTo : slid <= slideTo)) { slid = slideTo; slide = 0; }
+        if (used && slideTo !== undefined && (slide > 0 ? slid >= slideTo : slid <= slideTo)) { slid = slideTo; slide = 0; if (resetAtTarget) e12 = e12To; }
         // 02xx slides toward Furnace note 0 (portaNote 0, nv -60); reaching it stops the slide for good when targetResetsSlides.
         // shortcut: 01xx has no ceiling here (Furnace stops at the system's top note); add one if a song slides that far.
         else if (used && slideTo === undefined && slide < 0 && slid <= toRaw(-60 - slideNv)) { slid = toRaw(-60 - slideNv); if (resetAtTarget) slide = 0; }
@@ -451,7 +504,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         if (p.noise) { offs.push(noiseReg(a + Math.round(p2)) - p.ev.note!); if (offs[offs.length - 1]) moves = true; continue; }
         const r = rawT[Math.min(rawT.length - 1, p.tick + Math.floor((f * hz) / FRAME_HZ))] + p2;
         if (r) moves = true;
-        const want = linear ? furPeriod(a + r / 128) : furPeriod(a) - r;
+        const want = clampPer(linear ? furPeriod(a + r / 128) : furPeriod(a) - r);
         tgt.push(want);
         offs.push(Math.round(want - period(p.arpOn ? noteByte(a) : p.ev.note!)));
       }
@@ -464,7 +517,6 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         // A pitch env byte moves the period by at most 126 per frame (drv_pitchenv), less than a semitone at low notes,
         // so a fast drop (kick pitch macro, wide slide) is split: a note env carries the nearest driver note per frame
         // (drv_noteenv steps note_data in semitones, set_note resets seq_freq) and the pitch env the absolute residual.
-        const semi = (nb: number) => (nb >> 4) * 12 + (nb & 15);
         const nearest = tgt.map((t) => {
           let best = 0, err = Infinity;
           for (let s2 = 0; s2 < 96; s2++) {
@@ -474,11 +526,11 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
           return best;
         });
         if ((p.ev.note! & 15) > 11) p.ev.note = noteByte(p.nv); // the note env needs a regular base byte
-        const base = semi(p.ev.note!);
-        const notes = nearest.map((nb) => semi(nb) - base), res = nearest.map((nb, i) => Math.round(tgt[i] - period(nb)));
+        const base = semiOf(p.ev.note!);
+        const notes = nearest.map((nb) => semiOf(nb) - base), res = nearest.map((nb, i) => Math.round(tgt[i] - period(nb)));
         const tail = tailOf(notes.map((x, i) => `${x},${res[i]}`));
         const cut = tail.start + tail.p;
-        p.ev.cmds[p.ev.cmds.length - 3] = envIdx(noteEnv.note({ vals: notes.slice(0, cut), loop: tail.start }), 'note');
+        p.ev.cmds[p.ev.cmds.length - 3] = envIdx(noteEnv.note({ vals: notes.slice(0, cut), loop: tail.start }, 0, p.ev.note!), 'note');
         p.ev.cmds[p.ev.cmds.length - 1] = bakePitch(res, tail);
         continue;
       }
@@ -524,7 +576,7 @@ export function furnaceToHusic(m: FurnaceModule, subsong: number, player: Uint8A
         const c = e.cmds[k];
         if (c === -1) { if (out.length) unit(out.splice(0)); unit([]); loopAt = here(); state.clear(); curVol = -1; if (merged.some((x) => x.dda)) unit([XPCM, 0]); xpcmOn = false; continue; }
         const v = e.cmds[++k];
-        if (state.get(c) !== v || c === PAN || c === PAN_ENV) { out.push(c, v); state.set(c, v); }
+        if (state.get(c) !== v || c === PAN || (c === PAN_ENV && v !== 0xff)) { out.push(c, v); state.set(c, v); }
       }
       if (e.kind === 'note' && !!e.dda !== xpcmOn) { unit([XPCM, e.dda ? 1 : 0]); xpcmOn = !!e.dda; }
       if (out.length) unit(out);
