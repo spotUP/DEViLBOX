@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isPSMFormat, parsePSMFile } from '../formats/PSMParser';
 
@@ -12,6 +12,8 @@ const LIBXMP_DATA = resolve(
   import.meta.dirname,
   '../../../../Reference Code/NostalgicPlayer-main/Source/Ports/Tests/LibXmp.Test/Data'
 );
+// Reference Code is a local-only corpus (absent from a clean checkout): skip, do not fail.
+const HAS_CORPUS = existsSync(LIBXMP_DATA);
 const EP_SONG1  = resolve(LIBXMP_DATA, 'M/EP-Song1.psm');    // new PSM ("PSM ")
 const SILVER    = resolve(LIBXMP_DATA, 'M/Silver-Song0.psm'); // PSM16 ("PSM\xFE")
 
@@ -22,11 +24,11 @@ function loadPSM(path: string): Uint8Array {
 // ── Detection ─────────────────────────────────────────────────────────────────
 
 describe('isPSMFormat', () => {
-  it('detects new PSM by "PSM " + "FILE" magic', () => {
+  it.skipIf(!HAS_CORPUS)('detects new PSM by "PSM " + "FILE" magic', () => {
     expect(isPSMFormat(loadPSM(EP_SONG1))).toBe(true);
   });
 
-  it('detects PSM16 by "PSM\\xFE" magic with valid header', () => {
+  it.skipIf(!HAS_CORPUS)('detects PSM16 by "PSM\\xFE" magic with valid header', () => {
     expect(isPSMFormat(loadPSM(SILVER))).toBe(true);
   });
 
@@ -41,7 +43,7 @@ describe('isPSMFormat', () => {
 
 // ── New PSM parsing ───────────────────────────────────────────────────────────
 
-describe('parsePSMFile — EP-Song1.psm (new PSM)', () => {
+describe.skipIf(!HAS_CORPUS)('parsePSMFile — EP-Song1.psm (new PSM)', () => {
   it('parses without returning null', () => {
     const bytes = loadPSM(EP_SONG1);
     const song = parsePSMFile(bytes, 'EP-Song1.psm');
@@ -75,7 +77,7 @@ describe('parsePSMFile — EP-Song1.psm (new PSM)', () => {
 
 // ── PSM16 parsing ─────────────────────────────────────────────────────────────
 
-describe('parsePSMFile — Silver-Song0.psm (PSM16)', () => {
+describe.skipIf(!HAS_CORPUS)('parsePSMFile — Silver-Song0.psm (PSM16)', () => {
   it('parses without returning null', () => {
     const bytes = loadPSM(SILVER);
     const song = parsePSMFile(bytes, 'Silver-Song0.psm');

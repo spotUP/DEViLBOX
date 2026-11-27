@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isAMFFormat, parseAMFFile } from '../formats/AMFParser';
 
@@ -12,6 +12,8 @@ const LIBXMP_DATA = resolve(
   import.meta.dirname,
   '../../../../Reference Code/NostalgicPlayer-main/Source/Ports/Tests/LibXmp.Test/Data'
 );
+// Reference Code is a local-only corpus (absent from a clean checkout): skip, do not fail.
+const HAS_CORPUS = existsSync(LIBXMP_DATA);
 const AVOID    = resolve(LIBXMP_DATA, 'M/Avoid.amf');              // DSMI v8
 const NOTE7F   = resolve(LIBXMP_DATA, 'Format_Dsmi_Note7f.amf');  // DSMI v14
 
@@ -23,11 +25,11 @@ function loadAMF(path: string): ArrayBuffer {
 // ── Detection ─────────────────────────────────────────────────────────────────
 
 describe('isAMFFormat', () => {
-  it('detects DSMI AMF v8 (Avoid.amf)', () => {
+  it.skipIf(!HAS_CORPUS)('detects DSMI AMF v8 (Avoid.amf)', () => {
     expect(isAMFFormat(loadAMF(AVOID))).toBe(true);
   });
 
-  it('detects DSMI AMF v14 (Format_Dsmi_Note7f.amf)', () => {
+  it.skipIf(!HAS_CORPUS)('detects DSMI AMF v14 (Format_Dsmi_Note7f.amf)', () => {
     expect(isAMFFormat(loadAMF(NOTE7F))).toBe(true);
   });
 
@@ -44,7 +46,7 @@ describe('isAMFFormat', () => {
 
 // ── DSMI AMF v8 parsing ───────────────────────────────────────────────────────
 
-describe('parseAMFFile — Avoid.amf (DSMI v8)', () => {
+describe.skipIf(!HAS_CORPUS)('parseAMFFile — Avoid.amf (DSMI v8)', () => {
   it('parses without throwing', async () => {
     const ab = loadAMF(AVOID);
     await expect(parseAMFFile(ab, 'Avoid.amf')).resolves.toBeDefined();
@@ -81,7 +83,7 @@ describe('parseAMFFile — Avoid.amf (DSMI v8)', () => {
 
 // ── DSMI AMF v14 parsing ──────────────────────────────────────────────────────
 
-describe('parseAMFFile — Format_Dsmi_Note7f.amf (DSMI v14)', () => {
+describe.skipIf(!HAS_CORPUS)('parseAMFFile — Format_Dsmi_Note7f.amf (DSMI v14)', () => {
   it('parses without throwing', async () => {
     const ab = loadAMF(NOTE7F);
     await expect(parseAMFFile(ab, 'Format_Dsmi_Note7f.amf')).resolves.toBeDefined();
