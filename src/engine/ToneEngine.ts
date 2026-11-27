@@ -299,6 +299,8 @@ export class ToneEngine {
   // Native AudioContext — owned by DEViLBOX, shared with Tone.js via Tone.setContext()
   // This allows WASM/WAM synths to use the real BaseAudioContext directly.
   private _nativeContext: AudioContext | null = null;
+  /** Tone's wrapper of `_nativeContext`; restore with this, never re-wrap the raw context. */
+  private _toneContext: Tone.BaseContext | null = null;
 
   // BLEP (Band-Limited Step) processor for reducing aliasing
   private blepManager: BlepManager = new BlepManager();
@@ -489,7 +491,13 @@ export class ToneEngine {
     // Dev: census every node and edge (MCP get_audio_worklet_profile) before
     // Tone wires its destination, so the census sees that edge too.
     if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) installNodeCensus();
+    // Never close Tone's import-time default context: Tone.context / Tone.Draw /
+    // Tone.Destination / Tone.Transport are constants bound to it at import, and
+    // closing it left play() failing with "AudioContext failed to start: closed".
     Tone.setContext(this._nativeContext);
+    // Keep the ONE Tone wrapper: every Tone.setContext(raw) builds a new wrapper
+    // with its own Destination gain on the raw destination (a leaked feeder).
+    this._toneContext = Tone.getContext();
     // Register globally so WAM/WASM synths can access it without importing ToneEngine
     setDevilboxAudioContext(this._nativeContext);
     // Effect worklets stop computing silence once idle; every later module
@@ -645,6 +653,11 @@ export class ToneEngine {
    */
   public get nativeContext(): AudioContext {
     return this._nativeContext!;
+  }
+
+  /** Tone's one wrapper of nativeContext; pass this to Tone.setContext, never the raw context. */
+  public get toneContext(): Tone.BaseContext | null {
+    return this._toneContext;
   }
 
   /**
@@ -2030,7 +2043,7 @@ export class ToneEngine {
     // Ensure Tone.js context matches our native context — prevents cross-context
     // AudioNode errors when creating instruments after libopenmpt/UADE playback
     if (this._nativeContext && Tone.getContext().rawContext !== this._nativeContext) {
-      Tone.setContext(this._nativeContext);
+      Tone.setContext(this._toneContext ?? this._nativeContext);
     }
 
     // CRITICAL FIX: Many synth types don't need per-channel instances
