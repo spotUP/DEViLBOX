@@ -96,6 +96,10 @@ export interface DjLayout {
   rowHeight: number;
   /** grid-template-columns */
   columns: string;
+  /** DJ-TABS-TOUCH: too narrow for side-by-side columns; one region (deck or mixer) shows, picked by tabs. */
+  regionTabs: boolean;
+  /** Height of every tab strip (region tabs, deck panel tabs): the touch target on a coarse pointer. */
+  tabStrip: number;
   mixer: { extras: 'inline' | 'popover'; fxWet: 'inline' | 'popover'; knob: DjKnobSize; compact: boolean; needed: number; width: number; camelotWheel: number };
   deck: {
     width: number;
@@ -116,7 +120,7 @@ export interface DjLayout {
   budgets: Readonly<Record<string, number>>;
   /** Below the smallest fit: the DJ view scrolls; minHeight is the deck/mixer grid's height then. */
   floor: { scroll: boolean; minHeight: number };
-  /** D5 undecided - consumed by DJ-VIEW-TOUCH. Exempt from the every-knob-moves-output rule. */
+  /** Coarse: tab strips and transport buttons are touch-target sized (DJ-TABS-TOUCH). */
   pointer: DjPointer;
 }
 
@@ -127,6 +131,10 @@ interface State {
   shortWaveforms: boolean;
   panel: 'docked' | 'onDemand';
   compact: boolean;
+  /** One region (deck or mixer) at a time behind tabs: too narrow for columns. */
+  tabs: boolean;
+  /** Coarse pointer: tab strips and transport buttons grow to the touch target. */
+  coarse: boolean;
 }
 
 const STEPS: ReadonlyArray<{ step: DjStep; affects: 'mixer' | 'decks' | 'both' }> = [
@@ -150,8 +158,18 @@ function waveformStrip(s: State, count: number): number {
   return count * (waveformHeight(s) + DJ_SIZES.waveformBorder) + DJ_SIZES.waveformStripBorder;
 }
 
+function tabStripOf(s: State): number {
+  return s.coarse ? DJ_LAYOUT_LIMITS.touchTargetPx : DJ_SIZES.tabStrip;
+}
+
+function transportButtonOf(s: State): number {
+  const btn = DJ_SIZES.transportButton[sizeKey(s)];
+  return s.coarse ? Math.max(btn, DJ_LAYOUT_LIMITS.touchTargetPx) : btn;
+}
+
 function rowHeightOf(s: State, input: DjLayoutInput): number {
-  return input.height - waveformStrip(s, input.waveformCount) - DJ_SIZES.gridPad;
+  const regionTabs = s.tabs ? tabStripOf(s) + DJ_SIZES.gridGap : 0;
+  return input.height - waveformStrip(s, input.waveformCount) - DJ_SIZES.gridPad - regionTabs;
 }
 
 function mixerWidthOf(s: State, input: DjLayoutInput): number {
@@ -160,6 +178,7 @@ function mixerWidthOf(s: State, input: DjLayoutInput): number {
 }
 
 function deckWidthOf(s: State, input: DjLayoutInput): number {
+  if (s.tabs) return input.width - DJ_SIZES.gridPad;
   const columns = input.deckCount + 1;
   const gaps = (columns - 1) * DJ_SIZES.gridGap;
   return (input.width - DJ_SIZES.gridPad - mixerWidthOf(s, input) - gaps) / input.deckCount;
@@ -182,7 +201,7 @@ export function mixerNeed(s: State, dubBusOn: boolean): number {
 
 function transportWraps(s: State, deckWidth: number): boolean {
   const key = sizeKey(s);
-  const btn = DJ_SIZES.transportButton[key];
+  const btn = transportButtonOf(s);
   const inner = deckWidth - 2 * DJ_SIZES.deckPadding[key] - DJ_SIZES.deckBorder;
   return inner < 4 * btn + 3 * 8 + 8 + 2 * btn + 4;
 }
@@ -203,12 +222,12 @@ function deckNeedBase(s: State, kind: DeckKind, deckWidth: number): number {
     const rows = [scratchHeader(key), DJ_SIZES.deckCLanes, DJ_SIZES.scratchRecordSelect, DJ_SIZES.scratchPadRow];
     return pad + rows.reduce((a, b) => a + b, 0) + (rows.length - 1) * gap;
   }
-  const btn = DJ_SIZES.transportButton[key];
+  const btn = transportButtonOf(s);
   const header = DJ_SIZES.headerExtra + DJ_SIZES.scope[key];
   const transport = transportWraps(s, deckWidth) ? 2 * btn + DJ_SIZES.transportRowGap : btn;
   const panel = s.panel === 'docked'
-    ? DJ_SIZES.tabStrip + DJ_SIZES.tabGap + (s.large ? DJ_SIZES.panelBody.large : DJ_SIZES.panelBody.regular)
-    : DJ_SIZES.tabStrip;
+    ? tabStripOf(s) + DJ_SIZES.tabGap + (s.large ? DJ_SIZES.panelBody.large : DJ_SIZES.panelBody.regular)
+    : tabStripOf(s);
   const rows = [header, DJ_SIZES.overview, transport, panel];
   if (kind === 'trackC') rows.push(DJ_SIZES.deckCLanes);
   // the pattern area is the sixth row of a track deck: it carries one gap too
@@ -250,7 +269,11 @@ function apply(s: State, step: DjStep): State {
 }
 
 export function djLayout(input: DjLayoutInput): DjLayout {
-  let state: State = { scale: 'regular', large: false, extras: 'inline', shortWaveforms: false, panel: 'docked', compact: false };
+  const coarse = input.pointer === 'coarse';
+  const base: State = { scale: 'regular', large: false, extras: 'inline', shortWaveforms: false, panel: 'docked', compact: false, tabs: false, coarse };
+  // Columns are judged at their tightest (compact): only a screen too narrow even then goes to tabs.
+  const tabs = deckWidthOf({ ...base, compact: true, scale: 'compact' }, input) < DJ_LAYOUT_LIMITS.regionTabsBelowPx;
+  let state: State = { ...base, tabs };
 
   // D4: a roomy screen grows the controls, provided the large sizes still fit.
   const large: State = { ...state, scale: 'large', large: true };
@@ -287,7 +310,9 @@ export function djLayout(input: DjLayoutInput): DjLayout {
     steps,
     waveformHeight: waveformHeight(state),
     rowHeight,
-    columns: `minmax(0,1fr) auto minmax(0,1fr)${input.deckCount === 3 ? ' minmax(0,1fr)' : ''}`,
+    columns: state.tabs ? 'minmax(0,1fr)' : `minmax(0,1fr) auto minmax(0,1fr)${input.deckCount === 3 ? ' minmax(0,1fr)' : ''}`,
+    regionTabs: state.tabs,
+    tabStrip: tabStripOf(state),
     mixer: { extras: state.extras, fxWet: state.compact ? 'popover' : 'inline', knob: knobOf(state), compact: state.compact, needed: mixerNeed(state, input.dubBusOn), width: mixerW, camelotWheel: DJ_SIZES.mixer.camelotWheel[key] },
     deck: {
       width: deckWidth,
@@ -295,7 +320,7 @@ export function djLayout(input: DjLayoutInput): DjLayout {
       panelBodyHeight: state.large ? DJ_SIZES.panelBody.large : DJ_SIZES.panelBody.regular,
       platter: DJ_SIZES.platter[platterKey(state)],
       scope: DJ_SIZES.scope[key],
-      transportButton: DJ_SIZES.transportButton[key],
+      transportButton: transportButtonOf(state),
       gap: DJ_SIZES.deckGap[key],
       padding: DJ_SIZES.deckPadding[key],
       patternHeight: { track: patternTrack, trackC: patternTrackC },
@@ -318,10 +343,10 @@ export function djLayout(input: DjLayoutInput): DjLayout {
       scratchHeader: scratchHeader(key),
       overview: DJ_SIZES.overview,
       lanes: DJ_SIZES.deckCLanes,
-      transport: DJ_SIZES.transportButton[key],
+      transport: transportButtonOf(state),
       panel: state.panel === 'docked'
-        ? DJ_SIZES.tabStrip + DJ_SIZES.tabGap + (state.large ? DJ_SIZES.panelBody.large : DJ_SIZES.panelBody.regular)
-        : DJ_SIZES.tabStrip,
+        ? tabStripOf(state) + DJ_SIZES.tabGap + (state.large ? DJ_SIZES.panelBody.large : DJ_SIZES.panelBody.regular)
+        : tabStripOf(state),
     },
     floor: { scroll: finalMisfit.mixer || finalMisfit.decks, minHeight: need + DJ_SIZES.gridPad },
     pointer: input.pointer,

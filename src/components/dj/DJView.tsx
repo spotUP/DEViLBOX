@@ -22,6 +22,8 @@ import { handOverToDJ } from '@/lib/playback/oneProgrammeAtATime';
 import { DJDeck } from './DJDeck';
 import { AnchoredPopover } from '@components/ui/AnchoredPopover';
 import { DJLayoutContext } from './DJLayoutContext';
+import { TabStrip, type TabStripTab } from '@components/ui/TabStrip';
+import type { DJRegionTab } from '@/stores/useDJStore';
 import { DJSetBrowser } from './DJSetBrowser';
 import { useDJLayout } from '@/hooks/dj/useDJLayout';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
@@ -69,6 +71,13 @@ interface DJViewProps {
   onShowDrumpads?: () => void;
 }
 
+const REGION_TABS: ReadonlyArray<TabStripTab<DJRegionTab>> = [
+  { id: 'A', label: 'Deck A' },
+  { id: 'mixer', label: 'Mixer' },
+  { id: 'B', label: 'Deck B' },
+  { id: 'C', label: 'Deck C' },
+];
+
 export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads }) => {
   const djViewRef = useRef<HTMLDivElement>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
@@ -87,6 +96,12 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   useEffect(() => () => useUIStore.getState().setDjLayoutFrame(null), []);
   const setDJModeActive = useDJStore((s) => s.setDJModeActive);
   const setThirdDeckActive = useDJStore((s) => s.setThirdDeckActive);
+  const regionTab = useDJStore((s) => s.djRegionTab);
+  const setRegionTab = useDJStore((s) => s.setDJRegionTab);
+  // Deck C's tab goes with the third deck; a remembered 'C' falls back to Deck A.
+  const shownRegion: DJRegionTab = regionTab === 'C' && !thirdDeckActive ? 'A' : regionTab;
+  // Hidden, not unmounted: a deck keeps its engine bindings and scroll while another tab shows.
+  const regionHidden = (id: DJRegionTab): string => (layout.regionTabs && id !== shownRegion ? ' hidden' : '');
   const [showCrate, setShowCrate] = useState(false);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showAutoDJ, setShowAutoDJ] = useState(false);
@@ -584,6 +599,18 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
         )}
       </div>
 
+      {layout.regionTabs && deckViewMode !== '3d' && (
+        <div className="px-2 pt-2 flex-shrink-0" data-dj-region-tabs>
+          <TabStrip
+            tabs={thirdDeckActive ? REGION_TABS : REGION_TABS.filter((t) => t.id !== 'C')}
+            active={shownRegion}
+            onChange={setRegionTab}
+            ariaLabel="DJ deck or mixer"
+            tabHeight={layout.tabStrip}
+          />
+        </div>
+      )}
+
       {/* ================================================================== */}
       {/* MAIN LAYOUT: Deck A | Mixer | Deck B [| Deck C]                   */}
       {/* ================================================================== */}
@@ -611,23 +638,23 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
           /* ── Standard 2D modes (Visualizer / Vinyl) ──────────────────── */
           <>
             {/* ---- Deck A (left) ---- */}
-            <div data-dj-region="deckA" className="min-h-0 min-w-0 overflow-hidden">
+            <div data-dj-region="deckA" className={`min-h-0 min-w-0 overflow-hidden${regionHidden('A')}`}>
               <DJDeck deckId="A" />
             </div>
 
             {/* ---- Center Mixer ---- */}
-            <div data-dj-region="mixer" className="min-h-0 min-w-0 overflow-hidden">
+            <div data-dj-region="mixer" className={`min-h-0 min-w-0 overflow-hidden${regionHidden('mixer')}`}>
               <DJMixer />
             </div>
 
             {/* ---- Deck B (right) ---- */}
-            <div data-dj-region="deckB" className="min-h-0 min-w-0 overflow-hidden">
+            <div data-dj-region="deckB" className={`min-h-0 min-w-0 overflow-hidden${regionHidden('B')}`}>
               <DJDeck deckId="B" />
             </div>
 
             {/* ---- Deck C (far right, conditional) ---- */}
             {thirdDeckActive && (
-              <div data-dj-region="deckC" className="min-h-0 min-w-0 overflow-hidden">
+              <div data-dj-region="deckC" className={`min-h-0 min-w-0 overflow-hidden${regionHidden('C')}`}>
                 <DJDeck deckId="C" />
               </div>
             )}

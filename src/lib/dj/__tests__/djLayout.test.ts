@@ -116,13 +116,27 @@ describe('djLayout: what each give-way step changes', () => {
     expect(djLayout(inputFor(1280, 720, 3, 'scratchOnly', true)).mixer.fxWet).toBe('popover');
   });
 
-  it('a pointer type is echoed and moves no size (D5 is undecided)', () => {
+  it('a coarse pointer grows tab strips and transport buttons to the touch target; a fine one keeps the measured sizes', () => {
     const base = inputFor(1366, 768, 2, null, false);
     const fine = djLayout({ ...base, pointer: 'fine' });
     const coarse = djLayout({ ...base, pointer: 'coarse' });
     expect(coarse.pointer).toBe('coarse');
-    expect(fine.pointer).toBe('fine');
-    expect({ ...coarse, pointer: 'fine', input: fine.input }).toEqual(fine);
+    expect(fine.tabStrip).toBe(DJ_SIZES.tabStrip);
+    expect(coarse.tabStrip).toBe(DJ_LAYOUT_LIMITS.touchTargetPx);
+    expect(coarse.deck.transportButton).toBeGreaterThanOrEqual(DJ_LAYOUT_LIMITS.touchTargetPx);
+    expect(coarse.budgets.transport).toBe(coarse.deck.transportButton);
+  });
+
+  it('too narrow for side-by-side columns: one region at a time, full width, region tab strip budgeted', () => {
+    for (const [w, h, pointer] of [[390, 844, 'coarse'], [768, 1024, 'coarse'], [800, 900, 'fine']] as const) {
+      const l = djLayout({ width: w, height: h, deckCount: 2, deckC: null, waveformCount: 2, dubBusOn: false, pointer });
+      expect(l.regionTabs).toBe(true);
+      expect(l.columns).toBe('minmax(0,1fr)');
+      expect(l.deck.width).toBe(w - DJ_SIZES.gridPad);
+    }
+    const wide = djLayout(inputFor(1280, 720, 3, 'scratchOnly', false));
+    expect(wide.regionTabs).toBe(false);
+    expect(wide.columns.split(' ').length).toBe(4);
   });
 
   it('a box smaller than anything the solver can fit reaches the floor: the view scrolls at a minimum height', () => {

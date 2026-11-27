@@ -313,6 +313,8 @@ export type DeckViewMode = 'visualizer' | 'vinyl' | '3d';
 
 /** The open tab of a deck's lower panel (Pads, Scratch, Loop & Cue, Mix). */
 export type DeckPanelTab = 'pads' | 'scratch' | 'loopcue' | 'mix';
+/** Which DJ region shows when the layout has room for one column only (djLayout.regionTabs). */
+export type DJRegionTab = 'A' | 'mixer' | 'B' | 'C';
 
 /** 'paused': the Auto DJ is on but holds (its Pause, a deck paused by hand, the Three Deck Showcase holding the set). */
 export type AutoDJStatus = 'idle' | 'playing' | 'paused' | 'preloading' | 'preload-failed' | 'transition-pending' | 'transitioning';
@@ -323,6 +325,7 @@ interface DJState {
   deckViewMode: DeckViewMode;
   /** Open lower-panel tab per deck; survives deck re-renders and view switches. */
   deckPanelTab: Record<'A' | 'B' | 'C', DeckPanelTab>;
+  djRegionTab: DJRegionTab;
   /** Whether the lower panel body is open per deck. Only used while the layout opens the panel on demand (short screens); docked, the body is always shown. Not persisted. */
   deckPanelOpen: Record<'A' | 'B' | 'C', boolean>;
   /** The crate record Deck C's scratch pads play (scratchCatalogue id). */
@@ -419,6 +422,7 @@ interface DJActions {
   cycleDeckViewMode: () => void;
   setDeckViewMode: (mode: DeckViewMode) => void;
   setDeckPanelTab: (deck: 'A' | 'B' | 'C', tab: DeckPanelTab) => void;
+  setDJRegionTab: (tab: DJRegionTab) => void;
   setDeckPanelOpen: (deck: 'A' | 'B' | 'C', open: boolean) => void;
   setDeckCRecordId: (id: string) => void;
   setThirdDeckActive: (active: boolean) => void;
@@ -524,6 +528,7 @@ export const useDJStore = create<DJStore>()(
     djModeActive: false,
     deckViewMode: 'visualizer' as DeckViewMode,
     deckPanelTab: { A: 'pads', B: 'pads', C: 'pads' } as Record<'A' | 'B' | 'C', DeckPanelTab>,
+    djRegionTab: 'A' as DJRegionTab,
     deckPanelOpen: { A: false, B: false, C: false } as Record<'A' | 'B' | 'C', boolean>,
     deckCRecordId: CRATE_LOAD_ORDER[0]?.id ?? '',
     thirdDeckActive: false,
@@ -610,6 +615,7 @@ export const useDJStore = create<DJStore>()(
       set((state) => {
         state.deckPanelTab[deck] = tab;
       }),
+    setDJRegionTab: (tab) => set((state) => { state.djRegionTab = tab; }),
     setDeckPanelOpen: (deck, open) =>
       set((state) => {
         state.deckPanelOpen[deck] = open;

@@ -83,6 +83,10 @@ export const DJ_LAYOUT_LIMITS = {
   /** D4: a deck at least this wide AND a row at least largeRowPx tall gets the large tier. */
   largeDeckWidthPx: 640,
   largeRowPx: 900,
+  /** DJ-TABS-TOUCH: a side-by-side deck narrower than this (compact) -> one region at a time behind tabs. */
+  regionTabsBelowPx: 250,
+  /** DJ-TABS-TOUCH: smallest hit target on a coarse pointer (Apple HIG 44 pt). */
+  touchTargetPx: 44,
 } as const;
 
 /** Media query for a coarse (finger / stylus) primary pointer. */

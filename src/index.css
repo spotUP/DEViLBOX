@@ -3201,3 +3201,13 @@ button[class*="rounded"] {
 
 /* Row actions live in their own grid column (instrumentListColumns.ts), so
  * they no longer overlay the name. */
+
+/* DJ-TABS-TOUCH: no hover on a touch screen, so a control that only fades in on
+   group hover would never appear. Show it at rest there (DJ browser/playlist row
+   buttons and similar). */
+@media (hover: none) {
+  .group .group-hover\:opacity-100,
+  .group .group-hover\:opacity-60 {
+    opacity: 1;
+  }
+}

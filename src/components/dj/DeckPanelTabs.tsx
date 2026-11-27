@@ -106,7 +106,7 @@ export const DeckPanelTabs: React.FC<DeckPanelTabsProps> = ({ deckId }) => {
       data-dj-band="panel"
       data-dj-budget={layout.budgets.panel}
     >
-      <TabStrip tabs={DECK_PANEL_TABS} active={tab} onChange={select} ariaLabel={`Deck ${deckId} panel`} dense={layout.scale === 'compact'} />
+      <TabStrip tabs={DECK_PANEL_TABS} active={tab} onChange={select} ariaLabel={`Deck ${deckId} panel`} dense={layout.scale === 'compact'} tabHeight={layout.tabStrip} />
       {body}
     </div>
   );
