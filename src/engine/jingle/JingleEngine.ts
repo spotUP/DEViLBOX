@@ -1,7 +1,24 @@
 /**
  * JingleEngine — startup jingle audio engine.
  * Plays the DEViLBOX startup jingle (.mp3) with an analyser for visualization.
+ *
+ * The jingle plays on the app's shared AudioContext (getDevilboxAudioContext,
+ * owned by ToneEngine) into ToneEngine.masterInput, so it runs through the
+ * master chain, the master volume and the app meters like every other source.
+ * It never creates or closes a context of its own.
  */
+
+import { getDevilboxAudioContext, getNativeAudioNode } from '@/utils/audio-context';
+
+/** The app's shared context and the native node of its master input. */
+async function sharedMasterInput(): Promise<{ ctx: AudioContext; input: AudioNode }> {
+  // Loaded lazily: ToneEngine is large and imports most of the engine tree.
+  const { getToneEngine } = await import('@engine/ToneEngine');
+  const engine = getToneEngine();
+  const input = getNativeAudioNode(engine.masterInput as unknown as Record<string, unknown>);
+  if (!input) throw new Error('[startup jingle] master input has no native node');
+  return { ctx: getDevilboxAudioContext(), input };
+}
 
 let instance: JingleEngine | null = null;
 
@@ -44,10 +61,11 @@ export class JingleEngine {
   private endCallback: (() => void) | null = null;
 
   async preload(url: string): Promise<void> {
-    this.audioCtx = new AudioContext();
-    this.analyserNode = this.audioCtx.createAnalyser();
+    const { ctx, input } = await sharedMasterInput();
+    this.audioCtx = ctx;
+    this.analyserNode = ctx.createAnalyser();
     this.analyserNode.fftSize = 256;
-    this.analyserNode.connect(this.audioCtx.destination);
+    this.analyserNode.connect(input);
     const resp = await fetch(url);
     const contentType = resp.headers.get('content-type') ?? '';
     if (!resp.ok || contentType.startsWith('text/html')) {
@@ -97,7 +115,9 @@ export class JingleEngine {
 
   dispose(): void {
     this.stop();
-    this.audioCtx?.close();
+    // The context is the app's shared one: leave it running, only unhook ours.
+    try { this.source?.disconnect(); } catch { /* not connected */ }
+    try { this.analyserNode?.disconnect(); } catch { /* not connected */ }
     this.audioCtx = null;
     this.analyserNode = null;
     this.source = null;

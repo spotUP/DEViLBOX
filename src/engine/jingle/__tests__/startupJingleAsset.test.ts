@@ -27,6 +27,15 @@ class FakeAudioContext {
   }
 }
 
+// The jingle plays on the app's shared context (STARTUP-JINGLE-MISSING).
+const fakeContext = new FakeAudioContext();
+const fakeMasterInput = { connect: () => undefined };
+vi.mock('@engine/ToneEngine', () => ({ getToneEngine: () => ({ masterInput: fakeMasterInput }) }));
+vi.mock('@/utils/audio-context', () => ({
+  getDevilboxAudioContext: () => fakeContext,
+  getNativeAudioNode: () => fakeMasterInput,
+}));
+
 afterEach(() => {
   vi.unstubAllGlobals();
   FakeAudioContext.decodeCalls = 0;
@@ -44,7 +53,6 @@ describe('startup jingle asset', () => {
   });
 
   it('preload rejects when the server answers with the HTML fallback', async () => {
-    vi.stubGlobal('AudioContext', FakeAudioContext);
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<!doctype html>', {
       status: 200,
       headers: { 'content-type': 'text/html; charset=utf-8' },
@@ -55,7 +63,6 @@ describe('startup jingle asset', () => {
 
   it('preload decodes the asset when it is served', async () => {
     const bytes = readFileSync(resolve(PUBLIC_DIR, STARTUP_JINGLE_URL.replace(/^\//, '')));
-    vi.stubGlobal('AudioContext', FakeAudioContext);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(bytes, {
       status: 200,
       headers: { 'content-type': 'audio/mpeg' },

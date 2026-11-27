@@ -37,6 +37,14 @@ class FakeAudioContext {
   close() { return Promise.resolve(); }
 }
 
+const fakeContext = new FakeAudioContext();
+const fakeMasterInput = { connect: () => undefined };
+vi.mock('@engine/ToneEngine', () => ({ getToneEngine: () => ({ masterInput: fakeMasterInput }) }));
+vi.mock('@/utils/audio-context', () => ({
+  getDevilboxAudioContext: () => fakeContext,
+  getNativeAudioNode: () => fakeMasterInput,
+}));
+
 afterEach(() => { vi.unstubAllGlobals(); FakeAudioContext.startArgs = null; });
 
 describe('startup jingle plays only its audible part', () => {
@@ -47,7 +55,6 @@ describe('startup jingle plays only its audible part', () => {
   });
 
   it('play() stops the source at the audible end, not the decoded end', async () => {
-    vi.stubGlobal('AudioContext', FakeAudioContext);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(8), {
       status: 200, headers: { 'content-type': 'audio/mpeg' },
     })));
