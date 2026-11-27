@@ -338,3 +338,6 @@ public/data/presets/
 
 # CMake build artifacts
 CMakeFiles/
+
+# Local NSF dump (1 GB, oversize .7z/.pdb). Only the 7 tracked test NSFs stay in git.
+public/data/songs/nsf/
