@@ -34,7 +34,11 @@ for attempt in $(seq 1 30); do
   # the commit rehash every tracked file (13+ min with the virus scanner on).
   cp "$(git rev-parse --git-dir)/index" "$GIT_INDEX_FILE"
   git reset -q "$base" -- .
-  git add -- "${files[@]}"
+  # Named regular files are added even when ignored (docs/ is ignored but its
+  # docs are force-tracked); directories keep normal ignore rules.
+  for f in "${files[@]}"; do
+    if [ -f "$f" ]; then git add -f -- "$f"; else git add -- "$f"; fi
+  done
 
   # Every changed path must be one of the named files (or under a named dir).
   # quotePath=false: non-ASCII paths come out raw, not octal-quoted, so they match the named files.
