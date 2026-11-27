@@ -218,6 +218,11 @@ class ScratchDeckCProcessor extends AudioWorkletProcessor {
     // the demo's whole-render level and duck for a planned span (three_deck.render), when the routine was shaped
     this.shapes = [];
     this.levelCoef = Math.exp(-1 / (1 * this.busRate));
+    // the means the level reads forget with a 1 s time constant (decks A + B at the context rate, the layer and the
+    // chain at the bus rate): a mean since the bus's start held the session's average, so a quieter track after a
+    // louder one played the scratch up to +8 dB over the rule (SCRATCH-TOO-LOUD 2026-11-27)
+    this.beatCoef = Math.exp(-1 / (1 * sampleRate));
+    this.busCoef = Math.exp(-1 / (1 * this.busRate));
     // the bus clock: bus sample n is context time n / busRate
     this.bus = -1;
     // the last TAPS bus samples (the upsampler's window), newest at hist[(hi - 1) % TAPS]
@@ -312,14 +317,15 @@ class ScratchDeckCProcessor extends AudioWorkletProcessor {
    * the demo measures it over the routine it levels, never over the silence between routines. The layer's mean
    * square is the posted strokes' own (known before they play, so the first stroke is levelled before its first
    * sample) times the chain's energy gain over what has played (`chainGain`, 1 until the first stroke is past its
-   * onset). The decks' mean square runs from the
-   * bus's start. The level takes its first value at once, then glides to the ratio over ~1 s.
+   * onset). Every mean forgets over ~1 s (beatCoef, busCoef), so the level follows the track playing now. The level takes its first value at once, then glides to the ratio over ~1 s.
    * (AUTO-SCRATCH-LOUD-MOVES 2026-10-14: a mean square since the layer's first stroke counted every idle second as
    * layer, so a stroke after a rest played up to +26 dB over the routine's, and a new bus's first stroke, measured
    * on its own attack, up to +13 dB.)
    */
   followLevel(y, x, covered) {
-    this.chainX += x * x; this.chainY += y * y;
+    const d = this.busCoef;
+    this.chainX = d * this.chainX + x * x; this.chainY = d * this.chainY + y * y;
+    this.dryE *= d; this.dryN *= d;
     if (covered) { this.sounding = true; this.soundedN++; }
     // the chain's gain once what played is past its onset (the bus fell idle, or half a second has sounded: the
     // filters settle in milliseconds, the echo returns at 0.2 s) - never on a stroke's first samples
@@ -337,17 +343,22 @@ class ScratchDeckCProcessor extends AudioWorkletProcessor {
     return this.level;
   }
 
-  /** Decks A + B (the input, mono as the demo reads a beat) into the level's mean square from the bus's start. */
+  /** Decks A + B (the input, mono as the demo reads a beat) into the level's mean square over the last ~1 s. */
   takeBeat(input) {
     if (!this.follow || !input || !input.length || !input[0]) return;
     const nch = input.length, n = input[0].length;
+    let e = 0;
     for (let i = 0; i < n; i++) {
       let m = 0;
       for (let c = 0; c < nch; c++) m += input[c][i];
       m /= nch;
-      this.beatSum += m * m;
+      e += m * m;
     }
-    this.beatN += n;
+    // silent blocks (decks stopped, between tracks) hold the last track's level instead of pulling the mean down
+    if (e / n < 1e-10) return;
+    const d = Math.pow(this.beatCoef, n);
+    this.beatSum = d * this.beatSum + e;
+    this.beatN = d * this.beatN + n;
   }
 
   process(inputs, outputs) {

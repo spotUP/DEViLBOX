@@ -47,6 +47,32 @@ describe('the scratch level hears decks A and B (X6)', () => {
     expect(rmsOf(out, 3 * RATE, n) / (0.60 * 0.2)).toBeLessThan(1.1);
   }, 120_000);
 
+  it('live: the level follows the track playing now, not the session average (SCRATCH-TOO-LOUD)', async () => {
+    const { createDeckCBus } = await import('@/engine/dj/scratch/scratchDeckC');
+    // a loud track (0.4) for 4 s, 1 s of silence between tracks, then a quiet one (0.1); pad hits on the quiet one
+    const n = 12 * RATE;
+    const ctx = new OfflineAudioContext(1, n, RATE);
+    const music = new Float32Array(n);
+    music.set(noise(4 * RATE, 0.4, 7), 0);
+    music.set(noise(7 * RATE, 0.1, 8), 5 * RATE);
+    const beatBuf = ctx.createBuffer(1, n, RATE);
+    beatBuf.copyToChannel(music as Float32Array<ArrayBuffer>, 0);
+    const beat = ctx.createBufferSource();
+    beat.buffer = beatBuf;
+    beat.start(0);
+    const bus = await createDeckCBus(ctx, ctx.destination, { chain: 'threeDeck', follow: true, beat });
+    const len = Math.round(0.24 * RATE), hits: number[] = [];
+    for (let t = 6 * RATE; t + len < n; t += Math.round(0.4 * RATE)) { hits.push(t); bus.stroke(t, Float64Array.from(noise(len, 0.2, t))); }
+    await new Promise((r) => setTimeout(r, 20));
+    const out = (await ctx.startRendering()).getChannelData(0);
+    // the sounding part of each hit from 9 s on sits at 0.60 x the quiet track's RMS (the session average read +8 dB)
+    let e = 0, k = 0;
+    for (const h of hits) if (h >= 9 * RATE) for (let i = h; i < h + len; i++) { e += out[i]! * out[i]!; k++; }
+    const ratio = Math.sqrt(e / k) / (0.60 * 0.1);
+    expect(ratio).toBeGreaterThan(0.8);
+    expect(ratio).toBeLessThan(1.25);
+  }, 120_000);
+
   it('planned: both playing decks are read and summed (A at its routine offset, B from where it will be), weighted by the crossfader', async () => {
     const { routineShapeDecks } = await import('@/engine/dj/scratch/scratchDeckC');
     const a = { tag: 'A' }, b = { tag: 'B' };
