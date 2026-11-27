@@ -177,6 +177,8 @@ export class DeckEngine {
    */
   private restMultiplier = 1;
   private _isScratchActive = false;   // true while jog wheel is physically held
+  /** deckGain at rest (trim). Scratch backward phases drop deckGain to 0; every restore returns here. */
+  private _restGain = 1;
   /** Whether jog wheel scratch is currently active (hand on record). */
   get isScratchActive(): boolean { return this._isScratchActive; }
   /** Captured at startScratch() — true if the deck was playing before the
@@ -949,6 +951,8 @@ export class DeckEngine {
     // pause() fires after our start). This was the root cause of Auto DJ
     // fading to silence before the incoming track played.
     await this._cancelPrimingIfActive();
+    // A scratch that ended on a backward phase (or was cut by stop()) can leave deckGain at 0: the deck plays silent.
+    if (!this._isScratchActive && !this.isPatternActive()) this._setDeckGain(this._restGain);
 
     if (this._playbackMode === 'audio') {
       console.log(`[DeckEngine] play() in audio mode (stem=${this._stemMode})`);
@@ -991,6 +995,8 @@ export class DeckEngine {
 
   stop(): void {
     this._endBend();
+    // A pattern scratch would keep looping (and gating deckGain) on a stopped deck.
+    if (this.isPatternActive()) this.stopPattern();
     if (this._playbackMode === 'audio') {
       if (this._stemMode) {
         this.stemPlayer.stop();
@@ -1361,7 +1367,7 @@ export class DeckEngine {
           // Transition backward → forward
           this.scratchBuffer?.silenceAndStop();
           this.scratchBuffer?.unfreezeCapture();
-          this._rampDeckGain(1, 0.002);
+          this._rampDeckGain(this._restGain, 0.002);
           this.patternScratchDir = 1;
         }
         if (isAudio) {
@@ -1508,7 +1514,7 @@ export class DeckEngine {
         this._applyRestRate();
       }
       // Hard-set gain back to 1.0 — the channel is gated by play-state now.
-      this._setDeckGain(1);
+      this._setDeckGain(this._restGain);
       this.scratchDirection = 1;
       return;
     }
@@ -1531,7 +1537,7 @@ export class DeckEngine {
         this.scratchBuffer.playbackGain.gain.setValueAtTime(0, now);
       }
       // Hard-set deckGain to exactly 1.0 via raw native AudioParam
-      this._setDeckGain(1);
+      this._setDeckGain(this._restGain);
       // Force playback rate to restMultiplier — prevents rate drift from
       // incomplete _decayToRest animations or stale physics velocities.
       // Only reached when `_wasPlayingAtScratchStart` was true (the
@@ -1672,7 +1678,7 @@ export class DeckEngine {
     if (this._playbackMode === 'audio') {
       this.audioPlayer.seek(targetMs / 1000);
       this.audioPlayer.setPlaybackRate(fwdRate);
-      this._rampDeckGain(1, 0.002);
+      this._rampDeckGain(this._restGain, 0.002);
       if (!this.audioPlayer.isCurrentlyPlaying()) {
         this.audioPlayer.resume();
       }
@@ -1685,7 +1691,7 @@ export class DeckEngine {
         this.replayer.seekTo(this.backwardStartSongPos, this.backwardStartPattPos);
       }
       this.replayer.resume();
-      this._rampDeckGain(1, 0.002);
+      this._rampDeckGain(this._restGain, 0.002);
       this.replayer.setPitchMultiplier(fwdRate);
       this.replayer.setTempoMultiplier(fwdRate);
     }
@@ -1876,7 +1882,7 @@ export class DeckEngine {
     if (this.patternScratchDir === -1 && this.scratchBufferReady && this.scratchBuffer) {
       this.scratchBuffer.silenceAndStop();
       this.scratchBuffer.unfreezeCapture();
-      this._rampDeckGain(1, 0.005);
+      this._rampDeckGain(this._restGain, 0.005);
     }
 
     // Don't seek back — let the music continue from its current position.
@@ -2226,8 +2232,8 @@ export class DeckEngine {
 
   /** Set the trim/auto-gain level in dB (applied to deckGain node) */
   setTrimGain(dB: number): void {
-    const linear = Math.pow(10, dB / 20);
-    this.deckGain.gain.rampTo(Math.max(0, Math.min(8, linear)), 0.05);
+    this._restGain = Math.max(0, Math.min(8, Math.pow(10, dB / 20)));
+    this.deckGain.gain.rampTo(this._restGain, 0.05);
   }
 
   setVolume(value: number): void {
