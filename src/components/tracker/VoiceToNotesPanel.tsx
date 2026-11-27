@@ -8,7 +8,7 @@
  * pattern writing in lib/voice/writeToPattern. Take, settings and training state
  * live in stores/useVoiceStore; this modal and the setup wizard only render it.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Mic, Square, Check, Loader2, Timer, Wand2 } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { Modal } from '@components/ui/Modal';
@@ -20,6 +20,8 @@ import { CustomSelect } from '@components/common/CustomSelect';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { useCursorStore } from '@/stores/useCursorStore';
+import { liveCellWrites, applyLiveWrites } from '@/lib/voice/liveWrite';
 import { notify } from '@/stores/useNotificationStore';
 import { useVoiceStore, type Finetune, type VoiceEffectToggles, type VoiceMode, type VoiceTake } from '@/stores/useVoiceStore';
 import { useVoiceRecorder, defaultVoiceRecorderDeps, type VoiceRecorderDeps } from '@/hooks/audio/useVoiceRecorder';
@@ -54,7 +56,7 @@ import {
   type TrainingSample,
 } from '@/lib/voice/drumModel';
 import { NEW_808_INSTRUMENT, commitDrumHits, defaultDrumMap, quantiseHits, usedDrumClasses, type DrumMap } from '@/lib/voice/drumToNotes';
-import { currentTargetInstrument, drumMapAsWritten } from '@/lib/voice/voiceInstruments';
+import { currentTargetInstrument, drumMapAsWritten, playableMelodyInstrument } from '@/lib/voice/voiceInstruments';
 
 export interface VoiceToNotesPanelProps {
   isOpen: boolean;
@@ -244,6 +246,9 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   useEffect(() => setPending(true), [take, fine, quantise, channelIndex, startRow, mode]);
   // Set when a take ends: the take lands on the grid without a Commit click.
   const [autoCommit, setAutoCommit] = useState(false);
+  // Hum to Pattern: notes go into the cells while the take is sung, from the cursor row
+  const [liveWrite, setLiveWrite] = useState(false);
+  const writtenRef = useRef(new Map<number, number>());
 
   const finalNotes = useMemo(
     () =>
@@ -253,8 +258,9 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
 
   const handleRecord = useCallback(async () => {
     clearTake();
-    // A take always writes from row 0 of the pattern, wherever the cursor is (owner decision VNR-24)
-    setStartRow(0);
+    // A take writes from row 0 of the pattern (owner decision VNR-24); a live take from the cursor row
+    setStartRow(liveWrite && !drums ? useCursorStore.getState().cursor.rowIndex : 0);
+    writtenRef.current = new Map();
     await recorder.start({
       deviceId: deviceId || undefined,
       countInBeats: COUNT_IN_BEATS,
@@ -262,7 +268,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
       // Drum hits are found when the take stops; the pitch tracker is not needed
       livePreview: !drums,
     });
-  }, [recorder, deviceId, drums, clearTake, setStartRow]);
+  }, [recorder, deviceId, drums, clearTake, setStartRow, liveWrite]);
 
   const handleRecordTraining = useCallback(async (drum: DrumClass) => {
     setRecordingClass(drum);
@@ -425,6 +431,14 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const takeRecording = recording && !levelCheck && recordingClass === null;
   const shownNotes = recording ? recorder.liveNotes : finalNotes;
 
+  // Each live preview step writes the cells that changed; the take's commit on stop rewrites them (cleanup)
+  useEffect(() => {
+    if (!liveWrite || drums || !takeRecording || recorder.liveNotes.length === 0) return;
+    const rows = melodyRows(recorder.liveNotes, quantise, null, null, fine.effects);
+    const target = { channelIndex, startRow, instrumentId: playableMelodyInstrument(instrumentId) };
+    applyLiveWrites(liveCellWrites(rows, target, rowCount, writtenRef.current), channelIndex, writtenRef.current);
+  }, [liveWrite, drums, takeRecording, recorder.liveNotes, quantise, fine.effects, channelIndex, startRow, instrumentId, rowCount]);
+
   // The take's audio and pitch contour: read once per take from its pitch track,
   // shared by the preview, the commit and the timing table (lib/voice/noteEffects).
   const takeAudio = useMemo(() => (take ? { audio: take.audio, sampleRate: take.sampleRate } : null), [take]);
@@ -532,6 +546,12 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
               options={instrumentOptions}
               title="Instrument"
             />
+          )}
+          {!drums && (
+            <div className="flex items-center gap-2">
+              <Toggle label="Write notes while recording" hideLabel value={liveWrite} onChange={setLiveWrite} size="sm" disabled={recording} />
+              <span className="text-[10px] font-mono text-text-secondary">Write notes while recording, from the cursor row</span>
+            </div>
           )}
 
           {drums ? (

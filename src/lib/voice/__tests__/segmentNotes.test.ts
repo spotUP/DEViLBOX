@@ -59,14 +59,18 @@ describe('segmentNotes rules', () => {
     expect(pitches(s, track([silence(5), { hz: A3, frames: 30 }, { hz: Bb3, frames: 6 }, silence(5)]))).toEqual([57, 58]);
   });
 
-  it('a 60 ms unvoiced gap splits two same-pitch notes', () => {
-    expect(pitches(s, track([silence(5), { hz: A3, frames: 20 }, { hz: A3, frames: 4, confidence: 0.1 }, { hz: A3, frames: 20 }, silence(5)]))).toEqual([57, 57]);
+  it('a 60 ms unvoiced gap with a loudness dip (breath, consonant) splits two same-pitch notes', () => {
+    expect(pitches(s, track([silence(5), { hz: A3, frames: 20 }, { hz: A3, frames: 4, confidence: 0.1, db: -30 }, { hz: A3, frames: 20 }, silence(5)]))).toEqual([57, 57]);
   });
 
-  it('a voiced frame below the voicing threshold counts as unvoiced', () => {
+  it('a 60 ms confidence dip at full loudness is a vowel change, not a gap: one note (VNR-17)', () => {
+    expect(pitches(s, track([silence(5), { hz: A3, frames: 20 }, { hz: A3, frames: 4, confidence: 0.1 }, { hz: A3, frames: 20 }, silence(5)]))).toEqual([57]);
+  });
+
+  it('a voiced frame below the voicing threshold counts as unvoiced in the DP', () => {
     const t = track([silence(5), { hz: A3, frames: 20 }, { hz: A3, frames: 4, confidence: 0.4 }, { hz: A3, frames: 20 }, silence(5)]);
-    expect(pitches(s, t)).toEqual([57, 57]);
-    expect(pitches({ ...s, voicingThreshold: 0 }, t)).toEqual([57]);
+    expect(segmentFrames(t, s.pitchHoldMs, s.voicingThreshold)).toHaveLength(2);
+    expect(segmentFrames(t, s.pitchHoldMs, 0)).toHaveLength(1);
   });
 
   it('a 2 dB loudness dip does not split; a 12 dB dip does', () => {
@@ -110,5 +114,38 @@ describe('segmentNotes rules', () => {
     expect(notes.length).toBeGreaterThan(0);
     // Budget 50 ms (plan SG-5; measured 24.5 ms on the owner's Mac); slack for slow CI runners.
     expect(ms).toBeLessThan(200);
+  });
+
+  it('ooo eee ooo eee on one pitch, confidence dipping to 0.3 at each vowel change, is one note (VNR-17)', () => {
+    const runs: Run[] = [silence(5)];
+    for (let k = 0; k < 6; k++) {
+      runs.push({ hz: A3, frames: 25, db: k % 2 ? -18 : -22 });
+      if (k < 5) runs.push({ hz: A3 * 1.01, frames: 3, confidence: 0.3, db: -21 });
+    }
+    runs.push(silence(5));
+    const notes = segmentNotes(track(runs), s);
+    expect(notes.map((n) => n.pitchMidi)).toEqual([57]);
+    expect(notes[0].durationSeconds).toBeCloseTo((6 * 25 + 5 * 3) * TRACK_HOP_SECONDS, 6);
+  });
+
+  it('two sung notes as ooo/eee vowels stay two notes, not one per vowel (VNR-17)', () => {
+    const runs: Run[] = [silence(5)];
+    for (const hz of [A3, midiToHz(61)]) {
+      for (let k = 0; k < 4; k++) {
+        runs.push({ hz, frames: 20 });
+        if (k < 3) runs.push({ hz, frames: 2, confidence: 0.25 });
+      }
+      runs.push(silence(8));
+    }
+    expect(pitches(s, track(runs))).toEqual([57, 61]);
+  });
+
+  it('a bright vowel that makes the tracker jump an octave for a few frames stays one note (VNR-17)', () => {
+    const t = track([silence(5), { hz: A3, frames: 20 }, { hz: A3 * 2, frames: 7 }, { hz: A3, frames: 20 }, { hz: A3 / 2, frames: 6 }, { hz: A3, frames: 20 }, silence(5)]);
+    expect(pitches(s, t)).toEqual([57]);
+  });
+
+  it('a sung octave leap held longer than the fold window keeps its pitch', () => {
+    expect(pitches(s, track([silence(5), { hz: A3, frames: 30 }, { hz: A3 * 2, frames: 30 }, silence(5)]))).toEqual([57, 69]);
   });
 });

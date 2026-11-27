@@ -110,6 +110,13 @@ describe('liveWindow.mergeWindowNotes', () => {
     expect(merged[1].startTimeSeconds).toBeCloseTo(1.1, 6);
   });
 
+  it('keeps a settled note whose float end the sample-rounded window start lands just before', () => {
+    // previewStep starts the window at a settled note's end, rounded to a sample
+    const prev = [note(1.5, 0.5000000001, 64)];
+    const windowStart = Math.round(2.0000000001 * PITCH_SAMPLE_RATE) / PITCH_SAMPLE_RATE;
+    expect(mergeWindowNotes(prev, [], windowStart).map((n) => n.pitchMidi)).toEqual([64]);
+  });
+
   it('previewStep keeps the onset of a note the window would cut, so the ghost note starts where the commit puts it (VR-1)', async () => {
     const tone = (midi: number, from: number, to: number, out: Float32Array) => {
       const w = (2 * Math.PI * midiToHz(midi)) / PITCH_SAMPLE_RATE;

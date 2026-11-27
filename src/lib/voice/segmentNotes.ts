@@ -13,8 +13,9 @@
  * - beta     = pitchHoldMs / hop: the cost of one note
  *
  * Voice to Notes additions: frames below `voicingThreshold` get weight 0 (at 0
- * the result equals music.py), then MIDI = nearest semitone, length and range
- * filters, and amplitude from loudness.
+ * segmentFrames equals music.py); segmentNotes folds octave errors before the
+ * DP and joins same-pitch notes split at a confidence dip after it (VNR-17),
+ * then MIDI = nearest semitone, length and range filters, amplitude from loudness.
  */
 import type { VoiceNote } from './pitchNotes';
 import type { F0Track } from './pitchTrack';
@@ -132,11 +133,85 @@ export function segmentFrames(track: F0Track, pitchHoldMs: number, voicingThresh
   return notes.reverse();
 }
 
-/** Notes of a take: DP, nearest semitone, length and range filters, amplitude from loudness. */
+/** Frames on each side whose median pitch a frame is checked against for an octave error. */
+const FOLD_HALF_FRAMES = 8;
+/** Two same-pitch notes this close, with no loudness dip between them, are one held note (VNR-17). */
+const JOIN_GAP_MS = 100;
+/** A gap frame this far below the quieter of the two notes is a real break (breath, consonant, re-attack). */
+const JOIN_DIP_DB = 6;
+/** Frames either side of the boundary searched for that dip (the DP cuts a quiet split inside the dip). */
+const JOIN_EDGE_FRAMES = 2;
+
+/**
+ * Octave errors folded back: a voiced frame about an octave (or two) off the
+ * median of the voiced frames within +-8 frames is moved onto that octave.
+ * A bright vowel ("eee", strong 2nd harmonic) makes the tracker jump an
+ * octave for a few frames; a sung octave leap held longer than the half
+ * window keeps its pitch, because the median follows it.
+ */
+export function foldOctaveErrors(track: F0Track, voicingThreshold: number): Float32Array {
+  const { hz, confidence } = track;
+  const n = hz.length;
+  const out = Float32Array.from(hz);
+  const voiced = (t: number) => hz[t] > 0 && Number.isFinite(hz[t]) && confidence[t] >= Math.max(voicingThreshold, 1e-6);
+  const near: number[] = [];
+  for (let t = 0; t < n; t++) {
+    if (!voiced(t)) continue;
+    near.length = 0;
+    for (let j = Math.max(0, t - FOLD_HALF_FRAMES); j <= Math.min(n - 1, t + FOLD_HALF_FRAMES); j++) if (voiced(j)) near.push(hzToMidi(hz[j]));
+    near.sort((a, b) => a - b);
+    const d = hzToMidi(hz[t]) - near[near.length >> 1];
+    const k = Math.round(d / 12);
+    if (k !== 0 && Math.abs(d - 12 * k) < 1) out[t] = hz[t] / 2 ** k;
+  }
+  return out;
+}
+
+/**
+ * Join neighbouring notes of one semitone the DP split at a confidence dip:
+ * a vowel change on a held pitch (ooo -> eee) lowers the tracker's
+ * confidence for a few frames, which the DP reads as unvoiced and splits on.
+ * A real break dips in loudness and stays split.
+ */
+export function joinHeldNotes(segs: readonly SegmentedNote[], track: F0Track): SegmentedNote[] {
+  const { loudnessDb, hopSeconds } = track;
+  const n = loudnessDb.length;
+  const mean = (a: number, b: number) => {
+    let sum = 0;
+    for (let t = a; t < b; t++) sum += loudnessDb[t];
+    return sum / Math.max(1, b - a);
+  };
+  const out: SegmentedNote[] = [];
+  for (const seg of segs) {
+    const prev = out[out.length - 1];
+    if (prev && Math.floor(prev.mu + 0.5) === Math.floor(seg.mu + 0.5)
+      && (seg.startFrame - prev.endFrame) * hopSeconds * 1000 <= JOIN_GAP_MS) {
+      const floor = Math.min(mean(prev.startFrame, prev.endFrame), mean(seg.startFrame, seg.endFrame)) - JOIN_DIP_DB;
+      let dip = false;
+      for (let t = Math.max(0, prev.endFrame - JOIN_EDGE_FRAMES); t < Math.min(n, seg.startFrame + JOIN_EDGE_FRAMES); t++) {
+        if (loudnessDb[t] < floor) dip = true;
+      }
+      if (!dip) {
+        const a = prev.endFrame - prev.startFrame;
+        const b = seg.endFrame - seg.startFrame;
+        out[out.length - 1] = { startFrame: prev.startFrame, endFrame: seg.endFrame, mu: (prev.mu * a + seg.mu * b) / (a + b) };
+        continue;
+      }
+    }
+    out.push({ ...seg });
+  }
+  return out;
+}
+
+/**
+ * Notes of a take: octave errors folded, DP, held notes joined, nearest
+ * semitone, length and range filters, amplitude from loudness.
+ */
 export function segmentNotes(track: F0Track, s: SegmentSettings): VoiceNote[] {
   const hop = track.hopSeconds;
   const kept: { note: VoiceNote; level: number }[] = [];
-  for (const seg of segmentFrames(track, s.pitchHoldMs, s.voicingThreshold)) {
+  const folded: F0Track = { ...track, hz: foldOctaveErrors(track, s.voicingThreshold) };
+  for (const seg of joinHeldNotes(segmentFrames(folded, s.pitchHoldMs, s.voicingThreshold), track)) {
     const pitchMidi = Math.floor(seg.mu + 0.5);
     const durationSeconds = (seg.endFrame - seg.startFrame) * hop;
     if (durationSeconds * 1000 < s.minNoteLengthMs) continue;
