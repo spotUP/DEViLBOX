@@ -10,7 +10,7 @@ import { digMugEditModule, digMugGrid } from '@/engine/digmug/digMugEditWasm';
 import { parseDigitalMugicianFile } from '../formats/DigitalMugicianParser';
 import { dmIndexToNote } from '../formats/DigitalMugicianNotes';
 
-const SONGS = ['digital-mugician/believe.dmu', 'digital-mugician-2/snickle.mug', 'formats/cockwise.mug', 'formats/flight.dmu', 'formats/snickle.mug2'];
+const SONGS = ['digital-mugician/believe.dmu', 'digital-mugician-2/snickle.mug', 'digital-mugician-2/cockwise.mug', 'digital-mugician/flight.dmu', 'digital-mugician-2/snickle.mug2'];
 
 describe('Digital Mugician wasm grid = what the replayer plays', () => {
   for (const f of SONGS) it(f, async () => {
