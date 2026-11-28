@@ -3,6 +3,7 @@
  * Stores .dbx files locally in the browser with full CRUD operations
  */
 
+import { watchConnection, isConnectionLive } from './idbConnection';
 const DB_NAME = 'devilbox-library';
 const DB_VERSION = 1;
 const STORE_NAME = 'projects';
@@ -31,7 +32,11 @@ class ProjectLibrary {
   private initPromise: Promise<void> | null = null;
 
   async init(): Promise<void> {
-    if (this.db) return;
+    if (this.db) {
+      if (isConnectionLive(this.db)) return;
+      this.db = null;
+      this.initPromise = null;
+    }
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = new Promise((resolve, reject) => {
@@ -43,7 +48,11 @@ class ProjectLibrary {
       };
 
       request.onsuccess = () => {
-        this.db = request.result;
+        const conn = request.result;
+        this.db = conn;
+        watchConnection(conn, () => {
+          if (this.db === conn) { this.db = null; this.initPromise = null; }
+        });
         console.log('[ProjectLibrary] Database initialized');
         resolve();
       };

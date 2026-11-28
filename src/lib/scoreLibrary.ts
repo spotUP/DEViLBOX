@@ -3,6 +3,7 @@
  * Persists Nibbles scores locally in the browser
  */
 
+import { watchConnection, isConnectionLive } from './idbConnection';
 const DB_NAME = 'devilbox-scores';
 const DB_VERSION = 1;
 const STORE_NAME = 'nibbles';
@@ -22,7 +23,11 @@ class ScoreLibrary {
   private initPromise: Promise<void> | null = null;
 
   async init(): Promise<void> {
-    if (this.db) return;
+    if (this.db) {
+      if (isConnectionLive(this.db)) return;
+      this.db = null;
+      this.initPromise = null;
+    }
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = new Promise((resolve, reject) => {
@@ -34,7 +39,11 @@ class ScoreLibrary {
       };
 
       request.onsuccess = () => {
-        this.db = request.result;
+        const conn = request.result;
+        this.db = conn;
+        watchConnection(conn, () => {
+          if (this.db === conn) { this.db = null; this.initPromise = null; }
+        });
         console.log('[ScoreLibrary] Database initialized');
         resolve();
       };

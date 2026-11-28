@@ -6,6 +6,7 @@
  */
 
 import type { FullAnalysisResult } from '@/stores/useTrackerAnalysisStore';
+import { watchConnection, isConnectionLive } from '../lib/idbConnection';
 
 const DB_NAME = 'DEViLBOX_TrackerAnalysis';
 const DB_VERSION = 2; // bumped: CED-based genre classifier replaces hand-rolled BPM waterfall
@@ -23,7 +24,10 @@ let db: IDBDatabase | null = null;
 // ── Database Management ──────────────────────────────────────────────────────
 
 async function initDB(): Promise<IDBDatabase> {
-  if (db) return db;
+  if (db) {
+    if (isConnectionLive(db)) return db;
+    db = null;
+  }
 
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -34,9 +38,11 @@ async function initDB(): Promise<IDBDatabase> {
     };
 
     request.onsuccess = () => {
-      db = request.result;
+      const conn = request.result;
+      db = conn;
+      watchConnection(conn, () => { if (db === conn) db = null; });
       console.log('[TrackerAnalysisCache] Database initialized');
-      resolve(db!);
+      resolve(conn);
     };
 
     request.onupgradeneeded = (event) => {

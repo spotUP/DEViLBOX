@@ -25,6 +25,7 @@ import { snapshotSong } from '@/lib/song/snapshotSong';
 import { decideSnapshot, keysToDrop, MAX_REPLACED_REVISIONS, newestFirst, songFingerprint } from '@/lib/song/songRevisions';
 import { compressProject } from '@/lib/projectCompression';
 import { markExplicitlySaved, clearExplicitlySaved, setExplicitlySaved, isExplicitlySaved } from '@/lib/persistence/explicitSave';
+import { watchConnection, isConnectionLive } from '../lib/idbConnection';
 
 
 const AUTO_SAVE_INTERVAL = 300000; // 5 minutes
@@ -175,7 +176,10 @@ interface SavedProject {
 let cachedDB: IDBDatabase | null = null;
 
 function getDB(): Promise<IDBDatabase> {
-  if (cachedDB) return Promise.resolve(cachedDB);
+  if (cachedDB) {
+    if (isConnectionLive(cachedDB)) return Promise.resolve(cachedDB);
+    cachedDB = null;
+  }
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(IDB_NAME, IDB_VERSION);
     req.onupgradeneeded = () => {
@@ -192,9 +196,10 @@ function getDB(): Promise<IDBDatabase> {
       }
     };
     req.onsuccess = () => {
-      cachedDB = req.result;
-      cachedDB.onclose = () => { cachedDB = null; };
-      resolve(cachedDB);
+      const conn = req.result;
+      cachedDB = conn;
+      watchConnection(conn, () => { if (cachedDB === conn) cachedDB = null; });
+      resolve(conn);
     };
     req.onerror = () => reject(req.error);
   });

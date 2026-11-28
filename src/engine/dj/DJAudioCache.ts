@@ -24,6 +24,7 @@ import {
   attachChannelScopes, noteScopelessWav, needsChannelScopeRerender, CHANNEL_SCOPE_RENDER_VERSION,
   type ChannelScopeTrack,
 } from './channelScopeTrack';
+import { watchConnection, isConnectionLive } from '../../lib/idbConnection';
 
 export interface CachedAudio {
   hash: string;           // SHA-256 of source file
@@ -157,15 +158,22 @@ let db: IDBDatabase | null = null;
 
 /** Initialize IndexedDB */
 async function initDB(): Promise<IDBDatabase> {
-  if (db) return db;
+  if (db) {
+    // A connection that closed without telling us (no close/versionchange event) is dropped and reopened once.
+    if (isConnectionLive(db)) return db;
+    db = null;
+  }
 
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = () => reject(new Error('Failed to open IndexedDB'));
     request.onsuccess = () => {
-      db = request.result;
-      resolve(db!);
+      const conn = request.result;
+      // Deleted or upgraded elsewhere (another tab, DevTools): let it go, and the next call reopens.
+      watchConnection(conn, () => { if (db === conn) db = null; });
+      db = conn;
+      resolve(conn);
       // A cache over its cap (entries written while sizes counted the WAV only) trims on open,
       // not first on the next write.
       void trimCacheToCap();

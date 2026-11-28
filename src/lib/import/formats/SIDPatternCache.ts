@@ -6,6 +6,7 @@
  */
 
 import type { Pattern, InstrumentConfig } from '@/types';
+import { watchConnection, isConnectionLive } from '../../idbConnection';
 
 const DB_NAME = 'DEViLBOX_SIDPatternCache';
 const DB_VERSION = 1;
@@ -28,11 +29,19 @@ export interface CachedSIDPatterns {
 let db: IDBDatabase | null = null;
 
 async function initDB(): Promise<IDBDatabase> {
-  if (db) return db;
+  if (db) {
+    if (isConnectionLive(db)) return db;
+    db = null;
+  }
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onerror = () => reject(new Error('Failed to open SID pattern cache'));
-    req.onsuccess = () => { db = req.result; resolve(db!); };
+    req.onsuccess = () => {
+      const conn = req.result;
+      db = conn;
+      watchConnection(conn, () => { if (db === conn) db = null; });
+      resolve(conn);
+    };
     req.onupgradeneeded = (e) => {
       const database = (e.target as IDBOpenDBRequest).result;
       if (!database.objectStoreNames.contains(STORE_NAME)) {

@@ -23,6 +23,7 @@ import type {
   DemucsWorkerResponse,
 } from './types';
 import { STEM_NAMES_4S, STEM_NAMES_6S } from './types';
+import { watchConnection } from '../../lib/idbConnection';
 
 // ── Model URLs (hosted on our CDN or the live server) ──────────────────────────────
 
@@ -295,7 +296,7 @@ export class DemucsEngine {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(MODEL_DB_NAME, MODEL_DB_VERSION);
       req.onerror = () => reject(new Error('Failed to open model cache DB'));
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => { watchConnection(req.result, () => {}); resolve(req.result); };
       req.onupgradeneeded = (e) => {
         const db = (e.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains(MODEL_STORE)) {
@@ -342,7 +343,7 @@ export class DemucsEngine {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(STEM_DB_NAME, STEM_DB_VERSION);
       req.onerror = () => reject(new Error('Failed to open stem cache DB'));
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => { watchConnection(req.result, () => {}); resolve(req.result); };
       req.onupgradeneeded = (e) => {
         const db = (e.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains(STEM_STORE)) {

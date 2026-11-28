@@ -13,6 +13,7 @@ import type { DrumProgram, DrumPad, SampleData, SampleLayer, MpcResampleConfig }
 import type { InstrumentConfig } from '../../types/instrument/defaults';
 import type { EffectConfig } from '../../types/instrument/effects';
 import { createEmptyPad } from '../../types/drumpad';
+import { watchConnection, isConnectionLive } from '../idbConnection';
 
 const DB_NAME = 'devilbox-drumpad';
 const DB_VERSION = 1;
@@ -32,7 +33,10 @@ export interface StoredSample {
 let dbInstance: IDBDatabase | null = null;
 
 export function openDB(): Promise<IDBDatabase> {
-  if (dbInstance) return Promise.resolve(dbInstance);
+  if (dbInstance) {
+    if (isConnectionLive(dbInstance)) return Promise.resolve(dbInstance);
+    dbInstance = null;
+  }
 
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -48,9 +52,10 @@ export function openDB(): Promise<IDBDatabase> {
     };
 
     request.onsuccess = () => {
-      dbInstance = request.result;
-      dbInstance.onclose = () => { dbInstance = null; };
-      resolve(dbInstance);
+      const conn = request.result;
+      dbInstance = conn;
+      watchConnection(conn, () => { if (dbInstance === conn) dbInstance = null; });
+      resolve(conn);
     };
 
     request.onerror = () => {
