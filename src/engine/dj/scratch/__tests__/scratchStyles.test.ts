@@ -8,7 +8,8 @@ import {
   gestureSuitability, phraseBarsFor, MODE_MAX_LEVEL,
 } from '../scratchStyles';
 import { SCRATCH_GESTURE_IDS, getGesture } from '../scratchGestureCatalog';
-import type { ScratchGesture } from '../scratchTypes';
+import type { ScratchGesture, ScratchDJStyle } from '../scratchTypes';
+import { checkCutRate } from '../ScratchSafety';
 
 describe('levels (section 31, SCR-P1.6)', () => {
   it('every gesture has exactly one level; crab is L4, forwardStab L1', () => {
@@ -54,6 +55,18 @@ describe('style palettes (section 32, SCR-P1.7)', () => {
       expect(style.fxAmount).toBeLessThanOrEqual(1);
       expect(style.name).toMatch(/^[A-Z]/);
     }
+  });
+});
+
+describe('modes (section 62, SCR-P9.2)', () => {
+  it('SAFE never yields transformer; BATTLE yields crab but the governor still rejects 20 cuts per beat', () => {
+    for (const style of Object.keys(SCRATCH_STYLES) as ScratchDJStyle[]) {
+      expect(styleVocabulary(style, 'SAFE').filter((g) => g.startsWith('transformer')), style).toEqual([]);
+      expect(styleVocabulary(style, 'OFF'), style).toEqual([]);
+    }
+    expect(styleVocabulary('battle', 'BATTLE')).toContain('crab');
+    expect(checkCutRate({ cutsPerBeat: 20 }).ok).toBe(false);
+    expect(checkCutRate({ gesture: 'crab' }).ok).toBe(true);
   });
 });
 
