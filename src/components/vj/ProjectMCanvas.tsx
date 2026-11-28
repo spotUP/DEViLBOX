@@ -461,7 +461,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
         )}
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-black">
-            <div className="text-red-400/80 font-mono text-sm text-center px-8">
+            <div className="text-accent-error/80 font-mono text-sm text-center px-8">
               <div>projectM failed to load</div>
               <div className="text-xs mt-1 text-white/40">{error}</div>
               <div className="text-xs mt-2 text-white/30">Falling back to Butterchurn is recommended</div>

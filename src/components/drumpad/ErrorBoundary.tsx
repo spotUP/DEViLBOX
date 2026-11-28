@@ -61,10 +61,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <div className="flex items-center justify-center min-h-[400px] p-6">
           <div className="max-w-md w-full">
-            <div className="bg-dark-bgSecondary border border-red-500/50 rounded-lg p-6 space-y-4">
+            <div className="bg-dark-bgSecondary border border-accent-error/50 rounded-lg p-6 space-y-4">
               {/* Error Icon */}
               <div className="flex items-center gap-3">
-                <AlertTriangle className="w-8 h-8 text-red-400" />
+                <AlertTriangle className="w-8 h-8 text-accent-error" />
                 <div>
                   <h3 className="text-lg font-bold text-text-primary">Something went wrong</h3>
                   <p className="text-sm text-text-muted">
@@ -76,7 +76,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               {/* Error Details (development only) */}
               {process.env.NODE_ENV === 'development' && error && (
                 <div className="bg-dark-bg rounded p-3 space-y-2">
-                  <div className="text-xs font-mono text-red-400">
+                  <div className="text-xs font-mono text-accent-error">
                     <strong>Error:</strong> {error.toString()}
                   </div>
                   {errorInfo && (

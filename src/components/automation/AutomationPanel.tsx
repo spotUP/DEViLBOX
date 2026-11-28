@@ -33,11 +33,11 @@ export const AutomationPanel: React.FC = () => {
   // Theme-aware colors for "has data" indicator
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const hasDataBg = isCyanTheme ? 'bg-accent-highlight/20' : 'bg-orange-500/20';
-  const hasDataText = isCyanTheme ? 'text-accent-highlight' : 'text-orange-400';
-  const hasDataBorder = isCyanTheme ? 'border-accent-highlight' : 'border-orange-500';
-  const hasDataHover = isCyanTheme ? 'hover:bg-accent-highlight/30' : 'hover:bg-orange-500/30';
-  const hasDataDot = isCyanTheme ? 'bg-accent-highlight' : 'bg-orange-500';
+  const hasDataBg = isCyanTheme ? 'bg-accent-highlight/20' : 'bg-accent-warning/20';
+  const hasDataText = isCyanTheme ? 'text-accent-highlight' : 'text-accent-warning';
+  const hasDataBorder = isCyanTheme ? 'border-accent-highlight' : 'border-accent-warning';
+  const hasDataHover = isCyanTheme ? 'hover:bg-accent-highlight/30' : 'hover:bg-accent-warning/30';
+  const hasDataDot = isCyanTheme ? 'bg-accent-highlight' : 'bg-accent-warning';
 
   const pattern = patterns[currentPatternIndex];
   const numChannels = pattern?.channels.length || 4;
@@ -97,7 +97,7 @@ export const AutomationPanel: React.FC = () => {
               onClick={() => setRecordMode(!recordMode)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-all ${
                 recordMode
-                  ? 'bg-red-600 text-white border-red-500 shadow-glow-sm'
+                  ? 'bg-accent-error text-white border-accent-error shadow-glow-sm'
                   : 'bg-dark-bgTertiary text-text-secondary border-dark-border hover:border-dark-borderLight'
               }`}
               title="Record automation from knob movements during playback"

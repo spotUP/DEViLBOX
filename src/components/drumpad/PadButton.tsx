@@ -359,10 +359,10 @@ export const PadButton: React.FC<PadButtonProps> = ({
       {/* Pad badges */}
       <div className="absolute bottom-1 left-1 flex items-center gap-0.5">
         {pad.muteGroup > 0 && (
-          <span className="text-[8px] font-mono text-amber-400/70">M{pad.muteGroup}</span>
+          <span className="text-[8px] font-mono text-accent-warning/70">M{pad.muteGroup}</span>
         )}
         {pad.reverse && (
-          <span className="text-[8px] font-mono text-purple-400/70">R</span>
+          <span className="text-[8px] font-mono text-accent-secondary/70">R</span>
         )}
       </div>
 
@@ -370,7 +370,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
       {velocity > 0 && isLoaded && (
         <div className="absolute bottom-1 right-1">
           <div
-            className="w-1.5 h-1.5 rounded-full bg-emerald-400"
+            className="w-1.5 h-1.5 rounded-full bg-accent-success"
             style={{ opacity: 0.3 + (velocity / 127) * 0.7 }}
           />
         </div>

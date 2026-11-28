@@ -359,7 +359,7 @@ export const PadGrid: React.FC<PadGridProps> = ({
           <DubBusPanel />
           <button
             onClick={() => engineRef.current?.stopAll()}
-            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-red-400 bg-dark-bgSecondary border border-dark-border rounded transition-colors"
+            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-accent-error bg-dark-bgSecondary border border-dark-border rounded transition-colors"
             title="Stop all playing pads"
           >
             Stop All

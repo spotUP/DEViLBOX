@@ -27,11 +27,11 @@ export const StarRating: React.FC<{
               onRate ? 'cursor-pointer' : ''
             } ${
               hovered && star <= hovered
-                ? 'text-amber-300'
+                ? 'text-accent-warning'
                 : isUser
-                  ? 'text-amber-400'
+                  ? 'text-accent-warning'
                   : isFilled
-                    ? 'text-amber-500'
+                    ? 'text-accent-warning'
                     : 'text-white/40'
             }`}
             onMouseEnter={() => onRate && setHovered(star)}

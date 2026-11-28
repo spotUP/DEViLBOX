@@ -49,19 +49,19 @@ export const SynthErrorDialog: React.FC = () => {
       <ModalHeader
         title="Synth Error"
         subtitle={errorTypeLabels[activeError.errorType]}
-        icon={<AlertTriangle className="w-6 h-6 text-red-500" />}
+        icon={<AlertTriangle className="w-6 h-6 text-accent-error" />}
         className="select-none"
       />
 
       <div className="p-4 space-y-4 overflow-y-auto max-h-[60vh] select-text">
         {/* Error Summary */}
-        <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4">
+        <div className="bg-accent-error/30 border border-accent-error/50 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <div className="flex-1">
-              <p className="font-mono text-sm text-red-300">
-                <span className="text-red-400 font-bold">{activeError.synthType}</span>
+              <p className="font-mono text-sm text-accent-error">
+                <span className="text-accent-error font-bold">{activeError.synthType}</span>
                 {activeError.synthName && (
-                  <span className="text-red-300/70"> ({activeError.synthName})</span>
+                  <span className="text-accent-error/70"> ({activeError.synthName})</span>
                 )}
               </p>
               <p className="mt-2 text-text-primary">{activeError.message}</p>
@@ -106,7 +106,7 @@ export const SynthErrorDialog: React.FC = () => {
             {activeError.stack && (
               <div>
                 <span className="text-text-secondary text-sm">Stack Trace:</span>
-                <pre className="mt-1 p-2 bg-black/50 rounded text-xs font-mono text-red-300 overflow-x-auto max-h-32 overflow-y-auto">
+                <pre className="mt-1 p-2 bg-black/50 rounded text-xs font-mono text-accent-error overflow-x-auto max-h-32 overflow-y-auto">
                   {activeError.stack}
                 </pre>
               </div>
@@ -137,8 +137,8 @@ export const SynthErrorDialog: React.FC = () => {
           >
             {copied ? (
               <>
-                <Check size={16} className="text-green-500" />
-                <span className="text-green-500">Copied!</span>
+                <Check size={16} className="text-accent-success" />
+                <span className="text-accent-success">Copied!</span>
               </>
             ) : (
               <>
@@ -150,7 +150,7 @@ export const SynthErrorDialog: React.FC = () => {
 
           <button
             onClick={handleDismiss}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-accent-error hover:bg-accent-error/80 rounded transition-colors"
           >
             <X size={16} />
             <span>Dismiss</span>

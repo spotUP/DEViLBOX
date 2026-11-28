@@ -67,16 +67,16 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-2xl bg-[#1a1a1a] border-2 border-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.2)] rounded-xl overflow-hidden flex flex-col">
+      <div className="w-full max-w-2xl bg-[#1a1a1a] border-2 border-accent-warning/50 shadow-[0_0_30px_rgba(245,158,11,0.2)] rounded-xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-amber-900/40 to-transparent border-b border-amber-500/30 flex items-center justify-between">
+        <div className="px-6 py-4 bg-gradient-to-r from-accent-warning/40 to-transparent border-b border-accent-warning/30 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-500 rounded-lg">
+            <div className="p-2 bg-accent-warning rounded-lg">
               <Zap size={20} className="text-black" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-amber-400 tracking-tight">NANO EXPORTER</h2>
-              <p className="text-[10px] text-amber-500/60 uppercase font-black tracking-[0.2em]">4k Intro Binary Packing</p>
+              <h2 className="text-xl font-bold text-accent-warning tracking-tight">NANO EXPORTER</h2>
+              <p className="text-[10px] text-accent-warning/60 uppercase font-black tracking-[0.2em]">4k Intro Binary Packing</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-dark-bgHover rounded-full transition-colors text-text-secondary hover:text-text-primary">
@@ -98,7 +98,7 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
             </div>
             <div className="bg-black/40 border border-dark-border p-3 rounded-lg text-center">
               <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Target</div>
-              <div className={`text-lg font-mono ${stats.compressedBytes <= 4096 ? 'text-green-500' : 'text-amber-400'}`}>{stats.kb} KB</div>
+              <div className={`text-lg font-mono ${stats.compressedBytes <= 4096 ? 'text-accent-success' : 'text-accent-warning'}`}>{stats.kb} KB</div>
             </div>
           </div>
 
@@ -108,11 +108,11 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
               <textarea
                 readOnly
                 value={base64Data}
-                className="w-full h-32 bg-black/60 border border-dark-border rounded-lg p-4 font-mono text-[10px] text-amber-400/80 resize-none focus:outline-none focus:border-amber-500/50"
+                className="w-full h-32 bg-black/60 border border-dark-border rounded-lg p-4 font-mono text-[10px] text-accent-warning/80 resize-none focus:outline-none focus:border-accent-warning/50"
               />
               <button
                 onClick={handleCopy}
-                className="absolute top-2 right-2 p-2 bg-amber-500 text-black rounded-md hover:bg-amber-400 transition-colors shadow-lg flex items-center gap-2"
+                className="absolute top-2 right-2 p-2 bg-accent-warning text-black rounded-md hover:bg-accent-warning/80 transition-colors shadow-lg flex items-center gap-2"
               >
                 {copied ? <Check size={14} /> : <Copy size={14} />}
                 <span className="text-[10px] font-bold uppercase">{copied ? 'Copied' : 'Copy'}</span>
@@ -120,8 +120,8 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
             </div>
           </div>
 
-          <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-lg">
-            <h4 className="text-xs font-bold text-amber-400 uppercase mb-2">How to use in 4k Intro:</h4>
+          <div className="bg-accent-warning/5 border border-accent-warning/20 p-4 rounded-lg">
+            <h4 className="text-xs font-bold text-accent-warning uppercase mb-2">How to use in 4k Intro:</h4>
             <ul className="text-[11px] text-text-secondary space-y-1 list-disc pl-4">
               <li>Copy the Base64 string into your source code.</li>
               <li>Decode it into a Uint8Array at startup.</li>
@@ -143,7 +143,7 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
           </button>
           <button
             onClick={onClose}
-            className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 text-black rounded-lg font-bold text-xs transition-all"
+            className="flex-1 py-3 bg-accent-warning hover:bg-accent-warning/80 text-black rounded-lg font-bold text-xs transition-all"
           >
             DONE
           </button>

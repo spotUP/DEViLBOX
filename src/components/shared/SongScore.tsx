@@ -20,7 +20,7 @@ export const SongScore: React.FC<{ fileName: string | null | undefined }> = ({ f
   if (!info || info.count <= 0) return null;
   const label = `Average rating ${info.avg.toFixed(1)} from ${info.count} ${info.count === 1 ? 'vote' : 'votes'}`;
   return (
-    <span className="inline-flex items-center gap-0.5 flex-shrink-0 text-amber-500" title={label} aria-label={label}>
+    <span className="inline-flex items-center gap-0.5 flex-shrink-0 text-accent-warning" title={label} aria-label={label}>
       <Star size={10} fill="currentColor" aria-hidden="true" />
       <span className="text-[10px] tabular-nums">{info.avg.toFixed(1)}</span>
       <span className="text-[9px] text-text-muted/50">({info.count})</span>

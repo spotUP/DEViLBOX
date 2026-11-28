@@ -302,7 +302,7 @@ const PatternOverlayToggle: React.FC = () => {
     <button
       onClick={() => toggle(!enabled)}
       className={`p-2 rounded-full transition-colors text-text-primary ${
-        enabled ? 'bg-purple-600/50 hover:bg-purple-600/70' : 'bg-white/10 hover:bg-white/20'
+        enabled ? 'bg-accent-secondary/50 hover:bg-accent-secondary/70' : 'bg-white/10 hover:bg-white/20'
       }`}
       title={enabled ? 'Hide pattern overlay' : 'Show pattern overlay'}
     >
@@ -319,7 +319,7 @@ const MaxHeadroomToggle: React.FC = () => {
     <button
       onClick={() => toggle(!enabled)}
       className={`p-2 rounded-full transition-colors text-text-primary ${
-        enabled ? 'bg-cyan-600/50 hover:bg-cyan-600/70' : 'bg-white/10 hover:bg-white/20'
+        enabled ? 'bg-accent-primary/50 hover:bg-accent-primary/70' : 'bg-white/10 hover:bg-white/20'
       }`}
       title={enabled ? 'Disable Max Headroom mode' : 'Enable Max Headroom mode'}
     >
@@ -442,7 +442,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
             <button
               onClick={onToggleAutoAdvance}
               className={`p-2 rounded-full transition-colors text-text-primary ${
-                autoAdvance ? 'bg-green-600/50 hover:bg-green-600/70' : 'bg-white/10 hover:bg-white/20'
+                autoAdvance ? 'bg-accent-success/50 hover:bg-accent-success/70' : 'bg-white/10 hover:bg-white/20'
               }`}
               title={autoAdvance ? 'Pause auto-advance' : 'Resume auto-advance'}
             >
@@ -461,7 +461,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
               <button
                 onClick={onToggleBrowser}
                 className={`p-2 rounded-full transition-colors text-text-primary ${
-                  browserOpen ? 'bg-accent/50 hover:bg-accent/70' : 'bg-white/10 hover:bg-white/20'
+                  browserOpen ? 'bg-accent-primary/50 hover:bg-accent-primary/70' : 'bg-white/10 hover:bg-white/20'
                 }`}
                 title="Browse presets"
               >

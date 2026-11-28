@@ -155,7 +155,7 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
       {/* Value readout */}
       <span
         className={`text-[10px] font-mono font-bold text-center cursor-pointer flex-shrink-0 transition-colors ${
-          atCenter ? 'text-text-muted' : 'text-amber-400'
+          atCenter ? 'text-text-muted' : 'text-accent-warning'
         }`}
         onDoubleClick={resetPitch}
         onContextMenu={(e) => { e.preventDefault(); resetPitch(); }}
@@ -174,11 +174,11 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
           return (
             <div key={i} className="flex items-center justify-end gap-0" style={{ flex: 1 }}>
               {isMajor && (
-                <span className={`text-[6px] font-mono leading-none ${label === '0' ? 'text-amber-400/60' : 'text-text-muted/40'}`}>
+                <span className={`text-[6px] font-mono leading-none ${label === '0' ? 'text-accent-warning/60' : 'text-text-muted/40'}`}>
                   {label}
                 </span>
               )}
-              <div className={`h-px flex-shrink-0 ${isMajor ? 'w-1.5' : 'w-1'} ${label === '0' ? 'bg-amber-400/40' : 'bg-text-muted/30'}`} />
+              <div className={`h-px flex-shrink-0 ${isMajor ? 'w-1.5' : 'w-1'} ${label === '0' ? 'bg-accent-warning/40' : 'bg-text-muted/30'}`} />
             </div>
           );
         })}
@@ -216,7 +216,7 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
           {/* Handle body */}
           <div
             className={`absolute inset-0 rounded-[2px] transition-colors duration-75 border ${
-              isDragging ? 'border-amber-400/50' : 'border-dark-border'
+              isDragging ? 'border-accent-warning/50' : 'border-dark-border'
             }`}
             style={{
               background: isDragging
@@ -318,7 +318,7 @@ export const DJPitchSliderHorizontal: React.FC<DJPitchSliderProps> = ({
       />
       <div className="text-[8px] font-mono text-text-muted/50">+12</div>
       <div
-        className="text-[11px] font-mono font-bold text-amber-400 min-w-[35px] text-center cursor-pointer select-none"
+        className="text-[11px] font-mono font-bold text-accent-warning min-w-[35px] text-center cursor-pointer select-none"
         onDoubleClick={handleDoubleClick}
         title="Double-click to reset"
       >

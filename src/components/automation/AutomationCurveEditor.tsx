@@ -666,7 +666,7 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
             <div className="border-t border-ft2-border mt-1 pt-1">
               <button
                 onClick={() => { removePoint(curve.id, contextMenu.pointRow); setContextMenu(null); }}
-                className="block w-full text-left px-3 py-1 text-[10px] font-mono text-red-400 hover:bg-ft2-button"
+                className="block w-full text-left px-3 py-1 text-[10px] font-mono text-accent-error hover:bg-ft2-button"
               >Delete Point</button>
             </div>
           </div>

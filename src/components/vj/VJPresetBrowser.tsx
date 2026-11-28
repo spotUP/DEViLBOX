@@ -340,7 +340,7 @@ export const VJPresetBrowser: React.FC<VJPresetBrowserProps> = ({
                   <button
                     onClick={(e) => { e.stopPropagation(); toggleFavorite(entry.name); }}
                     className={`flex-shrink-0 transition-colors ${
-                      isFav ? 'text-yellow-400' : 'text-transparent group-hover:text-text-muted/40'
+                      isFav ? 'text-accent-warning' : 'text-transparent group-hover:text-text-muted/40'
                     }`}
                     title={isFav ? 'Remove from favorites' : 'Add to favorites'}
                   >
