@@ -14,6 +14,7 @@ import type {
   ThemeSnapshot,
   ChannelLayoutSnapshot,
 } from '../engine/renderer/worker-types';
+import { createWorkerFrameLoop } from './workerFrameLoop';
 
 // ─── Worker message types ─────────────────────────────────────────────────────
 
@@ -91,6 +92,7 @@ let dirty = true;
 // ─── Message handler ──────────────────────────────────────────────────────────
 
 self.onmessage = (e: MessageEvent<WorkerMsg>) => {
+  frameLoop?.wake();
   const msg = e.data;
 
   switch (msg.type) {
@@ -130,12 +132,14 @@ self.onmessage = (e: MessageEvent<WorkerMsg>) => {
 
 // ─── RAF loop ─────────────────────────────────────────────────────────────────
 
+let frameLoop: ReturnType<typeof createWorkerFrameLoop> | null = null;
+
 function startRAF(): void {
-  const tick = () => {
+  frameLoop ??= createWorkerFrameLoop(() => {
     renderFrame();
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
+    return isPlaying || dirty;
+  });
+  frameLoop.wake();
 }
 
 function renderFrame(): void {

@@ -7,6 +7,7 @@
  */
 
 import type { TurntableMsg, DeckColorsExt } from '../engine/renderer/worker-types';
+import { createWorkerFrameLoop } from './workerFrameLoop';
 
 type DeckColors = DeckColorsExt;
 
@@ -37,6 +38,7 @@ let lastScratchAngle = 0;  // Saved angle when scratch ends (for stopped decks)
 // ─── Message handler ──────────────────────────────────────────────────────────
 
 self.onmessage = (e: MessageEvent<TurntableMsg>) => {
+  frameLoop?.wake();
   const msg = e.data;
   switch (msg.type) {
     case 'init':
@@ -114,14 +116,18 @@ self.onmessage = (e: MessageEvent<TurntableMsg>) => {
 
 let lastRafTime = 0;
 
+let frameLoop: ReturnType<typeof createWorkerFrameLoop> | null = null;
+
 function startRAF(): void {
-  const tick = (now: number) => {
+  frameLoop ??= createWorkerFrameLoop((now: number) => {
     const dt = lastRafTime > 0 ? (now - lastRafTime) / 1000 : 0;
     lastRafTime = now;
     if (isPlaying || dirty) renderFrame(dt);
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
+    if (isPlaying || dirty) return true;
+    lastRafTime = 0; // the next wake starts with dt 0, not the sleep length
+    return false;
+  });
+  frameLoop.wake();
 }
 
 function renderFrame(dt: number): void {

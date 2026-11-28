@@ -16,6 +16,7 @@ const INSTRUMENT_COLORS = [
 const DEFAULT_COLOR = '#64748b';
 
 import type { VelocityMsg, VelocityState, SerializedNote } from '../engine/renderer/worker-types';
+import { createWorkerFrameLoop } from './workerFrameLoop';
 
 // ─── Worker state ──────────────────────────────────────────────────────────────
 
@@ -34,6 +35,7 @@ let dirty = true;
 // ─── Message handler ───────────────────────────────────────────────────────────
 
 self.onmessage = (e: MessageEvent<VelocityMsg>) => {
+  frameLoop?.wake();
   const msg = e.data;
   switch (msg.type) {
     case 'init':
@@ -90,12 +92,14 @@ function applyState(s: VelocityState): void {
 
 // ─── RAF loop ──────────────────────────────────────────────────────────────────
 
+let frameLoop: ReturnType<typeof createWorkerFrameLoop> | null = null;
+
 function startRAF(): void {
-  const tick = () => {
+  frameLoop ??= createWorkerFrameLoop(() => {
     if (dirty) renderFrame();
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
+    return dirty;
+  });
+  frameLoop.wake();
 }
 
 function renderFrame(): void {

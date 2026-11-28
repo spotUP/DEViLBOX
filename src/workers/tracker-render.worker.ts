@@ -29,6 +29,7 @@ import type {
   ChannelLayoutSnapshot,
   TrackerRenderInput,
 } from '../engine/renderer/worker-types';
+import { createWorkerFrameLoop } from './workerFrameLoop';
 
 // Constants (must match PatternEditorCanvas.tsx)
 const ROW_HEIGHT   = 24;
@@ -94,6 +95,7 @@ const workerPlayback = { row: 0, smoothOffset: 0, patternIndex: 0, isPlaying: fa
 // ─── Message handler ──────────────────────────────────────────────────────────
 
 self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
+  frameLoop?.wake();
   const msg = e.data;
 
   switch (msg.type) {
@@ -239,8 +241,10 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
 
 // ─── RAF loop ─────────────────────────────────────────────────────────────────
 
+let frameLoop: ReturnType<typeof createWorkerFrameLoop> | null = null;
+
 function startRAF(): void {
-  const tick = () => {
+  frameLoop ??= createWorkerFrameLoop(() => {
     // During playback, always render (smooth scrolling needs continuous updates)
     if (playback.isPlaying) dirty = true;
     if (tween.active && tween.sample(performance.now())) { drawVersion++; dirty = true; }
@@ -251,9 +255,9 @@ function startRAF(): void {
     if (dirty && (tween.fadingOut || layoutHold.canDraw(performance.now()))) {
       renderFrame();
     }
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
+    return playback.isPlaying || tween.active || pendingResize || dirty;
+  });
+  frameLoop.wake();
 }
 
 function applyPendingResize(): void {

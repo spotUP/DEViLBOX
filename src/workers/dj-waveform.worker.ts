@@ -7,6 +7,7 @@
 
 import type { WaveformMsg, SerializedCuePoint, WaveformOverviewState, DeckColors } from '../engine/renderer/worker-types';
 import { clockNowMs, positionAtFrame, type ClockAnchor } from '../engine/audioLatency';
+import { createWorkerFrameLoop } from './workerFrameLoop';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ function applyOverview(ov: WaveformOverviewState): void {
 // ─── Message handler ──────────────────────────────────────────────────────────
 
 self.onmessage = (e: MessageEvent<WaveformMsg>) => {
+  frameLoop?.wake();
   const msg = e.data;
   switch (msg.type) {
     case 'init':
@@ -129,8 +131,10 @@ self.onmessage = (e: MessageEvent<WaveformMsg>) => {
 
 // ─── RAF loop ─────────────────────────────────────────────────────────────────
 
+let frameLoop: ReturnType<typeof createWorkerFrameLoop> | null = null;
+
 function startRAF(): void {
-  const tick = () => {
+  frameLoop ??= createWorkerFrameLoop(() => {
     // A moving clock changes the picture every frame; a paused one only on a message.
     if (anchor.rate !== 0 || otherAnchor.rate !== 0) dirty = true;
     if (dirty) {
@@ -139,9 +143,9 @@ function startRAF(): void {
       otherAudioPosition = positionAtFrame(otherAnchor, now, otherDurationMs > 0 ? otherDurationMs / 1000 : Infinity);
       renderFrame();
     }
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
+    return anchor.rate !== 0 || otherAnchor.rate !== 0 || dirty;
+  });
+  frameLoop.wake();
 }
 
 // ─── Overview strip (top) ─────────────────────────────────────────────────────

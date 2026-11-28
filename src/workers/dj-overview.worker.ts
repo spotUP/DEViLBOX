@@ -7,6 +7,7 @@
 
 import type { OverviewMsg, OverviewState, OverviewScalars, DeckColors } from '../engine/renderer/worker-types';
 import { clockNowMs, positionAtFrame, type ClockAnchor } from '../engine/audioLatency';
+import { createWorkerFrameLoop } from './workerFrameLoop';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ let dirty           = true;
 // ─── Message handler ──────────────────────────────────────────────────────────
 
 self.onmessage = (e: MessageEvent<OverviewMsg>) => {
+  frameLoop?.wake();
   const msg = e.data;
   switch (msg.type) {
     case 'init':
@@ -144,8 +146,10 @@ function applyScalars(msg: OverviewScalars): void {
 
 // ─── RAF loop ─────────────────────────────────────────────────────────────────
 
+let frameLoop: ReturnType<typeof createWorkerFrameLoop> | null = null;
+
 function startRAF(): void {
-  const tick = () => {
+  frameLoop ??= createWorkerFrameLoop(() => {
     // A moving clock repaints when the playhead has moved half a device pixel
     // (a whole-track bar moves ~1 px a second); a paused one only on a message.
     const pos = positionAtFrame(anchor, clockNowMs(), durationMs > 0 ? durationMs / 1000 : Infinity);
@@ -156,9 +160,9 @@ function startRAF(): void {
       drawnHalfPx = halfPx;
       renderFrame();
     }
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
+    return anchor.rate !== 0 || pulsePhase > 0 || dirty;
+  });
+  frameLoop.wake();
 }
 
 function renderFrame(): void {

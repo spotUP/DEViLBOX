@@ -35,7 +35,7 @@ async function bootWorker() {
   await import('@/workers/tracker-render.worker');
   return (msg: unknown) => (self.onmessage as (e: { data: unknown }) => void)({ data: msg });
 }
-function runFrame(dt: number) { now += dt; const cb = frames.shift()!; cb(now); }
+function runFrame(dt: number) { now += dt; frames.shift()?.(now); } // an idle worker queues no frame
 
 const ui = (rowHeight: number) => ({
   useHex: true, blankEmpty: false, showGhostPatterns: false,
