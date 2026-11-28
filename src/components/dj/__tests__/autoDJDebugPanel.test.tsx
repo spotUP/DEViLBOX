@@ -83,6 +83,23 @@ describe('Auto DJ debug view', () => {
     useDJStore.getState().setAutoDJJuggleTelemetry(null);
   });
 
+  it('a waiting MUSICAL juggle reads Waiting with its reason, never Off', () => {
+    useDJStore.getState().setAutoDJTelemetry(null);
+    useDJStore.getState().setAutoDJJuggleTelemetry({
+      mode: 'MUSICAL', active: false, pattern: null, sequence: null, phase: null, intensity: 0, activeDeck: 'A',
+      deckA: { material: [], confidence: 0, role: 'VOICE' }, deckB: { material: [], confidence: 0, role: 'RESPONSE' },
+      nextActions: [], reason: '', confidence: 0, safety: 'stand-alone: set phase OPENING',
+      budget: { juggledFraction: 0, secondsSinceLastJuggle: 0, cooldownSec: 0 }, lastQuality: null, history: [],
+      standalone: null, juggleNow: null,
+    });
+    const { getByTestId } = render(<DJAutoDJDebugPanel telemetry={null} />);
+    const text = getByTestId('autodj-juggle').textContent ?? '';
+    expect(text).toContain('MUSICAL');
+    expect(text).toContain('Waiting - stand-alone: set phase OPENING');
+    expect(text).not.toMatch(/Juggle State\s*Off/);
+    useDJStore.getState().setAutoDJJuggleTelemetry(null);
+  });
+
   it('without telemetry it says so in full words', () => {
     useDJStore.getState().setAutoDJTelemetry(null);
     const { getByTestId } = render(<DJAutoDJDebugPanel />);
