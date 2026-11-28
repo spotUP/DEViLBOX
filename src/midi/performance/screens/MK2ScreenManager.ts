@@ -167,6 +167,8 @@ class MK2ScreenManager {
   private mk3Screens = new Map<MK2Mode, MK2Screen>();
   private dirty = true;
   private rafId: number | null = null;
+  private timerId: ReturnType<typeof setTimeout> | null = null;
+  private lastRenderAt = 0;
   private lastLeftHash = 0;
   private lastRightHash = 0;
   private unsubscribers: Array<() => void> = [];
@@ -251,8 +253,6 @@ class MK2ScreenManager {
       }),
     );
 
-    // Start render loop
-    this.scheduleRender();
     // Initial render
     this.markDirty();
 
@@ -266,6 +266,10 @@ class MK2ScreenManager {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
+    }
+    if (this.timerId !== null) {
+      clearTimeout(this.timerId);
+      this.timerId = null;
     }
   }
 
@@ -671,6 +675,7 @@ class MK2ScreenManager {
 
   markDirty(): void {
     this.dirty = true;
+    this.scheduleRender();
   }
 
   /** Force an immediate re-render (e.g. after knob turn for low-latency feedback). */
@@ -685,13 +690,22 @@ class MK2ScreenManager {
     this.lastRightHash = -1;
   }
 
+  /**
+   * One pending frame at most, at ~10 fps; nothing is armed while the screens
+   * hold still, so a connected device costs no frames until something changes
+   * (every change reaches markDirty through the store subscriptions).
+   */
   private scheduleRender(): void {
-    if (!this.started) return;
-    this.rafId = requestAnimationFrame(() => {
-      this.render();
-      // Re-schedule at ~10fps (every 100ms) instead of every rAF frame
-      setTimeout(() => this.scheduleRender(), 100);
-    });
+    if (!this.started || this.rafId !== null || this.timerId !== null) return;
+    const wait = Math.max(0, 100 - (performance.now() - this.lastRenderAt));
+    this.timerId = setTimeout(() => {
+      this.timerId = null;
+      this.rafId = requestAnimationFrame(() => {
+        this.rafId = null;
+        this.lastRenderAt = performance.now();
+        this.render();
+      });
+    }, wait);
   }
 
   private render(): void {

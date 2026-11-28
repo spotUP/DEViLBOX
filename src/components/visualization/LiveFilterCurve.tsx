@@ -10,7 +10,6 @@
  */
 
 import React, { useRef, useCallback, useLayoutEffect, useState, useEffect } from 'react';
-import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { getVisualizationData } from '@stores/useVisualizationStore';
 
 type FilterType = 'lowpass' | 'highpass' | 'bandpass' | 'notch';
@@ -354,13 +353,9 @@ export const LiveFilterCurve: React.FC<LiveFilterCurveProps> = ({
     height
   ]);
 
-  // Start animation
-  useVisualizationAnimation({
-    onFrame,
-    enabled: true,
-    fps: 60,
-    follows: 'time',
-  });
+  // The picture is a pure function of the values read at render (props and the
+  // visualization maps), so it draws when they change, never on an idle frame.
+  useEffect(() => { onFrame(); }, [onFrame]);
 
   const canvas = (
     <canvas

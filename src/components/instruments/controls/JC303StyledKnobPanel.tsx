@@ -187,10 +187,10 @@ const DB303Scope: React.FC<{ config: TB303Config; instrumentId: number }> = memo
     return hasAudio;
   }, [instrumentId, logicalWidth]);
 
-  // 30fps animation via the shared gated hook — pauses when the tab is hidden
-  // and backs off when onFrame reports no audio activity (idle scope shows the
-  // static filter curve; no need to redraw it every frame).
-  useVisualizationAnimation({ onFrame, fps: 30, follows: 'time' });
+  // The live waveform follows the signal, so the loop sleeps while the app is
+  // silent (useFrameGate); the static filter curve then redraws once per edit.
+  const { invalidate } = useVisualizationAnimation({ onFrame, fps: 30 });
+  useEffect(() => { invalidate(); }, [config, invalidate]);
 
   return (
     <div ref={containerRef} className="w-full" style={{ height: `${HEIGHT}px` }}>
