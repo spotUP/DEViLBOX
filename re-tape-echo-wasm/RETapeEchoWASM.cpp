@@ -22,6 +22,7 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include "../tape-wear-common/TapeHiss.h"
 #else
 #define EMSCRIPTEN_KEEPALIVE
 #endif
@@ -369,6 +370,9 @@ struct RETapeEchoInstance {
     return delay_ms * (float)sampleRate / 1000.0f;
   }
 
+  // Playback hiss + modulation noise, inside the loop
+  TapeHiss hiss;
+
   // Convert intensity (0-1) to feedback gain using dB mapping
   float calcFeedbackGain() const {
     // Pd: dB = intensity * 30 + 70, then dbtorms
@@ -379,6 +383,7 @@ struct RETapeEchoInstance {
 
   void processBlock(float* inL, float* inR, float* outL, float* outR, int numSamples) {
     float fbGain = calcFeedbackGain();
+    hiss.prepare((float)sampleRate);
 
     // Pre-compute wow/flutter/dirt scaling
     float wowScale = wow * 1.5f;
@@ -439,6 +444,11 @@ struct RETapeEchoInstance {
       float echoOut = 0.0f;
       if (h1Active) echoOut += head1Out;
       if (h2Active) echoOut += head2Out;
+
+      // === Hiss and modulation noise of this pass ===
+      // On the playback signal, before the feedback tap: the next pass
+      // records it and lays its own on top.
+      echoOut += hiss.next(echoOut);
 
       // === Tape loop ghost ===
       float tapeGhost = 0.0f;

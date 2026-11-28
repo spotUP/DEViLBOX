@@ -20,6 +20,7 @@ set_target_properties(RE201 PROPERTIES
 
 target_link_options(RE201 PRIVATE
   "SHELL:-s MODULARIZE=1"
+  "SHELL:-s INCOMING_MODULE_JS_API=[wasmBinary,locateFile,print,printErr]"
   "SHELL:-s EXPORT_NAME='createRE201'"
   "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_re201_create','_re201_destroy','_re201_process','_re201_set_bass','_re201_set_treble','_re201_set_delay_mode','_re201_set_repeat_rate','_re201_set_intensity','_re201_set_echo_volume','_re201_set_reverb_volume','_re201_set_input_level']"
   "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','wasmMemory','HEAPF32','HEAPU8']"

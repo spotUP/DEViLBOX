@@ -20,6 +20,7 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include "../tape-wear-common/TapeHiss.h"
 #else
 #define EMSCRIPTEN_KEEPALIVE
 #endif
@@ -300,6 +301,10 @@ struct AnotherDelayInstance {
   Biquad hpL, hpR;
   SchroederReverb reverb;
 
+  // Playback hiss + modulation noise, inside the loop (one per channel)
+  TapeHiss hissL{0x2545F491u};
+  TapeHiss hissR{0x9E3779B9u};
+
   // Oscillator phases
   float flutPhase = 0.0f;
   float wowPhase  = 0.0f;
@@ -324,6 +329,8 @@ struct AnotherDelayInstance {
   void processBlock(float* inL, float* inR, float* outL, float* outR, int n) {
     float delaySamp = delayTimeMs * sampleRate / 1000.0f;
     delaySamp = clampf(delaySamp, 1.0f, sampleRate * 1.99f);
+    hissL.prepare(sampleRate);
+    hissR.prepare(sampleRate);
 
     for (int i = 0; i < n; i++) {
       // Wow + flutter modulation
@@ -346,6 +353,12 @@ struct AnotherDelayInstance {
       delOutR = lpR.process(delOutR);
       delOutL = hpL.process(delOutL);
       delOutR = hpR.process(delOutR);
+
+      // Hiss and modulation noise of this pass, read off the tape with the
+      // signal: it goes to the output and back round the loop, so every
+      // repeat carries the noise of all the passes before it.
+      delOutL += hissL.next(delOutL);
+      delOutR += hissR.next(delOutR);
 
       // Tape saturation: (1/atan(2)) * atan(2*x)
       static const float invAtan2 = 1.0f / atanf(2.0f);

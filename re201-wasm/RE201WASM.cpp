@@ -19,6 +19,7 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include "../tape-wear-common/TapeHiss.h"
 #else
 #define EMSCRIPTEN_KEEPALIVE
 #endif
@@ -386,6 +387,7 @@ struct TapeDelay {
   OnePole   wowLPF;
   OnePole   paramSmooth;
   NoiseGen  noise;
+  TapeHiss  hiss;   // playback-head hiss + modulation noise, inside the loop
   Biquad    hpf;    // 40 Hz HPF
   Biquad    lpf;    // variable LPF
   float     smoothedDelay = 0.0f;
@@ -409,9 +411,13 @@ struct TapeDelay {
   }
 
   void updateLPF(float repeatRate) {
-    // Slower tape = more highs; faster = duller
-    float freq = 5000.0f + (1.0f - repeatRate) * 10000.0f;
-    freq = clampf(freq, 2000.0f, 15000.0f);
+    // Playback-head loss, once per pass round the loop. A faster tape puts a
+    // given frequency on a longer wavelength, so the head reads more highs:
+    // 2.5 kHz at the slowest speed (700 ms), 6 kHz at the fastest (50 ms).
+    // It was 5-15 kHz and the other way round (8.9 kHz for a 300 ms echo),
+    // which took 0.3 dB of 4 kHz per repeat: the repeats never got darker.
+    float freq = 2500.0f + repeatRate * 3500.0f;
+    freq = clampf(freq, 2000.0f, 6500.0f);
     lpf.setLowpass(freq, 0.707f, sampleRate);
   }
 
@@ -432,8 +438,14 @@ struct TapeDelay {
     float baseDelay = calcBaseDelay(repeatRate);
     updateLPF(repeatRate);
 
-    float wowDepth = wow * 3.0f;      // samples of wow modulation
-    float flutDepth = flutter * 1.5f;
+    // Wow and flutter as delay-time swing, in seconds of tape so the pitch
+    // deviation is the same at every sample rate. At the built-in 0.3 / 0.2:
+    // wow 0.06 % at 1 Hz, flutter 0.05 % at 4 and 12 Hz, per pass - and every
+    // pass adds its own, so late repeats smear. It was 3 and 1.5 SAMPLES
+    // (0.012 % and 0.005 %), below anything a repeat could show.
+    float wowDepth = wow * 0.0003f * sampleRate;
+    float flutDepth = flutter * 0.0001f * sampleRate;
+    hiss.prepare(sampleRate);
 
     for (int i = 0; i < n; i++) {
       // Smooth delay
@@ -471,6 +483,10 @@ struct TapeDelay {
       out = hpf.process(out);
       out = lpf.process(out);
       out = safeSample(out);
+
+      // Hiss and modulation noise of this pass. Added before the feedback tap,
+      // so the next pass records it and lays its own on top.
+      out += hiss.next(out);
 
       feedbackSample = out;
 

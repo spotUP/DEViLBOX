@@ -88,6 +88,48 @@ class NativeEQ3 {
   }
 }
 
+/** Peak of the hiss floor before colouring (TapeHiss.h FLOOR). */
+const TAPE_HISS_FLOOR = 1.6e-3;
+/** Modulation noise per unit of mean rectified head signal (TapeHiss.h MOD, peak to mean). */
+const TAPE_HISS_MODULATION = 0.03;
+/** Head level at which the hiss floor is fully open, -46 dBFS (TapeHiss.h GATE_REF). */
+const TAPE_HISS_GATE_REF = 5e-3;
+
+/** 0 at silence, rising with the square of the level to 1 at the gate reference. */
+const TAPE_HISS_GATE_CURVE = ((): Float32Array<ArrayBuffer> => {
+  const half = 4096;
+  const curve = new Float32Array(2 * half + 1);
+  for (let i = 0; i <= 2 * half; i++) {
+    const level = Math.abs(i - half) / half / TAPE_HISS_GATE_REF;
+    curve[i] = Math.min(1, level * level);
+  }
+  return curve;
+})();
+
+const tapeHissBuffers = new WeakMap<BaseAudioContext, AudioBuffer>();
+
+/**
+ * Four seconds of hiss, one buffer per context. A fixed-seed generator, not
+ * Math.random: two renders of the same bus must stay bit-identical.
+ */
+function tapeHissBuffer(context: BaseAudioContext): AudioBuffer {
+  const cached = tapeHissBuffers.get(context);
+  if (cached) return cached;
+  const length = Math.round(context.sampleRate * 4);
+  const buffer = context.createBuffer(1, length, context.sampleRate);
+  const data = buffer.getChannelData(0);
+  const colour = 1 - Math.exp(-2 * Math.PI * 9000 / context.sampleRate);
+  let state = 0x2545f491;
+  let lp = 0;
+  for (let i = 0; i < length; i++) {
+    state ^= state << 13; state ^= state >>> 17; state ^= state << 5;
+    lp += colour * ((state | 0) / 2147483648 - lp);
+    data[i] = lp;
+  }
+  tapeHissBuffers.set(context, buffer);
+  return buffer;
+}
+
 export class SpaceEchoEffect extends Tone.ToneAudioNode {
   readonly name = 'SpaceEcho';
 
@@ -117,6 +159,10 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
   private wowLFO: OscillatorNode;
   private wowDepth: GainNode;
   private wowGain: Tone.Gain;
+
+  // Tape hiss + modulation noise, added at the playback heads inside the loop.
+  private hissSource: AudioBufferSourceNode;
+  private hissNodes: AudioNode[];
 
   // Dry/Wet
   private dryGain: Tone.Gain;
@@ -228,10 +274,65 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.head2.connect(this.head2Gain);
     this.head3.connect(this.head3Gain);
 
+    // What the playback heads read off the tape, before the hiss is added.
+    const headSum = raw.createGain();
+    Tone.connect(this.head1Gain, headSum);
+    Tone.connect(this.head2Gain, headSum);
+    Tone.connect(this.head3Gain, headSum);
+
     const echoSum = new Tone.Gain(1);
-    this.head1Gain.connect(echoSum);
-    this.head2Gain.connect(echoSum);
-    this.head3Gain.connect(echoSum);
+    Tone.connect(headSum, echoSum);
+
+    // Tape hiss and modulation noise, the same model as tape-wear-common/
+    // TapeHiss.h (the WASM tape echoes). The noise joins the head signal
+    // BEFORE the feedback tap, so every pass round the loop records the noise
+    // of the passes before it and lays its own on top: the floor rises
+    // against the decaying signal with each repeat.
+    //   - hiss floor, gated by a slow average of the head signal: an echo
+    //     that was fed nothing is digitally silent and the hiss fades once
+    //     the repeats have died;
+    //   - modulation noise in proportion to the head signal.
+    // The level detectors read headSum, not echoSum: a detector on the sum
+    // that carries the hiss would close a loop with no delay in it.
+    const hissVca = raw.createGain();
+    hissVca.gain.value = 0;
+    this.hissSource = raw.createBufferSource();
+    this.hissSource.buffer = tapeHissBuffer(raw);
+    this.hissSource.loop = true;
+    this.hissSource.connect(hissVca);
+    Tone.connect(hissVca, echoSum);
+
+    const gateShaper = raw.createWaveShaper();
+    gateShaper.curve = TAPE_HISS_GATE_CURVE;
+    const gateLp = raw.createBiquadFilter();
+    gateLp.type = 'lowpass';
+    gateLp.frequency.value = 0.5;
+    gateLp.Q.value = 0.5;
+    const gateBoost = raw.createGain();
+    gateBoost.gain.value = 8;
+    const gateClamp = raw.createWaveShaper();
+    gateClamp.curve = new Float32Array([0, 0, TAPE_HISS_FLOOR]);
+    headSum.connect(gateShaper);
+    gateShaper.connect(gateLp);
+    gateLp.connect(gateBoost);
+    gateBoost.connect(gateClamp);
+    gateClamp.connect(hissVca.gain);
+
+    const rectifier = raw.createWaveShaper();
+    rectifier.curve = new Float32Array([1, 0, 1]);
+    const envelopeLp = raw.createBiquadFilter();
+    envelopeLp.type = 'lowpass';
+    envelopeLp.frequency.value = 100;
+    envelopeLp.Q.value = 0.5;
+    const modulationDepth = raw.createGain();
+    modulationDepth.gain.value = TAPE_HISS_MODULATION;
+    headSum.connect(rectifier);
+    rectifier.connect(envelopeLp);
+    envelopeLp.connect(modulationDepth);
+    modulationDepth.connect(hissVca.gain);
+
+    this.hissSource.start();
+    this.hissNodes = [headSum, hissVca, gateShaper, gateLp, gateBoost, gateClamp, rectifier, envelopeLp, modulationDepth];
 
     echoSum.connect(this.echoGain);
     Tone.connect(this.echoGain, this.eq.input);
@@ -404,6 +505,9 @@ export class SpaceEchoEffect extends Tone.ToneAudioNode {
     this.eq.disconnect();
     this.saturation.dispose();
     try { this.wowLFO.stop(); } catch { /* not started */ }
+    try { this.hissSource.stop(); } catch { /* not started */ }
+    this.hissSource.disconnect();
+    for (const node of this.hissNodes) node.disconnect();
     this.wowLFO.disconnect();
     this.wowDepth.disconnect();
     this.wowGain.dispose();

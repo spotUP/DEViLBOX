@@ -20,6 +20,7 @@ set_target_properties(RETapeEcho PROPERTIES
 
 target_link_options(RETapeEcho PRIVATE
   "SHELL:-s MODULARIZE=1"
+  "SHELL:-s INCOMING_MODULE_JS_API=[wasmBinary,locateFile,print,printErr]"
   "SHELL:-s EXPORT_NAME='createRETapeEcho'"
   "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_re_tape_echo_create','_re_tape_echo_destroy','_re_tape_echo_process','_re_tape_echo_set_mode','_re_tape_echo_set_repeat_rate','_re_tape_echo_set_intensity','_re_tape_echo_set_echo_volume','_re_tape_echo_set_wow','_re_tape_echo_set_flutter','_re_tape_echo_set_dirt','_re_tape_echo_set_input_bleed','_re_tape_echo_set_loop_amount','_re_tape_echo_set_playhead_filter']"
   "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
