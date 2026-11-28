@@ -30,6 +30,10 @@ import { isSidFileBytes, type SidForcedPlayback } from '@/lib/sid/SIDHeaderParse
 import { NuadeDriver } from '@/engine/nuade/nuadeDriver';
 import { uadeGlueForWorker, instantiateUadeWasm, addUadeCompanion, type UadeWasm } from '@/engine/uade/uadeWasmInstance';
 import { loadNuadeModuleFromPublic } from '@/engine/nuade/nuadeModule';
+import { renderWithConsole } from './dj-render/consoleRender';
+import { renderWithRetro } from './dj-render/retroRender';
+import { renderWithAdPlug } from './dj-render/adlibRender';
+import { renderWithSynth } from './dj-render/synthRender';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1548,17 +1552,13 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         } else if (isHivelyFormat(filename)) {
           result = await renderWithHively(fileBuffer, filename, subsong, id, stems);
         } else if (isAdLibFormat(filename)) {
-          // TODO: Implement renderWithAdPlug()
-          throw new Error('AdLib/OPL formats not yet supported in DJ renderer (use main tracker)');
+          result = await renderWithAdPlug(fileBuffer, filename, subsong, (p) => postProgress(id, p), maxSeconds, stems, companions);
         } else if (isConsoleFormat(filename)) {
-          // TODO: Implement console renderers (NSF, SPC, VGM, etc.)
-          throw new Error('Console formats not yet supported in DJ renderer (use main tracker)');
+          result = await renderWithConsole(fileBuffer, filename, subsong, (p) => postProgress(id, p), maxSeconds, stems);
         } else if (isRetroFormat(filename)) {
-          // TODO: Implement retro platform renderers (SC68, PT3, KSS, etc.)
-          throw new Error('Retro platform formats not yet supported in DJ renderer (use main tracker)');
+          result = await renderWithRetro(fileBuffer, filename, subsong, (p) => postProgress(id, p), maxSeconds, stems);
         } else if (isSynthFormat(filename)) {
-          // TODO: Implement synthesizer renderers (SunVox, V2, WaveSabre, etc.)
-          throw new Error('Synthesizer formats not yet supported in DJ renderer (use main tracker)');
+          result = await renderWithSynth(fileBuffer, filename, subsong, (p) => postProgress(id, p), maxSeconds, stems);
         } else if (isAmigaFormat(filename)) {
           result = await renderWithUADE(fileBuffer, filename, subsong, id, companions, maxSeconds, stems);
         } else {

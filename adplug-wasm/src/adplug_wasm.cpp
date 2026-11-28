@@ -523,6 +523,10 @@ public:
             }
         }
 
+        // A player that keys on a chip-1 voice is dual-OPL2: chip 0 left, chip 1 right from here on.
+        // Key-on only: RAD and other OPL3-aware players reset the chip-1 bank on init, which made OPL2 songs left-only.
+        if (chip == 1 && reg >= 0xB0 && reg <= 0xB8 && (val & 0x20) && realOpl->gettype() != TYPE_DUAL_OPL2)
+            realOpl->settype(TYPE_DUAL_OPL2);
         realOpl->setchip(chip);
         realOpl->write(reg, val);
     }
@@ -534,6 +538,9 @@ public:
 
     void init() override {
         realOpl->init();
+        // AdPlug players never announce their chip count; start single OPL2 (chip 0 on both
+        // channels) so OPL2 songs are not left-only, and flip to dual on the first chip-1 write.
+        realOpl->settype(TYPE_OPL2);
         memset(g_oplRegs, 0, sizeof(g_oplRegs));
         memset(g_oplKeyOn, 0, sizeof(g_oplKeyOn));
         memset(g_channelLevels, 0, sizeof(g_channelLevels));

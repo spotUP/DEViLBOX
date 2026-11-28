@@ -777,6 +777,17 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         if (this.wasm) this.wasm.seqSeek(data.order, data.row);
         break;
       }
+      case 'seqSetExtClock': {
+        if (this.wasm?.seqSetExtClock) this.wasm.seqSetExtClock(data.on ? 1 : 0);
+        this.extRows = [];
+        break;
+      }
+      case 'seqExtRow': {
+        // Another player (libopenmpt) owns the clock. The row waits for its audio time `at`
+        // (process() below), so the chip and the module's samples start it in the same block.
+        (this.extRows ||= []).push(data);
+        break;
+      }
       case 'seqSetCell': {
         if (this.wasm) this.wasm.seqSetCell(data.ch, data.pat, data.row, data.col, data.val);
         break;
@@ -1010,6 +1021,8 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         seqGetDivider: this.module._furnace_seq_get_divider,
         seqSetMute: this.module._furnace_seq_set_mute,
         seqTick: this.module._furnace_seq_tick,
+        seqSetExtClock: this.module._furnace_seq_set_ext_clock,
+        seqExtRow: this.module._furnace_seq_ext_row,
         seqGetOrder: this.module._furnace_seq_get_order,
         seqGetRow: this.module._furnace_seq_get_row,
         seqIsPlaying: this.module._furnace_seq_is_playing,
@@ -1236,8 +1249,10 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     // A needle of -1 is a channel the chip keeps no scope for (ZX beeper
     // channels 2-6, OPN extended-3 operators, ...): it never advances, so it
     // must not hold back the others; it streams silence.
+    // A channel the chip does not render (an idle ES5506 voice, ...) keeps a frozen needle: same rule.
+    const moved = now.map((v, i) => v >= 0 && ((v - from[i]) & 0xffff) > 0);
     let n = Infinity;
-    for (let i = 0; i < chans.length; i++) if (now[i] >= 0) n = Math.min(n, (now[i] - from[i]) & 0xffff);
+    for (let i = 0; i < chans.length; i++) if (moved[i]) n = Math.min(n, (now[i] - from[i]) & 0xffff);
     if (!(n > 0) || n === Infinity) return;
     if (n > 32768) {                     // more than half the ring: lost track
       this._oscReadPos = now;
@@ -1249,7 +1264,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     if (!heapBuffer) return;
     const views = [];
     for (let i = 0; i < chans.length; i++) {
-      if (now[i] < 0) { views.push(new Int16Array(n)); continue; }
+      if (!moved[i]) { views.push(new Int16Array(n)); continue; }
       const end = (from[i] + n) & 0xffff;
       this.wasm.readOsc(chans[i].handle, chans[i].ch, end, this.oscPtrOut, n);
       views.push(new Int16Array(heapBuffer, this.oscPtrOut, n).slice());
@@ -1333,6 +1348,17 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       // (Furnace nextBuf pattern: tick → render samplesPerTick, but we tick per
       // process() block for stability — the 128-sample granularity is close enough
       // for most use cases without risking audio thread overload.)
+      // External clock: start each named row in the block that holds its audio time.
+      while (this.extRows?.length && this.wasm.seqExtRow && !(this.extRows[0].at > currentTime + numSamples / sampleRate)) {
+        const r = this.extRows.shift();
+        this.wasm.seqExtRow(r.order, r.row, r.ticks);
+        if (r.tickRate > 0) {
+          this.wasm.seqSetDivider(r.tickRate);
+          this.tickRate = r.tickRate;
+          this.samplesPerTick = sampleRate / this.tickRate;
+        }
+        this.tickAccumulator = this.samplesPerTick - numSamples; // first tick of the row: this block
+      }
       this.tickAccumulator += numSamples;
       while (this.tickAccumulator >= this.samplesPerTick) {
         if (this.sequencerActive && this.wasm.seqIsPlaying && this.wasm.seqIsPlaying()) {

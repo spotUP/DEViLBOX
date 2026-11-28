@@ -47,3 +47,15 @@ export async function loadWebBundle<M>(jsPath: string, wasmPath: string, factory
     (WebAssembly as unknown as { instantiate: unknown }).instantiate = original;
   }
 }
+
+/**
+ * Product code that fetches an emscripten bundle and evaluates it with `new Function` (DJ render worker, worklets
+ * hosted in-process) runs in a browser worker, where the bundle takes its web/worker branch. Under vitest
+ * `globalThis.process` exists, so the bundle takes its node branch and reads the free names `require` and
+ * `__dirname`; give it both as globals. Test-only: the browser never sees these.
+ */
+export function exposeNodeGlobalsForEmscripten(dir = process.cwd()): void {
+  const g = globalThis as unknown as { require?: NodeJS.Require; __dirname?: string };
+  g.require ??= createRequire(import.meta.url);
+  g.__dirname ??= dir;
+}
