@@ -97,6 +97,8 @@ export function catalogueDemoGesture(g: Pick<ScratchGesture, 'handPath' | 'glide
 
 /** scratch.py `VEL`: the velocity response. */
 export const DEMO_VEL = { amp_base: 0.55, amp_span: 0.70, gain_base: 0.70, gain_span: 0.50, lp_thresh: 0.50, lp_base: 2500.0, lp_span: 6000.0, hp_thresh: 0.85, hp_freq: 3000.0, hp_mix: 0.15 } as const;
+/** The velocity-response curves with any values (the Auto Scratch panel's overrides). */
+export type ScratchVel = Readonly<Record<keyof typeof DEMO_VEL, number>>;
 
 export interface DemoDeckProfile { deck: TtDeck; slipmat: TtSlipmat; record: TtRecord; performer: TtPerformer; cartridge: TtCartridge }
 /** scratch.py `PROFILES[...]['deck']` (render_gesture's default is the battle setup). */
@@ -423,10 +425,10 @@ export function vizResize(a: ArrayLike<number>, n: number): Float64Array {
  * scratch.py `render_gesture` (offline tier, the `VEL` defaults): one gesture through the turntable
  * physics and the crossfader, `durSec` long, at `rate`.
  */
-export function renderGesture(source: DemoSource, name: string | DemoGesture, durSec: number, rate: number, opts: { velocity?: number; profile?: DemoDeckProfile; seed?: number } = {}): RenderedGesture {
+export function renderGesture(source: DemoSource, name: string | DemoGesture, durSec: number, rate: number, opts: { velocity?: number; profile?: DemoDeckProfile; seed?: number; vel?: ScratchVel } = {}): RenderedGesture {
   scratchRenderStats.gestures++;
   const velocity = opts.velocity ?? 1.0;
-  const vc = DEMO_VEL;
+  const vc = opts.vel ?? DEMO_VEL;
   const g = typeof name === 'string' ? DEMO_GESTURES[name] ?? DEMO_GESTURES.baby! : name;
   const prof = opts.profile ?? DEMO_DECK_PROFILES.default;
   const seed = opts.seed ?? 0;

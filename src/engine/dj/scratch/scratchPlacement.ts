@@ -84,6 +84,8 @@ export const PHRASE_END_BARS: readonly number[] = [3, 7, 15];
 export const MAX_PER_BAR = 4;
 /** Placement velocity weights (reference `PLAN_VEL`). */
 export const PLAN_VEL = { base: 0.55, rand: 0.40, energy: 0.10 } as const;
+/** The placement velocity weights with any values (the Auto Scratch panel's overrides). */
+export type PlanVel = Readonly<Record<keyof typeof PLAN_VEL, number>>;
 
 export type PlacementRole = 'turnaround' | 'answer' | 'accent';
 
@@ -268,7 +270,7 @@ export interface PlanPhraseInput {
   /** Replaces the section's density state (the planner's mode-capped state, SA-M6): the
    *  showcase multipliers and rest window follow the state actually played. */
   density?: DensityState;
-  planVel?: Partial<typeof PLAN_VEL>;
+  planVel?: Partial<PlanVel>;
   gestureCount?: number;
   beatsPerBar?: number;
   grid?: ScratchGrid;
