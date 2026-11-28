@@ -20,10 +20,14 @@
  */
 
 import metadata from '../../../../public/data/samples/packs/scratch-originals/scratch_bank_metadata.json';
+import synthSources from './synthSources.json';
 import { normalizeUrl } from '@utils/urlUtils';
 import { SCRATCH_BASE_PATH } from '@/constants/samplePacks';
 import type { ScratchAnchor, ScratchDJStyle, ScratchGestureId, ScratchLevel, ScratchRole } from './scratchTypes';
 import { compatibleGestures, GESTURE_LEVELS } from './scratchGestureCatalog';
+
+/** A baked synthesized cue (synthSources.json): sample positions at 22,050 Hz. */
+interface SynthCue { file: string; n: number; anchor: number; safe: number[]; safeForward?: number[]; safeReverse?: number[]; sub?: Record<string, number>; preferred?: string[] }
 
 /** The metadata's sample rate (SCR-P0.5: every anchor / range is in samples at this rate). */
 export const SCRATCH_METADATA_RATE = 22050;
@@ -310,7 +314,40 @@ export function wordEmphasisRecord(ids: readonly string[]): string | null {
 /** `scratch_dj.cues_from_bank`: the single record per cue role the 32-bar showcase scratches. */
 export const CUE_ROLE_RECORD: Readonly<Record<CueRole, string>> = { HOME: 'AH_STANDARD', SECONDARY: 'FRESH_STANDARD', ACCENT: 'YEAH_STANDARD', FX: 'LASER_FX' };
 
-const BY_ID: ReadonlyMap<string, ScratchRecord> = new Map(SCRATCH_RECORDS.map((r) => [r.id, r]));
+const SYNTH_GESTURES: readonly ScratchGestureId[] = ['baby', 'forwardStab', 'backwardStab', 'chirp', 'transformer4', 'transformer8', 'tearForward', 'flare1', 'flare2', 'scribble', 'orbit', 'crab', 'chirpDouble', 'cut', 'hydroplane', 'drop'];
+
+/** A baked demo render (R6 / R12, tools/scratch-fixtures/gen_synth_sources.py) as a record: its audio already carries the demo's grit. */
+function synthRecord(id: string, c: SynthCue, vocal: boolean): ScratchRecord {
+  const sec = (i: number) => i / SCRATCH_METADATA_RATE;
+  const pair = (p: readonly number[]) => [sec(p[0]!), sec(p[1]!)] as const;
+  const safe = pair(c.safe), safeForward = pair(c.safeForward ?? c.safe), safeReverse = pair(c.safeReverse ?? c.safe);
+  const vowel = sec(c.anchor);
+  return {
+    id, canonicalName: id, literalPhrase: id, file: c.file, sourceFile: '', url: normalizeUrl(`${SCRATCH_BASE_PATH}/${c.file}`),
+    category: vocal ? 'SHORT_EXCLAMATION' : 'FX', referenceRoles: [], roles: ['THEME', 'FEATURE', 'ACCENT', 'FILL', 'ANSWER'], styles: [],
+    recommendedGestures: c.preferred ?? [], gestures: SYNTH_GESTURES,
+    anchors: { attack: sec(c.sub?.attack ?? c.safe[0]!), vowel, tail: sec(c.sub?.ending ?? c.safe[1]!) },
+    safe, safeForward, safeReverse, wordSlices: [], demoCue: { anchor: c.anchor, safe: [c.safe[0]!, c.safe[1]!] },
+    clean: true, preScratched: false, durationSec: c.n / SCRATCH_METADATA_RATE,
+    voicedAmount: vocal ? 1 : 0, noiseAmount: vocal ? 0 : 1, onsetRate: 0, transientCount: 1, centroidHz: 0,
+    anchor: { position: vowel, safe, safeForward, safeReverse },
+  };
+}
+
+/** scratch_routine.build_cue_sources' word cues as records (`_routine_cues` with no checked bank record, R12). */
+export const synthWordRecordId = (slot: string): string => `CUE:${slot}`;
+
+/** The synthesized records: `build_sources` (R6) by source name, and the routine word cues by `CUE:<slot>`. */
+const SYNTH_RECORDS: readonly ScratchRecord[] = [
+  ...Object.entries(synthSources.sources as Record<string, SynthCue>).map(([n, c]) => synthRecord(n, c, n.startsWith('vocal_') || n === 'robot')),
+  ...Object.entries(synthSources.words as Record<string, SynthCue>).map(([w, c]) => synthRecord(synthWordRecordId(w), c, true)),
+];
+const SYNTH_IDS: ReadonlySet<string> = new Set(SYNTH_RECORDS.map((r) => r.id));
+
+/** A record whose audio is a baked demo render (already through its grit): the pool reads it clean. */
+export const isSynthRecord = (id: string): boolean => SYNTH_IDS.has(id);
+
+const BY_ID: ReadonlyMap<string, ScratchRecord> = new Map([...SCRATCH_RECORDS, ...SYNTH_RECORDS].map((r) => [r.id, r]));
 
 /** Records that are not in the crate (a tracker deck's samples, a phrase dropped on Deck C), registered by the pool. */
 const EXTRA = new Map<string, ScratchRecord>();

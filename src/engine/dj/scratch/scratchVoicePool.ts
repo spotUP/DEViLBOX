@@ -28,7 +28,7 @@ import {
 import { getDeckCMotion } from './deckCMotion';
 import { needleDrop as ttNeedleDrop, needleLift as ttNeedleLift, linspace } from '@/engine/turntable/turntableSim';
 import type { ScratchCue, ScratchEventFx, ScratchGesture, ScratchRenderSpec, ScratchRole } from './scratchTypes';
-import { getScratchRecord, findRecords, lastWordSlice, registerExtraRecord, forgetExtraRecords, type ScratchRecord } from './scratchCatalogue';
+import { getScratchRecord, isSynthRecord, findRecords, lastWordSlice, registerExtraRecord, forgetExtraRecords, type ScratchRecord } from './scratchCatalogue';
 import { realTimers, type ExecutorTimers } from '../autodj/executorTimers';
 
 /** The pool's strokes on the shared Deck C motion timeline. */
@@ -151,11 +151,12 @@ export class ScratchVoicePool {
   recordPcm(record: ScratchRecord): Promise<Float64Array> {
     const own = this.transient.get(record.id);
     if (own) return Promise.resolve(own.pcm);
-    const key = `${record.id}:${this.gritOn ? 'grit' : 'clean'}`;
+    // a baked demo render (R6) already carries its own grit
+    const grit = this.gritOn && !isSynthRecord(record.id);
+    const key = `${record.id}:${grit ? 'grit' : 'clean'}`;
     let p = this.demoPcm.get(key);
     if (!p) {
       scratchPoolStats.loads++;
-      const grit = this.gritOn;
       p = this.bytesFetcher(record).then((b) => demoRecordPcm(b, DEMO_RATE, { grit }));
       this.demoPcm.set(key, p);
       p.catch(() => this.demoPcm.delete(key));

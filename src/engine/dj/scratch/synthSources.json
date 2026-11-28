@@ -1,0 +1,252 @@
+{
+ "rate": 22050,
+ "sources": {
+  "vocal_ah": {
+   "file": "synth/vocal_ah.wav",
+   "n": 66274,
+   "anchor": 8042,
+   "safe": [
+    12,
+    21940
+   ]
+  },
+  "vocal_fresh": {
+   "file": "synth/vocal_fresh.wav",
+   "n": 77621,
+   "anchor": 14815,
+   "safe": [
+    251,
+    31440
+   ]
+  },
+  "vocal_yeah": {
+   "file": "synth/vocal_yeah.wav",
+   "n": 67376,
+   "anchor": 1155,
+   "safe": [
+    0,
+    22889
+   ]
+  },
+  "robot": {
+   "file": "synth/robot.wav",
+   "n": 93164,
+   "anchor": 16376,
+   "safe": [
+    2033,
+    48554
+   ]
+  },
+  "horn": {
+   "file": "synth/horn.wav",
+   "n": 7497,
+   "anchor": 1711,
+   "safe": [
+    0,
+    7496
+   ]
+  },
+  "snare": {
+   "file": "synth/snare.wav",
+   "n": 3087,
+   "anchor": 13,
+   "safe": [
+    0,
+    3086
+   ]
+  },
+  "noise": {
+   "file": "synth/noise.wav",
+   "n": 3528,
+   "anchor": 106,
+   "safe": [
+    0,
+    2863
+   ]
+  }
+ },
+ "words": {
+  "IF": {
+   "file": "synth/word_if.wav",
+   "n": 74137,
+   "anchor": 13640,
+   "safe": [
+    0,
+    28548
+   ],
+   "safeForward": [
+    13640,
+    28548
+   ],
+   "safeReverse": [
+    0,
+    13640
+   ],
+   "sub": {
+    "attack": 0,
+    "vowel": 13640,
+    "ending": 28548
+   },
+   "preferred": [
+    "forward_stab"
+   ]
+  },
+  "YOU": {
+   "file": "synth/word_you.wav",
+   "n": 73652,
+   "anchor": 13640,
+   "safe": [
+    0,
+    29930
+   ],
+   "safeForward": [
+    13640,
+    29930
+   ],
+   "safeReverse": [
+    0,
+    13640
+   ],
+   "sub": {
+    "attack": 0,
+    "vowel": 13640,
+    "ending": 29930
+   },
+   "preferred": [
+    "forward_stab",
+    "baby"
+   ]
+  },
+  "REALLY": {
+   "file": "synth/word_really.wav",
+   "n": 88577,
+   "anchor": 23980,
+   "safe": [
+    0,
+    45041
+   ],
+   "safeForward": [
+    23980,
+    45041
+   ],
+   "safeReverse": [
+    0,
+    23980
+   ],
+   "sub": {
+    "attack": 0,
+    "vowel": 23980,
+    "ending": 45041
+   },
+   "preferred": [
+    "baby",
+    "forward_stab"
+   ]
+  },
+  "ROCK": {
+   "file": "synth/word_rock.wav",
+   "n": 68567,
+   "anchor": 440,
+   "safe": [
+    0,
+    23207
+   ],
+   "safeForward": [
+    440,
+    23207
+   ],
+   "safeReverse": [
+    0,
+    440
+   ],
+   "sub": {
+    "attack": 0,
+    "vowel": 440,
+    "ending": 23207
+   },
+   "preferred": [
+    "forward_stab",
+    "baby",
+    "chirp"
+   ]
+  },
+  "FUNKY": {
+   "file": "synth/word_funky.wav",
+   "n": 90892,
+   "anchor": 32120,
+   "safe": [
+    348,
+    46570
+   ],
+   "safeForward": [
+    32120,
+    46570
+   ],
+   "safeReverse": [
+    348,
+    32120
+   ],
+   "sub": {
+    "attack": 348,
+    "vowel": 32120,
+    "ending": 46570
+   },
+   "preferred": [
+    "baby",
+    "forward_stab"
+   ]
+  },
+  "BEAT": {
+   "file": "synth/word_beat.wav",
+   "n": 74534,
+   "anchor": 13640,
+   "safe": [
+    19,
+    29446
+   ],
+   "safeForward": [
+    13640,
+    29446
+   ],
+   "safeReverse": [
+    19,
+    13640
+   ],
+   "sub": {
+    "attack": 19,
+    "vowel": 13640,
+    "ending": 29446
+   },
+   "preferred": [
+    "chirp",
+    "transformer8"
+   ]
+  },
+  "PHRASE": {
+   "file": "synth/word_phrase.wav",
+   "n": 151012,
+   "anchor": 46200,
+   "safe": [
+    0,
+    105788
+   ],
+   "safeForward": [
+    46200,
+    105788
+   ],
+   "safeReverse": [
+    0,
+    46200
+   ],
+   "sub": {
+    "attack": 0,
+    "vowel": 46200,
+    "ending": 105788
+   },
+   "preferred": [
+    "drag",
+    "forward_stab"
+   ]
+  }
+ }
+}

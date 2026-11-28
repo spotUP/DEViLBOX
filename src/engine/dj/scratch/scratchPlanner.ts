@@ -21,7 +21,7 @@ import { foldedStep, routineBarsIn } from './scratchTempo';
 import { overlayRecord } from './scratchDemoRoutines';
 import type { ScratchPerformanceContext } from './scratchContext';
 import { DEMO_PROFILES, DEMO_RATE, type DemoProfileName } from './scratchRender';
-import { ALL_SOURCE_NAMES, CLEAN_CRATE_POOL, SYNTH_SOURCE_NAMES, sourcePool } from './scratchCatalogue';
+import { ALL_SOURCE_NAMES, CLEAN_CRATE_POOL, SYNTH_SOURCE_NAMES, sourcePool, synthWordRecordId } from './scratchCatalogue';
 import type { ScratchAnchor, ScratchEvent, ScratchGestureId, ScratchRenderSpec, ScratchSource, DeckScratchAnchor } from './scratchTypes';
 
 /** Below this beat confidence the planner plays safe: level 1, no routine. */
@@ -302,8 +302,8 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
       const placed = r.events.filter((ev) => ev.bar * 16 + ev.step < demoRb * 16).map((ev): PlacedScratch => {
         const rb = first + ev.bar + Math.floor(ev.step / 16);
         const { bar, step } = onTheSet(sec, rb, ev.step % 16);
-        // with a record set each word slot scratches its own record (`_routine_cues`, R12)
-        const record = allowed ? routineSlotRecord(ev.sourceRole, allowed) : undefined;
+        // with a record set each word slot scratches its own record, none checked: the demo's synthesized word (`_routine_cues`, R12)
+        const record = allowed ? routineSlotRecord(ev.sourceRole, allowed) ?? synthWordRecordId(ev.sourceRole) : undefined;
         return {
           bar, step, beat: stepToBeat({ bar, step }, grid, bpb), gesture: ev.gesture, velocity: ev.velocity, placementRole: ev.role === 'ANSWER' ? 'answer' as const : step >= 15 ? 'turnaround' as const : 'accent' as const, role: ev.role,
           render: folded(render.routine(ev.bar, ev.step, first, ev.tail)), routineSlot: ev.sourceRole, layer: 'demo', ...(record ? { record } : {}),

@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { planScratch, routineSlotRecord, type OverlaySection } from '../scratchPlanner';
 import type { PlacedScratch } from '../scratchPlacement';
 import { REFERENCE_GESTURE_IDS, getGesture } from '../scratchGestureCatalog';
-import { CLEAN_CRATE_POOL, CRATE_LOAD_ORDER, CUE_ROLE_POOLS, type CueRole } from '../scratchCatalogue';
+import { CLEAN_CRATE_POOL, CRATE_LOAD_ORDER, CUE_ROLE_POOLS, SYNTH_SOURCE_NAMES, synthWordRecordId, type CueRole } from '../scratchCatalogue';
 import { SCRATCH_PROFILES, type ScratchProfileId } from '../scratchStyles';
 import { buildScratchDjRoutine, buildThreeDeckRoutine, validateScratchDjRoutine } from '../scratchDemoRoutines';
 import { SECTION_OF_KIND, type ScratchPerformanceContext } from '../scratchContext';
@@ -40,7 +40,7 @@ function ctxFor(track: SpecTrack, vocal = 0, beatConfidence = 1): ScratchPerform
 }
 
 /** The DEViLBOX overlay over the whole track, planned window by window (4 bars) as the controller plans it. */
-function devilboxOverlay(track: SpecTrack, routine: string | null, mode: 'SAFE' | 'MUSICAL' | 'PERFORMER' | 'BATTLE' = 'BATTLE', ctx = ctxFor(track)): PlacedScratch[] {
+function devilboxOverlay(track: SpecTrack, routine: string | null, mode: 'SAFE' | 'MUSICAL' | 'PERFORMER' | 'BATTLE' = 'BATTLE', ctx = ctxFor(track), records: true | readonly string[] = true): PlacedScratch[] {
   const last = track.sections[track.sections.length - 1]!;
   const total = last.startBar + last.bars;
   const sectionAt = (bar: number): OverlaySection => {
@@ -51,7 +51,7 @@ function devilboxOverlay(track: SpecTrack, routine: string | null, mode: 'SAFE' 
   for (let from = 0; from < total; from += 4) {
     const plan = planScratch(ctx, {
       mode, seed: track.seed, fromBar: from, bars: Math.min(4, total - from), sectionAt,
-      profile: profileOf(track.profile), routine: routine as 'auto' | null, records: true,
+      profile: profileOf(track.profile), routine: routine as 'auto' | null, records,
     });
     out.push(...plan.events);
   }
@@ -105,6 +105,14 @@ describe('the scratch planners plan what the Up Rough demo plans (SCR-PHRASING-P
       }
     });
   }
+
+  it('a routine on a record set with no checked bank record scratches the synthesized word cues (`_routine_cues`, R12)', () => {
+    const row = (fixture.overlay as OverlayRow[]).find((r) => r.routine)!;
+    const track = spec.tracks.find((t) => t.name === row.track)! as SpecTrack;
+    const slots = devilboxOverlay(track, row.routine, 'BATTLE', ctxFor(track), SYNTH_SOURCE_NAMES).filter((e) => e.routineSlot);
+    expect(slots.length).toBeGreaterThan(0);
+    for (const e of slots) expect(e.record).toBe(synthWordRecordId(e.routineSlot!));
+  });
 
   it('the 32-bar showcase (scratch_dj.build_routine) for every style and seed, with its validation', () => {
     for (const row of fixture.scratchDj as unknown as Array<{ style: string; seed: number; events: Array<[number, number, string, string, number]>; issues: string[] }>) {
