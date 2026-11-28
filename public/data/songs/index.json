@@ -1,8 +1,8 @@
 {
-  "generated": "2026-11-26T20:12:06.440Z",
+  "generated": "2026-11-28T03:16:23.120Z",
   "perEntry": 6,
   "registryTotal": 294,
-  "covered": 201,
+  "covered": 202,
   "entries": [
     {
       "id": "actionamics",
@@ -1739,16 +1739,6 @@
       ],
       "total": 1,
       "dir": "/data/songs/kss"
-    },
-    {
-      "id": "kwv",
-      "label": "kwv",
-      "formatKey": null,
-      "files": [
-        "/data/songs/kwv/waves.kwv"
-      ],
-      "total": 1,
-      "dir": "/data/songs/kwv"
     },
     {
       "id": "leggless-music-editor",
@@ -3561,6 +3551,16 @@
       "dir": "/data/songs/syntracker"
     },
     {
+      "id": "t0ast",
+      "label": "t0ast",
+      "formatKey": "t0ast",
+      "files": [
+        "/data/songs/t0ast/BeRo - popcorn.t0ast"
+      ],
+      "total": 1,
+      "dir": "/data/songs/t0ast"
+    },
+    {
       "id": "tcb-tracker",
       "label": "tcb-tracker",
       "formatKey": "tcbTracker",
@@ -4564,7 +4564,8 @@
         ],
         "ken-silverman-kdm": [
           "flysong.kdm",
-          "kdmsong.kdm"
+          "kdmsong.kdm",
+          "waves.kwv"
         ],
         "klystrack": [
           "Ocean Loader III.kt"
@@ -4576,9 +4577,6 @@
         ],
         "kss": [
           "gradius 2.kss"
-        ],
-        "kwv": [
-          "waves.kwv"
         ],
         "leggless-music-editor": [
           "the punisher gameover.lme"
@@ -6952,6 +6950,9 @@
           "tip tap tribe.synmod",
           "trip to holland.synmod",
           "under the stars.synmod"
+        ],
+        "t0ast": [
+          "BeRo - popcorn.t0ast"
         ],
         "tcb-tracker": [
           "cannonfodder.tcb",
@@ -39775,7 +39776,8 @@
     "/data/songs/ken-silverman-kdm": {
       "siblings": [
         "flysong.kdm",
-        "kdmsong.kdm"
+        "kdmsong.kdm",
+        "waves.kwv"
       ]
     },
     "/data/songs/klystrack": {
@@ -39793,11 +39795,6 @@
     "/data/songs/kss": {
       "siblings": [
         "gradius 2.kss"
-      ]
-    },
-    "/data/songs/kwv": {
-      "siblings": [
-        "waves.kwv"
       ]
     },
     "/data/songs/leggless-music-editor": {
@@ -42145,7 +42142,7 @@
           "count duckula.nsf",
           "cybernoid ii (vrc7).nsf",
           "dink smallwood - battle.nsf",
-          "dk 64: puzzles in the caves.nsf",
+          "dk 64 - puzzles in the caves.nsf",
           "doom - nobody told me about id.nsf",
           "duck tales - the moon (vrc6 ntsc).nsf",
           "duck tales - the moon (vrc6 pal).nsf",
@@ -47550,7 +47547,7 @@
         "count duckula.nsf",
         "cybernoid ii (vrc7).nsf",
         "dink smallwood - battle.nsf",
-        "dk 64: puzzles in the caves.nsf",
+        "dk 64 - puzzles in the caves.nsf",
         "doom - nobody told me about id.nsf",
         "duck tales - the moon (vrc6 ntsc).nsf",
         "duck tales - the moon (vrc6 pal).nsf",
@@ -89262,6 +89259,11 @@
         "under the stars.synmod"
       ]
     },
+    "/data/songs/t0ast": {
+      "siblings": [
+        "BeRo - popcorn.t0ast"
+      ]
+    },
     "/data/songs/tcb-tracker": {
       "siblings": [
         "cannonfodder.tcb",
@@ -90796,10 +90798,6 @@
     {
       "formatKey": "uade_sun",
       "label": "SUN-Tronic"
-    },
-    {
-      "formatKey": "t0ast",
-      "label": "T0AST"
     },
     {
       "formatKey": "uade_tfmx1_5",

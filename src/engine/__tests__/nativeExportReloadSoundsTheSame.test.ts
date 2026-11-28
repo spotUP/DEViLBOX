@@ -24,7 +24,8 @@ import { EXPORT_ROUND_TRIP } from '@/lib/import/gridProvenance';
 import { pickDscNote } from './helpers/pickDscNote';
 import { loadTfmxWalkModule, type TfmxWalkHost } from './helpers/tfmxWalkHost';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join, basename, dirname } from 'node:path';
+import { expectedCompanionNames } from '@/lib/import/companionResolver';
 
 vi.mock('@/engine/ToneEngine', () => {
   const engine = new Proxy({}, { get: () => () => Promise.resolve() });
@@ -41,6 +42,15 @@ vi.mock('@engine/TrackerReplayer', async (orig) => {
   return { ...(await orig<object>()), getTrackerReplayer: () => replayer };
 });
 vi.mock('@/lib/songdb', () => ({ computeSongDBHash: () => '', lookupSongDB: async () => null }));
+// The browser loads T0astEdit.js from BASE_URL; here from public/t0ast (its .wasm through the fetch stub below).
+vi.mock('@engine/t0ast/t0astEditWasm', async (orig) => {
+  const { join: j } = await import('node:path');
+  const real = await orig<typeof import('@engine/t0ast/t0astEditWasm')>();
+  let mod: Promise<import('@engine/t0ast/t0astEditWasm').T0astEditModule> | null = null;
+  const create = () => (mod ??= import('../../../public/t0ast/T0astEdit.js').then((m) => m.default({ locateFile: (f: string) => j(process.cwd(), 'public/t0ast', f) })));
+  // t0astGrid calls t0astEditModule inside its own module, past this mock, so it gets `create` passed in.
+  return { ...real, t0astEditModule: () => create(), t0astGrid: (b: Uint8Array, c?: Parameters<typeof real.t0astGrid>[1]) => real.t0astGrid(b, c ?? create) };
+});
 
 const ROOT = process.cwd();
 const SONGS = join(ROOT, 'public/data/songs');
@@ -75,7 +85,7 @@ function corpus(exts: string[], inDir?: string): string[] {
 }
 
 /** The emscripten bundles the grid walks of these parsers fetch (public/<dir>/<name>.js + .wasm). */
-const WASM_BUNDLES: Array<[string, string]> = [['davidwhittaker', 'DavidWhittaker'], ['bd', 'Bd'], ['tfmx', 'TFMX']];
+const WASM_BUNDLES: Array<[string, string]> = [['davidwhittaker', 'DavidWhittaker'], ['bd', 'Bd'], ['tfmx', 'TFMX'], ['t0ast', 'T0astEdit'], ['eupmini', 'EupminiEdit']];
 
 beforeAll(() => {
   const g = globalThis as Record<string, unknown>;
@@ -245,6 +255,8 @@ const FORMATS: FormatRow[] = [
   { key: 'ult', rig: 'paula', held: 'no exporter in the registry', files: ['ultra-tracker/seasons.ult'] },
   { key: 'unic', rig: 'paula', files: ['unic-tracker/african dreams.unic'], pick: (s) => Promise.resolve(pickNote(s, s.songPositions[0])) },
   { key: 'xm', rig: 'paula', files: ['xm/flo boarding - level 1.xm'] },
+  { key: 't0ast', rig: 'paula', files: ['t0ast/BeRo - popcorn.t0ast'] },
+  { key: 'eupmini', rig: 'paula', files: ['euphony/Mondschein/Mondschein.eup'] },
 ];
 
 type Cell = { note: number; instrument: number; volume: number; effTyp: number; eff: number; effTyp2: number; eff2: number };
@@ -277,15 +289,23 @@ function firstByteDiff(a: Uint8Array, b: Uint8Array): string {
   return a.length === b.length ? 'equal' : `sizes ${a.length}/${b.length}`;
 }
 
+/** The app's own companion list (KDM waves.kwv), read from the song's directory; the reload of the export opens with the same ones. */
+let companions: Map<string, ArrayBuffer> | undefined;
+function companionsOf(rel: string): Map<string, ArrayBuffer> | undefined {
+  const found = expectedCompanionNames(basename(rel)).map((n) => [n, join(SONGS, dirname(rel), n)] as const).filter(([, p]) => existsSync(p));
+  return found.length ? new Map(found.map(([n, p]) => [n, new Uint8Array(readFileSync(p)).buffer as ArrayBuffer])) : undefined;
+}
+
 async function loadThroughApp(rel: string): Promise<{ bytes: Uint8Array; name: string }> {
   const bytes = new Uint8Array(readFileSync(join(SONGS, rel)));
   const name = basename(rel);
+  companions = companionsOf(rel);
   const file = new File([bytes.slice().buffer as ArrayBuffer], name);
   const { importTrackerModule } = await import('@/lib/song/songBranches');
   await importTrackerModule({
     metadata: { title: name, type: 'MOD', channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1, duration: 0 },
     arrayBuffer: await file.arrayBuffer(), file,
-  } as never, { useLibopenmpt: true } as never);
+  } as never, { useLibopenmpt: true, companionFiles: companions } as never);
   return { bytes, name };
 }
 
@@ -317,7 +337,8 @@ const EXPECTED_NO_RIG: string[] = [
   'face-the-music/rock.ftm', 'dynamic-synthesizer/dns.ptc', 'fredmon/fuzzball-title.fred', 'hivelytracker/waiting for a message.hvl',
   'richard-joseph/cannon fodder (intro).sng', 'synth-dream/sdr.monsterbusiness 1', 'tfm-music-maker/rainstorm.tfe', 'tfmx/mdat.hbtitle',
   'composer-669/speed fighter.669', 'psm/Epic Pinball - Song 0 - Title.psm', 'advanced-music-format/avoid.amf', 'jaytrax/dreamer.jxs', 'ken-silverman-kdm/kdmsong.kdm',
-  'digital-tracker-dtm/sonic subspace.dtm', 'organya/obj0640-1.org', 'studio-pixel---piyopiyo/obj0176-1.pmd',
+  'digital-tracker-dtm/sonic subspace.dtm', 'organya/obj0640-1.org', 'studio-pixel---piyopiyo/obj0176-1.pmd', 't0ast/BeRo - popcorn.t0ast',
+  'euphony/Mondschein/Mondschein.eup',
   // Byte-exact since the layout-patch export; UADE refuses both, so only bytes and grid are held.
   'composer-667/speed fighter.667', 'soundtracker-pro-ii/noname.stp', 'protracker-iff/rew_vibr.ptm',
 ];
@@ -342,7 +363,7 @@ async function originalTrace(rig: RigName, rel: string, bytes: Uint8Array, name:
 
 async function reload(bytes: Uint8Array, name: string): Promise<GridSong> {
   const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-  return (await parseModuleToSong(new File([bytes.slice().buffer as ArrayBuffer], name))) as unknown as GridSong;
+  return (await parseModuleToSong(new File([bytes.slice().buffer as ArrayBuffer], name), undefined, undefined, undefined, companions)) as unknown as GridSong;
 }
 
 interface Edit { p: number; ch: number; r: number; note: number }

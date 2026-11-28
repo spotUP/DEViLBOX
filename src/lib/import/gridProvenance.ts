@@ -111,6 +111,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   inStereoAmbiguous: 'pass',
   jxs: 'pass',
   kdm: 'pass',
+  t0ast: 'pass',
   med: 'pass',
   organya: 'pass',
   piyoPiyo: 'pass',
