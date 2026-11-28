@@ -9,7 +9,26 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../MIDIManager', () => ({ getMIDIManager: () => ({}) }));
 vi.mock('../performance/screens/MK2ScreenManager', () => ({
-  getMK2ScreenManager: () => ({ start: () => {}, setDeviceModel: () => {}, resetDisplayHashes: () => {}, markDirty: () => {} }),
+  getMK2ScreenManager: () => ({
+    start: () => {}, setDeviceModel: () => {}, resetDisplayHashes: () => {}, markDirty: () => {},
+    registerScreen: () => {}, registerMK3Screen: () => {}, forceRender: () => {},
+  }),
+}));
+// A connect lazy-loads the screens and the drum pad store. The real ones import the
+// tracker and instrument stores (the whole engine): transforming that graph took
+// past the 30 s test timeout, so the reconnect case timed out before it ran.
+vi.mock('../performance/screens/InstrumentScreen', () => ({ InstrumentScreen: class {} }));
+vi.mock('../performance/screens/MixerScreen', () => ({ MixerScreen: class {} }));
+vi.mock('../performance/screens/StepScreen', () => ({ StepScreen: class {} }));
+vi.mock('../performance/screens/SampleScreen', () => ({ SampleScreen: class {} }));
+vi.mock('../performance/screens/BrowseScreen', () => ({ BrowseScreen: class {} }));
+vi.mock('../performance/screens/SongScreen', () => ({ SongScreen: class {} }));
+vi.mock('../performance/screens/PlaybackScreen', () => ({ PlaybackScreen: class {} }));
+vi.mock('../performance/screens/MK3Screens', () => ({
+  MK3InstrumentScreen: class {}, MK3MixerScreen: class {}, MK3BrowseScreen: class {},
+}));
+vi.mock('@/stores/useDrumPadStore', () => ({
+  useDrumPadStore: { getState: () => ({ setControllerPadCount: () => {} }) },
 }));
 vi.mock('../../stores/useTransportStore', () => ({ useTransportStore: { getState: () => ({}) } }));
 
