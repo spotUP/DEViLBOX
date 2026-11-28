@@ -159,8 +159,8 @@ export const USBSIDWizard: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-dark-border bg-dark-bgSecondary/50">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
-              <Usb className="w-4 h-4 text-green-400" />
+            <div className="w-8 h-8 rounded-lg bg-accent-success/20 flex items-center justify-center">
+              <Usb className="w-4 h-4 text-accent-success" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-text-primary">USB-SID-Pico Setup</h2>
@@ -180,11 +180,11 @@ export const USBSIDWizard: React.FC = () => {
             const isPast = ['detect', 'connect', 'engine', 'done'].indexOf(step) > i;
             return (
               <React.Fragment key={s}>
-                {i > 0 && <div className={`flex-1 h-px ${isPast ? 'bg-green-500' : 'bg-dark-border'}`} />}
-                <div className={`flex items-center gap-1.5 ${isCurrent ? 'text-text-primary' : isPast ? 'text-green-400' : 'text-text-muted/50'}`}>
+                {i > 0 && <div className={`flex-1 h-px ${isPast ? 'bg-accent-success' : 'bg-dark-border'}`} />}
+                <div className={`flex items-center gap-1.5 ${isCurrent ? 'text-text-primary' : isPast ? 'text-accent-success' : 'text-text-muted/50'}`}>
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold border ${
-                    isPast ? 'bg-green-500/20 border-green-500 text-green-400' :
-                    isCurrent ? 'bg-blue-500/20 border-blue-500 text-blue-400' :
+                    isPast ? 'bg-accent-success/20 border-accent-success text-accent-success' :
+                    isCurrent ? 'bg-accent-primary/20 border-accent-primary text-accent-primary' :
                     'border-dark-border text-text-muted/40'
                   }`}>
                     {isPast ? <Check size={10} /> : i + 1}
@@ -203,8 +203,8 @@ export const USBSIDWizard: React.FC = () => {
           {step === 'detect' && (
             <>
               <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mx-auto">
-                  <Usb className="w-8 h-8 text-blue-400" />
+                <div className="w-16 h-16 rounded-full bg-accent-primary/10 border border-accent-primary/30 flex items-center justify-center mx-auto">
+                  <Usb className="w-8 h-8 text-accent-primary" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">USB-SID-Pico Detected</h3>
@@ -225,7 +225,7 @@ export const USBSIDWizard: React.FC = () => {
 
               <button
                 onClick={() => setStep('connect')}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 Set Up Hardware Output
                 <ChevronRight size={16} />
@@ -246,15 +246,15 @@ export const USBSIDWizard: React.FC = () => {
               <div className="text-center space-y-3">
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto border ${
                   connected
-                    ? 'bg-green-500/10 border-green-500/30'
+                    ? 'bg-accent-success/10 border-accent-success/30'
                     : checkingPaired
-                      ? 'bg-blue-500/10 border-blue-500/30'
-                      : 'bg-yellow-500/10 border-yellow-500/30'
+                      ? 'bg-accent-primary/10 border-accent-primary/30'
+                      : 'bg-accent-warning/10 border-accent-warning/30'
                 }`}>
                   {checkingPaired ? (
-                    <div className="w-8 h-8 border-3 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                    <div className="w-8 h-8 border-3 border-accent-primary/30 border-t-blue-400 rounded-full animate-spin" />
                   ) : (
-                    <Usb className={`w-8 h-8 ${connected ? 'text-green-400' : 'text-yellow-400'}`} />
+                    <Usb className={`w-8 h-8 ${connected ? 'text-accent-success' : 'text-accent-warning'}`} />
                   )}
                 </div>
                 <div>
@@ -274,8 +274,8 @@ export const USBSIDWizard: React.FC = () => {
 
               {/* Explain the browser dialog before they see it */}
               {needsPairing && !connected && !connecting && (
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 space-y-2">
-                  <p className="text-[10px] text-blue-300 leading-relaxed">
+                <div className="bg-accent-primary/10 border border-accent-primary/20 rounded-lg p-3 space-y-2">
+                  <p className="text-[10px] text-accent-primary leading-relaxed">
                     <strong>What happens next:</strong> When you click the button below, your browser will
                     open a device selection dialog. Select <strong>"USB-SID-Pico"</strong> from the list
                     and click <strong>"Connect"</strong>.
@@ -288,12 +288,12 @@ export const USBSIDWizard: React.FC = () => {
               )}
 
               {connected && firmware && (
-                <div className="bg-dark-bgSecondary/50 border border-green-500/20 rounded-lg p-3 space-y-1">
-                  <p className="text-[10px] text-green-400 font-mono">
+                <div className="bg-dark-bgSecondary/50 border border-accent-success/20 rounded-lg p-3 space-y-1">
+                  <p className="text-[10px] text-accent-success font-mono">
                     Firmware: {firmware}
                   </p>
                   {chips && chips.length > 0 && (
-                    <p className="text-[10px] text-green-400 font-mono">
+                    <p className="text-[10px] text-accent-success font-mono">
                       SID chips: {chips.filter(c => c.detected).map(c => `Slot ${c.slot}${c.type ? ` (${c.type})` : ''}`).join(', ') || 'Detecting...'}
                     </p>
                   )}
@@ -301,16 +301,16 @@ export const USBSIDWizard: React.FC = () => {
               )}
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                  <p className="text-[10px] text-red-400 leading-relaxed">{error}</p>
+                <div className="bg-accent-error/10 border border-accent-error/30 rounded-lg p-3 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-accent-error shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-accent-error leading-relaxed">{error}</p>
                 </div>
               )}
 
               {connected ? (
                 <button
                   onClick={() => setStep('engine')}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-success hover:bg-accent-success/80 text-text-primary text-sm font-semibold rounded-lg transition-colors"
                 >
                   Continue
                   <ChevronRight size={16} />
@@ -322,7 +322,7 @@ export const USBSIDWizard: React.FC = () => {
                   className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                     connecting
                       ? 'bg-dark-bgSecondary text-text-muted cursor-wait'
-                      : 'bg-blue-600 hover:bg-blue-500 text-text-primary'
+                      : 'bg-accent-primary hover:bg-accent-primary/80 text-text-primary'
                   }`}
                 >
                   {connecting ? (
@@ -345,8 +345,8 @@ export const USBSIDWizard: React.FC = () => {
           {step === 'engine' && (
             <>
               <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-full bg-purple-500/10 border border-purple-500/30 flex items-center justify-center mx-auto">
-                  <Zap className="w-8 h-8 text-purple-400" />
+                <div className="w-16 h-16 rounded-full bg-accent-secondary/10 border border-accent-secondary/30 flex items-center justify-center mx-auto">
+                  <Zap className="w-8 h-8 text-accent-secondary" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Select SID Engine</h3>
@@ -359,20 +359,20 @@ export const USBSIDWizard: React.FC = () => {
 
               <div className="space-y-2">
                 {sidEngine === 'jssid' ? (
-                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 flex items-center gap-3">
-                    <Check className="w-5 h-5 text-green-400 shrink-0" />
+                  <div className="bg-accent-success/10 border border-accent-success/30 rounded-lg p-3 flex items-center gap-3">
+                    <Check className="w-5 h-5 text-accent-success shrink-0" />
                     <div>
-                      <p className="text-xs text-green-400 font-semibold">jsSID is already selected</p>
+                      <p className="text-xs text-accent-success font-semibold">jsSID is already selected</p>
                       <p className="text-[10px] text-text-muted mt-0.5">
                         {SID_ENGINES.jssid.description}
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
+                  <div className="bg-accent-warning/10 border border-accent-warning/30 rounded-lg p-3 flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-accent-warning shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-xs text-yellow-400 font-semibold">
+                      <p className="text-xs text-accent-warning font-semibold">
                         Current engine: {SID_ENGINES[sidEngine].name}
                       </p>
                       <p className="text-[10px] text-text-muted mt-0.5">
@@ -386,7 +386,7 @@ export const USBSIDWizard: React.FC = () => {
 
               <button
                 onClick={handleSetEngine}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 {sidEngine === 'jssid' ? 'Continue' : 'Switch to jsSID & Continue'}
                 <ChevronRight size={16} />
@@ -398,8 +398,8 @@ export const USBSIDWizard: React.FC = () => {
           {step === 'done' && (
             <>
               <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center mx-auto">
-                  <Volume2 className="w-8 h-8 text-green-400" />
+                <div className="w-16 h-16 rounded-full bg-accent-success/10 border border-accent-success/30 flex items-center justify-center mx-auto">
+                  <Volume2 className="w-8 h-8 text-accent-success" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">You're All Set!</h3>
@@ -413,7 +413,7 @@ export const USBSIDWizard: React.FC = () => {
               <div className="bg-dark-bgSecondary/50 border border-dark-border/50 rounded-lg p-3 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-text-muted">Device</span>
-                  <span className="text-green-400 font-mono">{deviceName || 'USB-SID-Pico'}</span>
+                  <span className="text-accent-success font-mono">{deviceName || 'USB-SID-Pico'}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-text-muted">Engine</span>
@@ -431,8 +431,8 @@ export const USBSIDWizard: React.FC = () => {
                 )}
               </div>
 
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                <p className="text-[10px] text-blue-300 leading-relaxed">
+              <div className="bg-accent-primary/10 border border-accent-primary/20 rounded-lg p-3">
+                <p className="text-[10px] text-accent-primary leading-relaxed">
                   <strong>Tip:</strong> Audio will play through both your computer speakers and the
                   USB-SID-Pico simultaneously. Use the SID engine settings to adjust hardware-specific
                   options like clock rate and stereo output.
@@ -441,7 +441,7 @@ export const USBSIDWizard: React.FC = () => {
 
               <button
                 onClick={handleFinish}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-success hover:bg-accent-success/80 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 <Check size={16} />
                 Done — Start Playing

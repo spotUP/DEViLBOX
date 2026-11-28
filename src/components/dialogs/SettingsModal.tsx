@@ -752,7 +752,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">MIDI TOOLS</h3>
                 <div className="space-y-2">
                   <button onClick={() => { onClose(); useUIStore.getState().openModal('midi-wizard'); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded text-left hover:bg-purple-500/20 transition-colors">
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-accent-secondary/10 border border-accent-secondary/30 rounded text-left hover:bg-accent-secondary/20 transition-colors">
                     <span className="text-accent-secondary text-xs">🎛</span>
                     <div className="flex-1">
                       <p className="text-xs text-ft2-highlight font-mono">Controller Setup Wizard</p>
@@ -760,7 +760,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     </div>
                   </button>
                   <button onClick={() => { onClose(); useUIStore.getState().openModal('midi-mapper'); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded text-left hover:bg-blue-500/20 transition-colors">
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-accent-primary/10 border border-accent-primary/30 rounded text-left hover:bg-accent-primary/20 transition-colors">
                     <span className="text-accent-primary text-xs">🎚</span>
                     <div className="flex-1">
                       <p className="text-xs text-ft2-highlight font-mono">Controller Mapper</p>
@@ -768,16 +768,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     </div>
                   </button>
                   <button onClick={() => { onClose(); useUIStore.getState().openModal('nks-wizard'); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/30 rounded text-left hover:bg-orange-500/20 transition-colors">
-                    <span className="text-orange-400 text-xs">🎹</span>
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-accent-warning/10 border border-accent-warning/30 rounded text-left hover:bg-accent-warning/20 transition-colors">
+                    <span className="text-accent-warning text-xs">🎹</span>
                     <div className="flex-1">
                       <p className="text-xs text-ft2-highlight font-mono">NKS Performance Setup</p>
                       <p className="text-[9px] text-ft2-textDim font-mono">Parameter pages, hardware integration</p>
                     </div>
                   </button>
                   <button onClick={() => { onClose(); useUIStore.getState().openModal('nks-library'); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded text-left hover:bg-purple-500/20 transition-colors">
-                    <span className="text-purple-400 text-xs">📚</span>
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-accent-secondary/10 border border-accent-secondary/30 rounded text-left hover:bg-accent-secondary/20 transition-colors">
+                    <span className="text-accent-secondary text-xs">📚</span>
                     <div className="flex-1">
                       <p className="text-xs text-ft2-highlight font-mono">NKS Library Browser</p>
                       <p className="text-[9px] text-ft2-textDim font-mono">Browse Komplete Kontrol preset library</p>

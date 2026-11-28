@@ -86,17 +86,17 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
   return (
     <div className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-dark-bg border border-blue-700/50 rounded-xl shadow-2xl shadow-blue-900/20 w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col overflow-hidden"
+        className="bg-dark-bg border border-accent-primary/50 rounded-xl shadow-2xl shadow-blue-900/20 w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ═══ Header ═══ */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-blue-800/30 bg-gradient-to-r from-blue-950/40 to-purple-950/20 shrink-0">
+        <div className="flex items-center justify-between px-6 py-3 border-b border-accent-primary/30 bg-gradient-to-r from-blue-950/40 to-purple-950/20 shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <Cpu className="w-5 h-5 text-blue-400" />
-              <h2 className="text-lg font-bold text-blue-100">SID File Info</h2>
+              <Cpu className="w-5 h-5 text-accent-primary" />
+              <h2 className="text-lg font-bold text-accent-primary">SID File Info</h2>
             </div>
-            <span className="text-xs px-2 py-0.5 rounded bg-blue-800/30 text-blue-300/80 font-mono">
+            <span className="text-xs px-2 py-0.5 rounded bg-accent-primary/30 text-accent-primary/80 font-mono">
               {sidMetadata.format}v{sidMetadata.version}
             </span>
           </div>
@@ -116,7 +116,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
               onClick={() => setActiveTab(tab.id)}
               className={`px-3 py-2 text-xs whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-blue-500 text-blue-300'
+                  ? 'border-accent-primary text-accent-primary'
                   : 'border-transparent text-text-muted hover:text-text-secondary'
               }`}
             >
@@ -135,12 +135,12 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
             {/* Left: SID File Details */}
             <div className="space-y-4">
               {/* Title / Author / Copyright */}
-              <div className="bg-blue-950/30 border border-blue-800/30 rounded-lg p-4 space-y-2">
+              <div className="bg-accent-primary/30 border border-accent-primary/30 rounded-lg p-4 space-y-2">
                 <div className="flex items-start gap-3">
-                  <Music className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
+                  <Music className="w-4 h-4 text-accent-primary mt-0.5 shrink-0" />
                   <div className="min-w-0">
-                    <h3 className="text-base font-semibold text-blue-100 truncate">{sidMetadata.title || 'Untitled'}</h3>
-                    <p className="text-sm text-blue-300/80 truncate">{sidMetadata.author || 'Unknown'}</p>
+                    <h3 className="text-base font-semibold text-accent-primary truncate">{sidMetadata.title || 'Untitled'}</h3>
+                    <p className="text-sm text-accent-primary/80 truncate">{sidMetadata.author || 'Unknown'}</p>
                     {sidMetadata.copyright && (
                       <p className="text-xs text-text-muted truncate mt-0.5">{sidMetadata.copyright}</p>
                     )}
@@ -148,17 +148,17 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                 </div>
 
                 {/* Chip / Clock / Duration */}
-                <div className="flex flex-wrap items-center gap-3 text-xs text-text-muted border-t border-blue-800/20 pt-2">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-text-muted border-t border-accent-primary/20 pt-2">
                   <div className="flex items-center gap-1.5">
-                    <Cpu className="w-3.5 h-3.5 text-blue-400/60" />
-                    <span className="text-blue-300/80 font-medium">{chipLabel}{chipCount > 1 ? ` × ${chipCount}` : ''}</span>
+                    <Cpu className="w-3.5 h-3.5 text-accent-primary/60" />
+                    <span className="text-accent-primary/80 font-medium">{chipLabel}{chipCount > 1 ? ` × ${chipCount}` : ''}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-blue-400/60" />
-                    <span className="text-blue-300/80">{clockLabel}</span>
+                    <Clock className="w-3.5 h-3.5 text-accent-primary/60" />
+                    <span className="text-accent-primary/80">{clockLabel}</span>
                   </div>
                   {durationStr && (
-                    <span className="text-blue-200 font-mono ml-auto text-sm">{durationStr}</span>
+                    <span className="text-accent-primary font-mono ml-auto text-sm">{durationStr}</span>
                   )}
                 </div>
               </div>
@@ -179,7 +179,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                             const v = Math.max(1, Math.min(sidMetadata.subsongs, Number(e.target.value)));
                             handleSubsongChange(v - 1);
                           }}
-                          className="w-20 text-sm bg-dark-bg border border-blue-800/40 rounded px-2 py-1 text-text-primary font-mono"
+                          className="w-20 text-sm bg-dark-bg border border-accent-primary/40 rounded px-2 py-1 text-text-primary font-mono"
                         />
                         <span className="text-xs text-text-muted">of {sidMetadata.subsongs}</span>
                       </div>
@@ -191,7 +191,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                           value: String(i),
                           label: `Subsong ${i + 1}${i === sidMetadata.defaultSubsong ? ' (default)' : ''}`,
                         }))}
-                        className="flex-1 text-sm bg-dark-bg border border-blue-800/40 rounded px-2 py-1 text-text-primary"
+                        className="flex-1 text-sm bg-dark-bg border border-accent-primary/40 rounded px-2 py-1 text-text-primary"
                       />
                     )}
                   </div>
@@ -203,7 +203,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
               {/* SID Engine Selector */}
               <div className="bg-dark-bgSecondary/50 border border-dark-border/50 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <Zap className="w-3.5 h-3.5 text-blue-400/60" />
+                  <Zap className="w-3.5 h-3.5 text-accent-primary/60" />
                   <label className="text-xs text-text-muted font-medium">SID Engine</label>
                 </div>
                 <CustomSelect
@@ -217,18 +217,18 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                     value: eng.id,
                     label: `${eng.name} — ${eng.accuracy}, ${eng.speed} (${eng.size})${eng.features.asidHardware ? ' ★ HW' : ''}`,
                   }))}
-                  className="w-full text-sm bg-dark-bg border border-blue-800/40 rounded px-2 py-1.5 text-text-primary mb-2"
+                  className="w-full text-sm bg-dark-bg border border-accent-primary/40 rounded px-2 py-1.5 text-text-primary mb-2"
                 />
                 <p className="text-[10px] text-text-muted/60 leading-tight">
                   {SID_ENGINES[sidEngine].description}
                 </p>
                 {sidHwMode !== 'off' && !SID_ENGINES[sidEngine].features.asidHardware && (
-                  <p className="text-[10px] text-yellow-400 leading-tight mt-1">
+                  <p className="text-[10px] text-accent-warning leading-tight mt-1">
                     ⚠ Hardware SID output requires jsSID engine. Select jsSID ★ HW above.
                   </p>
                 )}
                 {sidHwMode !== 'off' && SID_ENGINES[sidEngine].features.asidHardware && (
-                  <p className="text-[10px] text-green-400 leading-tight mt-1">
+                  <p className="text-[10px] text-accent-success leading-tight mt-1">
                     ✓ Hardware SID output active via {sidHwMode === 'webusb' ? 'USB-SID-Pico' : 'ASID'}
                   </p>
                 )}
@@ -263,8 +263,8 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                 <div className="flex flex-wrap gap-1.5">
                   {fileTags.map(t => (
                     <span key={t.name} className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border ${
-                      t.type === 'GENRE' ? 'bg-purple-900/30 text-purple-300/80 border-purple-800/30'
-                        : 'bg-green-900/30 text-green-300/80 border-green-800/30'
+                      t.type === 'GENRE' ? 'bg-accent-secondary/30 text-accent-secondary/80 border-accent-secondary/30'
+                        : 'bg-accent-success/30 text-accent-success/80 border-accent-success/30'
                     }`}>
                       <Tag className="w-2.5 h-2.5" />{t.name}
                     </span>
@@ -276,18 +276,18 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
             {/* Right: Composer Profile Card */}
             <div className="space-y-4">
               {composerLoading ? (
-                <div className="flex items-center justify-center py-12 text-text-muted bg-blue-950/20 border border-blue-800/20 rounded-lg">
+                <div className="flex items-center justify-center py-12 text-text-muted bg-accent-primary/20 border border-accent-primary/20 rounded-lg">
                   <Loader2 className="w-5 h-5 animate-spin mr-2" />
                   <span className="text-sm">Loading composer…</span>
                 </div>
               ) : composer ? (
                 <>
                   {/* Composer Bio Card */}
-                  <div className="bg-blue-950/30 border border-blue-800/30 rounded-lg p-4">
+                  <div className="bg-accent-primary/30 border border-accent-primary/30 rounded-lg p-4">
                     <div className="flex gap-4">
                       {/* Photo — only shown when available */}
                       {photoUrl && (
-                        <div className="shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-blue-900/30 border border-blue-800/30">
+                        <div className="shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-accent-primary/30 border border-accent-primary/30">
                           <img
                             src={photoUrl}
                             alt={composer.name}
@@ -299,20 +299,20 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
 
                       {/* Bio Info */}
                       <div className="flex-1 min-w-0 space-y-1.5">
-                        <h3 className="text-base font-bold text-blue-100">{composer.name}</h3>
+                        <h3 className="text-base font-bold text-accent-primary">{composer.name}</h3>
                         {composer.handles.length > 0 && (
-                          <p className="text-xs text-blue-300/70 truncate">
+                          <p className="text-xs text-accent-primary/70 truncate">
                             aka {composer.handles.join(', ')}
                           </p>
                         )}
                         {composer.country && (
-                          <div className="flex items-center gap-1.5 text-xs text-blue-300/60">
+                          <div className="flex items-center gap-1.5 text-xs text-accent-primary/60">
                             <Globe className="w-3 h-3" />
                             <span>{composer.country}</span>
                           </div>
                         )}
                         {(birthYear || deathYear) && (
-                          <div className="flex items-center gap-1.5 text-xs text-blue-300/60">
+                          <div className="flex items-center gap-1.5 text-xs text-accent-primary/60">
                             <Calendar className="w-3 h-3" />
                             <span>
                               {birthYear ? `b. ${birthYear}` : ''}
@@ -323,7 +323,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                           </div>
                         )}
                         {composer.notable && (
-                          <div className="flex items-start gap-1.5 text-xs text-yellow-400/80">
+                          <div className="flex items-start gap-1.5 text-xs text-accent-warning/80">
                             <Star className="w-3 h-3 mt-0.5 shrink-0" />
                             <span>{composer.notable}</span>
                           </div>
@@ -335,12 +335,12 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                   {/* Stats Bar */}
                   <div className="flex items-center gap-4 text-xs text-text-muted px-1">
                     <div className="flex items-center gap-1.5">
-                      <Music className="w-3.5 h-3.5 text-blue-400/60" />
+                      <Music className="w-3.5 h-3.5 text-accent-primary/60" />
                       <span className="font-medium">{composer.tuneCount} tunes</span>
                     </div>
                     {composer.activeYears.length > 0 && (
                       <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-blue-400/60" />
+                        <Calendar className="w-3.5 h-3.5 text-accent-primary/60" />
                         <span>{composer.activeYears[0]}–{composer.activeYears[composer.activeYears.length - 1]}</span>
                       </div>
                     )}
@@ -349,7 +349,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                         href={`https://csdb.dk/${composer.csdbType}/?id=${composer.csdbId}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-blue-400/80 hover:text-blue-300 ml-auto"
+                        className="flex items-center gap-1 text-accent-primary/80 hover:text-accent-primary ml-auto"
                       >
                         CSDb <ExternalLink className="w-3 h-3" />
                       </a>
@@ -360,12 +360,12 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                   {(genreTags.length > 0 || prodTags.length > 0) && (
                     <div className="flex flex-wrap gap-1.5 px-1">
                       {genreTags.map(t => (
-                        <span key={t.name} className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-purple-900/30 text-purple-300/80 border border-purple-800/30 rounded">
+                        <span key={t.name} className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-accent-secondary/30 text-accent-secondary/80 border border-accent-secondary/30 rounded">
                           <Tag className="w-2.5 h-2.5" />{t.name}
                         </span>
                       ))}
                       {prodTags.map(t => (
-                        <span key={t.name} className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-green-900/30 text-green-300/80 border border-green-800/30 rounded">
+                        <span key={t.name} className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-accent-success/30 text-accent-success/80 border border-accent-success/30 rounded">
                           {t.name}
                         </span>
                       ))}
@@ -426,7 +426,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                       <span className="text-text-primary truncate mr-2">{p.player}</span>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <div
-                          className="h-1.5 bg-blue-500/60 rounded-full"
+                          className="h-1.5 bg-accent-primary/60 rounded-full"
                           style={{ width: `${Math.max(8, (p.cnt / composer.players[0].cnt) * 60)}px` }}
                         />
                         <span className="text-text-muted w-6 text-right font-mono">{p.cnt}</span>
@@ -467,7 +467,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2 py-1 text-[10px] bg-blue-900/20 text-blue-300/80 border border-blue-800/30 rounded hover:bg-blue-900/40 transition-colors"
+                      className="inline-flex items-center gap-1 px-2 py-1 text-[10px] bg-accent-primary/20 text-accent-primary/80 border border-accent-primary/30 rounded hover:bg-accent-primary/40 transition-colors"
                     >
                       <ExternalLink className="w-2.5 h-2.5" />{link.name}
                     </a>
@@ -490,12 +490,12 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                     key={tune.id}
                     onClick={() => handleLoadTune(tune)}
                     disabled={loadingTuneId !== null}
-                    className="flex items-center gap-2 py-1 text-xs hover:bg-blue-900/20 rounded px-1 transition-colors text-left w-full group"
+                    className="flex items-center gap-2 py-1 text-xs hover:bg-accent-primary/20 rounded px-1 transition-colors text-left w-full group"
                   >
                     {loadingTuneId === tune.id ? (
-                      <Loader2 className="w-3 h-3 animate-spin text-blue-400 shrink-0" />
+                      <Loader2 className="w-3 h-3 animate-spin text-accent-primary shrink-0" />
                     ) : (
-                      <Download className="w-3 h-3 text-blue-400/0 group-hover:text-blue-400/80 shrink-0 transition-colors" />
+                      <Download className="w-3 h-3 text-accent-primary/0 group-hover:text-accent-primary/80 shrink-0 transition-colors" />
                     )}
                     <span className="text-text-primary truncate flex-1">{tune.filename}</span>
                     {tune.player && (
@@ -507,7 +507,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
               {tunes.length > 10 && (
                 <button
                   onClick={() => setShowAllTunes(!showAllTunes)}
-                  className="flex items-center gap-1 mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                  className="flex items-center gap-1 mt-2 text-xs text-accent-primary hover:text-accent-primary transition-colors"
                 >
                   {showAllTunes ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                   {showAllTunes ? 'Show less' : `Show all ${tunes.length} tunes`}

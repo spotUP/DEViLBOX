@@ -94,38 +94,38 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
                   <button
                     onClick={() => onShowScaleVolume?.('block')}
                     disabled={!hasSelection}
-                    className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-1.5 text-xs bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     Scale Block
                   </button>
                   <button
                     onClick={() => onShowFadeVolume?.('block')}
                     disabled={!hasSelection}
-                    className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-1.5 text-xs bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     Fade Block
                   </button>
                   <button
                     onClick={() => onShowScaleVolume?.('track')}
-                    className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-text-primary rounded transition-colors"
+                    className="px-3 py-1.5 text-xs bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded transition-colors"
                   >
                     Scale Track
                   </button>
                   <button
                     onClick={() => onShowFadeVolume?.('track')}
-                    className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-text-primary rounded transition-colors"
+                    className="px-3 py-1.5 text-xs bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded transition-colors"
                   >
                     Fade Track
                   </button>
                   <button
                     onClick={() => onShowScaleVolume?.('pattern')}
-                    className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-text-primary rounded transition-colors"
+                    className="px-3 py-1.5 text-xs bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded transition-colors"
                   >
                     Scale Pattern
                   </button>
                   <button
                     onClick={() => onShowFadeVolume?.('pattern')}
-                    className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-text-primary rounded transition-colors"
+                    className="px-3 py-1.5 text-xs bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded transition-colors"
                   >
                     Fade Pattern
                   </button>
@@ -321,14 +321,14 @@ export const AdvancedEditModal: React.FC<AdvancedEditModalProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={onExportPattern}
-                    className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-text-primary rounded flex items-center justify-center gap-1 transition-colors"
+                    className="px-3 py-1.5 text-xs bg-accent-success hover:bg-accent-success/80 text-text-primary rounded flex items-center justify-center gap-1 transition-colors"
                   >
                     <Download size={12} />
                     Pattern (.xp)
                   </button>
                   <button
                     onClick={onExportTrack}
-                    className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-text-primary rounded flex items-center justify-center gap-1 transition-colors"
+                    className="px-3 py-1.5 text-xs bg-accent-success hover:bg-accent-success/80 text-text-primary rounded flex items-center justify-center gap-1 transition-colors"
                   >
                     <Download size={12} />
                     Track (.xt)

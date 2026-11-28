@@ -24,7 +24,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({ isOpen, onClose })
       name: 'Windows',
       icon: <Monitor size={24} />,
       desc: 'Installer (.exe) or Portable (.zip)',
-      color: 'text-blue-400',
+      color: 'text-accent-primary',
     },
     {
       name: 'macOS',
@@ -36,7 +36,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({ isOpen, onClose })
       name: 'Linux',
       icon: <Terminal size={24} />,
       desc: 'AppImage, Debian, or Tarball',
-      color: 'text-orange-400',
+      color: 'text-accent-warning',
     }
   ];
 

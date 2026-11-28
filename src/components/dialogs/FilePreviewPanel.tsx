@@ -168,7 +168,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
             <span>{modlandStatus.totalFiles.toLocaleString()} files</span>
           )}
           {modlandStatus?.status === 'indexing' && (
-            <span className="text-amber-400 flex items-center gap-1">
+            <span className="text-accent-warning flex items-center gap-1">
               <Loader2 size={10} className="animate-spin" /> Indexing...
             </span>
           )}
@@ -183,7 +183,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
             placeholder="Search modules..."
             className="w-full pl-7 pr-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight
                        rounded text-text-primary placeholder:text-text-muted/40
-                       focus:border-green-600 focus:outline-none transition-colors"
+                       focus:border-accent-success focus:outline-none transition-colors"
           />
         </div>
         <CustomSelect
@@ -236,7 +236,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
                       {file.filename}
                     </div>
                     <div className="flex gap-3 text-xs text-text-muted items-center">
-                      <span className="text-green-400/70">{file.format}</span>
+                      <span className="text-accent-success/70">{file.format}</span>
                       <span>{file.author}</span>
                     </div>
                   </div>
@@ -257,13 +257,13 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
                   })()}
 
                   {modlandDownloading.has(file.full_path) ? (
-                    <Loader2 size={14} className="animate-spin text-green-400 flex-shrink-0" />
+                    <Loader2 size={14} className="animate-spin text-accent-success flex-shrink-0" />
                   ) : (
                     <button
                       onClick={() => handleModlandLoad(file)}
                       className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded
-                                 bg-green-900/30 text-green-400 border border-green-800/50
-                                 hover:bg-green-800/40 hover:text-green-300 transition-colors
+                                 bg-accent-success/30 text-accent-success border border-accent-success/50
+                                 hover:bg-accent-success/40 hover:text-accent-success transition-colors
                                  opacity-0 group-hover:opacity-100 flex-shrink-0"
                     >
                       <Download size={12} />
@@ -296,7 +296,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
 
           {modlandLoading && modlandResults.length === 0 && (
             <div className="flex items-center justify-center py-16">
-              <Loader2 size={20} className="animate-spin text-green-400" />
+              <Loader2 size={20} className="animate-spin text-accent-success" />
             </div>
           )}
         </div>
@@ -464,7 +464,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
             placeholder="Search composers, songs..."
             className="w-full pl-7 pr-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight
                        rounded text-text-primary placeholder:text-text-muted/40
-                       focus:border-blue-600 focus:outline-none transition-colors"
+                       focus:border-accent-primary focus:outline-none transition-colors"
           />
         </div>
         {hvscPath && (
@@ -502,7 +502,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
                     onClick={() => entry.isDirectory ? browseHVSCDirectory(entry.path) : handleHVSCLoad(entry)}
                   >
                     {entry.isDirectory ? (
-                      <Folder size={16} className="text-blue-400 flex-shrink-0" />
+                      <Folder size={16} className="text-accent-primary flex-shrink-0" />
                     ) : (
                       <FileAudio size={16} className="text-text-muted flex-shrink-0" />
                     )}
@@ -532,7 +532,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
 
                     {!entry.isDirectory && (
                       hvscDownloading.has(entry.path) ? (
-                        <Loader2 size={14} className="animate-spin text-blue-400 flex-shrink-0" />
+                        <Loader2 size={14} className="animate-spin text-accent-primary flex-shrink-0" />
                       ) : (
                         <button
                           onClick={(e) => {
@@ -540,8 +540,8 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
                             handleHVSCLoad(entry);
                           }}
                           className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded
-                                     bg-blue-900/30 text-blue-400 border border-blue-800/50
-                                     hover:bg-blue-800/40 hover:text-blue-300 transition-colors
+                                     bg-accent-primary/30 text-accent-primary border border-accent-primary/50
+                                     hover:bg-accent-primary/40 hover:text-accent-primary transition-colors
                                      opacity-0 group-hover:opacity-100 flex-shrink-0"
                         >
                           <Download size={12} />
@@ -588,7 +588,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
                     onClick={() => handleHVSCDirectoryClick(entry)}
                   >
                     {entry.isDirectory ? (
-                      <Folder size={16} className="text-blue-400 flex-shrink-0" />
+                      <Folder size={16} className="text-accent-primary flex-shrink-0" />
                     ) : (
                       <FileAudio size={16} className="text-text-muted flex-shrink-0" />
                     )}
@@ -620,7 +620,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
 
                     {!entry.isDirectory && (
                       hvscDownloading.has(entry.path) ? (
-                        <Loader2 size={14} className="animate-spin text-blue-400 flex-shrink-0" />
+                        <Loader2 size={14} className="animate-spin text-accent-primary flex-shrink-0" />
                       ) : (
                         <button
                           onClick={(e) => {
@@ -628,8 +628,8 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
                             handleHVSCLoad(entry);
                           }}
                           className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded
-                                     bg-blue-900/30 text-blue-400 border border-blue-800/50
-                                     hover:bg-blue-800/40 hover:text-blue-300 transition-colors
+                                     bg-accent-primary/30 text-accent-primary border border-accent-primary/50
+                                     hover:bg-accent-primary/40 hover:text-accent-primary transition-colors
                                      opacity-0 group-hover:opacity-100 flex-shrink-0"
                         >
                           <Download size={12} />
@@ -645,7 +645,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
 
           {hvscLoading && (
             <div className="flex items-center justify-center py-16">
-              <Loader2 size={20} className="animate-spin text-blue-400" />
+              <Loader2 size={20} className="animate-spin text-accent-primary" />
             </div>
           )}
         </div>

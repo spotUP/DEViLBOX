@@ -14,8 +14,8 @@ interface SIDTagsTabProps {
 }
 
 const TAG_COLORS: Record<string, string> = {
-  music: 'bg-purple-900/50 text-purple-300 border-purple-700',
-  collection: 'bg-green-900/50 text-green-300 border-green-700',
+  music: 'bg-accent-secondary/50 text-accent-secondary border-accent-secondary',
+  collection: 'bg-accent-success/50 text-accent-success border-accent-success',
 };
 const DEFAULT_TAG_COLOR = 'bg-dark-bgTertiary text-text-muted border-dark-border';
 
@@ -122,7 +122,7 @@ export const SIDTagsTab: React.FC<SIDTagsTabProps> = ({ className, fileId }) => 
             <input
               value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tags…"
-              className="w-full text-sm bg-dark-bg border border-blue-800/40 rounded pl-7 pr-2 py-1.5 text-text-primary placeholder:text-text-muted/40"
+              className="w-full text-sm bg-dark-bg border border-accent-primary/40 rounded pl-7 pr-2 py-1.5 text-text-primary placeholder:text-text-muted/40"
             />
           </div>
           <div className="max-h-36 overflow-y-auto space-y-1">
@@ -151,10 +151,10 @@ export const SIDTagsTab: React.FC<SIDTagsTabProps> = ({ className, fileId }) => 
               value={newName} onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
               placeholder="New tag name…"
-              className="flex-1 text-sm bg-dark-bg border border-blue-800/40 rounded px-2 py-1.5 text-text-primary placeholder:text-text-muted/40"
+              className="flex-1 text-sm bg-dark-bg border border-accent-primary/40 rounded px-2 py-1.5 text-text-primary placeholder:text-text-muted/40"
             />
             <button onClick={handleCreate} disabled={busy || !newName.trim()}
-              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded bg-blue-700 hover:bg-blue-600 text-text-primary disabled:opacity-40 transition-colors">
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded bg-accent-primary hover:bg-accent-primary/80 text-text-primary disabled:opacity-40 transition-colors">
               {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
               Create
             </button>

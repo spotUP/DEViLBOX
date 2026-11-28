@@ -603,7 +603,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
               {/* Warning: multi-file format loaded without its companion files */}
               {needsCompanionFiles && (
-                <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-400">
+                <div className="flex items-start gap-2 p-3 bg-accent-warning/10 border border-accent-warning/30 rounded text-xs text-accent-warning">
                   <AlertCircle size={14} className="shrink-0 mt-0.5" />
                   <div className="flex flex-col gap-2">
                     {(() => {
@@ -616,7 +616,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                           </span>
                           <button
                             type="button"
-                            className="text-xs px-2 py-1 bg-amber-500/20 border border-amber-500/40 rounded hover:bg-amber-500/30 transition-colors cursor-pointer"
+                            className="text-xs px-2 py-1 bg-accent-warning/20 border border-accent-warning/40 rounded hover:bg-accent-warning/30 transition-colors cursor-pointer"
                             onClick={() => {
                               if (moduleInfo?.file && companionInputRef.current) {
                                 pendingMainFileRef.current = moduleInfo.file;
@@ -638,7 +638,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                           {' '}folder next to this module.
                           <button
                             type="button"
-                            className="ml-2 text-xs px-2 py-1 bg-amber-500/20 border border-amber-500/40 rounded hover:bg-amber-500/30 transition-colors cursor-pointer"
+                            className="ml-2 text-xs px-2 py-1 bg-accent-warning/20 border border-accent-warning/40 rounded hover:bg-accent-warning/30 transition-colors cursor-pointer"
                             onClick={() => {
                               if (moduleInfo?.file && samplesFolderInputRef.current) {
                                 pendingMainFileRef.current = moduleInfo.file;
@@ -684,7 +684,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
               )}
 
               {formatCapabilities && formatCapabilities.isEditable && !formatCapabilities.isNativeExportable && (
-                <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-400">
+                <div className="flex items-start gap-2 p-3 bg-accent-warning/10 border border-accent-warning/30 rounded text-xs text-accent-warning">
                   <Info size={14} className="shrink-0 mt-0.5" />
                   <div>
                     <span className="font-semibold">No native export.</span>

@@ -135,7 +135,7 @@ export const SIDTransportBar: React.FC<SIDTransportBarProps> = ({ className }) =
       {/* Loop */}
       <button
         onClick={() => setLooping(!looping)}
-        className={`p-1 transition-colors ${looping ? 'text-blue-400' : 'text-text-muted hover:text-text-primary'}`}
+        className={`p-1 transition-colors ${looping ? 'text-accent-primary' : 'text-text-muted hover:text-text-primary'}`}
         title="Loop"
       >
         <Repeat size={14} />
@@ -149,7 +149,7 @@ export const SIDTransportBar: React.FC<SIDTransportBarProps> = ({ className }) =
       {/* Time scrub bar */}
       <div className="flex-1 h-1 bg-dark-border rounded cursor-pointer relative group">
         <div
-          className="absolute inset-y-0 left-0 bg-blue-500/60 rounded"
+          className="absolute inset-y-0 left-0 bg-accent-primary/60 rounded"
           style={{ width: `${progress * 100}%` }}
         />
       </div>

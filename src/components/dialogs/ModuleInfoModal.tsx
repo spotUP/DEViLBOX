@@ -37,15 +37,15 @@ const InfoRow: React.FC<{ label: string; value?: string | null; accent?: boolean
   return (
     <div className="flex gap-2 py-0.5 text-[11px]">
       <span className="w-24 shrink-0 text-text-secondary">{label}</span>
-      <span className={accent ? 'text-blue-300' : 'text-text-primary'}>{value}</span>
+      <span className={accent ? 'text-accent-primary' : 'text-text-primary'}>{value}</span>
     </div>
   );
 };
 
 const SectionHeader: React.FC<{ icon: React.ReactNode; title: string }> = ({ icon, title }) => (
   <div className="flex items-center gap-1.5 pt-3 pb-1 border-t border-dark-border/30 first:border-0 first:pt-0">
-    <span className="text-blue-400">{icon}</span>
-    <span className="text-[11px] font-bold text-blue-300">{title}</span>
+    <span className="text-accent-primary">{icon}</span>
+    <span className="text-[11px] font-bold text-accent-primary">{title}</span>
   </div>
 );
 

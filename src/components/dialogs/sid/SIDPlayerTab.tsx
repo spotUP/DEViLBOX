@@ -85,9 +85,9 @@ export const SIDPlayerTab: React.FC<SIDPlayerTabProps> = ({
   return (
     <div className={`flex flex-col h-full overflow-y-auto p-3 space-y-3 ${className ?? ''}`}>
       {/* Player title */}
-      <div className="bg-blue-950/30 border border-blue-800/40 rounded-lg p-3">
+      <div className="bg-accent-primary/30 border border-accent-primary/40 rounded-lg p-3">
         <div className="flex items-center gap-2 mb-2">
-          <Play className="w-4 h-4 text-blue-400" />
+          <Play className="w-4 h-4 text-accent-primary" />
           <h3 className="text-sm font-medium text-text-primary">
             {playerInfo?.title ?? playerName}
           </h3>
@@ -96,7 +96,7 @@ export const SIDPlayerTab: React.FC<SIDPlayerTabProps> = ({
         {/* Developer */}
         {playerInfo?.developer && (
           <div className="flex items-center gap-2 text-xs text-text-muted mb-1">
-            <User className="w-3 h-3 text-blue-400/60" />
+            <User className="w-3 h-3 text-accent-primary/60" />
             <span className="text-text-secondary">{playerInfo.developer}</span>
           </div>
         )}
@@ -104,7 +104,7 @@ export const SIDPlayerTab: React.FC<SIDPlayerTabProps> = ({
         {/* Year range */}
         {(playerInfo?.yearFrom || playerInfo?.yearTo) && (
           <div className="flex items-center gap-2 text-xs text-text-muted">
-            <Calendar className="w-3 h-3 text-blue-400/60" />
+            <Calendar className="w-3 h-3 text-accent-primary/60" />
             <span className="text-text-secondary">
               {playerInfo.yearFrom && playerInfo.yearTo
                 ? `${playerInfo.yearFrom} – ${playerInfo.yearTo}`
@@ -117,7 +117,7 @@ export const SIDPlayerTab: React.FC<SIDPlayerTabProps> = ({
       {/* Description */}
       {playerInfo?.description && (
         <div className="flex items-start gap-2">
-          <FileText className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+          <FileText className="w-3.5 h-3.5 text-accent-primary mt-0.5 shrink-0" />
           <div>
             <span className="text-[10px] uppercase tracking-wider text-text-muted block mb-1">Description</span>
             <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">

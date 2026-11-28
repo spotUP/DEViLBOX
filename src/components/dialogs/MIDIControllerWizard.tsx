@@ -158,8 +158,8 @@ export const MIDIControllerWizard: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-dark-border bg-dark-bgSecondary/50">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
-              <Sliders className="w-4 h-4 text-purple-400" />
+            <div className="w-8 h-8 rounded-lg bg-accent-secondary/20 flex items-center justify-center">
+              <Sliders className="w-4 h-4 text-accent-secondary" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-text-primary">MIDI Controller Setup</h2>
@@ -178,11 +178,11 @@ export const MIDIControllerWizard: React.FC = () => {
             const isPast = steps.indexOf(step) > i;
             return (
               <React.Fragment key={s}>
-                {i > 0 && <div className={`flex-1 h-px ${isPast ? 'bg-green-500' : 'bg-dark-border'}`} />}
-                <div className={`flex items-center gap-1.5 ${isCurrent ? 'text-text-primary' : isPast ? 'text-green-400' : 'text-text-muted/50'}`}>
+                {i > 0 && <div className={`flex-1 h-px ${isPast ? 'bg-accent-success' : 'bg-dark-border'}`} />}
+                <div className={`flex items-center gap-1.5 ${isCurrent ? 'text-text-primary' : isPast ? 'text-accent-success' : 'text-text-muted/50'}`}>
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold border ${
-                    isPast ? 'bg-green-500/20 border-green-500 text-green-400' :
-                    isCurrent ? 'bg-purple-500/20 border-purple-500 text-purple-400' :
+                    isPast ? 'bg-accent-success/20 border-accent-success text-accent-success' :
+                    isCurrent ? 'bg-accent-secondary/20 border-accent-secondary text-accent-secondary' :
                     'border-dark-border text-text-muted/40'
                   }`}>
                     {isPast ? <Check size={10} /> : i + 1}
@@ -201,8 +201,8 @@ export const MIDIControllerWizard: React.FC = () => {
           {step === 'detect' && (
             <>
               <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-full bg-purple-500/10 border border-purple-500/30 flex items-center justify-center mx-auto">
-                  <Keyboard className="w-8 h-8 text-purple-400" />
+                <div className="w-16 h-16 rounded-full bg-accent-secondary/10 border border-accent-secondary/30 flex items-center justify-center mx-auto">
+                  <Keyboard className="w-8 h-8 text-accent-secondary" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">MIDI Controller Detected</h3>
@@ -222,9 +222,9 @@ export const MIDIControllerWizard: React.FC = () => {
               </div>
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-2">
-                  <X className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                  <p className="text-[10px] text-red-400 leading-relaxed">{error}</p>
+                <div className="bg-accent-error/10 border border-accent-error/30 rounded-lg p-3 flex items-start gap-2">
+                  <X className="w-4 h-4 text-accent-error shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-accent-error leading-relaxed">{error}</p>
                 </div>
               )}
 
@@ -234,7 +234,7 @@ export const MIDIControllerWizard: React.FC = () => {
                 className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                   initializing
                     ? 'bg-dark-bgSecondary text-text-muted cursor-wait'
-                    : 'bg-purple-600 hover:bg-purple-500 text-text-primary'
+                    : 'bg-accent-secondary hover:bg-accent-secondary/80 text-text-primary'
                 }`}
               >
                 {initializing ? (
@@ -263,8 +263,8 @@ export const MIDIControllerWizard: React.FC = () => {
           {step === 'select' && (
             <>
               <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-full bg-purple-500/10 border border-purple-500/30 flex items-center justify-center mx-auto">
-                  <Music className="w-8 h-8 text-purple-400" />
+                <div className="w-16 h-16 rounded-full bg-accent-secondary/10 border border-accent-secondary/30 flex items-center justify-center mx-auto">
+                  <Music className="w-8 h-8 text-accent-secondary" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Select Your Controller</h3>
@@ -285,11 +285,11 @@ export const MIDIControllerWizard: React.FC = () => {
                     onClick={() => handleInputSelect(dev.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-colors ${
                       chosenInputId === dev.id
-                        ? 'bg-purple-500/10 border-purple-500/40 text-text-primary'
+                        ? 'bg-accent-secondary/10 border-accent-secondary/40 text-text-primary'
                         : 'bg-dark-bgSecondary/50 border-dark-border/50 text-text-secondary hover:border-dark-border'
                     }`}
                   >
-                    <div className={`w-2 h-2 rounded-full ${chosenInputId === dev.id ? 'bg-purple-400' : 'bg-dark-border'}`} />
+                    <div className={`w-2 h-2 rounded-full ${chosenInputId === dev.id ? 'bg-accent-secondary' : 'bg-dark-border'}`} />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate">{dev.name}</p>
                       {dev.manufacturer && (
@@ -297,12 +297,12 @@ export const MIDIControllerWizard: React.FC = () => {
                       )}
                     </div>
                     {chosenInputId === dev.id && matchedProfile && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium shrink-0">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent-success/20 text-accent-success font-medium shrink-0">
                         {matchedProfile.name}
                       </span>
                     )}
                     {dev.isTD3 && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 font-medium shrink-0">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent-warning/20 text-accent-warning font-medium shrink-0">
                         TD-3
                       </span>
                     )}
@@ -320,11 +320,11 @@ export const MIDIControllerWizard: React.FC = () => {
                       onClick={() => setChosenOutputId(dev.id)}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors ${
                         chosenOutputId === dev.id
-                          ? 'bg-purple-500/10 border-purple-500/40 text-text-primary'
+                          ? 'bg-accent-secondary/10 border-accent-secondary/40 text-text-primary'
                           : 'bg-dark-bgSecondary/50 border-dark-border/50 text-text-secondary hover:border-dark-border'
                       }`}
                     >
-                      <div className={`w-2 h-2 rounded-full ${chosenOutputId === dev.id ? 'bg-purple-400' : 'bg-dark-border'}`} />
+                      <div className={`w-2 h-2 rounded-full ${chosenOutputId === dev.id ? 'bg-accent-secondary' : 'bg-dark-border'}`} />
                       <p className="text-xs truncate">{dev.name}</p>
                     </button>
                   ))}
@@ -336,7 +336,7 @@ export const MIDIControllerWizard: React.FC = () => {
                 disabled={!chosenInputId}
                 className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                   chosenInputId
-                    ? 'bg-purple-600 hover:bg-purple-500 text-text-primary'
+                    ? 'bg-accent-secondary hover:bg-accent-secondary/80 text-text-primary'
                     : 'bg-dark-bgSecondary text-text-muted cursor-not-allowed'
                 }`}
               >
@@ -350,8 +350,8 @@ export const MIDIControllerWizard: React.FC = () => {
           {step === 'profile' && (
             <>
               <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-full bg-purple-500/10 border border-purple-500/30 flex items-center justify-center mx-auto">
-                  <Sliders className="w-8 h-8 text-purple-400" />
+                <div className="w-16 h-16 rounded-full bg-accent-secondary/10 border border-accent-secondary/30 flex items-center justify-center mx-auto">
+                  <Sliders className="w-8 h-8 text-accent-secondary" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">Controller Profile</h3>
@@ -364,10 +364,10 @@ export const MIDIControllerWizard: React.FC = () => {
               </div>
 
               {matchedProfile ? (
-                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 space-y-2">
+                <div className="bg-accent-success/10 border border-accent-success/30 rounded-lg p-3 space-y-2">
                   <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-400" />
-                    <p className="text-xs text-green-400 font-semibold">{matchedProfile.name}</p>
+                    <Check className="w-4 h-4 text-accent-success" />
+                    <p className="text-xs text-accent-success font-semibold">{matchedProfile.name}</p>
                   </div>
                   <p className="text-[10px] text-text-muted leading-relaxed">
                     {matchedProfile.manufacturer} • {matchedProfile.knobs.length} knobs
@@ -379,7 +379,7 @@ export const MIDIControllerWizard: React.FC = () => {
                       {matchedProfile.knobs.slice(0, 8).map((knob: ControllerKnob, i: number) => (
                         <div key={i} className="flex flex-col items-center p-1 rounded bg-dark-bg/50">
                           <span className="text-[8px] font-mono text-text-muted">K{i+1}</span>
-                          <span className="text-[9px] text-purple-300 truncate w-full text-center">
+                          <span className="text-[9px] text-accent-secondary truncate w-full text-center">
                             {knob.defaultMapping || knob.name}
                           </span>
                         </div>
@@ -400,7 +400,7 @@ export const MIDIControllerWizard: React.FC = () => {
                         }}
                         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors ${
                           manualProfileId === profile.id
-                            ? 'bg-purple-500/10 border-purple-500/40 text-text-primary'
+                            ? 'bg-accent-secondary/10 border-accent-secondary/40 text-text-primary'
                             : 'bg-dark-bgSecondary/50 border-dark-border/50 text-text-secondary hover:border-dark-border'
                         }`}
                       >
@@ -421,7 +421,7 @@ export const MIDIControllerWizard: React.FC = () => {
                     }}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors ${
                       !manualProfileId && !matchedProfile
-                        ? 'bg-purple-500/10 border-purple-500/40 text-text-primary'
+                        ? 'bg-accent-secondary/10 border-accent-secondary/40 text-text-primary'
                         : 'bg-dark-bgSecondary/50 border-dark-border/50 text-text-secondary hover:border-dark-border'
                     }`}
                   >
@@ -432,7 +432,7 @@ export const MIDIControllerWizard: React.FC = () => {
 
               <button
                 onClick={() => setStep('done')}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-secondary hover:bg-accent-secondary/80 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 {matchedProfile ? 'Apply Profile & Finish' : 'Continue with Generic'}
                 <ChevronRight size={16} />
@@ -444,8 +444,8 @@ export const MIDIControllerWizard: React.FC = () => {
           {step === 'done' && (
             <>
               <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center mx-auto">
-                  <Zap className="w-8 h-8 text-green-400" />
+                <div className="w-16 h-16 rounded-full bg-accent-success/10 border border-accent-success/30 flex items-center justify-center mx-auto">
+                  <Zap className="w-8 h-8 text-accent-success" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">You're All Set!</h3>
@@ -458,7 +458,7 @@ export const MIDIControllerWizard: React.FC = () => {
               <div className="bg-dark-bgSecondary/50 border border-dark-border/50 rounded-lg p-3 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-text-muted">Device</span>
-                  <span className="text-purple-400 font-mono truncate ml-2">{chosenDevice?.name || 'MIDI Controller'}</span>
+                  <span className="text-accent-secondary font-mono truncate ml-2">{chosenDevice?.name || 'MIDI Controller'}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-text-muted">Profile</span>
@@ -475,8 +475,8 @@ export const MIDIControllerWizard: React.FC = () => {
                 )}
               </div>
 
-              <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 space-y-1.5">
-                <p className="text-[10px] text-purple-300 leading-relaxed">
+              <div className="bg-accent-secondary/10 border border-accent-secondary/20 rounded-lg p-3 space-y-1.5">
+                <p className="text-[10px] text-accent-secondary leading-relaxed">
                   <strong>Tip:</strong> Use <strong>MIDI Learn</strong> to customize which knob controls which
                   parameter. Right-click any knob in the synth panel and move a controller knob to map it.
                 </p>
@@ -488,7 +488,7 @@ export const MIDIControllerWizard: React.FC = () => {
 
               <button
                 onClick={handleFinish}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-success hover:bg-accent-success/80 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 <Check size={16} />
                 Done — Start Playing

@@ -44,55 +44,55 @@ export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
   return (
     <div className="space-y-2">
       {/* SID Header Info */}
-      <div className="bg-blue-950/30 border border-blue-800/40 rounded-lg p-3 space-y-2">
+      <div className="bg-accent-primary/30 border border-accent-primary/40 rounded-lg p-3 space-y-2">
         {/* Title & Author Row */}
         <div className="space-y-1">
           {header.title && (
             <div className="flex items-center gap-2">
-              <Music className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-              <span className="text-sm font-medium text-blue-200 truncate">{header.title}</span>
+              <Music className="w-3.5 h-3.5 text-accent-primary shrink-0" />
+              <span className="text-sm font-medium text-accent-primary truncate">{header.title}</span>
             </div>
           )}
           {header.author && (
             <div className="flex items-center gap-2">
-              <User className="w-3.5 h-3.5 text-blue-400/70 shrink-0" />
-              <span className="text-xs text-blue-300/80 truncate">{header.author}</span>
+              <User className="w-3.5 h-3.5 text-accent-primary/70 shrink-0" />
+              <span className="text-xs text-accent-primary/80 truncate">{header.author}</span>
             </div>
           )}
           {header.copyright && (
             <div className="flex items-center gap-2">
-              <Disc className="w-3.5 h-3.5 text-blue-400/50 shrink-0" />
+              <Disc className="w-3.5 h-3.5 text-accent-primary/50 shrink-0" />
               <span className="text-xs text-text-muted truncate">{header.copyright}</span>
             </div>
           )}
         </div>
 
         {/* Chip & Clock Info */}
-        <div className="flex items-center gap-3 text-xs text-text-muted border-t border-blue-800/30 pt-2">
+        <div className="flex items-center gap-3 text-xs text-text-muted border-t border-accent-primary/30 pt-2">
           <div className="flex items-center gap-1.5">
-            <Cpu className="w-3 h-3 text-blue-400/60" />
-            <span className="text-blue-300/80">
+            <Cpu className="w-3 h-3 text-accent-primary/60" />
+            <span className="text-accent-primary/80">
               {chipLabel}{chipCount > 1 ? ` × ${chipCount}` : ''}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Clock className="w-3 h-3 text-blue-400/60" />
-            <span className="text-blue-300/80">{clockLabel}</span>
+            <Clock className="w-3 h-3 text-accent-primary/60" />
+            <span className="text-accent-primary/80">{clockLabel}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Hash className="w-3 h-3 text-blue-400/60" />
-            <span className="text-blue-300/80">{header.format}v{header.version}</span>
+            <Hash className="w-3 h-3 text-accent-primary/60" />
+            <span className="text-accent-primary/80">{header.format}v{header.version}</span>
           </div>
           {durationStr && (
-            <span className="text-blue-300/80 ml-auto font-mono">{durationStr}</span>
+            <span className="text-accent-primary/80 ml-auto font-mono">{durationStr}</span>
           )}
         </div>
 
         {/* SID Engine Selector */}
-        <div className="flex flex-col gap-1 border-t border-blue-800/30 pt-2">
+        <div className="flex flex-col gap-1 border-t border-accent-primary/30 pt-2">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 shrink-0">
-              <Zap className="w-3 h-3 text-blue-400/60" />
+              <Zap className="w-3 h-3 text-accent-primary/60" />
               <label className="text-xs text-text-muted whitespace-nowrap">Engine:</label>
             </div>
             <CustomSelect
@@ -102,7 +102,7 @@ export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
                 value: eng.id,
                 label: `${eng.name} — ${eng.accuracy}, ${eng.speed} (${eng.size})${eng.features.asidHardware ? ' ★ HW' : ''}`,
               }))}
-              className="flex-1 text-xs bg-dark-bgSecondary border border-blue-800/40 rounded px-2 py-1 text-text-primary"
+              className="flex-1 text-xs bg-dark-bgSecondary border border-accent-primary/40 rounded px-2 py-1 text-text-primary"
             />
           </div>
           {sidHwMode !== 'off' && !SID_ENGINES[sidEngine].features.asidHardware && (

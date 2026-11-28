@@ -144,7 +144,7 @@ export const SIDSTILTab: React.FC<SIDSTILTabProps> = ({
           <>
             {currentSTIL.title && (
               <div className="flex items-start gap-2">
-                <Music className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+                <Music className="w-3.5 h-3.5 text-accent-primary mt-0.5 shrink-0" />
                 <div>
                   <span className="text-[10px] uppercase tracking-wider text-text-muted block">Title</span>
                   <span className="text-sm text-text-primary">{currentSTIL.title}</span>
@@ -154,7 +154,7 @@ export const SIDSTILTab: React.FC<SIDSTILTabProps> = ({
 
             {(currentSTIL.author || currentSTIL.artist) && (
               <div className="flex items-start gap-2">
-                <User className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+                <User className="w-3.5 h-3.5 text-accent-primary mt-0.5 shrink-0" />
                 <div>
                   <span className="text-[10px] uppercase tracking-wider text-text-muted block">
                     {currentSTIL.artist ? 'Artist' : 'Author'}
@@ -168,7 +168,7 @@ export const SIDSTILTab: React.FC<SIDSTILTabProps> = ({
 
             {currentSTIL.comment && currentSTIL.comment.length > 0 && (
               <div className="flex items-start gap-2">
-                <MessageSquare className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+                <MessageSquare className="w-3.5 h-3.5 text-accent-primary mt-0.5 shrink-0" />
                 <div>
                   <span className="text-[10px] uppercase tracking-wider text-text-muted block">Comment</span>
                   <div className="space-y-1">
@@ -191,7 +191,7 @@ export const SIDSTILTab: React.FC<SIDSTILTabProps> = ({
         {fileInfo?.lyrics && (
           <div className="border-t border-dark-border pt-3">
             <div className="flex items-center gap-1.5 mb-2">
-              <FileText className="w-3.5 h-3.5 text-blue-400" />
+              <FileText className="w-3.5 h-3.5 text-accent-primary" />
               <span className="text-[10px] uppercase tracking-wider text-text-muted">Lyrics</span>
             </div>
             <pre className="text-xs text-text-secondary font-mono leading-relaxed bg-dark-bgSecondary/50 rounded p-2.5 whitespace-pre-wrap max-h-48 overflow-y-auto">

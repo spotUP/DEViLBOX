@@ -32,9 +32,9 @@ export const ComposerProfile: React.FC<ComposerProfileProps> = ({ composer }) =>
   return (
     <div className="space-y-3">
       {/* Profile Card */}
-      <div className="flex gap-3 bg-blue-950/30 border border-blue-800/40 rounded-lg p-3">
+      <div className="flex gap-3 bg-accent-primary/30 border border-accent-primary/40 rounded-lg p-3">
         {/* Photo */}
-        <div className="shrink-0 w-20 h-20 rounded overflow-hidden bg-blue-900/30 border border-blue-800/30">
+        <div className="shrink-0 w-20 h-20 rounded overflow-hidden bg-accent-primary/30 border border-accent-primary/30">
           {photoUrl ? (
             <img
               src={photoUrl}
@@ -44,7 +44,7 @@ export const ComposerProfile: React.FC<ComposerProfileProps> = ({ composer }) =>
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <User className="w-8 h-8 text-blue-800/50" />
+              <User className="w-8 h-8 text-accent-primary/50" />
             </div>
           )}
         </div>
@@ -52,7 +52,7 @@ export const ComposerProfile: React.FC<ComposerProfileProps> = ({ composer }) =>
         {/* Info */}
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-blue-200 truncate">{composer.name}</h3>
+            <h3 className="text-sm font-bold text-accent-primary truncate">{composer.name}</h3>
             {brandUrl && (
               <img
                 src={brandUrl}
@@ -64,18 +64,18 @@ export const ComposerProfile: React.FC<ComposerProfileProps> = ({ composer }) =>
             )}
           </div>
           {composer.handles.length > 0 && (
-            <p className="text-xs text-blue-300/70 truncate">
+            <p className="text-xs text-accent-primary/70 truncate">
               aka {composer.handles.join(', ')}
             </p>
           )}
           {composer.country && (
-            <div className="flex items-center gap-1.5 text-xs text-blue-300/60">
+            <div className="flex items-center gap-1.5 text-xs text-accent-primary/60">
               <Globe className="w-3 h-3" />
               <span className="truncate">{composer.country}</span>
             </div>
           )}
           {(birthYear || deathYear) && (
-            <div className="flex items-center gap-1.5 text-xs text-blue-300/60">
+            <div className="flex items-center gap-1.5 text-xs text-accent-primary/60">
               <Calendar className="w-3 h-3" />
               <span>
                 {birthYear ? `b. ${birthYear}` : ''}
@@ -86,7 +86,7 @@ export const ComposerProfile: React.FC<ComposerProfileProps> = ({ composer }) =>
             </div>
           )}
           {composer.notable && (
-            <div className="flex items-center gap-1.5 text-xs text-yellow-400/80">
+            <div className="flex items-center gap-1.5 text-xs text-accent-warning/80">
               <Star className="w-3 h-3" />
               <span className="truncate">{composer.notable}</span>
             </div>
@@ -97,12 +97,12 @@ export const ComposerProfile: React.FC<ComposerProfileProps> = ({ composer }) =>
       {/* Stats Row */}
       <div className="flex items-center gap-3 text-xs text-text-muted px-1">
         <div className="flex items-center gap-1.5">
-          <Music className="w-3 h-3 text-blue-400/60" />
+          <Music className="w-3 h-3 text-accent-primary/60" />
           <span>{composer.tuneCount} tune{composer.tuneCount !== 1 ? 's' : ''}</span>
         </div>
         {composer.activeYears.length > 0 && (
           <div className="flex items-center gap-1.5">
-            <Calendar className="w-3 h-3 text-blue-400/60" />
+            <Calendar className="w-3 h-3 text-accent-primary/60" />
             <span>
               {composer.activeYears[0]}–{composer.activeYears[composer.activeYears.length - 1]}
             </span>
@@ -113,7 +113,7 @@ export const ComposerProfile: React.FC<ComposerProfileProps> = ({ composer }) =>
             href={`https://csdb.dk/${composer.csdbType}/?id=${composer.csdbId}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-blue-400/80 hover:text-blue-300 ml-auto"
+            className="flex items-center gap-1 text-accent-primary/80 hover:text-accent-primary ml-auto"
           >
             CSDb <ExternalLink className="w-3 h-3" />
           </a>
@@ -132,7 +132,7 @@ export const ComposerProfile: React.FC<ComposerProfileProps> = ({ composer }) =>
                 <span className="text-text-primary truncate mr-2">{p.player}</span>
                 <div className="flex items-center gap-1.5">
                   <div
-                    className="h-1.5 bg-blue-500/60 rounded-full"
+                    className="h-1.5 bg-accent-primary/60 rounded-full"
                     style={{
                       width: `${Math.max(8, (p.cnt / composer.players[0].cnt) * 80)}px`,
                     }}
@@ -149,12 +149,12 @@ export const ComposerProfile: React.FC<ComposerProfileProps> = ({ composer }) =>
       {(genreTags.length > 0 || prodTags.length > 0) && (
         <div className="flex flex-wrap gap-1 px-1">
           {genreTags.map(t => (
-            <span key={t.name} className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-purple-900/30 text-purple-300/80 border border-purple-800/30 rounded">
+            <span key={t.name} className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-accent-secondary/30 text-accent-secondary/80 border border-accent-secondary/30 rounded">
               <Tag className="w-2.5 h-2.5" />{t.name}
             </span>
           ))}
           {prodTags.map(t => (
-            <span key={t.name} className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-green-900/30 text-green-300/80 border border-green-800/30 rounded">
+            <span key={t.name} className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-accent-success/30 text-accent-success/80 border border-accent-success/30 rounded">
               {t.name}
             </span>
           ))}
@@ -185,7 +185,7 @@ export const ComposerProfile: React.FC<ComposerProfileProps> = ({ composer }) =>
               href={link.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-blue-900/20 text-blue-300/80 border border-blue-800/30 rounded hover:bg-blue-900/40 transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-accent-primary/20 text-accent-primary/80 border border-accent-primary/30 rounded hover:bg-accent-primary/40 transition-colors"
             >
               <ExternalLink className="w-2.5 h-2.5" />{link.name}
             </a>

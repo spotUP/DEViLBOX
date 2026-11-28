@@ -136,10 +136,10 @@ export const SIDCSDbTab: React.FC<SIDCSDbTabProps> = ({
   return (
     <div className={`flex flex-col h-full overflow-y-auto p-3 space-y-3 ${className ?? ''}`}>
       {/* Profile header */}
-      <div className="bg-blue-950/30 border border-blue-800/40 rounded-lg p-3">
+      <div className="bg-accent-primary/30 border border-accent-primary/40 rounded-lg p-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Database className="w-4 h-4 text-blue-400" />
+            <Database className="w-4 h-4 text-accent-primary" />
             <h3 className="text-sm font-medium text-text-primary">
               {scener?.handle ?? composerName ?? 'Unknown'}
             </h3>
@@ -162,7 +162,7 @@ export const SIDCSDbTab: React.FC<SIDCSDbTabProps> = ({
       {scener?.groups && scener.groups.length > 0 && (
         <div>
           <div className="flex items-center gap-1.5 mb-1.5">
-            <Users className="w-3.5 h-3.5 text-blue-400" />
+            <Users className="w-3.5 h-3.5 text-accent-primary" />
             <span className="text-[10px] uppercase tracking-wider text-text-muted">Groups</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -185,7 +185,7 @@ export const SIDCSDbTab: React.FC<SIDCSDbTabProps> = ({
       {scener?.releases && scener.releases.length > 0 && (
         <div>
           <div className="flex items-center gap-1.5 mb-1.5">
-            <Award className="w-3.5 h-3.5 text-blue-400" />
+            <Award className="w-3.5 h-3.5 text-accent-primary" />
             <span className="text-[10px] uppercase tracking-wider text-text-muted">
               Releases ({scener.releases.length})
             </span>
@@ -210,7 +210,7 @@ export const SIDCSDbTab: React.FC<SIDCSDbTabProps> = ({
                     <span className="text-[10px] text-text-muted font-mono">{release.year}</span>
                   )}
                   {release.event && (
-                    <span className="text-[10px] text-blue-400/60 truncate max-w-[100px]">{release.event}</span>
+                    <span className="text-[10px] text-accent-primary/60 truncate max-w-[100px]">{release.event}</span>
                   )}
                   <ExternalLink className="w-2.5 h-2.5 text-text-muted opacity-0 group-hover:opacity-100" />
                 </div>

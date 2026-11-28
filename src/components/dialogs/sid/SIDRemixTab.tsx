@@ -41,9 +41,9 @@ export const SIDRemixTab: React.FC<SIDRemixTabProps> = ({
   return (
     <div className={`flex flex-col h-full p-3 space-y-4 ${className ?? ''}`}>
       {/* Header */}
-      <div className="bg-blue-950/30 border border-blue-800/40 rounded-lg p-3">
+      <div className="bg-accent-primary/30 border border-accent-primary/40 rounded-lg p-3">
         <div className="flex items-center gap-2 mb-1">
-          <Headphones className="w-4 h-4 text-blue-400" />
+          <Headphones className="w-4 h-4 text-accent-primary" />
           <h3 className="text-sm font-medium text-text-primary">SID Remixes</h3>
         </div>
         <p className="text-xs text-text-muted">
