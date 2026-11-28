@@ -86,7 +86,7 @@ export const SpaceyDelayerEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('multiTap', multiTap ? 0 : 1)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               multiTap
-                ? 'bg-purple-600 text-text-primary'
+                ? 'bg-accent-secondary text-text-primary'
                 : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
@@ -96,7 +96,7 @@ export const SpaceyDelayerEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('tapeFilter', tapeFilter ? 0 : 1)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tapeFilter
-                ? 'bg-purple-600 text-text-primary'
+                ? 'bg-accent-secondary text-text-primary'
                 : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
@@ -156,8 +156,8 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
               onClick={() => applyPreset(preset)}
               title={preset.description}
               className="px-2.5 py-1.5 rounded text-xs font-medium transition-colors
-                bg-dark-bgTertiary text-text-secondary hover:bg-red-600/30 hover:text-text-primary
-                active:bg-red-600 active:text-text-primary"
+                bg-dark-bgTertiary text-text-secondary hover:bg-accent-error/30 hover:text-text-primary
+                active:bg-accent-error active:text-text-primary"
             >
               {preset.name}
             </button>
@@ -266,7 +266,7 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
                 onClick={() => onUpdateParameter('mode', i)}
                 className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${
                   mode === i
-                    ? 'bg-red-600 text-text-primary'
+                    ? 'bg-accent-error text-text-primary'
                     : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
                 }`}
               >
@@ -280,7 +280,7 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('playheadFilter', playheadFilter ? 0 : 1)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               playheadFilter
-                ? 'bg-red-600 text-text-primary'
+                ? 'bg-accent-error text-text-primary'
                 : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
@@ -290,7 +290,7 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('inputBleed', inputBleed ? 0 : 1)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               inputBleed
-                ? 'bg-red-600 text-text-primary'
+                ? 'bg-accent-error text-text-primary'
                 : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
@@ -478,8 +478,8 @@ export const ToneArmEditor: React.FC<VisualEffectEditorProps> = ({
               className={[
                 'flex-1 py-1.5 rounded-lg text-xs font-mono font-bold border transition-all',
                 activeRpm === p.label
-                  ? 'bg-lime-700/70 border-lime-500 text-lime-100'
-                  : 'bg-black/40 border-dark-border text-text-muted hover:border-lime-700 hover:text-lime-300',
+                  ? 'bg-accent-success/70 border-accent-success text-accent-success'
+                  : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-success hover:text-accent-success',
               ].join(' ')}
             >
               {p.label}
@@ -603,8 +603,8 @@ export const TumultEditor: React.FC<VisualEffectEditorProps> = ({
   const BRANCH_VALUES  = [0, 2, 1] as const;
 
   const btnBase     = 'flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all';
-  const btnActive   = 'bg-violet-700/70 border-violet-500 text-violet-100';
-  const btnInactive = 'bg-black/40 border-dark-border text-text-muted hover:border-violet-700 hover:text-violet-300';
+  const btnActive   = 'bg-accent-secondary/70 border-accent-secondary text-accent-secondary';
+  const btnInactive = 'bg-black/40 border-dark-border text-text-muted hover:border-accent-secondary hover:text-accent-secondary';
 
   return (
     <div className="space-y-4">
@@ -766,7 +766,7 @@ const TumultEQBand: React.FC<{
       <button
         onClick={() => onSet(enableKey, enabled ? 0 : 1)}
         className={`w-4 h-4 rounded-sm border transition-all ${
-          enabled ? 'bg-violet-500 border-violet-400' : 'bg-black/40 border-dark-border'
+          enabled ? 'bg-accent-secondary border-accent-secondary' : 'bg-black/40 border-dark-border'
         }`}
       />
     </div>
@@ -776,7 +776,7 @@ const TumultEQBand: React.FC<{
           <button key={t} onClick={() => onSet(typeKey, i)}
             className={`flex-1 py-0.5 rounded text-[10px] border transition-all ${
               filterType === i
-                ? 'bg-violet-700/70 border-violet-500 text-violet-100'
+                ? 'bg-accent-secondary/70 border-accent-secondary text-accent-secondary'
                 : 'bg-black/40 border-dark-border text-text-muted'
             }`}>
             {t}

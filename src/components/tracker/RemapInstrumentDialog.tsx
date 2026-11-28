@@ -59,7 +59,7 @@ export const RemapInstrumentDialog: React.FC<RemapInstrumentDialogProps> = ({
               max="255"
               value={source}
               onChange={(e) => setSource(Math.max(0, Math.min(255, parseInt(e.target.value) || 0)))}
-              className="w-full px-3 py-2 bg-dark-bgSecondary border border-dark-border rounded text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-dark-bgSecondary border border-dark-border rounded text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-accent-primary"
               autoFocus
             />
             <p className="text-xs text-text-muted mt-1">
@@ -77,7 +77,7 @@ export const RemapInstrumentDialog: React.FC<RemapInstrumentDialogProps> = ({
               max="255"
               value={dest}
               onChange={(e) => setDest(Math.max(0, Math.min(255, parseInt(e.target.value) || 0)))}
-              className="w-full px-3 py-2 bg-dark-bgSecondary border border-dark-border rounded text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-dark-bgSecondary border border-dark-border rounded text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-accent-primary"
             />
             <p className="text-xs text-text-muted mt-1">
               Instrument ID to replace with (0-255)
@@ -97,7 +97,7 @@ export const RemapInstrumentDialog: React.FC<RemapInstrumentDialogProps> = ({
           </div>
 
           {source === dest && (
-            <div className="bg-yellow-900/30 border border-yellow-700/50 rounded p-3 text-xs text-yellow-300">
+            <div className="bg-accent-warning/30 border border-accent-warning/50 rounded p-3 text-xs text-accent-warning">
               ⚠️ Source and destination are the same - no changes will be made.
             </div>
           )}
@@ -113,7 +113,7 @@ export const RemapInstrumentDialog: React.FC<RemapInstrumentDialogProps> = ({
           <button
             onClick={handleConfirm}
             disabled={source === dest}
-            className="px-4 py-2 text-sm font-medium text-text-primary bg-blue-600 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium text-text-primary bg-accent-primary rounded hover:bg-accent-primary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Remap <span className="opacity-75">(Enter)</span>
           </button>

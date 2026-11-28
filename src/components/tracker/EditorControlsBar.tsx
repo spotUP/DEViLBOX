@@ -424,7 +424,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {/* IT Mask Indicator (persistent when itMaskVariables behavior is active) */}
         {c.maskDisplay && (
           <div className="flex items-center px-2 ml-1 pl-2 border-l border-dark-border">
-            <span className="text-cyan-400 font-bold text-[10px] font-mono tracking-wider">
+            <span className="text-accent-primary font-bold text-[10px] font-mono tracking-wider">
               [MASK: {c.maskDisplay}]
             </span>
           </div>
@@ -441,8 +441,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           ${quality === 'low'
             ? 'bg-accent-error/20 text-accent-error border-accent-error/40'
             : quality === 'medium'
-            ? 'bg-orange-500/20 text-orange-400 border-orange-500/40'
-            : 'bg-green-500/20 text-green-400 border-green-500/40'
+            ? 'bg-accent-warning/20 text-accent-warning border-accent-warning/40'
+            : 'bg-accent-success/20 text-accent-success border-accent-success/40'
           }
         `}
         title={`Performance: ${quality.toUpperCase()} | Avg FPS: ${avgFps} | Current: ${fps.fps}`}
@@ -451,8 +451,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         <span className="opacity-70">FPS</span>
         <div className={`w-1.5 h-1.5 rounded-full ${
           quality === 'low' ? 'bg-accent-error' :
-          quality === 'medium' ? 'bg-orange-400' :
-          'bg-green-400'
+          quality === 'medium' ? 'bg-accent-warning' :
+          'bg-accent-success'
         } animate-pulse-brief`} />
       </div>
       </div>

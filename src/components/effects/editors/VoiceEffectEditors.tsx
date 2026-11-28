@@ -93,7 +93,7 @@ export const VocoderEditor: React.FC<VisualEffectEditorProps> = ({
               onClick={() => applyPreset(p.name)}
               className={`px-2 py-1.5 text-[11px] font-bold rounded transition-colors ${
                 presetName === p.name
-                  ? 'bg-purple-600 text-text-primary'
+                  ? 'bg-accent-secondary text-text-primary'
                   : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
               }`}
             >
@@ -110,7 +110,7 @@ export const VocoderEditor: React.FC<VisualEffectEditorProps> = ({
               onClick={() => onUpdateParameter('source', s.value)}
               className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${
                 source === s.value
-                  ? 'bg-purple-600 text-text-primary'
+                  ? 'bg-accent-secondary text-text-primary'
                   : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
               }`}
               title={s.value === 'self' ? 'Chain audio modulates the carrier' : 'Microphone input modulates the carrier'}
@@ -131,7 +131,7 @@ export const VocoderEditor: React.FC<VisualEffectEditorProps> = ({
               onClick={() => tweak('carrierType', i)}
               className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${
                 Math.round(carrierType) === i
-                  ? 'bg-purple-600 text-text-primary'
+                  ? 'bg-accent-secondary text-text-primary'
                   : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
               }`}
             >
@@ -244,7 +244,7 @@ export const AutoTuneEditor: React.FC<VisualEffectEditorProps> = ({
               onClick={() => onUpdateParameter('key', i)}
               className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${
                 Math.round(key) === i
-                  ? 'bg-pink-600 text-text-primary'
+                  ? 'bg-accent-secondary text-text-primary'
                   : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
               }`}
             >
@@ -264,7 +264,7 @@ export const AutoTuneEditor: React.FC<VisualEffectEditorProps> = ({
               onClick={() => onUpdateParameter('scale', s)}
               className={`px-2 py-1.5 text-[11px] font-bold uppercase rounded transition-colors ${
                 scale === s
-                  ? 'bg-pink-600 text-text-primary'
+                  ? 'bg-accent-secondary text-text-primary'
                   : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
               }`}
             >

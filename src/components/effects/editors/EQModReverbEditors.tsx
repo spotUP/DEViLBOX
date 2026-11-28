@@ -198,7 +198,7 @@ export const PhonoFilterEditor: React.FC<VisualEffectEditorProps> = ({ effect, o
           {modes.map((label, idx) => (
             <button key={idx} onClick={() => onUpdateParameter('mode', idx)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                mode === idx ? 'bg-amber-700/70 border-amber-500 text-amber-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-amber-700'
+                mode === idx ? 'bg-accent-warning/70 border-accent-warning text-accent-warning' : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-warning'
               }`}>{label}</button>
           ))}
         </div>
@@ -549,7 +549,7 @@ export const PulsatorEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUp
           {WAVE_LABELS.map((label, i) => (
             <button key={i} onClick={() => onUpdateParameter('waveform', i)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                Math.round(waveform) === i ? 'bg-rose-700/70 border-rose-500 text-rose-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-rose-700'
+                Math.round(waveform) === i ? 'bg-accent-secondary/70 border-accent-secondary text-accent-secondary' : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-secondary'
               }`}>{label}</button>
           ))}
         </div>
@@ -596,7 +596,7 @@ export const RingModEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpd
           {WAVE_LABELS.map((label, i) => (
             <button key={i} onClick={() => onUpdateParameter('waveform', i)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                Math.round(waveform) === i ? 'bg-pink-700/70 border-pink-500 text-pink-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-pink-700'
+                Math.round(waveform) === i ? 'bg-accent-secondary/70 border-accent-secondary text-accent-secondary' : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-secondary'
               }`}>{label}</button>
           ))}
         </div>
@@ -1025,8 +1025,8 @@ export const MashaEditor: React.FC<VisualEffectEditorProps> = ({ effect, onUpdat
             onPointerLeave={() => { if (active >= 0.5) onUpdateParameter('active', 0); }}
             className={`px-6 py-2 rounded-lg text-sm font-bold border-2 transition-all select-none ${
               active >= 0.5
-                ? 'bg-red-600 border-red-400 text-white shadow-lg shadow-red-600/40 animate-pulse'
-                : 'bg-black/40 border-dark-border text-text-muted hover:border-red-700'
+                ? 'bg-accent-error border-accent-error text-white shadow-lg shadow-red-600/40 animate-pulse'
+                : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-error'
             }`}>{active >= 0.5 ? 'ACTIVE' : 'HOLD'}</button>
         </div>
         <div className="flex justify-around items-end">

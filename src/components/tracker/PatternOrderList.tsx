@@ -225,7 +225,7 @@ export const PatternOrderList: React.FC = React.memo(() => {
                   {patternIndex}
                 </div>
                 {posSpeed !== null && (
-                  <div className="text-[8px] text-center leading-none mt-0.5 text-amber-400 font-mono">
+                  <div className="text-[8px] text-center leading-none mt-0.5 text-accent-warning font-mono">
                     S:{posSpeed}
                   </div>
                 )}

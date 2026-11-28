@@ -526,7 +526,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
               <ChevronUp size={14} />
             </button>
             <button
-              className="p-1.5 text-text-muted hover:text-red-400 bg-black/40 hover:bg-black/70 rounded transition-colors"
+              className="p-1.5 text-text-muted hover:text-accent-error bg-black/40 hover:bg-black/70 rounded transition-colors"
               onClick={() => useUIStore.getState().setKnobPanelCollapsed(true)}
               title="Close synth panel"
             >

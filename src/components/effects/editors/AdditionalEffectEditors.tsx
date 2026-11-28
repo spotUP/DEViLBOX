@@ -257,7 +257,7 @@ export const GranularFreezeEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('freeze', isFrozen ? 0 : 1)}
             className={`px-8 py-3 text-sm font-bold rounded-lg transition-colors ${
               isFrozen
-                ? 'bg-cyan-600 text-text-primary ring-2 ring-cyan-400'
+                ? 'bg-accent-primary text-text-primary ring-2 ring-accent-primary'
                 : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
@@ -267,7 +267,7 @@ export const GranularFreezeEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('thru', thru >= 0.5 ? 0 : 1)}
             className={`px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
               thru >= 0.5
-                ? 'bg-cyan-700 text-text-primary'
+                ? 'bg-accent-primary text-text-primary'
                 : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >

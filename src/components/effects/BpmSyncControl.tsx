@@ -55,7 +55,7 @@ export const BpmSyncControl: React.FC<BpmSyncControlProps> = ({
         onClick={() => onToggleSync(!isOn)}
         className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide transition-colors ${
           isOn
-            ? 'bg-emerald-600 text-text-primary'
+            ? 'bg-accent-success text-text-primary'
             : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'
         }`}
         title={isOn ? 'BPM sync ON — click to disable' : 'Enable BPM sync'}
@@ -77,12 +77,12 @@ export const BpmSyncControl: React.FC<BpmSyncControlProps> = ({
                 label: d.label,
               })),
             }))}
-            className="bg-dark-bgTertiary text-text-secondary text-xs rounded px-2 py-1 border border-dark-borderLight focus:outline-none focus:border-emerald-500"
+            className="bg-dark-bgTertiary text-text-secondary text-xs rounded px-2 py-1 border border-dark-borderLight focus:outline-none focus:border-accent-success"
           />
 
           {/* Computed ms readout */}
           {computedMs !== null && (
-            <span className="text-[10px] text-emerald-400 font-mono tabular-nums">
+            <span className="text-[10px] text-accent-success font-mono tabular-nums">
               {computedMs < 1000
                 ? `${Math.round(computedMs)}ms`
                 : `${(computedMs / 1000).toFixed(2)}s`}

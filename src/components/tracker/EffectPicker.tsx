@@ -201,7 +201,7 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
             placeholder="Search effects..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="w-full bg-dark-bgSecondary border border-dark-borderLight rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-blue-500"
+            className="w-full bg-dark-bgSecondary border border-dark-borderLight rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-accent-primary"
             aria-label="Search effects"
           />
         </div>

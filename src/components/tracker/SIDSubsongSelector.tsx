@@ -25,8 +25,8 @@ export const SIDSubsongSelector: React.FC = React.memo(() => {
   return (
     <>
       <div className="flex items-center gap-1.5 px-2">
-        <Cpu size={12} className="text-blue-400 shrink-0" />
-        <span className="text-[10px] text-blue-300/70 font-mono">{chipBadge}</span>
+        <Cpu size={12} className="text-accent-primary shrink-0" />
+        <span className="text-[10px] text-accent-primary/70 font-mono">{chipBadge}</span>
         {sidMetadata.subsongs > 1 && (
           <CustomSelect
             value={String(sidMetadata.currentSubsong)}
@@ -35,12 +35,12 @@ export const SIDSubsongSelector: React.FC = React.memo(() => {
               value: String(i),
               label: `Sub ${i + 1}`,
             }))}
-            className="text-[10px] bg-dark-bgSecondary border border-blue-800/40 rounded px-1.5 py-0.5 text-text-primary min-w-[80px]"
+            className="text-[10px] bg-dark-bgSecondary border border-accent-primary/40 rounded px-1.5 py-0.5 text-text-primary min-w-[80px]"
           />
         )}
         <button
           onClick={() => setShowInfo(true)}
-          className="p-0.5 text-blue-400/60 hover:text-blue-300 transition-colors rounded"
+          className="p-0.5 text-accent-primary/60 hover:text-accent-primary transition-colors rounded"
           title="SID file info"
         >
           <Info size={13} />

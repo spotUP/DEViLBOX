@@ -28,14 +28,14 @@ export const ModuleInfoButton: React.FC = React.memo(() => {
         {format && (
           <button
             onClick={() => setShowInfo(true)}
-            className="px-1.5 py-0.5 text-[10px] font-bold text-blue-300 bg-blue-500/20 border border-blue-500/40 rounded hover:bg-blue-500/30 transition-colors"
+            className="px-1.5 py-0.5 text-[10px] font-bold text-accent-primary bg-accent-primary/20 border border-accent-primary/40 rounded hover:bg-accent-primary/30 transition-colors"
           >
             {format}
           </button>
         )}
         <button
           onClick={() => setShowInfo(true)}
-          className="text-text-secondary hover:text-blue-300 transition-colors p-0.5"
+          className="text-text-secondary hover:text-accent-primary transition-colors p-0.5"
           title="Module Info"
         >
           <Info size={14} />

@@ -236,8 +236,8 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
         {unimplementedParams.length > 0 && (
           <section className="rounded-xl p-4 border border-dark-border bg-black/30 backdrop-blur-sm shadow-inner-dark opacity-50">
             <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle size={14} className="text-yellow-500" />
-              <h3 className="text-[11px] font-black text-yellow-500/80 uppercase tracking-[0.15em]">
+              <AlertTriangle size={14} className="text-accent-warning" />
+              <h3 className="text-[11px] font-black text-accent-warning/80 uppercase tracking-[0.15em]">
                 Coming Soon
               </h3>
             </div>

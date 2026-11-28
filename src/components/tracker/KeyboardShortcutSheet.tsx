@@ -177,7 +177,7 @@ export const KeyboardShortcutSheet: React.FC<KeyboardShortcutSheetProps> = ({ is
                   </h3>
                   {section.shortcuts.map((shortcut, i) => (
                     <div key={`${section.title}-${i}`} className="flex items-center justify-between gap-2 py-0.5">
-                      <kbd className="text-[10px] font-mono bg-dark-bgSecondary border border-dark-borderLight rounded px-1.5 py-0.5 text-yellow-300 whitespace-nowrap">
+                      <kbd className="text-[10px] font-mono bg-dark-bgSecondary border border-dark-borderLight rounded px-1.5 py-0.5 text-accent-warning whitespace-nowrap">
                         {shortcut.keys}
                       </kbd>
                       <span className="text-[11px] text-text-secondary text-right">{shortcut.action}</span>
@@ -191,7 +191,7 @@ export const KeyboardShortcutSheet: React.FC<KeyboardShortcutSheetProps> = ({ is
 
         {/* Footer */}
         <div className="px-5 py-2 border-t border-dark-border text-[10px] text-text-muted text-center">
-          Press <kbd className="bg-dark-bgSecondary border border-dark-borderLight rounded px-1 text-yellow-400">Esc</kbd> to close
+          Press <kbd className="bg-dark-bgSecondary border border-dark-borderLight rounded px-1 text-accent-warning">Esc</kbd> to close
           {' '} | Scheme: {schemeName} | Ctrl/Cmd shown as Ctrl (use Cmd on macOS)
         </div>
       </div>

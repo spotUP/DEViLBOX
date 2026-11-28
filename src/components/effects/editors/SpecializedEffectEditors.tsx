@@ -34,7 +34,7 @@ export const AutoPannerEditor: React.FC<VisualEffectEditorProps> = ({
           {WAVE_TYPES.map((w) => (
             <button key={w} onClick={() => onUpdateParameter('type', w)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
-                type === w ? 'bg-green-700/70 border-green-500 text-green-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-green-700'
+                type === w ? 'bg-accent-success/70 border-accent-success text-accent-success' : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-success'
               }`}>{w === 'sawtooth' ? 'saw' : w}</button>
           ))}
         </div>
@@ -221,7 +221,7 @@ export const ChebyshevEditor: React.FC<VisualEffectEditorProps> = ({
           {OVERSAMPLE_OPTS.map((o) => (
             <button key={o} onClick={() => onUpdateParameter('oversample', o)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                oversample === o ? 'bg-amber-700/70 border-amber-500 text-amber-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-amber-700'
+                oversample === o ? 'bg-accent-warning/70 border-accent-warning text-accent-warning' : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-warning'
               }`}>{o === 'none' ? 'Off' : o}</button>
           ))}
         </div>

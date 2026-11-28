@@ -276,10 +276,10 @@ export const ChannelManager: React.FC<ChannelManagerProps> = ({ isOpen, onClose 
                   onClick={(e) => toggleSelection(index, e.shiftKey)}
                   className={`flex items-center gap-2 px-3 py-2 rounded cursor-pointer transition-all ${
                     isSelected
-                      ? 'bg-blue-600/30 border border-blue-500'
+                      ? 'bg-accent-primary/30 border border-accent-primary'
                       : 'bg-dark-bgSecondary hover:bg-dark-bgSecondary/80 border border-transparent'
                   } ${isDragging ? 'opacity-50' : ''} ${
-                    isDropTarget ? 'border-dashed border-yellow-500' : ''
+                    isDropTarget ? 'border-dashed border-accent-warning' : ''
                   }`}
                 >
                   {/* Drag handle */}
@@ -287,7 +287,7 @@ export const ChannelManager: React.FC<ChannelManagerProps> = ({ isOpen, onClose 
 
                   {/* Selection checkbox */}
                   {isSelected ? (
-                    <CheckCircle2 size={16} className="text-blue-400" />
+                    <CheckCircle2 size={16} className="text-accent-primary" />
                   ) : (
                     <Circle size={16} className="text-text-secondary" />
                   )}
@@ -365,7 +365,7 @@ export const ChannelManager: React.FC<ChannelManagerProps> = ({ isOpen, onClose 
                       toggleChannelMute(index);
                     }}
                     className={`p-1 rounded ${
-                      channel.muted ? 'text-red-500 bg-red-500/20' : 'text-text-secondary hover:bg-dark-bg'
+                      channel.muted ? 'text-accent-error bg-accent-error/20' : 'text-text-secondary hover:bg-dark-bg'
                     }`}
                     title={channel.muted ? 'Unmute' : 'Mute'}
                   >
@@ -377,7 +377,7 @@ export const ChannelManager: React.FC<ChannelManagerProps> = ({ isOpen, onClose 
                       toggleChannelSolo(index);
                     }}
                     className={`p-1 rounded ${
-                      channel.solo ? 'text-yellow-500 bg-yellow-500/20' : 'text-text-secondary hover:bg-dark-bg'
+                      channel.solo ? 'text-accent-warning bg-accent-warning/20' : 'text-text-secondary hover:bg-dark-bg'
                     }`}
                     title={channel.solo ? 'Unsolo' : 'Solo'}
                   >

@@ -40,7 +40,7 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('routing', 0)}
             className={`px-4 py-1.5 text-xs font-medium rounded transition-colors ${
               Math.round(routing) === 0
-                ? 'bg-purple-600 text-text-primary'
+                ? 'bg-accent-secondary text-text-primary'
                 : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
@@ -50,7 +50,7 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('routing', 1)}
             className={`px-4 py-1.5 text-xs font-medium rounded transition-colors ${
               Math.round(routing) === 1
-                ? 'bg-purple-600 text-text-primary'
+                ? 'bg-accent-secondary text-text-primary'
                 : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
@@ -270,8 +270,8 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
               className={[
                 'flex-1 py-1.5 rounded-lg text-xs font-mono font-bold border transition-all',
                 activeRpm === p.rpm
-                  ? 'bg-amber-700/70 border-amber-500 text-amber-100'
-                  : 'bg-black/40 border-dark-border text-text-muted hover:border-amber-700 hover:text-amber-300',
+                  ? 'bg-accent-warning/70 border-accent-warning text-accent-warning'
+                  : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-warning hover:text-accent-warning',
               ].join(' ')}
             >
               {p.label}
@@ -309,8 +309,8 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
               className={[
                 'flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all',
                 activeCond === p.label
-                  ? 'bg-amber-700/70 border-amber-500 text-amber-100'
-                  : 'bg-black/40 border-dark-border text-text-muted hover:border-amber-700 hover:text-amber-300',
+                  ? 'bg-accent-warning/70 border-accent-warning text-accent-warning'
+                  : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-warning hover:text-accent-warning',
               ].join(' ')}
             >
               {p.label}
@@ -321,8 +321,8 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
         {/* Individual noise volume controls */}
         <div className="flex gap-3">
           {/* Hiss section */}
-          <div className="flex-1 rounded-lg bg-black/20 border border-amber-900/30 p-2">
-            <div className="text-xs font-mono text-amber-600/80 mb-2 text-center tracking-widest uppercase">Hiss</div>
+          <div className="flex-1 rounded-lg bg-black/20 border border-accent-warning/30 p-2">
+            <div className="text-xs font-mono text-accent-warning/80 mb-2 text-center tracking-widest uppercase">Hiss</div>
             <div className="flex justify-center">
               <Knob
                 value={hiss}
@@ -337,8 +337,8 @@ export const VinylNoiseEditor: React.FC<VisualEffectEditorProps> = ({
           </div>
 
           {/* Crackle section */}
-          <div className="flex-1 rounded-lg bg-black/20 border border-amber-900/30 p-2">
-            <div className="text-xs font-mono text-amber-600/80 mb-2 text-center tracking-widest uppercase">Crackle</div>
+          <div className="flex-1 rounded-lg bg-black/20 border border-accent-warning/30 p-2">
+            <div className="text-xs font-mono text-accent-warning/80 mb-2 text-center tracking-widest uppercase">Crackle</div>
             <div className="flex justify-around">
               <Knob
                 value={dust}
@@ -583,7 +583,7 @@ export const LeslieEditor: React.FC<VisualEffectEditorProps> = ({
               onClick={() => onUpdateParameter('speed', i === 0 ? 0.0 : i === 1 ? 0.5 : 1.0)}
               className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${
                 speedIdx === i
-                  ? 'bg-orange-600 text-text-primary'
+                  ? 'bg-accent-warning text-text-primary'
                   : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
               }`}
             >

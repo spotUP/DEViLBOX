@@ -316,9 +316,9 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
 
           {/* Performance Warning Indicator */}
           {neuralEffectCount >= 3 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <AlertTriangle size={14} className="text-yellow-500" />
-              <span className="text-xs text-yellow-500 font-medium">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-accent-warning/10 border border-accent-warning/30 rounded-lg">
+              <AlertTriangle size={14} className="text-accent-warning" />
+              <span className="text-xs text-accent-warning font-medium">
                 {neuralEffectCount} neural effects - High CPU usage
               </span>
             </div>

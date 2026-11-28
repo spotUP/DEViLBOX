@@ -95,9 +95,9 @@ export const FadeVolumeDialog: React.FC<FadeVolumeDialogProps> = ({
               <p>
                 <strong className="text-text-secondary">Fade Direction:</strong>{' '}
                 {startVol > endVol ? (
-                  <span className="text-red-400">Fade out (loud → quiet)</span>
+                  <span className="text-accent-error">Fade out (loud → quiet)</span>
                 ) : startVol < endVol ? (
-                  <span className="text-green-400">Fade in (quiet → loud)</span>
+                  <span className="text-accent-success">Fade in (quiet → loud)</span>
                 ) : (
                   <span className="text-text-secondary">No change (flat)</span>
                 )}
@@ -119,7 +119,7 @@ export const FadeVolumeDialog: React.FC<FadeVolumeDialogProps> = ({
           </button>
           <button
             onClick={handleConfirm}
-            className="px-4 py-2 text-sm font-medium text-text-primary bg-blue-600 rounded hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-text-primary bg-accent-primary rounded hover:bg-accent-primary/80 transition-colors"
           >
             Apply <span className="opacity-75">(Enter)</span>
           </button>

@@ -34,7 +34,7 @@ export const DistortionEditor: React.FC<VisualEffectEditorProps> = ({
           {OVERSAMPLE_OPTS.map((o) => (
             <button key={o} onClick={() => onUpdateParameter('oversample', o)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                oversample === o ? 'bg-red-700/70 border-red-500 text-red-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-red-700'
+                oversample === o ? 'bg-accent-error/70 border-accent-error text-accent-error' : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-error'
               }`}>{o === 'none' ? 'Off' : o}</button>
           ))}
         </div>
@@ -336,7 +336,7 @@ export const TremoloEditor: React.FC<VisualEffectEditorProps> = ({
           {WAVE_TYPES.map((w) => (
             <button key={w} onClick={() => onUpdateParameter('type', w)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
-                type === w ? 'bg-orange-700/70 border-orange-500 text-orange-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-orange-700'
+                type === w ? 'bg-accent-warning/70 border-accent-warning text-accent-warning' : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-warning'
               }`}>{w === 'sawtooth' ? 'saw' : w}</button>
           ))}
         </div>
@@ -399,7 +399,7 @@ export const VibratoEditor: React.FC<VisualEffectEditorProps> = ({
           {WAVE_TYPES.map((w) => (
             <button key={w} onClick={() => onUpdateParameter('type', w)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
-                type === w ? 'bg-teal-700/70 border-teal-500 text-teal-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-teal-700'
+                type === w ? 'bg-accent-primary/70 border-accent-primary text-accent-primary' : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-primary'
               }`}>{w === 'sawtooth' ? 'saw' : w}</button>
           ))}
         </div>

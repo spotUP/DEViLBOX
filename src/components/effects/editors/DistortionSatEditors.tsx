@@ -318,7 +318,7 @@ export const CabinetSimEditor: React.FC<VisualEffectEditorProps> = ({ effect, on
           {CAB_MODELS.map((label, i) => (
             <button key={i} onClick={() => onUpdateParameter('cabinet', i)}
               className={`px-2 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                Math.round(cabinet) === i ? 'bg-amber-800/70 border-amber-600 text-amber-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-amber-800'
+                Math.round(cabinet) === i ? 'bg-accent-warning/70 border-accent-warning text-accent-warning' : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-warning'
               }`}>{label}</button>
           ))}
         </div>

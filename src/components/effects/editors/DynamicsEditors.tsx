@@ -614,7 +614,7 @@ export const SidechainGateEditor: React.FC<VisualEffectEditorProps> = ({ effect,
             value={String(Math.round(sidechainSource))}
             onChange={(v) => onUpdateParameter('sidechainSource', Number(v))}
             options={sidechainKeyOptions(channelCount, channelNames)}
-            className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-cyan-500 focus:outline-none"
+            className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-accent-primary focus:outline-none"
           />
         </div>
         <div className="flex justify-around items-end">
@@ -667,7 +667,7 @@ export const SidechainLimiterEditor: React.FC<VisualEffectEditorProps> = ({ effe
             value={String(Math.round(sidechainSource))}
             onChange={(v) => onUpdateParameter('sidechainSource', Number(v))}
             options={sidechainKeyOptions(channelCount, channelNames)}
-            className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-cyan-500 focus:outline-none"
+            className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-accent-primary focus:outline-none"
           />
         </div>
         <div className="flex justify-around items-end">

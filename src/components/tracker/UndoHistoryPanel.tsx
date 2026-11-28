@@ -105,8 +105,8 @@ export const UndoHistoryPanel: React.FC<UndoHistoryPanelProps> = ({ isOpen, onCl
         )}
 
         {/* Current position marker */}
-        <div className="px-3 py-1 bg-blue-900/30 border-y border-blue-800/50">
-          <span className="text-[10px] text-blue-400 font-medium">Current State</span>
+        <div className="px-3 py-1 bg-accent-primary/30 border-y border-accent-primary/50">
+          <span className="text-[10px] text-accent-primary font-medium">Current State</span>
         </div>
 
         {/* Undo stack (past) */}

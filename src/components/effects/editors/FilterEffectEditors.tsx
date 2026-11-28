@@ -39,7 +39,7 @@ export const AutoFilterEditor: React.FC<VisualEffectEditorProps> = ({
           {WAVE_TYPES.map((w) => (
             <button key={w} onClick={() => onUpdateParameter('type', w)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all capitalize ${
-                type === w ? 'bg-yellow-700/70 border-yellow-500 text-yellow-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-yellow-700'
+                type === w ? 'bg-accent-warning/70 border-accent-warning text-accent-warning' : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-warning'
               }`}>{w === 'sawtooth' ? 'saw' : w}</button>
           ))}
         </div>
@@ -304,7 +304,7 @@ export const FilterEditor: React.FC<VisualEffectEditorProps> = ({
           {FILTER_TYPES.map((t) => (
             <button key={t} onClick={() => onUpdateParameter('type', t)}
               className={`px-2 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                type === t ? 'bg-orange-700/70 border-orange-500 text-orange-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-orange-700'
+                type === t ? 'bg-accent-warning/70 border-accent-warning text-accent-warning' : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-warning'
               }`}>{TYPE_SHORT[t] || t}</button>
           ))}
         </div>
@@ -312,7 +312,7 @@ export const FilterEditor: React.FC<VisualEffectEditorProps> = ({
           {ROLLOFFS.map((r) => (
             <button key={r} onClick={() => onUpdateParameter('rolloff', r)}
               className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all ${
-                rolloff === r ? 'bg-orange-700/70 border-orange-500 text-orange-100' : 'bg-black/40 border-dark-border text-text-muted hover:border-orange-700'
+                rolloff === r ? 'bg-accent-warning/70 border-accent-warning text-accent-warning' : 'bg-black/40 border-dark-border text-text-muted hover:border-accent-warning'
               }`}>{r}dB</button>
           ))}
         </div>
@@ -500,7 +500,7 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
             value={String(Math.round(sidechainSource))}
             onChange={(v) => onUpdateParameter('sidechainSource', Number(v))}
             options={sidechainKeyOptions(channelCount, channelNames)}
-            className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-emerald-500 focus:outline-none"
+            className="w-full bg-black/60 border border-dark-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:border-accent-success focus:outline-none"
           />
         </div>
         <div className="flex justify-around items-end">
@@ -618,7 +618,7 @@ export const MoogFilterEditor: React.FC<VisualEffectEditorProps> = ({
               onClick={() => onUpdateParameter('model', i)}
               className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${
                 Math.round(model) === i
-                  ? 'bg-amber-600 text-text-primary'
+                  ? 'bg-accent-warning text-text-primary'
                   : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
               }`}
             >
@@ -636,7 +636,7 @@ export const MoogFilterEditor: React.FC<VisualEffectEditorProps> = ({
                   onClick={() => onUpdateParameter('filterMode', i)}
                   className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${
                     Math.round(filterMode) === i
-                      ? 'bg-amber-600 text-text-primary'
+                      ? 'bg-accent-warning text-text-primary'
                       : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
                   }`}
                 >
